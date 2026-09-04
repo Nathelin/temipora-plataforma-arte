@@ -22,9 +22,10 @@ public class JwtUtils {
     @Value("${jwt.time.expiration}")
     private String vencimientoSesion; // TODO: ver cuánto tiempo de sesión permito...
 
-    public String generarTokenAcceso(String nombreUsuario){
+    public String generarTokenAcceso(String nombreUsuario, String rol){
         return Jwts.builder()
             .subject(nombreUsuario)
+            .claim("rol", rol)
             .issuedAt(new Date(System.currentTimeMillis()))
             .expiration(new Date(System.currentTimeMillis() + Long.parseLong(vencimientoSesion)))
             .signWith(obtenerFirma())
@@ -51,6 +52,10 @@ public class JwtUtils {
 
     public String obtenerNombreUsuarioToken(String token) {
         return obtenerUnClaim(token, claims -> claims.getSubject());
+    }
+
+    public String obtenerRolToken(String token) {
+        return obtenerUnClaim(token, claims -> claims.get("rol", String.class));
     }
 
 
