@@ -21,6 +21,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.temipora.backend_springboot.config.filters.JwtAuthenticationFilter;
 import com.temipora.backend_springboot.config.filters.JwtAuthorizationFilter;
+import com.temipora.backend_springboot.servicios.UsuarioService;
 
 import java.util.List;
 
@@ -31,17 +32,20 @@ public class SecurityConfig {
 
     private final JwtUtils jwtUtils;
     private final UserDetailsService userDetailsService;
+    private final UsuarioService usuarioService;
 
-    public SecurityConfig(JwtUtils jwtUtils, UserDetailsService userDetailsService) {
+    public SecurityConfig(JwtUtils jwtUtils, UserDetailsService userDetailsService,
+            UsuarioService usuarioService) {
         this.jwtUtils = jwtUtils;
         this.userDetailsService = userDetailsService;
+        this.usuarioService = usuarioService;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
             AuthenticationManager authenticationManager) throws Exception {
 
-        JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtUtils);
+        JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtUtils, usuarioService);
         jwtAuthenticationFilter.setFilterProcessesUrl("/api/auth/login");
         jwtAuthenticationFilter.setAuthenticationManager(authenticationManager);
 
@@ -56,6 +60,9 @@ public class SecurityConfig {
                     "/",
                     "/api/auth/login",
                     "/api/auth/registrarse",
+                    "/api/upload",
+                    "/api/checkNombreUsuario",
+                    "/uploads/**",
                     "/checkNombreUsuario",
                     "/TOS",
                     "/css/**",
