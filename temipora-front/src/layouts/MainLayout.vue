@@ -120,7 +120,7 @@ function irAInicio() {
                 </button>
                 <button
                   class="w-full text-left px-4 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
-                  @click="router.push({ name: 'configuracion' })"
+                  @click="router.push({ name: 'configuracion-perfil' })"
                 >
                   Configuración
                 </button>
