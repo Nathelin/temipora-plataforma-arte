@@ -32,18 +32,16 @@ public class SecurityConfig {
 
     private final JwtUtils jwtUtils;
     private final UserDetailsService userDetailsService;
-    private final UsuarioService usuarioService;
 
-    public SecurityConfig(JwtUtils jwtUtils, UserDetailsService userDetailsService,
-            UsuarioService usuarioService) {
+    public SecurityConfig(JwtUtils jwtUtils, UserDetailsService userDetailsService) {
         this.jwtUtils = jwtUtils;
         this.userDetailsService = userDetailsService;
-        this.usuarioService = usuarioService;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
-            AuthenticationManager authenticationManager) throws Exception {
+            AuthenticationManager authenticationManager,
+            UsuarioService usuarioService) throws Exception {
 
         JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtUtils, usuarioService);
         jwtAuthenticationFilter.setFilterProcessesUrl("/api/auth/login");
@@ -63,7 +61,6 @@ public class SecurityConfig {
                     "/api/upload",
                     "/api/checkNombreUsuario",
                     "/uploads/**",
-                    "/checkNombreUsuario",
                     "/TOS",
                     "/css/**",
                     "/js/**",

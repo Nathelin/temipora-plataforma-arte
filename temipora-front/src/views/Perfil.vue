@@ -32,10 +32,13 @@ async function cargarPerfil() {
     const res = await api.get(`/perfil/${nombreUsuario}`)
     const data = res.data
 
+    const portfolioRes = data.rol === 'ARTISTA'
+      ? await api.get(`/portfolio/${data.nombreUsuario}`)
+      : { data: [] }
+
     perfil.value = {
       ...data,
-      // placeholders
-      portfolio: [],
+      portfolio: portfolioRes.data,
       servicios: [],
       productos: [],
       pedidos: [],
@@ -61,6 +64,79 @@ const esDuenio = computed(() => {
 
 function fotoInicial(nombre) {
   return (nombre || '?').charAt(0).toUpperCase()
+}
+
+const portfolioModalAbierto = ref(false)
+const imagenSeleccionada = ref(null)
+const guardandoImagen = ref(false)
+const errorPortfolio = ref('')
+const tituloImagen = ref('')
+const descripcionImagen = ref('')
+const medioImagen = ref('TRADICIONAL')
+const materialesImagen = ref('')
+const contenidoSensibleImagen = ref('')
+const archivoImagen = ref(null)
+const previewImagen = ref('')
+
+function abrirAltaImagen() {
+  tituloImagen.value = ''
+  descripcionImagen.value = ''
+  medioImagen.value = 'TRADICIONAL'
+  materialesImagen.value = ''
+  contenidoSensibleImagen.value = ''
+  archivoImagen.value = null
+  previewImagen.value = ''
+  errorPortfolio.value = ''
+  portfolioModalAbierto.value = true
+}
+
+function cerrarAltaImagen() {
+  portfolioModalAbierto.value = false
+}
+
+function onImagenPortfolioChange(event) {
+  const archivo = event.target.files[0] || null
+  if (archivo && !esImagenPermitida(archivo)) {
+    archivoImagen.value = null
+    previewImagen.value = ''
+    errorPortfolio.value = 'El formato de la imagen es inválido.'
+    event.target.value = ''
+    return
+  }
+
+  errorPortfolio.value = ''
+  archivoImagen.value = archivo
+  previewImagen.value = archivo ? URL.createObjectURL(archivo) : ''
+}
+
+function abrirDetalleImagen(imagen) {
+  imagenSeleccionada.value = imagen
+}
+
+function cerrarDetalleImagen() {
+  imagenSeleccionada.value = null
+}
+
+async function guardarImagenPortfolio() {
+  guardandoImagen.value = true
+  errorPortfolio.value = ''
+  try {
+    const url = await subirArchivo(archivoImagen.value)
+    const res = await api.post(`/portfolio/usuarios/${perfil.value.idUsuario}/imagenes`, {
+      titulo: tituloImagen.value,
+      descripcion: descripcionImagen.value,
+      url,
+      medio: medioImagen.value,
+      materiales: materialesImagen.value,
+      contenidoSensible: contenidoSensibleImagen.value || null,
+    })
+    perfil.value.portfolio.unshift(res.data)
+    cerrarAltaImagen()
+  } catch (e) {
+    errorPortfolio.value = e.response?.data?.message || 'No se pudo guardar la imagen.'
+  } finally {
+    guardandoImagen.value = false
+  }
 }
 
 // --- Edición de perfil ---
@@ -191,7 +267,7 @@ async function guardarPerfil() {
 
     <div class="max-w-screen-2xl mx-auto px-4 sm:px-8">
       <div class="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 pb-6 border-b border-rosa pt-2 sm:pt-4">
-        <div class="relative w-40 sm:w-48 h-10 sm:h-12 shrink-0 z-20">
+        <div class="relative w-40 sm:w-48 h-10 sm:h-12 shrink-0 z-10">
           <div class="absolute bottom-0 left-0 w-40 h-40 sm:w-48 sm:h-48 rounded-full overflow-hidden border-4 border-blanco bg-coral/20 shadow-md">
             <img
               v-if="perfil.urlFotoPerfil"
@@ -262,14 +338,34 @@ async function guardarPerfil() {
             </button>
           </div>
 
-          <div v-if="tabActiva === 'portfolio'" class="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            <div v-for="obra in perfil.portfolio" :key="obra.id" class="rounded-xl overflow-hidden bg-rosa/20 aspect-square flex flex-col">
-              <div class="flex-1 bg-coral/20">
-                <img v-if="obra.url" :src="obra.url" alt="" class="w-full h-full object-cover" />
+            <div v-if="tabActiva === 'portfolio'" class="mt-6">
+              <div class="flex items-center justify-between gap-4 mb-4">
+                <p v-if="!perfil.portfolio.length" class="mr-auto text-sm text-cafe/60">
+                  Este portfolio todavía no tiene imágenes.
+                </p>
+                <button
+                  v-if="esDuenio"
+                  class="ml-auto px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
+                  @click="abrirAltaImagen"
+                >
+                  Subir imagen
+                </button>
               </div>
-              <div class="p-3 text-sm text-cafe">{{ obra.titulo }}</div>
+
+              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <button
+                  v-for="obra in perfil.portfolio"
+                  :key="obra.idImagen"
+                  class="rounded-xl overflow-hidden bg-rosa/20 aspect-square flex flex-col text-left hover:ring-2 hover:ring-coral transition"
+                  @click="abrirDetalleImagen(obra)"
+                >
+                  <div class="min-h-0 flex-1 bg-coral/20">
+                    <img v-if="obra.url" :src="obra.url" :alt="obra.titulo" class="w-full h-full object-cover" />
+                  </div>
+                  <div class="shrink-0 bg-rosa/20 p-3 text-sm text-cafe truncate">{{ obra.titulo }}</div>
+                </button>
+              </div>
             </div>
-          </div>
 
           <div v-if="tabActiva === 'servicios'" class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div v-for="s in perfil.servicios" :key="s.id" class="bg-blanco border border-rosa rounded-xl p-5">
@@ -307,6 +403,93 @@ async function guardarPerfil() {
             </div>
           </div>
         </template>
+      </div>
+    </div>
+
+    <!-- Modal alta de imagen de portfolio -->
+    <div
+      v-if="portfolioModalAbierto"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-granate/40 px-4"
+      @click.self="cerrarAltaImagen"
+    >
+      <div class="w-full max-w-5xl bg-blanco rounded-2xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+        <h2 class="text-lg text-granate mb-4">Subir imagen a portfolio</h2>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div class="space-y-5">
+            <div>
+              <label class="block text-sm text-cafe mb-2">Título <span class="text-rojizo">*</span></label>
+              <input v-model="tituloImagen" type="text" maxlength="100" class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
+            </div>
+
+            <div>
+              <label class="block text-sm text-cafe mb-2">Descripción <span class="text-rojizo">*</span></label>
+              <textarea v-model="descripcionImagen" rows="5" maxlength="1000" class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"></textarea>
+            </div>
+
+            <div>
+              <label class="block text-sm text-cafe mb-2">Medio <span class="text-rojizo">*</span></label>
+              <select v-model="medioImagen" class="block w-full rounded-lg border-0 py-2.5 px-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
+                <option value="TRADICIONAL">Tradicional</option>
+                <option value="DIGITAL">Digital</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm text-cafe mb-2">Materiales</label>
+              <input v-model="materialesImagen" type="text" maxlength="500" placeholder="Ej.: óleo sobre lienzo" class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
+            </div>
+
+            <div>
+              <label class="block text-sm text-cafe mb-2">Contenido sensible</label>
+              <select v-model="contenidoSensibleImagen" class="block w-full rounded-lg border-0 py-2.5 px-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
+                <option value="">Sin contenido sensible</option>
+                <option value="VIOLENCIA">Violencia</option>
+                <option value="DESNUDOS">Desnudos</option>
+                <option value="GENERAL">Contenido sensible general</option>
+              </select>
+            </div>
+
+            <p v-if="errorPortfolio" class="text-rojizo text-sm">{{ errorPortfolio }}</p>
+          </div>
+
+          <div class="flex flex-col">
+            <label class="block text-sm text-cafe mb-2">Imagen <span class="text-rojizo">*</span></label>
+            <div class="flex-1 min-h-72 rounded-xl border border-dashed border-rosa bg-rosa/10 flex items-center justify-center overflow-hidden">
+              <img v-if="previewImagen" :src="previewImagen" alt="Vista previa" class="w-full h-full max-h-[28rem] object-contain" />
+              <p v-else class="px-6 text-center text-sm text-cafe/50">Selecciona una imagen para ver la vista previa.</p>
+            </div>
+            <input id="portfolio-imagen" type="file" :accept="acceptImagenes" class="sr-only" @change="onImagenPortfolioChange" />
+            <label for="portfolio-imagen" class="mt-4 inline-flex cursor-pointer justify-center rounded-md border border-coral bg-coral/10 px-4 py-2 text-sm text-granate hover:bg-coral/20 transition">
+              {{ archivoImagen ? 'Cambiar imagen' : 'Seleccionar imagen' }}
+            </label>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 mt-6">
+          <button class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition" @click="cerrarAltaImagen">Cancelar</button>
+          <button :disabled="guardandoImagen || !archivoImagen" class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm" @click="guardarImagenPortfolio">
+            {{ guardandoImagen ? 'Guardando...' : 'Guardar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal detalle de imagen -->
+    <div v-if="imagenSeleccionada" class="fixed inset-0 z-50 flex items-center justify-center bg-granate/40 px-4" @click.self="cerrarDetalleImagen">
+      <div class="w-full max-w-2xl bg-blanco rounded-2xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+        <img :src="imagenSeleccionada.url" :alt="imagenSeleccionada.titulo" class="w-full max-h-[55vh] object-contain rounded-lg bg-rosa/20" />
+        <h2 class="text-xl text-granate mt-5">{{ imagenSeleccionada.titulo }}</h2>
+        <p class="text-sm text-cafe mt-2">{{ imagenSeleccionada.descripcion }}</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4 text-sm text-cafe/70">
+          <p><span class="text-rojizo">Medio:</span> {{ imagenSeleccionada.medio }}</p>
+          <p><span class="text-rojizo">Materiales:</span> {{ imagenSeleccionada.materiales || 'No especificados' }}</p>
+          <p><span class="text-rojizo">Subida:</span> {{ new Date(imagenSeleccionada.fechaSubida).toLocaleString() }}</p>
+          <p><span class="text-rojizo">Contenido sensible:</span> {{ imagenSeleccionada.contenidoSensible || 'No' }}</p>
+        </div>
+        <div class="flex justify-end mt-6">
+          <button class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition" @click="cerrarDetalleImagen">Cerrar</button>
+        </div>
       </div>
     </div>
 

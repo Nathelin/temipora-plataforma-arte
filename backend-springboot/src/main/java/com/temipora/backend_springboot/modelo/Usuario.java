@@ -42,6 +42,9 @@ public class Usuario {
     @Pattern(regexp = "^[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9]+$")
     private String nombreUsuario;
 
+    @Size(min = 1, max = 25, message = "El nombre de usuario ingresado debe tener entre 3 y 25 caracteres")
+    private String nombreDisplay;
+
     private String biografia;
 
     @NotBlank(message = "Debe definir una contraseña.")
