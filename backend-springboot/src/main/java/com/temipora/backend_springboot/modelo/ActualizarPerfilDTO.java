@@ -17,4 +17,13 @@ public class ActualizarPerfilDTO {
     private String urlFotoPerfil;
 
     private String urlBanner;
+
+    @Size(max = 15, message = "El sexo no puede superar los 15 caracteres")
+    private String sexo;
+
+    @Size(max = 20, message = "El teléfono no puede superar los 20 caracteres")
+    private String telefono;
+
+    @Size(max = 60, message = "El país no puede superar los 60 caracteres")
+    private String pais;
 }

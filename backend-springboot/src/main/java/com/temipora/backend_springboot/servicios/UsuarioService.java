@@ -95,6 +95,15 @@ public class UsuarioService{
         if (dto.getUrlBanner() != null) {
             usuario.setUrlBanner(dto.getUrlBanner());
         }
+        if (dto.getSexo() != null) {
+            usuario.setSexo(dto.getSexo());
+        }
+        if (dto.getTelefono() != null) {
+            usuario.setTelefono(dto.getTelefono());
+        }
+        if (dto.getPais() != null) {
+            usuario.setPais(dto.getPais());
+        }
 
         return UsuarioDTO.desdeUsuario(usuarioRepository.save(usuario));
     }

@@ -1,10 +1,11 @@
 <script setup>
-import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
-import { acceptImagenes, esImagenPermitida } from '../servicios/archivos'
+import { acceptImagenes } from '../servicios/archivos'
 
 const route = useRoute()
+const router = useRouter()
 
 const perfil = ref({
   idUsuario: null,
@@ -50,7 +51,7 @@ async function cargarPerfil() {
   }
 }
 
-cargarPerfil()
+watch(() => route.params.nombreUsuario, cargarPerfil, { immediate: true })
 
 const esArtista = computed(() => perfil.value.rol === 'ARTISTA')
 const tabActiva = ref('portfolio')
@@ -139,63 +140,6 @@ async function guardarImagenPortfolio() {
   }
 }
 
-// --- Edición de perfil ---
-const modalAbierto = ref(false)
-const guardando = ref(false)
-
-const editNombreDisplay = ref('')
-const editBiografia = ref('')
-const editFoto = ref(null)
-const editBanner = ref(null)
-const previewFoto = ref('')
-const previewBanner = ref('')
-const errorEdicion = ref('')
-
-function abrirModal() {
-  editNombreDisplay.value = perfil.value.nombreDisplay || ''
-  editBiografia.value = perfil.value.biografia || ''
-  editFoto.value = null
-  editBanner.value = null
-  previewFoto.value = ''
-  previewBanner.value = ''
-  errorEdicion.value = ''
-  modalAbierto.value = true
-}
-
-function cerrarModal() {
-  modalAbierto.value = false
-}
-
-function onFotoChange(e) {
-  const f = e.target.files[0] || null
-  if (f && !esImagenPermitida(f)) {
-    editFoto.value = null
-    previewFoto.value = ''
-    errorEdicion.value = 'El formato es inválido.'
-    e.target.value = ''
-    return
-  }
-
-  errorEdicion.value = ''
-  editFoto.value = f
-  previewFoto.value = f ? URL.createObjectURL(f) : ''
-}
-
-function onBannerChange(e) {
-  const f = e.target.files[0] || null
-  if (f && !esImagenPermitida(f)) {
-    editBanner.value = null
-    previewBanner.value = ''
-    errorEdicion.value = 'El formato es inválido.'
-    e.target.value = ''
-    return
-  }
-
-  errorEdicion.value = ''
-  editBanner.value = f
-  previewBanner.value = f ? URL.createObjectURL(f) : ''
-}
-
 async function subirArchivo(archivo) {
   const form = new FormData()
   form.append('archivo', archivo)
@@ -203,45 +147,8 @@ async function subirArchivo(archivo) {
   return res.data.url
 }
 
-async function guardarPerfil() {
-  guardando.value = true
-  errorEdicion.value = ''
-  try {
-    let urlFoto = null
-    let urlBanner = null
-
-    if (editFoto.value) {
-      urlFoto = await subirArchivo(editFoto.value)
-    }
-    if (editBanner.value) {
-      urlBanner = await subirArchivo(editBanner.value)
-    }
-
-    const payload = {
-      nombreDisplay: editNombreDisplay.value,
-      biografia: editBiografia.value,
-      ...(urlFoto ? { urlFotoPerfil: urlFoto } : {}),
-      ...(urlBanner ? { urlBanner } : {}),
-    }
-
-    const res = await api.put(`/usuarios/${perfil.value.idUsuario}/perfil`, payload)
-
-    perfil.value.nombreDisplay = res.data.nombreDisplay
-    perfil.value.biografia = res.data.biografia
-    perfil.value.urlFotoPerfil = res.data.urlFotoPerfil
-    perfil.value.urlBanner = res.data.urlBanner
-
-    localStorage.setItem('urlFotoPerfil', res.data.urlFotoPerfil || '')
-    window.dispatchEvent(new CustomEvent('perfil-foto-actualizada', {
-      detail: { url: res.data.urlFotoPerfil || '' },
-    }))
-
-    modalAbierto.value = false
-  } catch (e) {
-    errorEdicion.value = e.response?.data?.message || 'No se pudo guardar el perfil. Intentalo de nuevo.'
-  } finally {
-    guardando.value = false
-  }
+function irAConfiguracion(seccion = 'perfil') {
+  router.push({ name: `configuracion-${seccion}` })
 }
 </script>
 
@@ -298,13 +205,14 @@ async function guardarPerfil() {
         <div class="flex items-center gap-3 shrink-0 mt-4 sm:mt-0 pb-1 sm:pb-3">
           <button v-if="esDuenio"
             class="px-4 py-2 rounded-md text-sm text-granate border border-rosa bg-blanco hover:bg-rosa/20 transition"
+            @click="irAConfiguracion('privacidad')"
           >
             Preferencias
           </button>
           <button
             v-if="esDuenio"
             class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
-            @click="abrirModal"
+            @click="irAConfiguracion('perfil')"
           >
             Editar perfil
           </button>
@@ -493,93 +401,6 @@ async function guardarPerfil() {
       </div>
     </div>
 
-    <!-- Modal editar perfil -->
-    <div
-      v-if="modalAbierto"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-granate/40 px-4"
-      @click.self="cerrarModal"
-    >
-      <div class="w-full max-w-lg bg-blanco rounded-2xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-lg text-granate mb-4">Editar perfil</h2>
-
-        <div class="space-y-5">
-          <div>
-            <label class="block text-sm text-cafe mb-2">Nombre de display</label>
-            <input
-              v-model="editNombreDisplay"
-              type="text"
-              maxlength="25"
-              class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm text-cafe mb-2">Biografía</label>
-            <textarea
-              v-model="editBiografia"
-              rows="4"
-              maxlength="500"
-              class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"
-            ></textarea>
-            <p class="text-right text-xs text-cafe/50 mt-1">{{ editBiografia.length }}/500</p>
-          </div>
-
-          <div>
-            <label class="block text-sm text-cafe mb-2">Foto de perfil</label>
-            <div class="flex items-center gap-4">
-              <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-rosa bg-rosa/20 shrink-0">
-                <img v-if="previewFoto" :src="previewFoto" alt="" class="w-full h-full object-cover" />
-                <img v-else-if="perfil.urlFotoPerfil" :src="perfil.urlFotoPerfil" alt="" class="w-full h-full object-cover" />
-                <span v-else class="w-full h-full flex items-center justify-center text-granate">{{ fotoInicial(perfil.nombreUsuario) }}</span>
-              </div>
-              <div>
-                <input id="foto-perfil" type="file" :accept="acceptImagenes" @change="onFotoChange" class="sr-only" />
-                <label
-                  for="foto-perfil"
-                  class="inline-flex cursor-pointer items-center rounded-md border border-coral bg-coral/10 px-4 py-2 text-sm font-medium text-granate transition hover:bg-coral/20 focus-within:outline-none focus-within:ring-2 focus-within:ring-coral focus-within:ring-offset-2"
-                >
-                  {{ editFoto ? 'Foto seleccionada' : 'Cambiar foto' }}
-                </label>
-                <p class="mt-1 text-xs text-cafe/60">JPG, PNG o WEBP</p>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label class="block text-sm text-cafe mb-2">Banner</label>
-            <div v-if="previewBanner" class="mb-2 w-full h-24 rounded-lg overflow-hidden bg-rosa/20">
-              <img :src="previewBanner" alt="" class="w-full h-full object-cover" />
-            </div>
-            <input id="banner-perfil" type="file" :accept="acceptImagenes" @change="onBannerChange" class="sr-only" />
-            <label
-              for="banner-perfil"
-              class="inline-flex cursor-pointer items-center rounded-md border border-coral bg-coral/10 px-4 py-2 text-sm font-medium text-granate transition hover:bg-coral/20 focus-within:outline-none focus-within:ring-2 focus-within:ring-coral focus-within:ring-offset-2"
-            >
-              {{ editBanner ? 'Banner seleccionado' : 'Cambiar banner' }}
-            </label>
-            <p class="mt-1 text-xs text-cafe/60">JPG, PNG o WEBP</p>
-          </div>
-
-          <p v-if="errorEdicion" class="text-rojizo text-sm">{{ errorEdicion }}</p>
-        </div>
-
-        <div class="flex items-center justify-end gap-3 mt-6">
-          <button
-            class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition"
-            @click="cerrarModal"
-          >
-            Cancelar
-          </button>
-          <button
-            :disabled="guardando"
-            class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
-            @click="guardarPerfil"
-          >
-            {{ guardando ? 'Guardando...' : 'Guardar' }}
-          </button>
-        </div>
-      </div>
-    </div>
     </template>
   </div>
 </template>
