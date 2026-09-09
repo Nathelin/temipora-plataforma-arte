@@ -13,6 +13,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import com.temipora.backend_springboot.config.JwtUtils;
 import com.temipora.backend_springboot.modelo.LoginRequest;
+import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.servicios.UsuarioService;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -23,9 +25,11 @@ import tools.jackson.databind.ObjectMapper;
 public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilter {
 
     private JwtUtils jwtUtils;
+    private UsuarioService usuarioService;
 
-    public JwtAuthenticationFilter(JwtUtils jwtUtils) {
+    public JwtAuthenticationFilter(JwtUtils jwtUtils, UsuarioService usuarioService) {
         this.jwtUtils = jwtUtils;
+        this.usuarioService = usuarioService;
     }
 
     @Override
@@ -61,6 +65,10 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
             .map(a -> a.getAuthority().replace("ROLE_", ""))
             .orElse("");
 
+        usuarioService.actualizarUltimaConexion(usuario.getUsername());
+
+        Usuario entidad = usuarioService.getByNombreUsuario(usuario.getUsername());
+
         String token = jwtUtils.generarTokenAcceso(usuario.getUsername(), rol);
 
         Map<String, Object> httpResponse = new HashMap<>();
@@ -68,6 +76,8 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         httpResponse.put("Message", "Autenticación realizada correctamente");
         httpResponse.put("NombreUsuario", usuario.getUsername());
         httpResponse.put("rol", rol);
+        httpResponse.put("idUsuario", entidad.getIdUsuario());
+        httpResponse.put("urlFotoPerfil", entidad.getUrlFotoPerfil());
 
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setStatus(HttpServletResponse.SC_OK);
