@@ -3,6 +3,7 @@ package com.temipora.backend_springboot.config;
 import java.time.LocalDateTime;
 
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,7 @@ import com.temipora.backend_springboot.repositorios.RolRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 @Component
+@Order(2)
 public class AdminSeeder implements CommandLineRunner {
 
     private final UsuarioRepository usuarioRepository;
