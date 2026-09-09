@@ -228,14 +228,14 @@ onMounted(cargarUsuarios)
                       </div>
                     </div>
 
-                    <div v-if="u.urlBanner" class="mt-4">
+                    <!--div v-if="u.urlBanner" class="mt-4">
                       <span class="text-cafe/50 text-sm">Banner:</span>
                       <img
                         :src="u.urlBanner"
                         alt="banner"
                         class="mt-2 w-full h-36 object-cover rounded-2xl border border-rosa"
                       />
-                    </div>
+                    </div-->
                   </td>
                 </tr>
               </template>
