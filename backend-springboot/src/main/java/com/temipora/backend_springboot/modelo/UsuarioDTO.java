@@ -33,6 +33,7 @@ public class UsuarioDTO {
     private String urlFotoPerfil;
     private String urlFotoPerfilMiniatura;
     private String urlBanner;
+    private EPreferenciaContenidoSensible preferenciaSensible;
     private String rol;
 
     public static UsuarioDTO desdeUsuario(Usuario usuario) {
@@ -56,6 +57,7 @@ public class UsuarioDTO {
             .urlFotoPerfil(usuario.getUrlFotoPerfil())
             .urlFotoPerfilMiniatura(usuario.getUrlFotoPerfilMiniatura())
             .urlBanner(usuario.getUrlBanner())
+            .preferenciaSensible(usuario.getPreferenciaSensible())
             .rol(usuario.getRol() != null ? usuario.getRol().getNombre().name() : null)
             .build();
     }

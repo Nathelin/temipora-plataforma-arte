@@ -2,15 +2,22 @@ package com.temipora.backend_springboot.servicios;
 
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
+
+import jakarta.persistence.criteria.Predicate;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
+import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
 import com.temipora.backend_springboot.modelo.RegistroUsuarioDTO;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
@@ -20,7 +27,7 @@ import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 @Service
 @Validated
-public class UsuarioService{
+public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
@@ -43,22 +50,23 @@ public class UsuarioService{
         }
 
         Rol rol = rolRepository
-            .findByNombre(dto.getRol())
-            .orElseThrow(() -> new IllegalStateException("El rol " + dto.getRol() + " no existe"));
+                .findByNombre(dto.getRol())
+                .orElseThrow(() -> new IllegalStateException("El rol " + dto.getRol() + " no existe"));
 
         Usuario usuario = Usuario.builder()
-            .nombreUsuario(dto.getNombreUsuario())
-            .nombre(dto.getNombre())
-            .apellido(dto.getApellido())
-            .correo(dto.getCorreo())
-            .contrasenia(passwordEncoder.encode(dto.getContrasenia()))
-            .fechaNacimiento(dto.getFechaNacimiento())
-            .biografia(dto.getBiografia())
-            .urlFotoPerfil(dto.getUrlFotoPerfil())
-            .estadoCuenta(true)
-            .fechaCreacion(LocalDateTime.now())
-            .rol(rol)
-            .build();
+                .nombreUsuario(dto.getNombreUsuario())
+                .nombre(dto.getNombre())
+                .apellido(dto.getApellido())
+                .correo(dto.getCorreo())
+                .contrasenia(passwordEncoder.encode(dto.getContrasenia()))
+                .fechaNacimiento(dto.getFechaNacimiento())
+                .biografia(dto.getBiografia())
+                .urlFotoPerfil(dto.getUrlFotoPerfil())
+                .estadoCuenta(true)
+                .preferenciaSensible(EPreferenciaContenidoSensible.ADVERTIR)
+                .fechaCreacion(LocalDateTime.now())
+                .rol(rol)
+                .build();
 
         return usuarioRepository.save(usuario);
     }
@@ -68,8 +76,8 @@ public class UsuarioService{
     }
 
     public Usuario getByNombreUsuario(String nombreUsuario) {
-    return usuarioRepository.findByNombreUsuarioIgnoreCase(nombreUsuario)
-        .orElseThrow(() -> new NoSuchElementException(nombreUsuario));
+        return usuarioRepository.findByNombreUsuarioIgnoreCase(nombreUsuario)
+                .orElseThrow(() -> new NoSuchElementException(nombreUsuario));
     }
 
     public void actualizarUltimaConexion(String nombreUsuario) {
@@ -81,7 +89,7 @@ public class UsuarioService{
 
     public UsuarioDTO actualizarPerfil(Long idUsuario, ActualizarPerfilDTO dto) {
         Usuario usuario = usuarioRepository.findByIdUsuario(idUsuario)
-            .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idUsuario));
+                .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idUsuario));
 
         if (dto.getNombreDisplay() != null) {
             usuario.setNombreDisplay(dto.getNombreDisplay());
@@ -110,7 +118,35 @@ public class UsuarioService{
 
     public List<UsuarioDTO> obtenerTodosLosUsuarios() {
         return usuarioRepository.findAll().stream()
-            .map(UsuarioDTO::desdeUsuario)
-            .toList();
+                .map(UsuarioDTO::desdeUsuario)
+                .toList();
+    }
+
+    public Page<UsuarioDTO> obtenerUsuariosPaginados(String nombreUsuario, String correo, Boolean estadoCuenta, ERol rol, Pageable pageable) {
+        Specification<Usuario> filtros = (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (nombreUsuario != null && !nombreUsuario.isBlank()) {
+                predicates.add(criteriaBuilder.like(
+                        criteriaBuilder.lower(root.get("nombreUsuario")),
+                        "%" + nombreUsuario.trim().toLowerCase() + "%"));
+            }
+            if (correo != null && !correo.isBlank()) {
+                predicates.add(criteriaBuilder.like(
+                        criteriaBuilder.lower(root.get("correo")),
+                        "%" + correo.trim().toLowerCase() + "%"));
+            }
+            if (estadoCuenta != null) {
+                predicates.add(criteriaBuilder.equal(root.get("estadoCuenta"), estadoCuenta));
+            }
+            if (rol != null) {
+                predicates.add(criteriaBuilder.equal(root.get("rol").get("nombre"), rol));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return usuarioRepository.findAll(filtros, pageable)
+                .map(UsuarioDTO::desdeUsuario);
     }
 }
