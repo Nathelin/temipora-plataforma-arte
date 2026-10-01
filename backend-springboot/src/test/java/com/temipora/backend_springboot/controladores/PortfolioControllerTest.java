@@ -1,0 +1,223 @@
+package com.temipora.backend_springboot.controladores;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import com.temipora.backend_springboot.config.JwtUtils;
+import com.temipora.backend_springboot.config.SecurityConfig;
+import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.ImagenPortfolioDTO;
+import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.UsuarioRepository;
+import com.temipora.backend_springboot.servicios.PortfolioService;
+import com.temipora.backend_springboot.servicios.UsuarioService;
+
+@WebMvcTest(controllers = PortfolioController.class)
+@Import({ SecurityConfig.class, JwtUtils.class })
+@TestPropertySource(properties = {
+        "jwt.secret=dGVtaXBvcmEtand0LXRlc3Qtc2VjcmV0LTMyYnl0ZXMtb2sh",
+        "jwt.time.expiration=3600000",
+        "storage.local.dir=target/test-uploads"
+})
+class PortfolioControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private JwtUtils jwtUtils;
+
+    @MockitoBean
+    private PortfolioService portfolioService;
+
+    @MockitoBean
+    private UsuarioService usuarioService;
+
+    @MockitoBean
+    private UsuarioRepository usuarioRepository;
+
+    @MockitoBean
+    private UserDetailsService userDetailsService;
+
+    // ---------------------------------------------------------------
+    // GET /api/portfolio/{nombreUsuario}
+    // ---------------------------------------------------------------
+
+    @Test
+    void listar_sinToken_devuelve401YNoLlamaAlServicio() throws Exception {
+        mockMvc.perform(get("/api/portfolio/artista777"))
+                .andExpect(status().isUnauthorized());
+
+        verify(portfolioService, never()).listar(any());
+    }
+
+    @Test
+    void listar_conTokenValido_devuelve200ConImagenes() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+        when(portfolioService.listar("artista777"))
+                .thenReturn(List.of(imagenDe("Obra 1")));
+
+        mockMvc.perform(get("/api/portfolio/artista777")
+                .header("Authorization", "Bearer " + token("cliente42", ERol.CLIENTE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].titulo").value("Obra 1"));
+    }
+
+    // ---------------------------------------------------------------
+    // GET /api/portfolio/{nombreUsuario}/paginado
+    // ---------------------------------------------------------------
+
+    @Test
+    void listarPaginado_visitanteResuelto_pasaSuIdComoViewer() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("cliente42"))
+                .thenReturn(Optional.of(Usuario.builder().idUsuario(55L).build()));
+        when(portfolioService.listarParaVisorPorNombreUsuario(
+                eq("artista777"), eq(55L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(imagenDe("Obra 1")), PageRequest.of(0, 10), 1));
+
+        mockMvc.perform(get("/api/portfolio/artista777/paginado")
+                .header("Authorization", "Bearer " + token("cliente42", ERol.CLIENTE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    void listarPaginado_visitanteNoRegistrado_pasaViewerNulo() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("cliente42"))
+                .thenReturn(Optional.empty());
+        when(portfolioService.listarParaVisorPorNombreUsuario(
+                eq("artista777"), isNull(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
+
+        mockMvc.perform(get("/api/portfolio/artista777/paginado")
+                .header("Authorization", "Bearer " + token("cliente42", ERol.CLIENTE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    // ---------------------------------------------------------------
+    // POST /api/portfolio/usuarios/{idUsuario}/imagenes
+    // ---------------------------------------------------------------
+
+    @Test
+    void crear_imagen_sinToken_devuelve401() throws Exception {
+        mockMvc.perform(post("/api/portfolio/usuarios/7/imagenes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestValido()))
+                .andExpect(status().isUnauthorized());
+
+        verify(portfolioService, never()).crear(any(), any());
+    }
+
+    @Test
+    void crear_imagen_tokenDeCliente_devuelve403() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+
+        mockMvc.perform(post("/api/portfolio/usuarios/7/imagenes")
+                .header("Authorization", "Bearer " + token("cliente42", ERol.CLIENTE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestValido()))
+                .andExpect(status().isForbidden());
+
+        verify(portfolioService, never()).crear(any(), any());
+    }
+
+    @Test
+    void crear_imagen_artistaDistintoAlDelToken_devuelve403() throws Exception {
+        stubUsuarioConRol("artista777", ERol.ARTISTA);
+        when(portfolioService.nombreUsuario(7L)).thenReturn("otroArtista");
+
+        mockMvc.perform(post("/api/portfolio/usuarios/7/imagenes")
+                .header("Authorization", "Bearer " + token("artista777", ERol.ARTISTA))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestValido()))
+                .andExpect(status().isForbidden());
+
+        verify(portfolioService, never()).crear(any(), any());
+    }
+
+    @Test
+    void crear_imagen_artistaCoincide_devuelve201() throws Exception {
+        stubUsuarioConRol("artista777", ERol.ARTISTA);
+        when(portfolioService.nombreUsuario(7L)).thenReturn("artista777");
+        when(portfolioService.crear(eq(7L), any())).thenReturn(imagenDe("Mi obra"));
+
+        mockMvc.perform(post("/api/portfolio/usuarios/7/imagenes")
+                .header("Authorization", "Bearer " + token("artista777", ERol.ARTISTA))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestValido()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.titulo").value("Mi obra"));
+    }
+
+    @Test
+    void crear_imagen_bodyInvalido_devuelve400() throws Exception {
+        stubUsuarioConRol("artista777", ERol.ARTISTA);
+
+        mockMvc.perform(post("/api/portfolio/usuarios/7/imagenes")
+                .header("Authorization", "Bearer " + token("artista777", ERol.ARTISTA))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").exists());
+
+        verify(portfolioService, never()).crear(any(), any());
+    }
+
+    // ---------------------------------------------------------------
+    // helpers
+    // ---------------------------------------------------------------
+
+    private void stubUsuarioConRol(String nombreUsuario, ERol rol) {
+        when(userDetailsService.loadUserByUsername(nombreUsuario))
+                .thenReturn(User.withUsername(nombreUsuario)
+                        .password("{noop}prueba")
+                        .authorities("ROLE_" + rol.name())
+                        .build());
+    }
+
+    private String token(String nombreUsuario, ERol rol) {
+        return jwtUtils.generarTokenAcceso(nombreUsuario, rol.name());
+    }
+
+    private ImagenPortfolioDTO imagenDe(String titulo) {
+        return ImagenPortfolioDTO.builder()
+                .idImagen(5L)
+                .titulo(titulo)
+                .url("https://x/img.png")
+                .estado(true)
+                .build();
+    }
+
+    private String requestValido() {
+        return "{\"titulo\":\"Mi obra\",\"descripcion\":\"Una obra\","
+                + "\"url\":\"https://x/img.png\",\"medio\":\"DIGITAL\"}";
+    }
+}
