@@ -4,9 +4,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.Imagen;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioDTO;
@@ -45,6 +48,40 @@ public class PortfolioService {
             .orElseGet(List::of);
     }
 
+    @Transactional(readOnly = true)
+    public Page<ImagenPortfolioDTO> listarParaVisor(Long portfolioId, Long viewerId, Pageable pageable) {
+        // 1. Obtener preferencia del visitante (o default ADVERTIR)
+        EPreferenciaContenidoSensible pref = (viewerId != null)
+            ? usuarioRepository.findByIdUsuario(viewerId)
+                .map(Usuario::getPreferenciaSensible)
+                .orElse(EPreferenciaContenidoSensible.ADVERTIR)
+            : EPreferenciaContenidoSensible.ADVERTIR;
+
+        // 2. Consultar imágenes visibles según preferencia
+        Page<Imagen> page = pref == EPreferenciaContenidoSensible.OCULTAR
+            ? imagenRepository.findVisibleForViewerOcultandoSensibles(portfolioId, viewerId, pageable)
+            : imagenRepository.findVisibleForViewer(portfolioId, pageable);
+
+        // 3. Mapear a DTO con campo calculado requiereAdvertencia
+        return page.map(img -> {
+            boolean requiereAdvertencia = img.getContenidoSensible() != null
+                && pref == EPreferenciaContenidoSensible.ADVERTIR
+                && (viewerId == null || !img.getUsuario().getIdUsuario().equals(viewerId));
+            return ImagenPortfolioDTO.desdeImagen(img, requiereAdvertencia);
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ImagenPortfolioDTO> listarParaVisorPorNombreUsuario(String nombreUsuario, Long viewerId, Pageable pageable) {
+        Usuario artista = obtenerArtista(nombreUsuario);
+        Portfolio portfolio = portfolioRepository.findByArtista(artista)
+            .orElse(null);
+        if (portfolio == null) {
+            return Page.empty(pageable);
+        }
+        return listarParaVisor(portfolio.getIdPortfolio(), viewerId, pageable);
+    }
+
     @Transactional
     public ImagenPortfolioDTO crear(Long idUsuario, ImagenPortfolioRequest request) {
         Usuario artista = usuarioRepository.findByIdUsuario(idUsuario)
@@ -74,6 +111,7 @@ public class PortfolioService {
         imagen.setContenidoSensible(request.getContenidoSensible());
         imagen.setEstado(true);
         imagen.setPortfolio(portfolio);
+        imagen.setUsuario(artista); // asignar el usuario que sube la imagen
 
         return ImagenPortfolioDTO.desdeImagen(imagenRepository.save(imagen));
     }

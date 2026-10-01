@@ -3,6 +3,7 @@ package com.temipora.backend_springboot.config;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -35,5 +36,11 @@ public class ManejoGlobalErrores {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, String>> manejarTipoInvalido(MethodArgumentTypeMismatchException e) {
         return ResponseEntity.badRequest().body(Map.of("message", "Parámetro inválido: " + e.getName()));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, String>> manejarIntegridadDatos(DataIntegrityViolationException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(Map.of("message", "La imagen no pudo guardarse porque sus datos no son compatibles con la base de datos."));
     }
 }

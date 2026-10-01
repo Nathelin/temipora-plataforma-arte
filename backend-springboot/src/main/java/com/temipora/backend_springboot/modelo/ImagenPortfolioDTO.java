@@ -18,8 +18,13 @@ public class ImagenPortfolioDTO {
     private MedioPortfolio medio;
     private String materiales;
     private ContenidoSensible contenidoSensible;
+    private boolean requiereAdvertencia;
 
     public static ImagenPortfolioDTO desdeImagen(Imagen imagen) {
+        return desdeImagen(imagen, false);
+    }
+
+    public static ImagenPortfolioDTO desdeImagen(Imagen imagen, boolean requiereAdvertencia) {
         return ImagenPortfolioDTO.builder()
             .idImagen(imagen.getIdImagen())
             .url(imagen.getUrl())
@@ -30,6 +35,7 @@ public class ImagenPortfolioDTO {
             .medio(imagen.getMedio())
             .materiales(imagen.getMateriales())
             .contenidoSensible(imagen.getContenidoSensible())
+            .requiereAdvertencia(requiereAdvertencia)
             .build();
     }
 }

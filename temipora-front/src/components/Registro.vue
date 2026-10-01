@@ -181,7 +181,7 @@ const pasosRouter = [
       </button>
 
       <div class="sm:mx-auto sm:w-full sm:max-w-sm">
-        <h2 class="text-center text-2xl font-normal leading-9 tracking-tight text-granate">
+        <h2 class="sm:pt-5 text-center text-2xl font-normal leading-9 tracking-tight text-granate">
           Crear cuenta
         </h2>
         <p class="text-center text-sm text-cafe/60 mt-1"></p>
@@ -208,7 +208,7 @@ const pasosRouter = [
       </p>
 
       <!-- Paso 1 -->
-      <div v-if="paso === 1" class="space-y-8">
+      <div v-if="paso === 1" class="space-y-8 pt-10 sm:pt-14 ">
         <div>
           <label class="block text-sm text-cafe mb-2">Nombre de usuario<span class="text-rojizo">*</span></label>
           <input
@@ -270,7 +270,7 @@ const pasosRouter = [
       </div>
 
       <!-- Paso 2 -->
-      <div v-else-if="paso === 2" class="space-y-8">
+      <div v-else-if="paso === 2" class="space-y-8 pt-10 sm:pt-14 ">
         <div>
           <label class="block text-sm text-cafe mb-2">Nombre<span class="text-rojizo">*</span></label>
           <input v-model="nombre" type="text" class="pl-4 pr-4 block w-full rounded-lg border-0 py-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
@@ -286,7 +286,7 @@ const pasosRouter = [
       </div>
 
       <!-- Paso 3 -->
-      <div v-else-if="paso === 3" class="space-y-4">
+      <div v-else-if="paso === 3" class="space-y-4 pt-10 sm:pt-14 ">
         <p class="text-sm text-cafe/70 mb-4">¿Qué te gustaría hacer en Temipora?</p>
 
         <label
@@ -311,7 +311,7 @@ const pasosRouter = [
       </div>
 
       <!-- Paso 4 -->
-      <div v-else-if="paso === 4" class="space-y-6">
+      <div v-else-if="paso === 4" class="space-y-6 pt-10 sm:pt-10 ">
         <div class="flex flex-col items-center">
           <div class="w-28 h-28 rounded-full overflow-hidden border-2 border-coral bg-rosa/30 flex items-center justify-center mb-4">
             <img

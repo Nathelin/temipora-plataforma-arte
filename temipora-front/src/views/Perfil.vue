@@ -2,10 +2,11 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
-import { acceptImagenes } from '../servicios/archivos'
+import { acceptImagenes, esImagenPermitida } from '../servicios/archivos'
 
 const route = useRoute()
 const router = useRouter()
+
 
 const perfil = ref({
   idUsuario: null,
@@ -34,12 +35,12 @@ async function cargarPerfil() {
     const data = res.data
 
     const portfolioRes = data.rol === 'ARTISTA'
-      ? await api.get(`/portfolio/${data.nombreUsuario}`)
-      : { data: [] }
+      ? await api.get(`/portfolio/${data.nombreUsuario}/paginado`)
+      : { data: { content: [] } }
 
     perfil.value = {
       ...data,
-      portfolio: portfolioRes.data,
+      portfolio: portfolioRes.data.content || [],
       servicios: [],
       productos: [],
       pedidos: [],
@@ -69,6 +70,7 @@ function fotoInicial(nombre) {
 
 const portfolioModalAbierto = ref(false)
 const imagenSeleccionada = ref(null)
+const mostrarImagenSensible = ref(false)
 const guardandoImagen = ref(false)
 const errorPortfolio = ref('')
 const tituloImagen = ref('')
@@ -112,13 +114,32 @@ function onImagenPortfolioChange(event) {
 
 function abrirDetalleImagen(imagen) {
   imagenSeleccionada.value = imagen
+  mostrarImagenSensible.value = false
 }
 
 function cerrarDetalleImagen() {
   imagenSeleccionada.value = null
+  mostrarImagenSensible.value = false
+}
+
+function revelarImagenSensible() {
+  mostrarImagenSensible.value = true
 }
 
 async function guardarImagenPortfolio() {
+  if (!archivoImagen.value) {
+    errorPortfolio.value = 'Selecciona una imagen.'
+    return
+  }
+  if (!tituloImagen.value.trim()) {
+    errorPortfolio.value = 'El título es obligatorio.'
+    return
+  }
+  if (!descripcionImagen.value.trim()) {
+    errorPortfolio.value = 'La descripción es obligatoria.'
+    return
+  }
+
   guardandoImagen.value = true
   errorPortfolio.value = ''
   try {
@@ -268,7 +289,23 @@ function irAConfiguracion(seccion = 'perfil') {
                   @click="abrirDetalleImagen(obra)"
                 >
                   <div class="min-h-0 flex-1 bg-coral/20">
-                    <img v-if="obra.url" :src="obra.url" :alt="obra.titulo" class="w-full h-full object-cover" />
+                    <div class="relative w-full h-full">
+                      <img
+                        v-if="obra.url"
+                        :src="obra.url"
+                        :alt="obra.titulo"
+                        class="w-full h-full object-cover transition duration-200"
+                        :class="obra.requiereAdvertencia ? 'blur-[18px] scale-105' : ''"
+                      />
+                      <span
+                        v-if="obra.requiereAdvertencia"
+                        class="absolute inset-0 flex items-center justify-center bg-granate/10 text-3xl text-white drop-shadow"
+                        :title="`Contenido sensible: ${obra.contenidoSensible}`"
+                        :aria-label="`Contenido sensible: ${obra.contenidoSensible}`"
+                      >
+                        ⚠
+                      </span>
+                    </div>
                   </div>
                   <div class="shrink-0 bg-rosa/20 p-3 text-sm text-cafe truncate">{{ obra.titulo }}</div>
                 </button>
@@ -327,12 +364,12 @@ function irAConfiguracion(seccion = 'perfil') {
           <div class="space-y-5">
             <div>
               <label class="block text-sm text-cafe mb-2">Título <span class="text-rojizo">*</span></label>
-              <input v-model="tituloImagen" type="text" maxlength="100" class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
+              <input v-model="tituloImagen" type="text" maxlength="100" required class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
             </div>
 
             <div>
               <label class="block text-sm text-cafe mb-2">Descripción <span class="text-rojizo">*</span></label>
-              <textarea v-model="descripcionImagen" rows="5" maxlength="1000" class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"></textarea>
+              <textarea v-model="descripcionImagen" rows="5" maxlength="1000" required class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"></textarea>
             </div>
 
             <div>
@@ -364,7 +401,7 @@ function irAConfiguracion(seccion = 'perfil') {
           <div class="flex flex-col">
             <label class="block text-sm text-cafe mb-2">Imagen <span class="text-rojizo">*</span></label>
             <div class="flex-1 min-h-72 rounded-xl border border-dashed border-rosa bg-rosa/10 flex items-center justify-center overflow-hidden">
-              <img v-if="previewImagen" :src="previewImagen" alt="Vista previa" class="w-full h-full max-h-[28rem] object-contain" />
+              <img v-if="previewImagen" :src="previewImagen" alt="Vista previa" class="w-full h-full max-h-112 object-contain" />
               <p v-else class="px-6 text-center text-sm text-cafe/50">Selecciona una imagen para ver la vista previa.</p>
             </div>
             <input id="portfolio-imagen" type="file" :accept="acceptImagenes" class="sr-only" @change="onImagenPortfolioChange" />
@@ -386,7 +423,32 @@ function irAConfiguracion(seccion = 'perfil') {
     <!-- Modal detalle de imagen -->
     <div v-if="imagenSeleccionada" class="fixed inset-0 z-50 flex items-center justify-center bg-granate/40 px-4" @click.self="cerrarDetalleImagen">
       <div class="w-full max-w-2xl bg-blanco rounded-2xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
-        <img :src="imagenSeleccionada.url" :alt="imagenSeleccionada.titulo" class="w-full max-h-[55vh] object-contain rounded-lg bg-rosa/20" />
+        <div class="relative overflow-hidden rounded-lg bg-rosa/20">
+          <img
+            :src="imagenSeleccionada.url"
+            :alt="imagenSeleccionada.titulo"
+            class="w-full max-h-[55vh] object-contain transition duration-200"
+            :class="imagenSeleccionada.requiereAdvertencia && !mostrarImagenSensible ? 'blur-[18px] scale-105' : ''"
+          />
+          <span
+            v-if="imagenSeleccionada.requiereAdvertencia && !mostrarImagenSensible"
+            class="absolute inset-0 flex items-center justify-center text-5xl text-white drop-shadow"
+            :title="`Contenido sensible: ${imagenSeleccionada.contenidoSensible}`"
+            :aria-label="`Contenido sensible: ${imagenSeleccionada.contenidoSensible}`"
+          >
+            ⚠
+          </span>
+        </div>
+        <div v-if="imagenSeleccionada.requiereAdvertencia && !mostrarImagenSensible" class="mt-4 rounded-lg bg-rosa/30 px-4 py-3 text-sm text-cafe">
+          <label>Esta imagen tiene contenido sensible categorizado como: {{ imagenSeleccionada.contenidoSensible.toLowerCase() }}.    </label>
+          <button
+            type="button"
+            class="mt-3 rounded-md bg-coral px-4 py-2 text-sm text-white hover:bg-rojizo transition"
+            @click="revelarImagenSensible"
+          >
+            Ver imagen
+          </button>
+        </div>
         <h2 class="text-xl text-granate mt-5">{{ imagenSeleccionada.titulo }}</h2>
         <p class="text-sm text-cafe mt-2">{{ imagenSeleccionada.descripcion }}</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4 text-sm text-cafe/70">

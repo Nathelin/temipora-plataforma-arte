@@ -58,7 +58,7 @@ async function iniciarSesion() {
         <p class="text-center text-sm text-cafe/60 mt-1">Nos alegra verte de nuevo</p>
       </div>
 
-      <form class="mt-16 space-y-16" @submit.prevent="iniciarSesion">
+      <form class="mt-16 space-y-16 sm:pt-5" @submit.prevent="iniciarSesion">
         <div>
           <label for="nombreUsuario" class="block text-sm font-normal leading-6 text-cafe">
             Nombre de usuario

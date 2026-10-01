@@ -6,9 +6,14 @@ import Registro from '../components/Registro.vue'
 import TOS from '../components/TOS.vue'
 import MainLayout from '../layouts/MainLayout.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
+import ConfiguracionLayout from '../layouts/ConfiguracionLayout.vue'
 import Inicio from '../views/Inicio.vue'
 import Perfil from '../views/Perfil.vue'
 import Servicios from '../views/Servicios.vue'
+import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
+import ConfiguracionPrivacidad from '../views/ConfiguracionPrivacidad.vue'
+import ConfiguracionTerminos from '../views/ConfiguracionTerminos.vue'
+import ConfiguracionCuenta from '../views/ConfiguracionCuenta.vue'
 
 const routes = [
   {
@@ -36,7 +41,17 @@ const routes = [
           return { name: 'inicio' }
         },
       },
-      { path: 'configuracion', redirect: '/' },
+      {
+        path: 'configuracion',
+        component: ConfiguracionLayout,
+        children: [
+          { path: '', redirect: '/configuracion/perfil' },
+          { path: 'perfil', name: 'configuracion-perfil', component: ConfiguracionPerfil, meta: { title: 'Configuración - Perfil' } },
+          { path: 'privacidad', name: 'configuracion-privacidad', component: ConfiguracionPrivacidad, meta: { title: 'Configuración - Privacidad' } },
+          { path: 'terminos', name: 'configuracion-terminos', component: ConfiguracionTerminos, meta: { title: 'Configuración - Términos' } },
+          { path: 'cuenta', name: 'configuracion-cuenta', component: ConfiguracionCuenta, meta: { title: 'Configuración - Cuenta' } },
+        ],
+      },
       { path: 'about', redirect: '/' },
       { path: 'contacto', redirect: '/' },
     ],

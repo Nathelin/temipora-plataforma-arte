@@ -4,20 +4,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
-
-import jakarta.persistence.criteria.Predicate;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
-import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
 import com.temipora.backend_springboot.modelo.RegistroUsuarioDTO;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
@@ -63,7 +58,6 @@ public class UsuarioService {
                 .biografia(dto.getBiografia())
                 .urlFotoPerfil(dto.getUrlFotoPerfil())
                 .estadoCuenta(true)
-                .preferenciaSensible(EPreferenciaContenidoSensible.ADVERTIR)
                 .fechaCreacion(LocalDateTime.now())
                 .rol(rol)
                 .build();
@@ -112,6 +106,9 @@ public class UsuarioService {
         if (dto.getPais() != null) {
             usuario.setPais(dto.getPais());
         }
+        if (dto.getPreferenciaSensible() != null) {
+            usuario.setPreferenciaSensible(dto.getPreferenciaSensible());
+        }
 
         return UsuarioDTO.desdeUsuario(usuarioRepository.save(usuario));
     }
@@ -123,30 +120,12 @@ public class UsuarioService {
     }
 
     public Page<UsuarioDTO> obtenerUsuariosPaginados(String nombreUsuario, String correo, Boolean estadoCuenta, ERol rol, Pageable pageable) {
-        Specification<Usuario> filtros = (root, query, criteriaBuilder) -> {
-            List<Predicate> predicates = new ArrayList<>();
-
-            if (nombreUsuario != null && !nombreUsuario.isBlank()) {
-                predicates.add(criteriaBuilder.like(
-                        criteriaBuilder.lower(root.get("nombreUsuario")),
-                        "%" + nombreUsuario.trim().toLowerCase() + "%"));
-            }
-            if (correo != null && !correo.isBlank()) {
-                predicates.add(criteriaBuilder.like(
-                        criteriaBuilder.lower(root.get("correo")),
-                        "%" + correo.trim().toLowerCase() + "%"));
-            }
-            if (estadoCuenta != null) {
-                predicates.add(criteriaBuilder.equal(root.get("estadoCuenta"), estadoCuenta));
-            }
-            if (rol != null) {
-                predicates.add(criteriaBuilder.equal(root.get("rol").get("nombre"), rol));
-            }
-
-            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
-        };
-
-        return usuarioRepository.findAll(filtros, pageable)
+        return usuarioRepository.findByFilters(
+                nombreUsuario == null || nombreUsuario.isEmpty() ? null : nombreUsuario,
+                correo == null || correo.isEmpty() ? null : correo,
+                estadoCuenta,
+                rol,
+                pageable)
                 .map(UsuarioDTO::desdeUsuario);
     }
 }

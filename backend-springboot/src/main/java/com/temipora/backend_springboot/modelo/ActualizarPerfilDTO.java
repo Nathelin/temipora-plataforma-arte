@@ -26,4 +26,6 @@ public class ActualizarPerfilDTO {
 
     @Size(max = 60, message = "El país no puede superar los 60 caracteres")
     private String pais;
+
+    private EPreferenciaContenidoSensible preferenciaSensible;
 }

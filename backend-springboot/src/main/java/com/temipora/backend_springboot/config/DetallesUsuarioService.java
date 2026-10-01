@@ -25,12 +25,12 @@ public class DetallesUsuarioService implements UserDetailsService{
 
     @Override
     public UserDetails loadUserByUsername(String nombreUsuario) throws UsernameNotFoundException {
-        Usuario usuario = usuarioRepository.findBynombreUsuario(nombreUsuario)
-                                    .orElseThrow(()-> new UsernameNotFoundException("No se encontró al usuario."));
+        Usuario usuario = usuarioRepository.findByNombreUsuarioIgnoreCase(nombreUsuario)
+                                     .orElseThrow(()-> new UsernameNotFoundException("No se encontró al usuario."));
 
         Collection<? extends GrantedAuthority> permisos = java.util.Collections.singleton(
             new SimpleGrantedAuthority("ROLE_".concat(usuario.getRol().getNombre().name())));
-        
+         
         return new User(usuario.getNombreUsuario(), usuario.getContrasenia(), true, true, true, true, permisos);
 
         // el return tiene cuatro booleans, entre ellos para definir permisos y si hay bloqueos o expiración de sesión.

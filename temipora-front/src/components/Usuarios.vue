@@ -1,73 +1,93 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../servicios/api'
 
 const router = useRouter()
-const usuarios = ref([])
+const usernameSearch = ref('')
+const emailSearch = ref('')
 const cargando = ref(true)
 const error = ref('')
 const abierto = ref(null)
 const nombreAdmin = ref(localStorage.getItem('nombreUsuario') || '')
-const busqueda = ref('')
 const filtroRol = ref('todos')
 const filtroEstado = ref('todos')
+const currentPage = ref(0)
+const pageSize = ref(10)
+const totalElements = ref(0)
+const totalPages = ref(0)
+const usuarios = ref([]) // content of current page
+let debounceTimer
+let requestId = 0
 
-const usuariosFiltrados = computed(() => {
-  const termino = busqueda.value.trim().toLowerCase()
-
-  return [...usuarios.value]
-    .filter((usuario) => {
-      if (filtroRol.value !== 'todos' && usuario.rol !== filtroRol.value) {
-        return false
-      }
-
-      if (filtroEstado.value === 'activo' && !usuario.estadoCuenta) {
-        return false
-      }
-
-      if (filtroEstado.value === 'inactivo' && usuario.estadoCuenta) {
-        return false
-      }
-
-      if (!termino) {
-        return true
-      }
-
-      return [
-        usuario.nombreUsuario,
-        usuario.correo,
-        usuario.nombre,
-        usuario.apellido,
-        usuario.telefono,
-        usuario.sexo,
-        usuario.rol,
-      ].some((campo) => String(campo || '').toLowerCase().includes(termino))
-    })
-    .sort((a, b) => Number(a.idUsuario) - Number(b.idUsuario))
-})
-
-function limpiarFiltros() {
-  busqueda.value = ''
-  filtroRol.value = 'todos'
-  filtroEstado.value = 'todos'
+// Build params object for API call
+function getParams() {
+  return {
+    nombreUsuario: usernameSearch.value.trim() === '' ? null : usernameSearch.value.trim(),
+    correo: emailSearch.value.trim() === '' ? null : emailSearch.value.trim(),
+    estado: filtroEstado.value === 'todos' ? null : (filtroEstado.value === 'activo'),
+    rol: filtroRol.value === 'todos' ? null : filtroRol.value,
+    page: currentPage.value,
+    size: pageSize.value,
+    sort: 'idUsuario,asc'
+  }
 }
 
-async function cargarUsuarios() {
+async function fetchUsers() {
+  const currentRequestId = ++requestId
   cargando.value = true
   error.value = ''
   try {
-    const res = await api.get('/usuarios')
-    usuarios.value = res.data
+    const res = await api.get('/usuarios', { params: getParams() })
+    if (currentRequestId !== requestId) return
+
+    const data = res.data ?? {}
+    const content = Array.isArray(data) ? data : data.content
+    usuarios.value = Array.isArray(content) ? content : []
+    totalElements.value = Array.isArray(data)
+      ? data.length
+      : Number(data.totalElements ?? usuarios.value.length)
+    totalPages.value = Array.isArray(data)
+      ? (usuarios.value.length ? 1 : 0)
+      : Number(data.totalPages ?? (usuarios.value.length ? 1 : 0))
   } catch (e) {
+    if (currentRequestId !== requestId) return
+
     if (e.response && e.response.status === 401) {
       error.value = 'No autorizado. Solo administradores pueden ver esta vista.'
       router.push({ name: 'login' })
     } else {
       error.value = 'No se pudieron cargar los usuarios.'
     }
+    // Reset data on error
+    usuarios.value = []
+    totalElements.value = 0
+    totalPages.value = 0
   } finally {
     cargando.value = false
+  }
+}
+
+function limpiarFiltros() {
+  usernameSearch.value = ''
+  emailSearch.value = ''
+  filtroRol.value = 'todos'
+  filtroEstado.value = 'todos'
+  currentPage.value = 0
+  fetchUsers()
+}
+
+function anteriorPagina() {
+  if (currentPage.value > 0) {
+    currentPage.value--
+    fetchUsers()
+  }
+}
+
+function siguientePagina() {
+  if (currentPage.value < totalPages.value - 1) {
+    currentPage.value++
+    fetchUsers()
   }
 }
 
@@ -82,26 +102,39 @@ function cerrarSesion() {
   router.push({ name: 'login' })
 }
 
-onMounted(cargarUsuarios)
+// Watch for filter changes to refetch from page 0
+watch([usernameSearch, emailSearch, filtroRol, filtroEstado], () => {
+  currentPage.value = 0
+  clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(fetchUsers, 300)
+})
+
+onMounted(fetchUsers)
+onBeforeUnmount(() => clearTimeout(debounceTimer))
 </script>
 
 <template>
   <div>
-
     <main class="flex-1 w-full mx-auto px-4 sm:px-8 py-8 overflow-auto">
       <div class="flex flex-col gap-4 mb-6">
         <div class="flex items-center justify-between gap-4">
           <h1 class="text-xl font-normal text-granate">Usuarios registrados</h1>
           <span class="text-sm text-cafe/60">
-            {{ usuariosFiltrados.length }} de {{ usuarios.length }}
+            {{ usuarios.length }} de {{ totalElements }} mostrados
           </span>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-3">
           <input
-            v-model="busqueda"
+            v-model="usernameSearch"
             type="search"
-            placeholder="Buscar por usuario, correo, nombre..."
+            placeholder="Buscar por nombre de usuario..."
+            class="min-w-0 rounded-lg border-0 py-2.5 px-4 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+          />
+          <input
+            v-model="emailSearch"
+            type="email"
+            placeholder="Buscar por correo..."
             class="min-w-0 rounded-lg border-0 py-2.5 px-4 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
           />
 
@@ -134,24 +167,24 @@ onMounted(cargarUsuarios)
           </button>
         </div>
       </div>
-      
+
       <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando usuarios...</p>
       <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
 
-        <div v-else class="bg-blanco rounded-3xl overflow-hidden shadow-xl shadow-rosa/40">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm min-w-160">
+      <div v-else class="bg-blanco rounded-3xl overflow-hidden shadow-xl shadow-rosa/40">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm min-w-160">
             <thead class="bg-rosa/40 text-granate">
               <tr>
                 <th class="px-5 py-3 font-normal text-sm">ID</th>
                 <th class="px-5 py-3 font-normal text-sm">Usuario</th>
                 <th class="px-5 py-3 font-normal text-sm">Rol</th>
-                <th class="px-5 py-3 font-normal text-sm">Estado</th>
+                <th class="px-5 py-3 font-normal text-sm">Correo</th>
                 <th class="px-5 py-3"></th>
               </tr>
             </thead>
             <tbody>
-              <template v-for="u in usuariosFiltrados" :key="u.idUsuario">
+              <template v-for="u in usuarios" :key="u.idUsuario">
                 <tr class="border-t border-rosa/50 hover:bg-rosa/20 transition">
                   <td class="px-5 py-3 text-cafe/50 font-mono">{{ u.idUsuario }}</td>
                   <td class="px-5 py-3 text-granate font-normal">{{ u.nombreUsuario }}</td>
@@ -167,16 +200,7 @@ onMounted(cargarUsuarios)
                       {{ u.rol }}
                     </span>
                   </td>
-                  <td class="px-5 py-3">
-                    <span
-                      class="px-2.5 py-0.5 rounded-full text-xs font-normal"
-                      :class="u.estadoCuenta
-                        ? 'bg-green-500/10 text-green-700'
-                        : 'bg-rojizo/10 text-rojizo'"
-                    >
-                      {{ u.estadoCuenta ? 'Activo' : 'Inactivo' }}
-                    </span>
-                  </td>
+                  <td class="px-5 py-3 text-granate">{{ u.correo }}</td>
                   <td class="px-5 py-3 text-right">
                     <button
                       class="text-rojizo hover:text-coral transition"
@@ -227,26 +251,39 @@ onMounted(cargarUsuarios)
                         </p>
                       </div>
                     </div>
-
-                    <!--div v-if="u.urlBanner" class="mt-4">
-                      <span class="text-cafe/50 text-sm">Banner:</span>
-                      <img
-                        :src="u.urlBanner"
-                        alt="banner"
-                        class="mt-2 w-full h-36 object-cover rounded-2xl border border-rosa"
-                      />
-                    </div-->
                   </td>
                 </tr>
               </template>
             </tbody>
           </table>
-          </div>
-
-          <p v-if="!usuariosFiltrados.length" class="p-8 text-cafe/50 text-center">
-            {{ usuarios.length ? 'No hay usuarios que coincidan con los filtros.' : 'No hay usuarios registrados.' }}
-          </p>
         </div>
+
+        <div v-if="!usuarios.length" class="p-8 text-cafe/50 text-center">
+          {{ totalElements ? 'No hay usuarios que coincidan con los filtros.' : 'No hay usuarios registrados.' }}
+        </div>
+
+        <div v-else class="flex justify-between items-center mt-4 px-5">
+          <span class="text-sm text-cafe/60">
+            Página {{ currentPage + 1 }} de {{ totalPages > 0 ? totalPages : 1 }}
+          </span>
+          <div class="flex gap-2">
+            <button
+              :disabled="currentPage === 0"
+              class="rounded-lg border border-rosa px-3 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
+              @click="anteriorPagina"
+            >
+              Anterior
+            </button>
+            <button
+              :disabled="currentPage >= totalPages - 1 || totalPages === 0"
+              class="rounded-lg border border-rosa px-3 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
+              @click="siguientePagina"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </template>

@@ -52,11 +52,16 @@ public class Imagen {
 
     private String materiales;
 
+    // TODO: agregar las advertencias en imágenes propias....... hasta ahora solo están en ajenas
     @Enumerated(EnumType.STRING)
     private ContenidoSensible contenidoSensible;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "idPortfolio", nullable = false)
     private Portfolio portfolio;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "idUsuario", nullable = false)
+    private Usuario usuario;
 
 }

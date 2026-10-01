@@ -69,6 +69,9 @@ public class Usuario {
     @Builder.Default
     private boolean estadoCuenta = true;
 
+    @Builder.Default
+    private EPreferenciaContenidoSensible preferenciaSensible = EPreferenciaContenidoSensible.ADVERTIR;
+
     @Size(min = 1, max = 15)
     @Pattern(regexp = "^[a-zA-ZáéíóúÁÉÍÓÚñÑ\\s]+$")
     @Column(nullable = true)
@@ -83,6 +86,11 @@ public class Usuario {
 
     @Column(nullable = true, length = 20)
     private String telefono;
+
+    // TODO: sacar, en realidad tengo que relacionarlo con la tabla país
+    @Size(max = 60, message = "El país no puede superar los 60 caracteres")
+    @Column(nullable = true, length = 60)
+    private String pais;
 
     @Column(name = "fechaCreacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion;
