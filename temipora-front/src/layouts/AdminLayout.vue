@@ -13,6 +13,7 @@ const secciones = [
   { nombre: 'Gestión de usuarios', to: '/admin/usuarios', activa: true },
   { nombre: 'Gestión de productos', to: '/admin/tipos/producto', activa: true },
   { nombre: 'Gestión de servicios', to: '/admin/tipos/servicio', activa: true },
+  { nombre: 'Gestión de etiquetas', to: '/admin/etiquetas', activa: true },
   { nombre: 'Moderación', to: null, activa: false },
   { nombre: 'Sanciones', to: null, activa: false },
   { nombre: 'Notificaciones', to: null, activa: false },

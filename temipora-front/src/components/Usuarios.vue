@@ -54,8 +54,10 @@ async function fetchUsers() {
     if (currentRequestId !== requestId) return
 
     if (e.response && e.response.status === 401) {
-      error.value = 'No autorizado. Solo administradores pueden ver esta vista.'
+      error.value = 'Sesión expirada o inválida. Inicia sesión nuevamente.'
       router.push({ name: 'login' })
+    } else if (e.response && e.response.status === 403) {
+      error.value = 'No autorizado. Solo administradores pueden ver esta vista.'
     } else {
       error.value = 'No se pudieron cargar los usuarios.'
     }

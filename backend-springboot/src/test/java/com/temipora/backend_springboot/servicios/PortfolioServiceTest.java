@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -24,16 +26,23 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import com.temipora.backend_springboot.modelo.CategoriaEtiqueta;
 import com.temipora.backend_springboot.modelo.ContenidoSensible;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.Etiqueta;
+import com.temipora.backend_springboot.modelo.EtiquetaDTO;
+import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 import com.temipora.backend_springboot.modelo.Imagen;
+import com.temipora.backend_springboot.modelo.ImagenEtiqueta;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioDTO;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioRequest;
 import com.temipora.backend_springboot.modelo.MedioPortfolio;
 import com.temipora.backend_springboot.modelo.Portfolio;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
+import com.temipora.backend_springboot.repositorios.ImagenEtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.ImagenRepository;
 import com.temipora.backend_springboot.repositorios.PortfolioRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
@@ -49,6 +58,12 @@ class PortfolioServiceTest {
 
     @Mock
     private ImagenRepository imagenRepository;
+
+    @Mock
+    private EtiquetaRepository etiquetaRepository;
+
+    @Mock
+    private ImagenEtiquetaRepository imagenEtiquetaRepository;
 
     @InjectMocks
     private PortfolioService portfolioService;
@@ -80,6 +95,26 @@ class PortfolioServiceTest {
     }
 
     @Test
+    void listar_poblaLasEtiquetasDeCadaImagen() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        Imagen imagen = imagenDe(portfolio, artista, "Obra 1", null);
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("Artista777"))
+                .thenReturn(Optional.of(artista));
+        when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(portfolio));
+        when(imagenRepository.findByPortfolioAndEstadoTrueOrderByFechaSubidaDesc(portfolio))
+                .thenReturn(List.of(imagen));
+        when(imagenEtiquetaRepository.findByImagenIdImagenIn(List.of(5L)))
+                .thenReturn(List.of(fila(imagen, etiquetaDe(1L, "Acuarela", EtiquetaEstado.VALIDA, null))));
+
+        List<ImagenPortfolioDTO> resultado = portfolioService.listar("Artista777");
+
+        assertThat(resultado.get(0).getEtiquetas())
+                .extracting(EtiquetaDTO::getNombre)
+                .containsExactly("Acuarela");
+    }
+
+    @Test
     void listar_artistaSinPortfolio_devuelveListaVacia() {
         Usuario artista = usuarioArtista(7L, "Artista777");
         when(usuarioRepository.findByNombreUsuarioIgnoreCase("Artista777"))
@@ -91,6 +126,22 @@ class PortfolioServiceTest {
         assertThat(resultado).isEmpty();
         verify(imagenRepository, never())
                 .findByPortfolioAndEstadoTrueOrderByFechaSubidaDesc(any());
+    }
+
+    @Test
+    void listar_portfolioSinImagenes_noConsultaEtiquetas() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("Artista777"))
+                .thenReturn(Optional.of(artista));
+        when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(portfolio));
+        when(imagenRepository.findByPortfolioAndEstadoTrueOrderByFechaSubidaDesc(portfolio))
+                .thenReturn(List.of());
+
+        List<ImagenPortfolioDTO> resultado = portfolioService.listar("Artista777");
+
+        assertThat(resultado).isEmpty();
+        verify(imagenEtiquetaRepository, never()).findByImagenIdImagenIn(any());
     }
 
     @Test
@@ -195,6 +246,22 @@ class PortfolioServiceTest {
 
         assertThat(resultado.getContent()).hasSize(1);
         assertThat(resultado.getContent().get(0).isRequiereAdvertencia()).isFalse();
+    }
+
+    @Test
+    void listarParaVisor_poblaLasEtiquetasDeCadaImagen() {
+        Imagen imagen = imagenDe(null, null, "Obra 1", null);
+        when(imagenRepository.findVisibleForViewer(10L, PAGEABLE))
+                .thenReturn(new PageImpl<>(List.of(imagen), PAGEABLE, 1));
+        when(imagenEtiquetaRepository.findByImagenIdImagenIn(List.of(5L)))
+                .thenReturn(List.of(fila(imagen, etiquetaDe(1L, "Pixel", EtiquetaEstado.VALIDA, null))));
+
+        Page<ImagenPortfolioDTO> resultado = portfolioService
+                .listarParaVisor(10L, null, PAGEABLE);
+
+        assertThat(resultado.getContent().get(0).getEtiquetas())
+                .extracting(EtiquetaDTO::getNombre)
+                .containsExactly("Pixel");
     }
 
     // ---------------------------------------------------------------
@@ -347,6 +414,334 @@ class PortfolioServiceTest {
     }
 
     // ---------------------------------------------------------------
+    // crear con etiquetas (Fase B)
+    // ---------------------------------------------------------------
+
+    @Test
+    void crear_conEtiquetasValidas_guardaLasFilasDeUnion() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio existente = portfolioDe(artista);
+        Etiqueta acuarela = etiquetaDe(1L, "Acuarela", EtiquetaEstado.VALIDA, null);
+        Imagen[] guardada = new Imagen[1];
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(etiquetaRepository.findById(1L)).thenReturn(Optional.of(acuarela));
+        when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(existente));
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
+                eq(existente), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(false);
+        when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> {
+            Imagen imagen = invocation.getArgument(0);
+            imagen.setIdImagen(99L);
+            guardada[0] = imagen;
+            return imagen;
+        });
+        when(imagenEtiquetaRepository.findByImagenIdImagen(99L))
+                .thenAnswer(invocation -> List.of(fila(guardada[0], acuarela)));
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsEtiqueta(List.of(1L));
+
+        ImagenPortfolioDTO dto = portfolioService.crear(7L, request);
+
+        ArgumentCaptor<ImagenEtiqueta> filaCaptor = ArgumentCaptor.forClass(ImagenEtiqueta.class);
+        verify(imagenEtiquetaRepository).save(filaCaptor.capture());
+        assertThat(filaCaptor.getValue().getEtiqueta()).isSameAs(acuarela);
+        assertThat(filaCaptor.getValue().getImagen().getIdImagen()).isEqualTo(99L);
+        assertThat(dto.getEtiquetas()).extracting(EtiquetaDTO::getIdEtiqueta).containsExactly(1L);
+    }
+
+    @Test
+    void crear_masDeCincoEtiquetas_lanzaErrorAntesDeEscribir() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsEtiqueta(List.of(1L, 2L, 3L, 4L, 5L, 6L));
+
+        assertThatThrownBy(() -> portfolioService.crear(7L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Una imagen puede tener como máximo 5 etiquetas.");
+
+        verify(portfolioRepository, never()).findByArtista(any());
+        verify(etiquetaRepository, never()).findById(any());
+    }
+
+    @Test
+    void crear_etiquetaDadaDeBaja_lanzaError() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(etiquetaRepository.findById(1L))
+                .thenReturn(Optional.of(etiquetaDe(1L, "Vieja", EtiquetaEstado.INACTIVA, null)));
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsEtiqueta(List.of(1L));
+
+        assertThatThrownBy(() -> portfolioService.crear(7L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("La etiqueta 'Vieja' fue dada de baja y no puede asignarse a piezas nuevas.");
+
+        verify(portfolioRepository, never()).findByArtista(any());
+    }
+
+    @Test
+    void crear_etiquetaRechazada_lanzaError() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(etiquetaRepository.findById(1L))
+                .thenReturn(Optional.of(etiquetaDe(1L, "Manga", EtiquetaEstado.RECHAZADA, null)));
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsEtiqueta(List.of(1L));
+
+        assertThatThrownBy(() -> portfolioService.crear(7L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("La etiqueta 'Manga' fue rechazada y no puede asignarse a una imagen.");
+    }
+
+    @Test
+    void crear_etiquetaPendienteAjena_lanzaError() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Usuario otro = usuarioConRol(30L, "otroArtista", ERol.ARTISTA);
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(etiquetaRepository.findById(1L))
+                .thenReturn(Optional.of(etiquetaDe(1L, "Pixel", EtiquetaEstado.PENDIENTE, otro)));
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsEtiqueta(List.of(1L));
+
+        assertThatThrownBy(() -> portfolioService.crear(7L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("La etiqueta 'Pixel' está pendiente de evaluación y solo su creador puede asignarla.");
+    }
+
+    @Test
+    void crear_etiquetaPendientePropia_seAsigna() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio existente = portfolioDe(artista);
+        Etiqueta propia = etiquetaDe(1L, "Pixel", EtiquetaEstado.PENDIENTE, artista);
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(etiquetaRepository.findById(1L)).thenReturn(Optional.of(propia));
+        when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(existente));
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
+                eq(existente), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(false);
+        when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> {
+            Imagen imagen = invocation.getArgument(0);
+            imagen.setIdImagen(99L);
+            return imagen;
+        });
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsEtiqueta(List.of(1L));
+
+        portfolioService.crear(7L, request);
+
+        ArgumentCaptor<ImagenEtiqueta> filaCaptor = ArgumentCaptor.forClass(ImagenEtiqueta.class);
+        verify(imagenEtiquetaRepository).save(filaCaptor.capture());
+        assertThat(filaCaptor.getValue().getEtiqueta()).isSameAs(propia);
+    }
+
+    @Test
+    void crear_etiquetaInexistente_lanzaNoSuchElement() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(etiquetaRepository.findById(42L)).thenReturn(Optional.empty());
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsEtiqueta(List.of(42L));
+
+        assertThatThrownBy(() -> portfolioService.crear(7L, request))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("Etiqueta no encontrada: 42");
+
+        verify(portfolioRepository, never()).findByArtista(any());
+    }
+
+    @Test
+    void crear_etiquetasDuplicadas_lasDeduplica() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio existente = portfolioDe(artista);
+        Etiqueta valida = etiquetaDe(1L, "Acuarela", EtiquetaEstado.VALIDA, null);
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(etiquetaRepository.findById(1L)).thenReturn(Optional.of(valida));
+        when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(existente));
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
+                eq(existente), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(false);
+        when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> {
+            Imagen imagen = invocation.getArgument(0);
+            imagen.setIdImagen(99L);
+            return imagen;
+        });
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsEtiqueta(List.of(1L, 1L));
+
+        portfolioService.crear(7L, request);
+
+        verify(etiquetaRepository).findById(1L);
+        verify(imagenEtiquetaRepository).save(any(ImagenEtiqueta.class));
+    }
+
+    // ---------------------------------------------------------------
+    // modificar (Fase B)
+    // ---------------------------------------------------------------
+
+    @Test
+    void modificar_ok_actualizaCamposYReemplazaEtiquetas() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        Imagen imagen = imagenDe(portfolio, artista, "Obra 1", null);
+        Etiqueta acuarela = etiquetaDe(1L, "Acuarela", EtiquetaEstado.VALIDA, null);
+        Etiqueta pixel = etiquetaDe(2L, "Pixel", EtiquetaEstado.VALIDA, null);
+        ImagenEtiqueta filaVieja = fila(imagen, acuarela);
+        List<ImagenEtiqueta> filas = new ArrayList<>(List.of(filaVieja));
+
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(imagenRepository.findById(5L)).thenReturn(Optional.of(imagen));
+        when(imagenEtiquetaRepository.findByImagenIdImagen(5L)).thenAnswer(invocation -> List.copyOf(filas));
+        when(etiquetaRepository.findById(2L)).thenReturn(Optional.of(pixel));
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
+                eq(portfolio), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(false);
+        when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(imagenEtiquetaRepository.save(any(ImagenEtiqueta.class))).thenAnswer(invocation -> {
+            ImagenEtiqueta nueva = invocation.getArgument(0);
+            filas.add(nueva);
+            return nueva;
+        });
+        doAnswer(invocation -> {
+            filas.remove(invocation.getArgument(0));
+            return null;
+        }).when(imagenEtiquetaRepository).delete(any(ImagenEtiqueta.class));
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsEtiqueta(List.of(2L));
+
+        ImagenPortfolioDTO dto = portfolioService.modificar(7L, 5L, request);
+
+        verify(imagenEtiquetaRepository).delete(filaVieja);
+        verify(etiquetaRepository, never()).findById(1L);
+        assertThat(dto.getTitulo()).isEqualTo("Mi obra");
+        assertThat(dto.getEtiquetas()).extracting(EtiquetaDTO::getNombre).containsExactly("Pixel");
+    }
+
+    @Test
+    void modificar_conEtiquetaInactivaYaAsignada_laConserva() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        Imagen imagen = imagenDe(portfolio, artista, "Obra 1", null);
+        Etiqueta inactiva = etiquetaDe(1L, "Vieja", EtiquetaEstado.INACTIVA, null);
+        List<ImagenEtiqueta> filas = new ArrayList<>(List.of(fila(imagen, inactiva)));
+
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(imagenRepository.findById(5L)).thenReturn(Optional.of(imagen));
+        when(imagenEtiquetaRepository.findByImagenIdImagen(5L)).thenAnswer(invocation -> List.copyOf(filas));
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
+                eq(portfolio), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(false);
+        when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsEtiqueta(List.of(1L));
+
+        ImagenPortfolioDTO dto = portfolioService.modificar(7L, 5L, request);
+
+        verify(imagenEtiquetaRepository, never()).delete(any(ImagenEtiqueta.class));
+        verify(etiquetaRepository, never()).findById(any());
+        assertThat(dto.getEtiquetas()).extracting(EtiquetaDTO::getNombre).containsExactly("Vieja");
+    }
+
+    @Test
+    void modificar_imagenDeOtroArtista_lanzaNoSuchElement() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Usuario otro = usuarioArtista(8L, "OtroArtista");
+        Imagen ajena = imagenDe(portfolioDe(otro), otro, "Obra ajena", null);
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(imagenRepository.findById(5L)).thenReturn(Optional.of(ajena));
+
+        assertThatThrownBy(() -> portfolioService.modificar(7L, 5L, requestValido()))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("Imagen no encontrada: 5");
+
+        verify(imagenRepository, never()).save(any(Imagen.class));
+    }
+
+    @Test
+    void modificar_tituloRepetidoEnOtraImagen_lanzaError() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        Imagen imagen = imagenDe(portfolio, artista, "Obra 1", null);
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(imagenRepository.findById(5L)).thenReturn(Optional.of(imagen));
+        when(imagenEtiquetaRepository.findByImagenIdImagen(5L)).thenReturn(List.of());
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
+                eq(portfolio), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(true);
+
+        assertThatThrownBy(() -> portfolioService.modificar(7L, 5L, requestValido()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Ya existe una imagen con ese título y medio en el portfolio.");
+
+        verify(imagenRepository, never()).save(any(Imagen.class));
+    }
+
+    @Test
+    void modificar_tituloYMedioSinCambiar_noConsultaUnicidad() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        Imagen imagen = imagenDe(portfolio, artista, "Obra 1", null);
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(imagenRepository.findById(5L)).thenReturn(Optional.of(imagen));
+        when(imagenEtiquetaRepository.findByImagenIdImagen(5L)).thenReturn(List.of());
+        when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setTitulo("Obra 1");
+        request.setMateriales("  lapiz y acuarela  ");
+
+        ImagenPortfolioDTO dto = portfolioService.modificar(7L, 5L, request);
+
+        assertThat(dto.getTitulo()).isEqualTo("Obra 1");
+        assertThat(dto.getMateriales()).isEqualTo("lapiz y acuarela");
+        verify(imagenRepository, never())
+                .existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(any(), any(), any());
+    }
+
+    @Test
+    void modificar_artistaInexistente_lanzaNoSuchElement() {
+        when(usuarioRepository.findByIdUsuario(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> portfolioService.modificar(99L, 5L, requestValido()))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("Artista no encontrado: 99");
+
+        verify(imagenRepository, never()).findById(any());
+    }
+
+    @Test
+    void modificar_seisEtiquetas_lanzaErrorAntesDeCargar() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsEtiqueta(List.of(1L, 2L, 3L, 4L, 5L, 6L));
+
+        assertThatThrownBy(() -> portfolioService.modificar(7L, 5L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Una imagen puede tener como máximo 5 etiquetas.");
+
+        verify(imagenRepository, never()).findById(any());
+    }
+
+    @Test
+    void modificar_imagenInexistente_lanzaNoSuchElement() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(imagenRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> portfolioService.modificar(7L, 99L, requestValido()))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("Imagen no encontrada: 99");
+
+        verify(imagenEtiquetaRepository, never()).findByImagenIdImagen(any());
+    }
+
+    // ---------------------------------------------------------------
     // nombreUsuario
     // ---------------------------------------------------------------
 
@@ -424,5 +819,30 @@ class PortfolioServiceTest {
         request.setUrl("https://x/img.png");
         request.setMedio(MedioPortfolio.DIGITAL);
         return request;
+    }
+
+    private Etiqueta etiquetaDe(Long id, String nombre, EtiquetaEstado estado, Usuario creador) {
+        return Etiqueta.builder()
+                .idEtiqueta(id)
+                .nombre(nombre)
+                .descripcion("descripcion")
+                .categoria(CategoriaEtiqueta.builder()
+                        .idCategoriaEtiqueta(1L)
+                        .nombre("Estilo")
+                        .descripcion("Estilo artistico")
+                        .activo(true)
+                        .build())
+                .creadoPor(creador)
+                .estado(estado)
+                .vecesSolicitada(0)
+                .fechaCreacion(LocalDateTime.of(2026, 1, 1, 10, 0))
+                .build();
+    }
+
+    private ImagenEtiqueta fila(Imagen imagen, Etiqueta etiqueta) {
+        return ImagenEtiqueta.builder()
+                .imagen(imagen)
+                .etiqueta(etiqueta)
+                .build();
     }
 }

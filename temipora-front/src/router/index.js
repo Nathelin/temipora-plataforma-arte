@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../components/Login.vue'
 import Usuarios from '../components/Usuarios.vue'
 import TiposAdmin from '../components/TiposAdmin.vue'
+import EtiquetasAdmin from '../components/EtiquetasAdmin.vue'
 import Registro from '../components/Registro.vue'
 import TOS from '../components/TOS.vue'
 import MainLayout from '../layouts/MainLayout.vue'
@@ -80,6 +81,12 @@ const routes = [
         component: TiposAdmin,
         props: { tipo: 'servicio' },
         meta: { title: 'Tipos de servicio' },
+      },
+      {
+        path: 'etiquetas',
+        name: 'etiquetas-admin',
+        component: EtiquetasAdmin,
+        meta: { title: 'Gestión de etiquetas' },
       },
     ],
   },

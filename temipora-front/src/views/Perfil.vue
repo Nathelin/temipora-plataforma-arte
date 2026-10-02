@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { acceptImagenes, esImagenPermitida } from '../servicios/archivos'
+import SelectorEtiquetas from '../components/SelectorEtiquetas.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -80,15 +81,36 @@ const materialesImagen = ref('')
 const contenidoSensibleImagen = ref('')
 const archivoImagen = ref(null)
 const previewImagen = ref('')
+const modoImagen = ref('crear')
+const etiquetasImagen = ref([])
+const imagenEditando = ref(null)
 
 function abrirAltaImagen() {
+  modoImagen.value = 'crear'
+  imagenEditando.value = null
   tituloImagen.value = ''
   descripcionImagen.value = ''
   medioImagen.value = 'TRADICIONAL'
   materialesImagen.value = ''
   contenidoSensibleImagen.value = ''
+  etiquetasImagen.value = []
   archivoImagen.value = null
   previewImagen.value = ''
+  errorPortfolio.value = ''
+  portfolioModalAbierto.value = true
+}
+
+function abrirEdicionImagen(imagen) {
+  modoImagen.value = 'editar'
+  imagenEditando.value = imagen
+  tituloImagen.value = imagen.titulo
+  descripcionImagen.value = imagen.descripcion
+  medioImagen.value = imagen.medio
+  materialesImagen.value = imagen.materiales || ''
+  contenidoSensibleImagen.value = imagen.contenidoSensible || ''
+  etiquetasImagen.value = [...(imagen.etiquetas || [])]
+  archivoImagen.value = null
+  previewImagen.value = imagen.url
   errorPortfolio.value = ''
   portfolioModalAbierto.value = true
 }
@@ -127,7 +149,8 @@ function revelarImagenSensible() {
 }
 
 async function guardarImagenPortfolio() {
-  if (!archivoImagen.value) {
+  const enEdicion = modoImagen.value === 'editar'
+  if (!enEdicion && !archivoImagen.value) {
     errorPortfolio.value = 'Selecciona una imagen.'
     return
   }
@@ -143,16 +166,36 @@ async function guardarImagenPortfolio() {
   guardandoImagen.value = true
   errorPortfolio.value = ''
   try {
-    const url = await subirArchivo(archivoImagen.value)
-    const res = await api.post(`/portfolio/usuarios/${perfil.value.idUsuario}/imagenes`, {
+    let url = enEdicion ? imagenEditando.value.url : null
+    if (archivoImagen.value) {
+      url = await subirArchivo(archivoImagen.value)
+    }
+    const cuerpo = {
       titulo: tituloImagen.value,
       descripcion: descripcionImagen.value,
-      url,
+      url: url || previewImagen.value,
       medio: medioImagen.value,
       materiales: materialesImagen.value,
       contenidoSensible: contenidoSensibleImagen.value || null,
-    })
-    perfil.value.portfolio.unshift(res.data)
+      idsEtiqueta: etiquetasImagen.value.map(e => e.idEtiqueta),
+    }
+
+    if (enEdicion) {
+      const res = await api.put(
+        `/portfolio/usuarios/${perfil.value.idUsuario}/imagenes/${imagenEditando.value.idImagen}`,
+        cuerpo,
+      )
+      const indice = perfil.value.portfolio.findIndex(o => o.idImagen === res.data.idImagen)
+      if (indice !== -1) {
+        perfil.value.portfolio[indice] = res.data
+      }
+      if (imagenSeleccionada.value && imagenSeleccionada.value.idImagen === res.data.idImagen) {
+        imagenSeleccionada.value = res.data
+      }
+    } else {
+      const res = await api.post(`/portfolio/usuarios/${perfil.value.idUsuario}/imagenes`, cuerpo)
+      perfil.value.portfolio.unshift(res.data)
+    }
     cerrarAltaImagen()
   } catch (e) {
     errorPortfolio.value = e.response?.data?.message || 'No se pudo guardar la imagen.'
@@ -170,6 +213,86 @@ async function subirArchivo(archivo) {
 
 function irAConfiguracion(seccion = 'perfil') {
   router.push({ name: `configuracion-${seccion}` })
+}
+
+// ---------------------------------------------------------------
+// Mis etiquetas (UC-59)
+// ---------------------------------------------------------------
+
+const misEtiquetas = ref([])
+const cargandoEtiquetas = ref(false)
+const etiquetasCargadas = ref(false)
+const mensajeEtiquetas = ref('')
+const errorEtiquetas = ref('')
+
+watch(tabActiva, (tab) => {
+  if (tab === 'mis-etiquetas' && !etiquetasCargadas.value) {
+    cargarMisEtiquetas()
+  }
+})
+
+watch(() => route.params.nombreUsuario, () => {
+  etiquetasCargadas.value = false
+  misEtiquetas.value = []
+  mensajeEtiquetas.value = ''
+  errorEtiquetas.value = ''
+  if (tabActiva.value === 'mis-etiquetas') {
+    tabActiva.value = 'portfolio'
+  }
+})
+
+async function cargarMisEtiquetas() {
+  cargandoEtiquetas.value = true
+  errorEtiquetas.value = ''
+  try {
+    const res = await api.get('/etiquetas/mis')
+    misEtiquetas.value = res.data
+    etiquetasCargadas.value = true
+  } catch (e) {
+    errorEtiquetas.value = e.response?.data?.message || 'No se pudieron cargar tus etiquetas.'
+  } finally {
+    cargandoEtiquetas.value = false
+  }
+}
+
+async function reSolicitarEtiqueta(e) {
+  const confirmar = window.confirm(
+    `¿Re-solicitar la etiqueta "${e.nombre}" para que los administradores la reevalúen?`,
+  )
+  if (!confirmar) return
+
+  mensajeEtiquetas.value = ''
+  try {
+    await api.post(`/etiquetas/${e.idEtiqueta}/re-solicitar`)
+    await cargarMisEtiquetas()
+    mensajeEtiquetas.value = `Se registró la re-solicitud de "${e.nombre}".`
+  } catch (err) {
+    await cargarMisEtiquetas()
+    errorEtiquetas.value = err.response?.data?.message || 'No se pudo re-solicitar la etiqueta.'
+  }
+}
+
+function formatearFecha(fecha) {
+  if (!fecha) return null
+  return new Date(fecha).toLocaleString('es-AR', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function chipEstadoEtiqueta(estado) {
+  return {
+    VALIDA: 'bg-green-500/10 text-green-700',
+    PENDIENTE: 'bg-coral/15 text-coral',
+    RECHAZADA: 'bg-rojizo/10 text-rojizo',
+    INACTIVA: 'bg-cafe/10 text-cafe/60',
+  }[estado] || 'bg-durazno/40 text-cafe'
+}
+
+function textoEstadoEtiqueta(estado) {
+  return {
+    VALIDA: 'Válida',
+    PENDIENTE: 'Pendiente',
+    RECHAZADA: 'Rechazada',
+    INACTIVA: 'Dada de baja',
+  }[estado] || estado
 }
 </script>
 
@@ -265,6 +388,14 @@ function irAConfiguracion(seccion = 'perfil') {
             >
               Productos
             </button>
+            <button
+              v-if="esDuenio"
+              class="py-3 text-sm transition border-b-2"
+              :class="tabActiva === 'mis-etiquetas' ? 'border-coral text-granate font-medium' : 'border-transparent text-cafe/60 hover:text-cafe'"
+              @click="tabActiva = 'mis-etiquetas'"
+            >
+              Mis etiquetas
+            </button>
           </div>
 
             <div v-if="tabActiva === 'portfolio'" class="mt-6">
@@ -327,6 +458,54 @@ function irAConfiguracion(seccion = 'perfil') {
               <p class="text-sm text-rojizo mt-3">{{ p.precio }}</p>
             </div>
           </div>
+
+          <div v-if="tabActiva === 'mis-etiquetas' && esDuenio" class="mt-6">
+            <p v-if="mensajeEtiquetas" class="text-sm text-green-700 bg-green-500/10 border border-green-500/20 rounded-lg px-4 py-3 mb-4">
+              {{ mensajeEtiquetas }}
+            </p>
+            <p v-if="errorEtiquetas" class="text-sm text-rojizo bg-rojizo/5 border border-rojizo/20 rounded-lg px-4 py-3 mb-4">
+              {{ errorEtiquetas }}
+            </p>
+
+            <p v-if="cargandoEtiquetas" class="text-sm text-cafe/60 py-6 text-center">
+              Cargando tus etiquetas...
+            </p>
+            <template v-else>
+              <p v-if="!misEtiquetas.length" class="text-sm text-cafe/60 py-6">
+                Todavía no propusiste etiquetas. Puedes crear una al subir una imagen a tu portfolio.
+              </p>
+              <div v-else class="space-y-4">
+                <div
+                  v-for="e in misEtiquetas"
+                  :key="e.idEtiqueta"
+                  class="bg-blanco border border-rosa rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-4"
+                >
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-3 flex-wrap">
+                      <h3 class="text-granate font-medium">{{ e.nombre }}</h3>
+                      <span class="px-2.5 py-0.5 rounded-full text-xs" :class="chipEstadoEtiqueta(e.estado)">
+                        {{ textoEstadoEtiqueta(e.estado) }}
+                      </span>
+                    </div>
+                    <p class="text-sm text-cafe/70 mt-1">{{ e.descripcion }}</p>
+                    <p class="text-xs text-cafe/50 mt-2">
+                      {{ e.nombreCategoria }} · Propuesta el {{ formatearFecha(e.fechaCreacion) }}
+                      <template v-if="e.fechaEvaluacion">
+                        · Evaluada el {{ formatearFecha(e.fechaEvaluacion) }}{{ e.evaluadoPor ? ` por @${e.evaluadoPor}` : '' }}
+                      </template>
+                    </p>
+                  </div>
+                  <button
+                    v-if="e.estado === 'RECHAZADA'"
+                    class="shrink-0 px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
+                    @click="reSolicitarEtiqueta(e)"
+                  >
+                    Re-solicitar
+                  </button>
+                </div>
+              </div>
+            </template>
+          </div>
         </template>
 
         <template v-else>
@@ -351,14 +530,16 @@ function irAConfiguracion(seccion = 'perfil') {
       </div>
     </div>
 
-    <!-- Modal alta de imagen de portfolio -->
+    <!-- Modal alta / edición de imagen de portfolio -->
     <div
       v-if="portfolioModalAbierto"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-granate/40 px-4"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-granate/40 px-4"
       @click.self="cerrarAltaImagen"
     >
       <div class="w-full max-w-5xl bg-blanco rounded-2xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-lg text-granate mb-4">Subir imagen a portfolio</h2>
+        <h2 class="text-lg text-granate mb-4">
+          {{ modoImagen === 'editar' ? 'Editar imagen del portfolio' : 'Subir imagen a portfolio' }}
+        </h2>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div class="space-y-5">
@@ -395,6 +576,8 @@ function irAConfiguracion(seccion = 'perfil') {
               </select>
             </div>
 
+            <SelectorEtiquetas v-model="etiquetasImagen" />
+
             <p v-if="errorPortfolio" class="text-rojizo text-sm">{{ errorPortfolio }}</p>
           </div>
 
@@ -406,14 +589,14 @@ function irAConfiguracion(seccion = 'perfil') {
             </div>
             <input id="portfolio-imagen" type="file" :accept="acceptImagenes" class="sr-only" @change="onImagenPortfolioChange" />
             <label for="portfolio-imagen" class="mt-4 inline-flex cursor-pointer justify-center rounded-md border border-coral bg-coral/10 px-4 py-2 text-sm text-granate hover:bg-coral/20 transition">
-              {{ archivoImagen ? 'Cambiar imagen' : 'Seleccionar imagen' }}
+              {{ archivoImagen ? 'Cambiar imagen' : (modoImagen === 'editar' ? 'Cambiar imagen (opcional)' : 'Seleccionar imagen') }}
             </label>
           </div>
         </div>
 
         <div class="flex items-center justify-end gap-3 mt-6">
           <button class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition" @click="cerrarAltaImagen">Cancelar</button>
-          <button :disabled="guardandoImagen || !archivoImagen" class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm" @click="guardarImagenPortfolio">
+          <button :disabled="guardandoImagen || (modoImagen === 'crear' && !archivoImagen)" class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm" @click="guardarImagenPortfolio">
             {{ guardandoImagen ? 'Guardando...' : 'Guardar' }}
           </button>
         </div>
@@ -457,7 +640,28 @@ function irAConfiguracion(seccion = 'perfil') {
           <p><span class="text-rojizo">Subida:</span> {{ new Date(imagenSeleccionada.fechaSubida).toLocaleString() }}</p>
           <p><span class="text-rojizo">Contenido sensible:</span> {{ imagenSeleccionada.contenidoSensible || 'No' }}</p>
         </div>
-        <div class="flex justify-end mt-6">
+        <div v-if="imagenSeleccionada.etiquetas && imagenSeleccionada.etiquetas.length" class="mt-3">
+          <span class="text-sm text-rojizo">Etiquetas:</span>
+          <div class="flex flex-wrap gap-2 mt-1.5">
+            <span
+              v-for="e in imagenSeleccionada.etiquetas"
+              :key="e.idEtiqueta"
+              class="px-2.5 py-0.5 rounded-full text-xs"
+              :class="e.estado === 'PENDIENTE' ? 'bg-coral/15 text-coral' : 'bg-durazno/40 text-cafe'"
+              :title="e.estado === 'PENDIENTE' ? 'Pendiente de evaluación' : 'Etiqueta disponible'"
+            >
+              {{ e.nombre }}<span v-if="e.estado === 'PENDIENTE'" class="opacity-70"> · pendiente</span>
+            </span>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 mt-6">
+          <button
+            v-if="esDuenio"
+            class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
+            @click="abrirEdicionImagen(imagenSeleccionada)"
+          >
+            Editar
+          </button>
           <button class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition" @click="cerrarDetalleImagen">Cerrar</button>
         </div>
       </div>

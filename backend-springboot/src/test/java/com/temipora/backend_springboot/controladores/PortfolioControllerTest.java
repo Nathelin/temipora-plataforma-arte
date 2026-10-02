@@ -8,10 +8,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -189,6 +191,92 @@ class PortfolioControllerTest {
                 .andExpect(jsonPath("$.message").exists());
 
         verify(portfolioService, never()).crear(any(), any());
+    }
+
+    // ---------------------------------------------------------------
+    // PUT /api/portfolio/usuarios/{idUsuario}/imagenes/{idImagen}
+    // ---------------------------------------------------------------
+
+    @Test
+    void modificar_imagen_sinToken_devuelve401() throws Exception {
+        mockMvc.perform(put("/api/portfolio/usuarios/7/imagenes/5")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestValido()))
+                .andExpect(status().isUnauthorized());
+
+        verify(portfolioService, never()).modificar(any(), any(), any());
+    }
+
+    @Test
+    void modificar_imagen_tokenDeCliente_devuelve403() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+
+        mockMvc.perform(put("/api/portfolio/usuarios/7/imagenes/5")
+                .header("Authorization", "Bearer " + token("cliente42", ERol.CLIENTE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestValido()))
+                .andExpect(status().isForbidden());
+
+        verify(portfolioService, never()).modificar(any(), any(), any());
+    }
+
+    @Test
+    void modificar_imagen_artistaDistintoAlDelToken_devuelve403() throws Exception {
+        stubUsuarioConRol("artista777", ERol.ARTISTA);
+        when(portfolioService.nombreUsuario(7L)).thenReturn("otroArtista");
+
+        mockMvc.perform(put("/api/portfolio/usuarios/7/imagenes/5")
+                .header("Authorization", "Bearer " + token("artista777", ERol.ARTISTA))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestValido()))
+                .andExpect(status().isForbidden());
+
+        verify(portfolioService, never()).modificar(any(), any(), any());
+    }
+
+    @Test
+    void modificar_imagen_artistaCoincide_devuelve200() throws Exception {
+        stubUsuarioConRol("artista777", ERol.ARTISTA);
+        when(portfolioService.nombreUsuario(7L)).thenReturn("artista777");
+        when(portfolioService.modificar(eq(7L), eq(5L), any())).thenReturn(imagenDe("Mi obra editada"));
+
+        mockMvc.perform(put("/api/portfolio/usuarios/7/imagenes/5")
+                .header("Authorization", "Bearer " + token("artista777", ERol.ARTISTA))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestValido()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.titulo").value("Mi obra editada"));
+
+        verify(portfolioService).modificar(eq(7L), eq(5L), any());
+    }
+
+    @Test
+    void modificar_imagen_inexistente_devuelve404() throws Exception {
+        stubUsuarioConRol("artista777", ERol.ARTISTA);
+        when(portfolioService.nombreUsuario(7L)).thenReturn("artista777");
+        when(portfolioService.modificar(eq(7L), eq(99L), any()))
+                .thenThrow(new NoSuchElementException("Imagen no encontrada: 99"));
+
+        mockMvc.perform(put("/api/portfolio/usuarios/7/imagenes/99")
+                .header("Authorization", "Bearer " + token("artista777", ERol.ARTISTA))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestValido()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Imagen no encontrada: 99"));
+    }
+
+    @Test
+    void modificar_imagen_bodyInvalido_devuelve400() throws Exception {
+        stubUsuarioConRol("artista777", ERol.ARTISTA);
+
+        mockMvc.perform(put("/api/portfolio/usuarios/7/imagenes/5")
+                .header("Authorization", "Bearer " + token("artista777", ERol.ARTISTA))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").exists());
+
+        verify(portfolioService, never()).modificar(any(), any(), any());
     }
 
     // ---------------------------------------------------------------
