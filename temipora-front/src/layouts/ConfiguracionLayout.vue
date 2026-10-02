@@ -3,9 +3,12 @@ import { useRoute } from 'vue-router'
 
 const route = useRoute()
 
+const esArtista = localStorage.getItem('rol') === 'ARTISTA'
+
 const secciones = [
   { nombre: 'Perfil', to: '/configuracion/perfil' },
   { nombre: 'Privacidad y contenido', to: '/configuracion/privacidad' },
+  ...(esArtista ? [{ nombre: 'Mis etiquetas', to: '/configuracion/etiquetas' }] : []),
   { nombre: 'Términos de uso', to: '/configuracion/terminos' },
   { nombre: 'Cuenta y seguridad', to: '/configuracion/cuenta' },
 ]

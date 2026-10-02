@@ -1,8 +1,10 @@
 ﻿<script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { useSubirImagen } from '../composables/useSubirImagen'
 
 const router = useRouter()
+const { abrir } = useSubirImagen()
 
 const token = ref(localStorage.getItem('token') || '')
 const rol = ref(localStorage.getItem('rol') || '')
@@ -10,9 +12,39 @@ const nombreUsuario = ref(localStorage.getItem('nombreUsuario') || '')
 const urlFotoPerfil = ref(localStorage.getItem('urlFotoPerfil') || '')
 
 const menuAbierto = ref(false)
+const subirAbierto = ref(false)
+const contenedorMenu = ref(null)
+const contenedorSubir = ref(null)
 
 const estaLogueado = computed(() => !!token.value)
 const esAdmin = computed(() => rol.value === 'ADMIN')
+const esArtista = computed(() => rol.value === 'ARTISTA')
+
+function alternarMenu() {
+  menuAbierto.value = !menuAbierto.value
+}
+
+function subirImagen() {
+  subirAbierto.value = false
+  abrir('crear')
+  router.push({ name: 'portfolio-subir' })
+}
+
+function manejarClickExterior(event) {
+  if (contenedorMenu.value && !contenedorMenu.value.contains(event.target)) {
+    menuAbierto.value = false
+  }
+  if (contenedorSubir.value && !contenedorSubir.value.contains(event.target)) {
+    subirAbierto.value = false
+  }
+}
+
+function manejarTecla(event) {
+  if (event.key === 'Escape') {
+    menuAbierto.value = false
+    subirAbierto.value = false
+  }
+}
 
 function actualizarFotoPerfil(event) {
   urlFotoPerfil.value = event.detail?.url || ''
@@ -20,10 +52,14 @@ function actualizarFotoPerfil(event) {
 
 onMounted(() => {
   window.addEventListener('perfil-foto-actualizada', actualizarFotoPerfil)
+  document.addEventListener('click', manejarClickExterior)
+  document.addEventListener('keydown', manejarTecla)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('perfil-foto-actualizada', actualizarFotoPerfil)
+  document.removeEventListener('click', manejarClickExterior)
+  document.removeEventListener('keydown', manejarTecla)
 })
 
 function cerrarSesion() {
@@ -47,7 +83,7 @@ function irAInicio() {
 <template>
   <div class="min-h-screen w-full flex flex-col bg-crema text-cafe">
     <header class="bg-blanco border-b border-rosa sticky top-0 z-30">
-      <div class="max-w-screen-2xl mx-auto px-4 sm:px-8 h-12 flex items-center justify-between">
+      <div class="max-w-screen-2xl mx-auto px-4 sm:px-8 h-10 flex items-center justify-between">
         <!-- Izquierda -->
         <div class="flex items-center gap-6">
           <button class="text-xl font-normal text-granate" @click="irAInicio">
@@ -82,18 +118,58 @@ function irAInicio() {
           </template>
 
           <template v-else>
-            <div class="relative" @mouseenter="menuAbierto = true" @mouseleave="menuAbierto = false">
+            <!-- Botón Subir (solo artistas) -->
+            <div v-if="esArtista" ref="contenedorSubir" class="relative">
+              <button
+                class="px-3 py-1.5 rounded-md text-sm text-granate border border-rosa hover:bg-rosa/20 transition"
+                aria-haspopup="menu"
+                :aria-expanded="subirAbierto"
+                @click="subirAbierto = !subirAbierto"
+              >
+                <span aria-hidden="true">+</span><span class="hidden sm:inline"> Subir</span><span class="hidden sm:inline" aria-hidden="true"> ▾</span>
+              </button>
+
+              <div
+                v-if="subirAbierto"
+                class="absolute right-0 mt-2 w-52 rounded-lg bg-blanco shadow-lg border border-rosa overflow-hidden z-40"
+                role="menu"
+              >
+                <button
+                  class="w-full text-left px-4 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
+                  role="menuitem"
+                  @click="subirImagen"
+                >
+                  Imagen
+                </button>
+                <button
+                  disabled
+                  class="w-full text-left px-4 py-2 text-sm text-cafe/40 cursor-not-allowed"
+                  aria-disabled="true"
+                >
+                  Producto <span class="text-xs">· Próximamente</span>
+                </button>
+                <button
+                  disabled
+                  class="w-full text-left px-4 py-2 text-sm text-cafe/40 cursor-not-allowed"
+                  aria-disabled="true"
+                >
+                  Servicio <span class="text-xs">· Próximamente</span>
+                </button>
+              </div>
+            </div>
+
+            <div ref="contenedorMenu" class="relative">
               <div class="flex items-center gap-2">
-                <button class="flex items-center gap-2" @click="irAPerfil">
+                <button class="flex items-center gap-2" aria-haspopup="menu" :aria-expanded="menuAbierto" @click="alternarMenu">
                   <img
                     v-if="urlFotoPerfil"
                     :src="urlFotoPerfil"
                     alt="Perfil"
-                    class="w-9 h-9 rounded-full object-cover border border-rosa"
+                    class="w-8 h-8 rounded-full object-cover border border-rosa"
                   />
                   <span
                     v-else
-                    class="w-9 h-9 rounded-full bg-coral/20 text-granate flex items-center justify-center text-sm"
+                    class="w-8 h-8 rounded-full bg-coral/20 text-granate flex items-center justify-center text-sm"
                   >
                     {{ (nombreUsuario || '?').charAt(0).toUpperCase() }}
                   </span>
@@ -103,30 +179,35 @@ function irAInicio() {
 
               <div
                 v-if="menuAbierto"
-                class="absolute right-0 mt-2 w-44 rounded-lg bg-blanco shadow-lg border border-rosa overflow-hidden"
+                class="absolute right-0 mt-2 w-44 rounded-lg bg-blanco shadow-lg border border-rosa overflow-hidden z-40"
+                role="menu"
               >
                 <button
                   class="w-full text-left px-4 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
-                  @click="irAPerfil"
+                  role="menuitem"
+                  @click="menuAbierto = false; irAPerfil()"
                 >
                   Perfil
                 </button>
                 <button
                   v-if="esAdmin"
                   class="w-full text-left px-4 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
-                  @click="router.push({ name: 'usuarios' })"
+                  role="menuitem"
+                  @click="menuAbierto = false; router.push({ name: 'usuarios' })"
                 >
                   Panel de administración
                 </button>
                 <button
                   class="w-full text-left px-4 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
-                  @click="router.push({ name: 'configuracion-perfil' })"
+                  role="menuitem"
+                  @click="menuAbierto = false; router.push({ name: 'configuracion-perfil' })"
                 >
                   Configuración
                 </button>
                 <button
                   class="w-full text-left px-4 py-2 text-sm text-rojizo hover:bg-rosa/20 transition"
-                  @click="cerrarSesion"
+                  role="menuitem"
+                  @click="menuAbierto = false; cerrarSesion()"
                 >
                   Cerrar sesión
                 </button>
