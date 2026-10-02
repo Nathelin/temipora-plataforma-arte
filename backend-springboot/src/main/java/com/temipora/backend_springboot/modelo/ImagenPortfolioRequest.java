@@ -1,5 +1,7 @@
 package com.temipora.backend_springboot.modelo;
 
+import java.util.List;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -28,4 +30,7 @@ public class ImagenPortfolioRequest {
     private String materiales;
 
     private ContenidoSensible contenidoSensible;
+
+    @Size(max = 5, message = "Una imagen puede tener como máximo 5 etiquetas.")
+    private List<Long> idsEtiqueta;
 }

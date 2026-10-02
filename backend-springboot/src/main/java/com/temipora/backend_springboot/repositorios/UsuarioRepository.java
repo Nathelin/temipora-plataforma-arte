@@ -20,10 +20,12 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     boolean existsByNombreUsuarioIgnoreCase(String nombreUsuario);
     boolean existsByRol_Nombre(ERol nombre);
 
+    // Los patrones LIKE se arman en el servicio (sin null dentro de CONCAT):
+    // en PostgreSQL un null sin tipo en ('%'||?||'%') resuelve como bytea y falla lower(bytea).
     @Query("""
         SELECT u FROM Usuario u WHERE
-        (:nombreUsuario IS NULL OR lower(u.nombreUsuario) LIKE lower(CONCAT('%', :nombreUsuario, '%'))) AND
-        (:correo IS NULL OR lower(u.correo) LIKE lower(CONCAT('%', :correo, '%'))) AND
+        (:nombreUsuario IS NULL OR lower(u.nombreUsuario) LIKE :nombreUsuario) AND
+        (:correo IS NULL OR lower(u.correo) LIKE :correo) AND
         (:estadoCuenta IS NULL OR u.estadoCuenta = :estadoCuenta) AND
         (:rolNombre IS NULL OR u.rol.nombre = :rolNombre)
         """)

@@ -1,9 +1,11 @@
 package com.temipora.backend_springboot.modelo;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 
 @Getter
 @Builder
@@ -19,6 +21,10 @@ public class ImagenPortfolioDTO {
     private String materiales;
     private ContenidoSensible contenidoSensible;
     private boolean requiereAdvertencia;
+
+    @Builder.Default
+    @Setter
+    private List<EtiquetaDTO> etiquetas = List.of();
 
     public static ImagenPortfolioDTO desdeImagen(Imagen imagen) {
         return desdeImagen(imagen, false);

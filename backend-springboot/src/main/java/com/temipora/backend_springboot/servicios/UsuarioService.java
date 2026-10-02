@@ -121,11 +121,18 @@ public class UsuarioService {
 
     public Page<UsuarioDTO> obtenerUsuariosPaginados(String nombreUsuario, String correo, Boolean estadoCuenta, ERol rol, Pageable pageable) {
         return usuarioRepository.findByFilters(
-                nombreUsuario == null || nombreUsuario.isEmpty() ? null : nombreUsuario,
-                correo == null || correo.isEmpty() ? null : correo,
+                aPatronBusqueda(nombreUsuario),
+                aPatronBusqueda(correo),
                 estadoCuenta,
                 rol,
                 pageable)
                 .map(UsuarioDTO::desdeUsuario);
+    }
+
+    private String aPatronBusqueda(String texto) {
+        if (texto == null || texto.isBlank()) {
+            return null;
+        }
+        return "%" + texto.trim().toLowerCase() + "%";
     }
 }
