@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
@@ -38,4 +40,14 @@ public interface EtiquetaRepository extends JpaRepository<Etiqueta, Long> {
     List<Etiqueta> findByCategoriaIdCategoriaEtiquetaOrderByNombreAsc(Long idCategoria);
 
     long countByCategoriaIdCategoriaEtiquetaAndEstadoIn(Long idCategoria, Collection<EtiquetaEstado> estados);
+
+    @Query("""
+        SELECT DISTINCT e FROM ImagenEtiqueta ie
+          JOIN ie.etiqueta e
+          JOIN ie.imagen i
+        WHERE i.portfolio.idPortfolio = :portfolioId
+          AND i.estado = true
+        ORDER BY e.nombre
+        """)
+    List<Etiqueta> findEtiquetasDePortfolio(@Param("portfolioId") Long portfolioId);
 }

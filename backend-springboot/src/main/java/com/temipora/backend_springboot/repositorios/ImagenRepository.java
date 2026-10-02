@@ -21,23 +21,30 @@ public interface ImagenRepository extends JpaRepository<Imagen,Long>{
 
     @Query("""
         SELECT i FROM Imagen i
-          WHERE i.portfolio.idPortfolio = :portfolioId
+        WHERE i.portfolio.idPortfolio = :portfolioId
           AND i.estado = true
-        ORDER BY i.fechaSubida DESC
+          AND (:titulo IS NULL OR LOWER(i.titulo) LIKE :titulo)
+          AND (:idEtiqueta IS NULL OR EXISTS (
+                SELECT ie FROM ImagenEtiqueta ie
+                WHERE ie.imagen = i AND ie.etiqueta.idEtiqueta = :idEtiqueta))
+          AND (:medio IS NULL OR i.medio = :medio)
+          AND (:conSensible IS NULL
+               OR (:conSensible = true AND i.contenidoSensible IS NOT NULL)
+               OR (:conSensible = false AND i.contenidoSensible IS NULL))
+          AND (i.contenidoSensible IS NULL
+               OR :ocultarSensibles = false
+               OR i.usuario.idUsuario = :viewerId)
+        ORDER BY CASE WHEN :ordenAsc = true THEN i.fechaSubida END ASC,
+                 CASE WHEN :ordenAsc = false THEN i.fechaSubida END DESC
         """)
-    Page<Imagen> findVisibleForViewer(
-            @Param("portfolioId") Long portfolioId,
-            Pageable pageable);
-
-    @Query("""
-        SELECT i FROM Imagen i
-          WHERE i.portfolio.idPortfolio = :portfolioId
-          AND i.estado = true
-          AND (i.contenidoSensible IS NULL OR i.usuario.idUsuario = :viewerId)
-        ORDER BY i.fechaSubida DESC
-        """)
-    Page<Imagen> findVisibleForViewerOcultandoSensibles(
+    Page<Imagen> findParaVisor(
             @Param("portfolioId") Long portfolioId,
             @Param("viewerId") Long viewerId,
+            @Param("titulo") String titulo,
+            @Param("idEtiqueta") Long idEtiqueta,
+            @Param("medio") MedioPortfolio medio,
+            @Param("conSensible") Boolean conSensible,
+            @Param("ocultarSensibles") boolean ocultarSensibles,
+            @Param("ordenAsc") boolean ordenAsc,
             Pageable pageable);
 }

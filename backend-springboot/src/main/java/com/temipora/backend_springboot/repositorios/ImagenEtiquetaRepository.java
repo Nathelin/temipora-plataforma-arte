@@ -16,4 +16,6 @@ public interface ImagenEtiquetaRepository extends JpaRepository<ImagenEtiqueta, 
     List<ImagenEtiqueta> findByImagenIdImagenIn(Collection<Long> idsImagen);
 
     void deleteByEtiquetaIdEtiqueta(Long idEtiqueta);
+
+    void deleteByImagenIdImagen(Long idImagen);
 }

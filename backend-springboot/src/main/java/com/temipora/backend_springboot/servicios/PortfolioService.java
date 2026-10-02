@@ -20,10 +20,12 @@ import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaDTO;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
+import com.temipora.backend_springboot.modelo.FiltroPortfolioRequest;
 import com.temipora.backend_springboot.modelo.Imagen;
 import com.temipora.backend_springboot.modelo.ImagenEtiqueta;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioDTO;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioRequest;
+import com.temipora.backend_springboot.modelo.MedioPortfolio;
 import com.temipora.backend_springboot.modelo.Portfolio;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
@@ -76,7 +78,10 @@ public class PortfolioService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ImagenPortfolioDTO> listarParaVisor(Long portfolioId, Long viewerId, Pageable pageable) {
+    public Page<ImagenPortfolioDTO> listarParaVisor(
+            Long portfolioId, Long viewerId, FiltroPortfolioRequest filtro, Pageable pageable) {
+        FiltroPortfolioRequest f = filtro == null ? new FiltroPortfolioRequest() : filtro;
+
         // 1. Obtener preferencia del visitante (o default ADVERTIR)
         EPreferenciaContenidoSensible pref = (viewerId != null)
             ? usuarioRepository.findByIdUsuario(viewerId)
@@ -84,10 +89,17 @@ public class PortfolioService {
                 .orElse(EPreferenciaContenidoSensible.ADVERTIR)
             : EPreferenciaContenidoSensible.ADVERTIR;
 
-        // 2. Consultar imágenes visibles según preferencia
-        Page<Imagen> page = pref == EPreferenciaContenidoSensible.OCULTAR
-            ? imagenRepository.findVisibleForViewerOcultandoSensibles(portfolioId, viewerId, pageable)
-            : imagenRepository.findVisibleForViewer(portfolioId, pageable);
+        // 2. Consultar imágenes visibles según preferencia y filtros
+        Page<Imagen> page = imagenRepository.findParaVisor(
+            portfolioId,
+            viewerId,
+            normalizarTitulo(f.getTitulo()),
+            f.getIdEtiqueta(),
+            parseMedio(f.getMedio()),
+            parseSensible(f.getSensible()),
+            pref == EPreferenciaContenidoSensible.OCULTAR,
+            parseOrdenAsc(f.getOrden()),
+            pageable);
 
         // 3. Mapear a DTO con campo calculado requiereAdvertencia
         Map<Long, List<EtiquetaDTO>> porImagen = etiquetasPorImagen(idsDe(page.getContent()));
@@ -102,14 +114,26 @@ public class PortfolioService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ImagenPortfolioDTO> listarParaVisorPorNombreUsuario(String nombreUsuario, Long viewerId, Pageable pageable) {
+    public Page<ImagenPortfolioDTO> listarParaVisorPorNombreUsuario(
+            String nombreUsuario, Long viewerId, FiltroPortfolioRequest filtro, Pageable pageable) {
         Usuario artista = obtenerArtista(nombreUsuario);
         Portfolio portfolio = portfolioRepository.findByArtista(artista)
             .orElse(null);
         if (portfolio == null) {
             return Page.empty(pageable);
         }
-        return listarParaVisor(portfolio.getIdPortfolio(), viewerId, pageable);
+        return listarParaVisor(portfolio.getIdPortfolio(), viewerId, filtro, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EtiquetaDTO> etiquetasDePortfolio(String nombreUsuario) {
+        Usuario artista = obtenerArtista(nombreUsuario);
+        return portfolioRepository.findByArtista(artista)
+            .map(portfolio -> etiquetaRepository
+                .findEtiquetasDePortfolio(portfolio.getIdPortfolio()).stream()
+                .map(EtiquetaDTO::desdeEtiqueta)
+                .toList())
+            .orElse(List.of());
     }
 
     @Transactional
@@ -207,10 +231,72 @@ public class PortfolioService {
         return dtoConEtiquetas(guardada, false);
     }
 
+    @Transactional
+    public ImagenPortfolioDTO darDeBaja(Long idUsuario, Long idImagen) {
+        Usuario artista = usuarioRepository.findByIdUsuario(idUsuario)
+            .orElseThrow(() -> new NoSuchElementException("Artista no encontrado: " + idUsuario));
+        validarArtista(artista);
+
+        Imagen imagen = imagenRepository.findById(idImagen)
+            .orElseThrow(() -> new NoSuchElementException("Imagen no encontrada: " + idImagen));
+        if (!artista.getIdUsuario().equals(imagen.getPortfolio().getArtista().getIdUsuario())) {
+            throw new NoSuchElementException("Imagen no encontrada: " + idImagen);
+        }
+        if (!imagen.isEstado()) {
+            throw new IllegalArgumentException("La imagen ya fue dada de baja.");
+        }
+
+        imagen.setEstado(false);
+        Imagen guardada = imagenRepository.save(imagen);
+        imagenEtiquetaRepository.deleteByImagenIdImagen(idImagen);
+        return dtoConEtiquetas(guardada, false);
+    }
+
     public String nombreUsuario(Long idUsuario) {
         return usuarioRepository.findByIdUsuario(idUsuario)
             .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idUsuario))
             .getNombreUsuario();
+    }
+
+    private String normalizarTitulo(String titulo) {
+        if (titulo == null || titulo.isBlank()) {
+            return null;
+        }
+        return "%" + titulo.trim().toLowerCase() + "%";
+    }
+
+    private MedioPortfolio parseMedio(String medio) {
+        if (medio == null || medio.isBlank()) {
+            return null;
+        }
+        return switch (medio.trim().toUpperCase()) {
+            case "DIGITAL" -> MedioPortfolio.DIGITAL;
+            case "TRADICIONAL" -> MedioPortfolio.TRADICIONAL;
+            default -> throw new IllegalArgumentException("Medio no válido: " + medio);
+        };
+    }
+
+    private Boolean parseSensible(String sensible) {
+        if (sensible == null || sensible.isBlank()) {
+            return null;
+        }
+        return switch (sensible.trim().toLowerCase()) {
+            case "true", "si" -> Boolean.TRUE;
+            case "false", "no" -> Boolean.FALSE;
+            default -> throw new IllegalArgumentException(
+                "Filtro de contenido sensible no válido: " + sensible);
+        };
+    }
+
+    private boolean parseOrdenAsc(String orden) {
+        if (orden == null || orden.isBlank()) {
+            return false;
+        }
+        return switch (orden.trim().toUpperCase()) {
+            case "RECIENTE" -> false;
+            case "ANTIGUO" -> true;
+            default -> throw new IllegalArgumentException("Orden no válido: " + orden);
+        };
     }
 
     private Usuario obtenerArtista(String nombreUsuario) {

@@ -3,7 +3,9 @@ package com.temipora.backend_springboot.servicios;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -33,6 +35,7 @@ import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaDTO;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
+import com.temipora.backend_springboot.modelo.FiltroPortfolioRequest;
 import com.temipora.backend_springboot.modelo.Imagen;
 import com.temipora.backend_springboot.modelo.ImagenEtiqueta;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioDTO;
@@ -172,17 +175,17 @@ class PortfolioServiceTest {
     @Test
     void listarParaVisor_sinVisitante_prefPorDefectoYMarcaAdvertencia() {
         Imagen sensible = imagenDe(null, null, "Sensible", ContenidoSensible.DESNUDOS);
-        when(imagenRepository.findVisibleForViewer(10L, PAGEABLE))
+        when(imagenRepository.findParaVisor(eq(10L), isNull(), isNull(), isNull(), isNull(), isNull(), eq(false), eq(false), eq(PAGEABLE)))
                 .thenReturn(new PageImpl<>(List.of(sensible), PAGEABLE, 1));
 
         Page<ImagenPortfolioDTO> resultado = portfolioService
-                .listarParaVisor(10L, null, PAGEABLE);
+                .listarParaVisor(10L, null, filtroVacio(), PAGEABLE);
 
         assertThat(resultado.getContent()).hasSize(1);
         assertThat(resultado.getContent().get(0).isRequiereAdvertencia()).isTrue();
         verify(usuarioRepository, never()).findByIdUsuario(any());
         verify(imagenRepository, never())
-                .findVisibleForViewerOcultandoSensibles(any(), any(), any());
+                .findParaVisor(any(), any(), any(), any(), any(), any(), eq(true), anyBoolean(), any());
     }
 
     @Test
@@ -190,31 +193,31 @@ class PortfolioServiceTest {
         Usuario visitante = usuarioConPref(55L, EPreferenciaContenidoSensible.OCULTAR);
         Imagen sensible = imagenDe(null, null, "Sensible", ContenidoSensible.VIOLENCIA);
         when(usuarioRepository.findByIdUsuario(55L)).thenReturn(Optional.of(visitante));
-        when(imagenRepository.findVisibleForViewerOcultandoSensibles(10L, 55L, PAGEABLE))
+        when(imagenRepository.findParaVisor(eq(10L), eq(55L), isNull(), isNull(), isNull(), isNull(), eq(true), eq(false), eq(PAGEABLE)))
                 .thenReturn(new PageImpl<>(List.of(sensible), PAGEABLE, 1));
 
         Page<ImagenPortfolioDTO> resultado = portfolioService
-                .listarParaVisor(10L, 55L, PAGEABLE);
+                .listarParaVisor(10L, 55L, filtroVacio(), PAGEABLE);
 
         assertThat(resultado.getContent()).hasSize(1);
         assertThat(resultado.getContent().get(0).isRequiereAdvertencia()).isFalse();
-        verify(imagenRepository, never()).findVisibleForViewer(any(), any());
+        verify(imagenRepository, never()).findParaVisor(any(), any(), any(), any(), any(), any(), eq(false), anyBoolean(), any());
     }
 
     @Test
     void listarParaVisor_visitanteNoRegistrado_prefPorDefectoADVERTIR() {
         Imagen sinSensibilidad = imagenDe(null, null, "Normal", null);
         when(usuarioRepository.findByIdUsuario(55L)).thenReturn(Optional.empty());
-        when(imagenRepository.findVisibleForViewer(10L, PAGEABLE))
+        when(imagenRepository.findParaVisor(eq(10L), eq(55L), isNull(), isNull(), isNull(), isNull(), eq(false), eq(false), eq(PAGEABLE)))
                 .thenReturn(new PageImpl<>(List.of(sinSensibilidad), PAGEABLE, 1));
 
         Page<ImagenPortfolioDTO> resultado = portfolioService
-                .listarParaVisor(10L, 55L, PAGEABLE);
+                .listarParaVisor(10L, 55L, filtroVacio(), PAGEABLE);
 
         assertThat(resultado.getContent()).hasSize(1);
         assertThat(resultado.getContent().get(0).isRequiereAdvertencia()).isFalse();
         verify(imagenRepository, never())
-                .findVisibleForViewerOcultandoSensibles(any(), any(), any());
+                .findParaVisor(any(), any(), any(), any(), any(), any(), eq(true), anyBoolean(), any());
     }
 
     @Test
@@ -222,15 +225,15 @@ class PortfolioServiceTest {
         Usuario visitante = usuarioConPref(55L, EPreferenciaContenidoSensible.MOSTRAR_SIN_ADVERTENCIA);
         Imagen sensible = imagenDe(null, null, "Sensible", ContenidoSensible.DESNUDOS);
         when(usuarioRepository.findByIdUsuario(55L)).thenReturn(Optional.of(visitante));
-        when(imagenRepository.findVisibleForViewer(10L, PAGEABLE))
+        when(imagenRepository.findParaVisor(eq(10L), eq(55L), isNull(), isNull(), isNull(), isNull(), eq(false), eq(false), eq(PAGEABLE)))
                 .thenReturn(new PageImpl<>(List.of(sensible), PAGEABLE, 1));
 
         Page<ImagenPortfolioDTO> resultado = portfolioService
-                .listarParaVisor(10L, 55L, PAGEABLE);
+                .listarParaVisor(10L, 55L, filtroVacio(), PAGEABLE);
 
         assertThat(resultado.getContent().get(0).isRequiereAdvertencia()).isFalse();
         verify(imagenRepository, never())
-                .findVisibleForViewerOcultandoSensibles(any(), any(), any());
+                .findParaVisor(any(), any(), any(), any(), any(), any(), eq(true), anyBoolean(), any());
     }
 
     @Test
@@ -238,11 +241,11 @@ class PortfolioServiceTest {
         Usuario duenio = usuarioConPref(55L, EPreferenciaContenidoSensible.ADVERTIR);
         Imagen sensible = imagenDe(null, duenio, "Sensible", ContenidoSensible.GENERAL);
         when(usuarioRepository.findByIdUsuario(55L)).thenReturn(Optional.of(duenio));
-        when(imagenRepository.findVisibleForViewer(10L, PAGEABLE))
+        when(imagenRepository.findParaVisor(eq(10L), eq(55L), isNull(), isNull(), isNull(), isNull(), eq(false), eq(false), eq(PAGEABLE)))
                 .thenReturn(new PageImpl<>(List.of(sensible), PAGEABLE, 1));
 
         Page<ImagenPortfolioDTO> resultado = portfolioService
-                .listarParaVisor(10L, 55L, PAGEABLE);
+                .listarParaVisor(10L, 55L, filtroVacio(), PAGEABLE);
 
         assertThat(resultado.getContent()).hasSize(1);
         assertThat(resultado.getContent().get(0).isRequiereAdvertencia()).isFalse();
@@ -251,13 +254,13 @@ class PortfolioServiceTest {
     @Test
     void listarParaVisor_poblaLasEtiquetasDeCadaImagen() {
         Imagen imagen = imagenDe(null, null, "Obra 1", null);
-        when(imagenRepository.findVisibleForViewer(10L, PAGEABLE))
+        when(imagenRepository.findParaVisor(eq(10L), isNull(), isNull(), isNull(), isNull(), isNull(), eq(false), eq(false), eq(PAGEABLE)))
                 .thenReturn(new PageImpl<>(List.of(imagen), PAGEABLE, 1));
         when(imagenEtiquetaRepository.findByImagenIdImagenIn(List.of(5L)))
                 .thenReturn(List.of(fila(imagen, etiquetaDe(1L, "Pixel", EtiquetaEstado.VALIDA, null))));
 
         Page<ImagenPortfolioDTO> resultado = portfolioService
-                .listarParaVisor(10L, null, PAGEABLE);
+                .listarParaVisor(10L, null, filtroVacio(), PAGEABLE);
 
         assertThat(resultado.getContent().get(0).getEtiquetas())
                 .extracting(EtiquetaDTO::getNombre)
@@ -276,11 +279,11 @@ class PortfolioServiceTest {
         when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.empty());
 
         Page<ImagenPortfolioDTO> resultado = portfolioService
-                .listarParaVisorPorNombreUsuario("Artista777", null, PAGEABLE);
+                .listarParaVisorPorNombreUsuario("Artista777", null, filtroVacio(), PAGEABLE);
 
         assertThat(resultado.getContent()).isEmpty();
         assertThat(resultado.getTotalElements()).isZero();
-        verify(imagenRepository, never()).findVisibleForViewer(any(), any());
+        verify(imagenRepository, never()).findParaVisor(any(), any(), any(), any(), any(), any(), anyBoolean(), anyBoolean(), any());
     }
 
     @Test
@@ -291,14 +294,14 @@ class PortfolioServiceTest {
         when(usuarioRepository.findByNombreUsuarioIgnoreCase("Artista777"))
                 .thenReturn(Optional.of(artista));
         when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(portfolio));
-        when(imagenRepository.findVisibleForViewer(10L, PAGEABLE))
+        when(imagenRepository.findParaVisor(eq(10L), isNull(), isNull(), isNull(), isNull(), isNull(), eq(false), eq(false), eq(PAGEABLE)))
                 .thenReturn(new PageImpl<>(List.of(imagen), PAGEABLE, 1));
 
         Page<ImagenPortfolioDTO> resultado = portfolioService
-                .listarParaVisorPorNombreUsuario("Artista777", null, PAGEABLE);
+                .listarParaVisorPorNombreUsuario("Artista777", null, filtroVacio(), PAGEABLE);
 
         assertThat(resultado.getContent()).hasSize(1);
-        verify(imagenRepository).findVisibleForViewer(10L, PAGEABLE);
+        verify(imagenRepository).findParaVisor(eq(10L), isNull(), isNull(), isNull(), isNull(), isNull(), eq(false), eq(false), eq(PAGEABLE));
     }
 
     // ---------------------------------------------------------------
@@ -742,6 +745,235 @@ class PortfolioServiceTest {
     }
 
     // ---------------------------------------------------------------
+    // darDeBaja (UC-13)
+    // ---------------------------------------------------------------
+
+    @Test
+    void darDeBaja_ok_cambiaEstadoYBorraLasEtiquetas() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        Imagen imagen = imagenDe(portfolio, artista, "Obra 1", null);
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(imagenRepository.findById(5L)).thenReturn(Optional.of(imagen));
+        when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(imagenEtiquetaRepository.findByImagenIdImagen(5L)).thenReturn(List.of());
+
+        ImagenPortfolioDTO dto = portfolioService.darDeBaja(7L, 5L);
+
+        ArgumentCaptor<Imagen> imagenCaptor = ArgumentCaptor.forClass(Imagen.class);
+        verify(imagenRepository).save(imagenCaptor.capture());
+        assertThat(imagenCaptor.getValue().isEstado()).isFalse();
+        verify(imagenEtiquetaRepository).deleteByImagenIdImagen(5L);
+        assertThat(dto.getIdImagen()).isEqualTo(5L);
+    }
+
+    @Test
+    void darDeBaja_imagenDeOtroArtista_lanzaNoSuchElement() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Usuario otro = usuarioArtista(8L, "OtroArtista");
+        Imagen ajena = imagenDe(portfolioDe(otro), otro, "Obra ajena", null);
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(imagenRepository.findById(5L)).thenReturn(Optional.of(ajena));
+
+        assertThatThrownBy(() -> portfolioService.darDeBaja(7L, 5L))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("Imagen no encontrada: 5");
+
+        verify(imagenRepository, never()).save(any(Imagen.class));
+        verify(imagenEtiquetaRepository, never()).deleteByImagenIdImagen(any());
+    }
+
+    @Test
+    void darDeBaja_imagenInexistente_lanzaNoSuchElement() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(imagenRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> portfolioService.darDeBaja(7L, 99L))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("Imagen no encontrada: 99");
+
+        verify(imagenEtiquetaRepository, never()).deleteByImagenIdImagen(any());
+    }
+
+    @Test
+    void darDeBaja_imagenYaDadaDeBaja_lanzaIllegalArgument() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Imagen imagen = imagenDe(portfolioDe(artista), artista, "Obra 1", null);
+        imagen.setEstado(false);
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(imagenRepository.findById(5L)).thenReturn(Optional.of(imagen));
+
+        assertThatThrownBy(() -> portfolioService.darDeBaja(7L, 5L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("La imagen ya fue dada de baja.");
+
+        verify(imagenRepository, never()).save(any(Imagen.class));
+        verify(imagenEtiquetaRepository, never()).deleteByImagenIdImagen(any());
+    }
+
+    @Test
+    void darDeBaja_artistaInexistente_lanzaNoSuchElement() {
+        when(usuarioRepository.findByIdUsuario(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> portfolioService.darDeBaja(99L, 5L))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("Artista no encontrado: 99");
+
+        verify(imagenRepository, never()).findById(any());
+    }
+
+    @Test
+    void darDeBaja_usuarioNoArtista_lanzaIllegalArgument() {
+        Usuario cliente = usuarioConRol(7L, "cliente42", ERol.CLIENTE);
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(cliente));
+
+        assertThatThrownBy(() -> portfolioService.darDeBaja(7L, 5L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("El usuario no es un artista.");
+
+        verify(imagenRepository, never()).findById(any());
+    }
+
+    // ---------------------------------------------------------------
+    // listarParaVisor con filtros (búsqueda de portfolio)
+    // ---------------------------------------------------------------
+
+    @Test
+    void listarParaVisor_conFiltros_losPasaALaQuery() {
+        Imagen imagen = imagenDe(null, null, "Obra 1", null);
+        FiltroPortfolioRequest filtro = new FiltroPortfolioRequest();
+        filtro.setTitulo("  Obra  ");
+        filtro.setIdEtiqueta(3L);
+        filtro.setMedio("digital");
+        filtro.setSensible("si");
+        filtro.setOrden("antiguo");
+
+        when(imagenRepository.findParaVisor(
+                eq(10L), isNull(), eq("%obra%"), eq(3L), eq(MedioPortfolio.DIGITAL),
+                eq(Boolean.TRUE), eq(false), eq(true), eq(PAGEABLE)))
+                .thenReturn(new PageImpl<>(List.of(imagen), PAGEABLE, 1));
+
+        Page<ImagenPortfolioDTO> resultado = portfolioService
+                .listarParaVisor(10L, null, filtro, PAGEABLE);
+
+        assertThat(resultado.getContent()).hasSize(1);
+        assertThat(resultado.getContent().get(0).getTitulo()).isEqualTo("Obra 1");
+    }
+
+    @Test
+    void listarParaVisor_filtrosEnBlanco_seTratanComoSinFiltro() {
+        FiltroPortfolioRequest filtro = new FiltroPortfolioRequest();
+        filtro.setTitulo("");
+        filtro.setMedio("");
+        filtro.setSensible("");
+        filtro.setOrden("");
+
+        when(imagenRepository.findParaVisor(eq(10L), isNull(), isNull(), isNull(), isNull(),
+                isNull(), eq(false), eq(false), eq(PAGEABLE)))
+                .thenReturn(new PageImpl<>(List.of(), PAGEABLE, 0));
+
+        Page<ImagenPortfolioDTO> resultado = portfolioService
+                .listarParaVisor(10L, null, filtro, PAGEABLE);
+
+        assertThat(resultado.getContent()).isEmpty();
+    }
+
+    @Test
+    void listarParaVisor_sensibleFalseMedioTradicionalYOrdenReciente_loPasaCorrecto() {
+        FiltroPortfolioRequest filtro = new FiltroPortfolioRequest();
+        filtro.setMedio("TRADICIONAL");
+        filtro.setSensible("no");
+        filtro.setOrden("RECIENTE");
+
+        when(imagenRepository.findParaVisor(eq(10L), isNull(), isNull(), isNull(),
+                eq(MedioPortfolio.TRADICIONAL), eq(Boolean.FALSE), eq(false), eq(false), eq(PAGEABLE)))
+                .thenReturn(new PageImpl<>(List.of(), PAGEABLE, 0));
+
+        Page<ImagenPortfolioDTO> resultado = portfolioService
+                .listarParaVisor(10L, null, filtro, PAGEABLE);
+
+        assertThat(resultado.getContent()).isEmpty();
+    }
+
+    @Test
+    void listarParaVisor_medioInvalido_lanzaIllegalArgument() {
+        FiltroPortfolioRequest filtro = new FiltroPortfolioRequest();
+        filtro.setMedio("PINTURA");
+
+        assertThatThrownBy(() -> portfolioService.listarParaVisor(10L, null, filtro, PAGEABLE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Medio no válido: PINTURA");
+
+        verify(imagenRepository, never()).findParaVisor(any(), any(), any(), any(), any(), any(), anyBoolean(), anyBoolean(), any());
+    }
+
+    @Test
+    void listarParaVisor_ordenInvalido_lanzaIllegalArgument() {
+        FiltroPortfolioRequest filtro = new FiltroPortfolioRequest();
+        filtro.setOrden("ALEATORIO");
+
+        assertThatThrownBy(() -> portfolioService.listarParaVisor(10L, null, filtro, PAGEABLE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Orden no válido: ALEATORIO");
+
+        verify(imagenRepository, never()).findParaVisor(any(), any(), any(), any(), any(), any(), anyBoolean(), anyBoolean(), any());
+    }
+
+    @Test
+    void listarParaVisor_sensibleInvalido_lanzaIllegalArgument() {
+        FiltroPortfolioRequest filtro = new FiltroPortfolioRequest();
+        filtro.setSensible("quizas");
+
+        assertThatThrownBy(() -> portfolioService.listarParaVisor(10L, null, filtro, PAGEABLE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Filtro de contenido sensible no válido: quizas");
+    }
+
+    // ---------------------------------------------------------------
+    // etiquetasDePortfolio
+    // ---------------------------------------------------------------
+
+    @Test
+    void etiquetasDePortfolio_conPortfolio_devuelveEtiquetas() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("Artista777"))
+                .thenReturn(Optional.of(artista));
+        when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(portfolio));
+        when(etiquetaRepository.findEtiquetasDePortfolio(10L))
+                .thenReturn(List.of(etiquetaDe(1L, "Acuarela", EtiquetaEstado.VALIDA, null)));
+
+        List<EtiquetaDTO> resultado = portfolioService.etiquetasDePortfolio("Artista777");
+
+        assertThat(resultado).extracting(EtiquetaDTO::getNombre).containsExactly("Acuarela");
+    }
+
+    @Test
+    void etiquetasDePortfolio_sinPortfolio_devuelveVacio() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("Artista777"))
+                .thenReturn(Optional.of(artista));
+        when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.empty());
+
+        List<EtiquetaDTO> resultado = portfolioService.etiquetasDePortfolio("Artista777");
+
+        assertThat(resultado).isEmpty();
+        verify(etiquetaRepository, never()).findEtiquetasDePortfolio(any());
+    }
+
+    @Test
+    void etiquetasDePortfolio_usuarioNoArtista_lanzaIllegalArgument() {
+        Usuario cliente = usuarioConRol(7L, "cliente42", ERol.CLIENTE);
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("cliente42"))
+                .thenReturn(Optional.of(cliente));
+
+        assertThatThrownBy(() -> portfolioService.etiquetasDePortfolio("cliente42"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("El usuario no es un artista.");
+    }
+
+    // ---------------------------------------------------------------
     // nombreUsuario
     // ---------------------------------------------------------------
 
@@ -765,6 +997,10 @@ class PortfolioServiceTest {
     // ---------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------
+
+    private FiltroPortfolioRequest filtroVacio() {
+        return new FiltroPortfolioRequest();
+    }
 
     private Usuario usuarioArtista(Long id, String nombreUsuario) {
         return usuarioConRol(id, nombreUsuario, ERol.ARTISTA);

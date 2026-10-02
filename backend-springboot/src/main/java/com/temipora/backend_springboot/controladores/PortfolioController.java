@@ -14,8 +14,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.temipora.backend_springboot.modelo.EtiquetaDTO;
+import com.temipora.backend_springboot.modelo.FiltroPortfolioRequest;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioDTO;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioRequest;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
@@ -45,6 +48,11 @@ public class PortfolioController {
     @GetMapping("/{nombreUsuario}/paginado")
     public Page<ImagenPortfolioDTO> listarPaginado(
             @PathVariable String nombreUsuario,
+            @RequestParam(required = false) String titulo,
+            @RequestParam(required = false) Long idEtiqueta,
+            @RequestParam(required = false) String medio,
+            @RequestParam(required = false) String sensible,
+            @RequestParam(required = false) String orden,
             Pageable pageable,
             Authentication authentication) {
 
@@ -56,7 +64,19 @@ public class PortfolioController {
                 .orElse(null);
         }
 
-        return portfolioService.listarParaVisorPorNombreUsuario(nombreUsuario, viewerId, pageable);
+        FiltroPortfolioRequest filtro = new FiltroPortfolioRequest();
+        filtro.setTitulo(titulo);
+        filtro.setIdEtiqueta(idEtiqueta);
+        filtro.setMedio(medio);
+        filtro.setSensible(sensible);
+        filtro.setOrden(orden);
+
+        return portfolioService.listarParaVisorPorNombreUsuario(nombreUsuario, viewerId, filtro, pageable);
+    }
+
+    @GetMapping("/{nombreUsuario}/etiquetas")
+    public List<EtiquetaDTO> etiquetasDelPortfolio(@PathVariable String nombreUsuario) {
+        return portfolioService.etiquetasDePortfolio(nombreUsuario);
     }
 
     @PostMapping("/usuarios/{idUsuario}/imagenes")
@@ -85,5 +105,18 @@ public class PortfolioController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return ResponseEntity.ok(portfolioService.modificar(idUsuario, idImagen, request));
+    }
+
+    @PostMapping("/usuarios/{idUsuario}/imagenes/{idImagen}/baja")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public ResponseEntity<ImagenPortfolioDTO> darDeBaja(
+            @PathVariable Long idUsuario,
+            @PathVariable Long idImagen,
+            Authentication authentication) {
+        if (!authentication.getName().equalsIgnoreCase(
+                portfolioService.nombreUsuario(idUsuario))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(portfolioService.darDeBaja(idUsuario, idImagen));
     }
 }
