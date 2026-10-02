@@ -2,8 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
-import { acceptImagenes, esImagenPermitida } from '../servicios/archivos'
-import SelectorEtiquetas from '../components/SelectorEtiquetas.vue'
+import { useSubirImagen } from '../composables/useSubirImagen'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,16 +34,19 @@ async function cargarPerfil() {
     const res = await api.get(`/perfil/${nombreUsuario}`)
     const data = res.data
 
-    const portfolioRes = data.rol === 'ARTISTA'
-      ? await api.get(`/portfolio/${data.nombreUsuario}/paginado`)
-      : { data: { content: [] } }
-
     perfil.value = {
       ...data,
-      portfolio: portfolioRes.data.content || [],
+      portfolio: [],
       servicios: [],
       productos: [],
       pedidos: [],
+    }
+
+    if (data.rol === 'ARTISTA') {
+      await Promise.all([cargarPortfolio(true), cargarEtiquetasPortfolio()])
+    } else {
+      totalPortfolio.value = 0
+      etiquetasPortfolio.value = []
     }
   } catch (e) {
     errorCarga.value = 'No se pudo cargar el perfil.'
@@ -52,6 +54,107 @@ async function cargarPerfil() {
     cargandoPerfil.value = false
   }
 }
+
+// ---------------------------------------------------------------
+// Portfolio con filtros y paginación (20 por página)
+// ---------------------------------------------------------------
+
+const TAMANO_PAGINA = 20
+
+const filtros = ref({ titulo: '', etiqueta: '', medio: '', sensible: '', orden: 'RECIENTE' })
+const etiquetasPortfolio = ref([])
+const paginaPortfolio = ref(0)
+const totalPortfolio = ref(0)
+const cargandoPortfolio = ref(false)
+const errorListaPortfolio = ref('')
+
+const hayFiltrosActivos = computed(() => {
+  const f = filtros.value
+  return !!(f.titulo.trim() || f.etiqueta || f.medio || f.sensible)
+})
+
+const filtrosAbiertos = ref(false)
+
+const cantidadFiltrosActivos = computed(() => {
+  const f = filtros.value
+  let total = 0
+  if (f.titulo.trim()) total++
+  if (f.etiqueta) total++
+  if (f.medio) total++
+  if (f.sensible) total++
+  if (f.orden !== 'RECIENTE') total++
+  return total
+})
+
+let secuenciaPortfolio = 0
+
+async function cargarPortfolio(resetear = true, pagina = 0) {
+  if (perfil.value.rol !== 'ARTISTA' || !perfil.value.nombreUsuario) return
+  const miSecuencia = ++secuenciaPortfolio
+  cargandoPortfolio.value = true
+  if (resetear) errorListaPortfolio.value = ''
+  try {
+    const f = filtros.value
+    const params = { page: pagina, size: TAMANO_PAGINA, orden: f.orden || 'RECIENTE' }
+    const titulo = f.titulo.trim()
+    if (titulo) params.titulo = titulo
+    if (f.etiqueta) params.idEtiqueta = f.etiqueta
+    if (f.medio) params.medio = f.medio
+    if (f.sensible) params.sensible = f.sensible
+
+    const res = await api.get(`/portfolio/${perfil.value.nombreUsuario}/paginado`, { params })
+    if (miSecuencia !== secuenciaPortfolio) return
+    const contenido = res.data.content || []
+    perfil.value.portfolio = resetear ? contenido : [...perfil.value.portfolio, ...contenido]
+    paginaPortfolio.value = pagina
+    totalPortfolio.value = res.data.totalElements || 0
+  } catch (e) {
+    if (miSecuencia !== secuenciaPortfolio) return
+    if (resetear) {
+      perfil.value.portfolio = []
+      totalPortfolio.value = 0
+      errorListaPortfolio.value = 'No se pudo cargar el portfolio.'
+    }
+  } finally {
+    if (miSecuencia === secuenciaPortfolio) cargandoPortfolio.value = false
+  }
+}
+
+async function cargarEtiquetasPortfolio() {
+  const nombre = perfil.value.nombreUsuario
+  if (perfil.value.rol !== 'ARTISTA' || !nombre) return
+  try {
+    const res = await api.get(`/portfolio/${nombre}/etiquetas`)
+    if (perfil.value.nombreUsuario === nombre) etiquetasPortfolio.value = res.data
+  } catch (e) {
+    etiquetasPortfolio.value = []
+  }
+}
+
+function limpiarFiltros() {
+  const f = filtros.value
+  if (!hayFiltrosActivos.value && (f.orden || 'RECIENTE') === 'RECIENTE') return
+  filtros.value = { titulo: '', etiqueta: '', medio: '', sensible: '', orden: 'RECIENTE' }
+}
+
+async function cargarMasPortfolio() {
+  if (cargandoPortfolio.value) return
+  await cargarPortfolio(false, paginaPortfolio.value + 1)
+}
+
+let temporizadorFiltros = null
+watch(filtros, () => {
+  if (temporizadorFiltros) clearTimeout(temporizadorFiltros)
+  temporizadorFiltros = setTimeout(() => cargarPortfolio(true), 350)
+}, { deep: true })
+
+watch(() => route.params.nombreUsuario, () => {
+  filtros.value = { titulo: '', etiqueta: '', medio: '', sensible: '', orden: 'RECIENTE' }
+  etiquetasPortfolio.value = []
+  paginaPortfolio.value = 0
+  totalPortfolio.value = 0
+  errorListaPortfolio.value = ''
+})
 
 watch(() => route.params.nombreUsuario, cargarPerfil, { immediate: true })
 
@@ -69,74 +172,15 @@ function fotoInicial(nombre) {
   return (nombre || '?').charAt(0).toUpperCase()
 }
 
-const portfolioModalAbierto = ref(false)
+const { abrir } = useSubirImagen()
+
 const imagenSeleccionada = ref(null)
 const mostrarImagenSensible = ref(false)
-const guardandoImagen = ref(false)
-const errorPortfolio = ref('')
-const tituloImagen = ref('')
-const descripcionImagen = ref('')
-const medioImagen = ref('TRADICIONAL')
-const materialesImagen = ref('')
-const contenidoSensibleImagen = ref('')
-const archivoImagen = ref(null)
-const previewImagen = ref('')
-const modoImagen = ref('crear')
-const etiquetasImagen = ref([])
-const imagenEditando = ref(null)
-
-function abrirAltaImagen() {
-  modoImagen.value = 'crear'
-  imagenEditando.value = null
-  tituloImagen.value = ''
-  descripcionImagen.value = ''
-  medioImagen.value = 'TRADICIONAL'
-  materialesImagen.value = ''
-  contenidoSensibleImagen.value = ''
-  etiquetasImagen.value = []
-  archivoImagen.value = null
-  previewImagen.value = ''
-  errorPortfolio.value = ''
-  portfolioModalAbierto.value = true
-}
-
-function abrirEdicionImagen(imagen) {
-  modoImagen.value = 'editar'
-  imagenEditando.value = imagen
-  tituloImagen.value = imagen.titulo
-  descripcionImagen.value = imagen.descripcion
-  medioImagen.value = imagen.medio
-  materialesImagen.value = imagen.materiales || ''
-  contenidoSensibleImagen.value = imagen.contenidoSensible || ''
-  etiquetasImagen.value = [...(imagen.etiquetas || [])]
-  archivoImagen.value = null
-  previewImagen.value = imagen.url
-  errorPortfolio.value = ''
-  portfolioModalAbierto.value = true
-}
-
-function cerrarAltaImagen() {
-  portfolioModalAbierto.value = false
-}
-
-function onImagenPortfolioChange(event) {
-  const archivo = event.target.files[0] || null
-  if (archivo && !esImagenPermitida(archivo)) {
-    archivoImagen.value = null
-    previewImagen.value = ''
-    errorPortfolio.value = 'El formato de la imagen es inválido.'
-    event.target.value = ''
-    return
-  }
-
-  errorPortfolio.value = ''
-  archivoImagen.value = archivo
-  previewImagen.value = archivo ? URL.createObjectURL(archivo) : ''
-}
 
 function abrirDetalleImagen(imagen) {
   imagenSeleccionada.value = imagen
   mostrarImagenSensible.value = false
+  errorDetalle.value = ''
 }
 
 function cerrarDetalleImagen() {
@@ -148,151 +192,37 @@ function revelarImagenSensible() {
   mostrarImagenSensible.value = true
 }
 
-async function guardarImagenPortfolio() {
-  const enEdicion = modoImagen.value === 'editar'
-  if (!enEdicion && !archivoImagen.value) {
-    errorPortfolio.value = 'Selecciona una imagen.'
-    return
-  }
-  if (!tituloImagen.value.trim()) {
-    errorPortfolio.value = 'El título es obligatorio.'
-    return
-  }
-  if (!descripcionImagen.value.trim()) {
-    errorPortfolio.value = 'La descripción es obligatoria.'
-    return
-  }
+const errorDetalle = ref('')
 
-  guardandoImagen.value = true
-  errorPortfolio.value = ''
+async function eliminarImagenPortfolio() {
+  const img = imagenSeleccionada.value
+  if (!img) return
+  const confirmar = window.confirm(
+    `¿Eliminar "${img.titulo}" de tu portfolio? Esta acción no se puede deshacer.`,
+  )
+  if (!confirmar) return
+
+  errorDetalle.value = ''
   try {
-    let url = enEdicion ? imagenEditando.value.url : null
-    if (archivoImagen.value) {
-      url = await subirArchivo(archivoImagen.value)
+    await api.post(`/portfolio/usuarios/${perfil.value.idUsuario}/imagenes/${img.idImagen}/baja`)
+    perfil.value.portfolio = perfil.value.portfolio.filter(o => o.idImagen !== img.idImagen)
+    totalPortfolio.value = Math.max(0, totalPortfolio.value - 1)
+    if (hayFiltrosActivos.value) {
+      await cargarPortfolio(true)
     }
-    const cuerpo = {
-      titulo: tituloImagen.value,
-      descripcion: descripcionImagen.value,
-      url: url || previewImagen.value,
-      medio: medioImagen.value,
-      materiales: materialesImagen.value,
-      contenidoSensible: contenidoSensibleImagen.value || null,
-      idsEtiqueta: etiquetasImagen.value.map(e => e.idEtiqueta),
-    }
-
-    if (enEdicion) {
-      const res = await api.put(
-        `/portfolio/usuarios/${perfil.value.idUsuario}/imagenes/${imagenEditando.value.idImagen}`,
-        cuerpo,
-      )
-      const indice = perfil.value.portfolio.findIndex(o => o.idImagen === res.data.idImagen)
-      if (indice !== -1) {
-        perfil.value.portfolio[indice] = res.data
-      }
-      if (imagenSeleccionada.value && imagenSeleccionada.value.idImagen === res.data.idImagen) {
-        imagenSeleccionada.value = res.data
-      }
-    } else {
-      const res = await api.post(`/portfolio/usuarios/${perfil.value.idUsuario}/imagenes`, cuerpo)
-      perfil.value.portfolio.unshift(res.data)
-    }
-    cerrarAltaImagen()
+    cerrarDetalleImagen()
   } catch (e) {
-    errorPortfolio.value = e.response?.data?.message || 'No se pudo guardar la imagen.'
-  } finally {
-    guardandoImagen.value = false
+    errorDetalle.value = e.response?.data?.message || 'No se pudo eliminar la imagen.'
   }
-}
-
-async function subirArchivo(archivo) {
-  const form = new FormData()
-  form.append('archivo', archivo)
-  const res = await api.post('/upload', form)
-  return res.data.url
 }
 
 function irAConfiguracion(seccion = 'perfil') {
   router.push({ name: `configuracion-${seccion}` })
 }
 
-// ---------------------------------------------------------------
-// Mis etiquetas (UC-59)
-// ---------------------------------------------------------------
-
-const misEtiquetas = ref([])
-const cargandoEtiquetas = ref(false)
-const etiquetasCargadas = ref(false)
-const mensajeEtiquetas = ref('')
-const errorEtiquetas = ref('')
-
-watch(tabActiva, (tab) => {
-  if (tab === 'mis-etiquetas' && !etiquetasCargadas.value) {
-    cargarMisEtiquetas()
-  }
-})
-
-watch(() => route.params.nombreUsuario, () => {
-  etiquetasCargadas.value = false
-  misEtiquetas.value = []
-  mensajeEtiquetas.value = ''
-  errorEtiquetas.value = ''
-  if (tabActiva.value === 'mis-etiquetas') {
-    tabActiva.value = 'portfolio'
-  }
-})
-
-async function cargarMisEtiquetas() {
-  cargandoEtiquetas.value = true
-  errorEtiquetas.value = ''
-  try {
-    const res = await api.get('/etiquetas/mis')
-    misEtiquetas.value = res.data
-    etiquetasCargadas.value = true
-  } catch (e) {
-    errorEtiquetas.value = e.response?.data?.message || 'No se pudieron cargar tus etiquetas.'
-  } finally {
-    cargandoEtiquetas.value = false
-  }
-}
-
-async function reSolicitarEtiqueta(e) {
-  const confirmar = window.confirm(
-    `¿Re-solicitar la etiqueta "${e.nombre}" para que los administradores la reevalúen?`,
-  )
-  if (!confirmar) return
-
-  mensajeEtiquetas.value = ''
-  try {
-    await api.post(`/etiquetas/${e.idEtiqueta}/re-solicitar`)
-    await cargarMisEtiquetas()
-    mensajeEtiquetas.value = `Se registró la re-solicitud de "${e.nombre}".`
-  } catch (err) {
-    await cargarMisEtiquetas()
-    errorEtiquetas.value = err.response?.data?.message || 'No se pudo re-solicitar la etiqueta.'
-  }
-}
-
-function formatearFecha(fecha) {
-  if (!fecha) return null
-  return new Date(fecha).toLocaleString('es-AR', { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-function chipEstadoEtiqueta(estado) {
-  return {
-    VALIDA: 'bg-green-500/10 text-green-700',
-    PENDIENTE: 'bg-coral/15 text-coral',
-    RECHAZADA: 'bg-rojizo/10 text-rojizo',
-    INACTIVA: 'bg-cafe/10 text-cafe/60',
-  }[estado] || 'bg-durazno/40 text-cafe'
-}
-
-function textoEstadoEtiqueta(estado) {
-  return {
-    VALIDA: 'Válida',
-    PENDIENTE: 'Pendiente',
-    RECHAZADA: 'Rechazada',
-    INACTIVA: 'Dada de baja',
-  }[estado] || estado
+function irASubirImagen(imagen = null) {
+  abrir(imagen ? 'editar' : 'crear', imagen)
+  router.push({ name: 'portfolio-subir' })
 }
 </script>
 
@@ -364,7 +294,7 @@ function textoEstadoEtiqueta(estado) {
       </div>
 
       <!-- Pestañas -->
-      <div class="pb-12 pt-4">
+      <div class="pb-6">
         <template v-if="esArtista">
           <div class="flex items-center gap-6 border-b border-rosa">
             <button
@@ -388,31 +318,126 @@ function textoEstadoEtiqueta(estado) {
             >
               Productos
             </button>
-            <button
-              v-if="esDuenio"
-              class="py-3 text-sm transition border-b-2"
-              :class="tabActiva === 'mis-etiquetas' ? 'border-coral text-granate font-medium' : 'border-transparent text-cafe/60 hover:text-cafe'"
-              @click="tabActiva = 'mis-etiquetas'"
-            >
-              Mis etiquetas
-            </button>
           </div>
 
             <div v-if="tabActiva === 'portfolio'" class="mt-6">
-              <div class="flex items-center justify-between gap-4 mb-4">
-                <p v-if="!perfil.portfolio.length" class="mr-auto text-sm text-cafe/60">
-                  Este portfolio todavía no tiene imágenes.
-                </p>
-                <button
-                  v-if="esDuenio"
-                  class="ml-auto px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
-                  @click="abrirAltaImagen"
+              <!-- Barra compacta de filtros (siempre inicia colapsada) -->
+              <div class="mb-5 bg-blanco border border-rosa rounded-xl p-3">
+                <div class="flex flex-wrap items-center gap-3">
+                  <div class="flex-1 min-w-44 relative">
+                    <input
+                      v-model="filtros.titulo"
+                      type="text"
+                      placeholder="Buscar por título..."
+                      class="pl-4 pr-9 block w-full rounded-lg border-0 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+                    />
+                    <button
+                      v-if="filtros.titulo"
+                      type="button"
+                      class="absolute right-2.5 top-1/2 -translate-y-1/2 text-cafe/50 hover:text-granate"
+                      aria-label="Limpiar búsqueda"
+                      @click="filtros.titulo = ''"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    class="px-3 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition"
+                    :aria-expanded="filtrosAbiertos"
+                    @click="filtrosAbiertos = !filtrosAbiertos"
+                  >
+                    Filtros
+                    <span
+                      v-if="cantidadFiltrosActivos"
+                      class="ml-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-coral text-white text-xs"
+                    >
+                      {{ cantidadFiltrosActivos }}
+                    </span>
+                    <span class="ml-1" aria-hidden="true">{{ filtrosAbiertos ? '▴' : '▾' }}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="px-3 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition"
+                    @click="limpiarFiltros"
+                  >
+                    Limpiar
+                  </button>
+
+                  <p v-if="totalPortfolio > 0" class="ml-auto text-sm text-cafe/60">
+                    Mostrando {{ perfil.portfolio.length }} de {{ totalPortfolio }} imágenes
+                  </p>
+                </div>
+
+                <div
+                  v-if="filtrosAbiertos"
+                  class="mt-3 pt-3 border-t border-rosa/60 grid grid-cols-2 lg:grid-cols-4 gap-3"
                 >
-                  Subir imagen
-                </button>
+                  <div>
+                    <label class="block text-xs text-cafe/60 mb-1">Etiqueta</label>
+                    <select v-model="filtros.etiqueta" class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none bg-blanco">
+                      <option value="">Todas</option>
+                      <option v-for="e in etiquetasPortfolio" :key="e.idEtiqueta" :value="e.idEtiqueta">
+                        {{ e.nombre }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-xs text-cafe/60 mb-1">Medio</label>
+                    <select v-model="filtros.medio" class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none bg-blanco">
+                      <option value="">Todos</option>
+                      <option value="TRADICIONAL">Tradicional</option>
+                      <option value="DIGITAL">Digital</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-xs text-cafe/60 mb-1">Contenido sensible</label>
+                    <select v-model="filtros.sensible" class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none bg-blanco">
+                      <option value="">Todos</option>
+                      <option value="true">Con contenido sensible</option>
+                      <option value="false">Sin contenido sensible</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-xs text-cafe/60 mb-1">Orden</label>
+                    <select v-model="filtros.orden" class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none bg-blanco">
+                      <option value="RECIENTE">Más recientes</option>
+                      <option value="ANTIGUO">Más antiguos</option>
+                    </select>
+                  </div>
+                </div>
               </div>
 
-              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              <p v-if="cargandoPortfolio && !perfil.portfolio.length" class="text-sm text-cafe/60 py-8 text-center">
+                Cargando portfolio...
+              </p>
+              <p v-else-if="errorListaPortfolio" class="text-sm text-rojizo py-8 text-center">
+                {{ errorListaPortfolio }}
+              </p>
+              <p v-else-if="!perfil.portfolio.length && hayFiltrosActivos" class="text-sm text-cafe/60 py-8">
+                No hay imágenes que coincidan con los filtros.
+                <button type="button" class="ml-2 underline text-granate hover:text-coral transition" @click="limpiarFiltros">
+                  Limpiar filtros
+                </button>
+              </p>
+              <p v-else-if="!perfil.portfolio.length" class="text-sm text-cafe/60 py-8">
+                Este portfolio todavía no tiene imágenes.
+                <button
+                  v-if="esDuenio"
+                  type="button"
+                  class="ml-2 underline text-granate hover:text-coral transition"
+                  @click="irASubirImagen()"
+                >
+                  Sube tu primera imagen
+                </button>
+              </p>
+
+              <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 <button
                   v-for="obra in perfil.portfolio"
                   :key="obra.idImagen"
@@ -441,6 +466,17 @@ function textoEstadoEtiqueta(estado) {
                   <div class="shrink-0 bg-rosa/20 p-3 text-sm text-cafe truncate">{{ obra.titulo }}</div>
                 </button>
               </div>
+
+              <div v-if="perfil.portfolio.length && perfil.portfolio.length < totalPortfolio" class="mt-6 text-center">
+                <button
+                  type="button"
+                  :disabled="cargandoPortfolio"
+                  class="px-4 py-2 rounded-md text-sm text-granate border border-rosa hover:bg-rosa/20 disabled:opacity-50 transition"
+                  @click="cargarMasPortfolio"
+                >
+                  {{ cargandoPortfolio ? 'Cargando...' : 'Cargar más' }}
+                </button>
+              </div>
             </div>
 
           <div v-if="tabActiva === 'servicios'" class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -457,54 +493,6 @@ function textoEstadoEtiqueta(estado) {
               <p class="text-sm text-cafe/70 mt-1">{{ p.descripcion }}</p>
               <p class="text-sm text-rojizo mt-3">{{ p.precio }}</p>
             </div>
-          </div>
-
-          <div v-if="tabActiva === 'mis-etiquetas' && esDuenio" class="mt-6">
-            <p v-if="mensajeEtiquetas" class="text-sm text-green-700 bg-green-500/10 border border-green-500/20 rounded-lg px-4 py-3 mb-4">
-              {{ mensajeEtiquetas }}
-            </p>
-            <p v-if="errorEtiquetas" class="text-sm text-rojizo bg-rojizo/5 border border-rojizo/20 rounded-lg px-4 py-3 mb-4">
-              {{ errorEtiquetas }}
-            </p>
-
-            <p v-if="cargandoEtiquetas" class="text-sm text-cafe/60 py-6 text-center">
-              Cargando tus etiquetas...
-            </p>
-            <template v-else>
-              <p v-if="!misEtiquetas.length" class="text-sm text-cafe/60 py-6">
-                Todavía no propusiste etiquetas. Puedes crear una al subir una imagen a tu portfolio.
-              </p>
-              <div v-else class="space-y-4">
-                <div
-                  v-for="e in misEtiquetas"
-                  :key="e.idEtiqueta"
-                  class="bg-blanco border border-rosa rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-4"
-                >
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-3 flex-wrap">
-                      <h3 class="text-granate font-medium">{{ e.nombre }}</h3>
-                      <span class="px-2.5 py-0.5 rounded-full text-xs" :class="chipEstadoEtiqueta(e.estado)">
-                        {{ textoEstadoEtiqueta(e.estado) }}
-                      </span>
-                    </div>
-                    <p class="text-sm text-cafe/70 mt-1">{{ e.descripcion }}</p>
-                    <p class="text-xs text-cafe/50 mt-2">
-                      {{ e.nombreCategoria }} · Propuesta el {{ formatearFecha(e.fechaCreacion) }}
-                      <template v-if="e.fechaEvaluacion">
-                        · Evaluada el {{ formatearFecha(e.fechaEvaluacion) }}{{ e.evaluadoPor ? ` por @${e.evaluadoPor}` : '' }}
-                      </template>
-                    </p>
-                  </div>
-                  <button
-                    v-if="e.estado === 'RECHAZADA'"
-                    class="shrink-0 px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
-                    @click="reSolicitarEtiqueta(e)"
-                  >
-                    Re-solicitar
-                  </button>
-                </div>
-              </div>
-            </template>
           </div>
         </template>
 
@@ -527,79 +515,6 @@ function textoEstadoEtiqueta(estado) {
             </div>
           </div>
         </template>
-      </div>
-    </div>
-
-    <!-- Modal alta / edición de imagen de portfolio -->
-    <div
-      v-if="portfolioModalAbierto"
-      class="fixed inset-0 z-[60] flex items-center justify-center bg-granate/40 px-4"
-      @click.self="cerrarAltaImagen"
-    >
-      <div class="w-full max-w-5xl bg-blanco rounded-2xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-lg text-granate mb-4">
-          {{ modoImagen === 'editar' ? 'Editar imagen del portfolio' : 'Subir imagen a portfolio' }}
-        </h2>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div class="space-y-5">
-            <div>
-              <label class="block text-sm text-cafe mb-2">Título <span class="text-rojizo">*</span></label>
-              <input v-model="tituloImagen" type="text" maxlength="100" required class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
-            </div>
-
-            <div>
-              <label class="block text-sm text-cafe mb-2">Descripción <span class="text-rojizo">*</span></label>
-              <textarea v-model="descripcionImagen" rows="5" maxlength="1000" required class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"></textarea>
-            </div>
-
-            <div>
-              <label class="block text-sm text-cafe mb-2">Medio <span class="text-rojizo">*</span></label>
-              <select v-model="medioImagen" class="block w-full rounded-lg border-0 py-2.5 px-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
-                <option value="TRADICIONAL">Tradicional</option>
-                <option value="DIGITAL">Digital</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-sm text-cafe mb-2">Materiales</label>
-              <input v-model="materialesImagen" type="text" maxlength="500" placeholder="Ej.: óleo sobre lienzo" class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
-            </div>
-
-            <div>
-              <label class="block text-sm text-cafe mb-2">Contenido sensible</label>
-              <select v-model="contenidoSensibleImagen" class="block w-full rounded-lg border-0 py-2.5 px-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
-                <option value="">Sin contenido sensible</option>
-                <option value="VIOLENCIA">Violencia</option>
-                <option value="DESNUDOS">Desnudos</option>
-                <option value="GENERAL">Contenido sensible general</option>
-              </select>
-            </div>
-
-            <SelectorEtiquetas v-model="etiquetasImagen" />
-
-            <p v-if="errorPortfolio" class="text-rojizo text-sm">{{ errorPortfolio }}</p>
-          </div>
-
-          <div class="flex flex-col">
-            <label class="block text-sm text-cafe mb-2">Imagen <span class="text-rojizo">*</span></label>
-            <div class="flex-1 min-h-72 rounded-xl border border-dashed border-rosa bg-rosa/10 flex items-center justify-center overflow-hidden">
-              <img v-if="previewImagen" :src="previewImagen" alt="Vista previa" class="w-full h-full max-h-112 object-contain" />
-              <p v-else class="px-6 text-center text-sm text-cafe/50">Selecciona una imagen para ver la vista previa.</p>
-            </div>
-            <input id="portfolio-imagen" type="file" :accept="acceptImagenes" class="sr-only" @change="onImagenPortfolioChange" />
-            <label for="portfolio-imagen" class="mt-4 inline-flex cursor-pointer justify-center rounded-md border border-coral bg-coral/10 px-4 py-2 text-sm text-granate hover:bg-coral/20 transition">
-              {{ archivoImagen ? 'Cambiar imagen' : (modoImagen === 'editar' ? 'Cambiar imagen (opcional)' : 'Seleccionar imagen') }}
-            </label>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-end gap-3 mt-6">
-          <button class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition" @click="cerrarAltaImagen">Cancelar</button>
-          <button :disabled="guardandoImagen || (modoImagen === 'crear' && !archivoImagen)" class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm" @click="guardarImagenPortfolio">
-            {{ guardandoImagen ? 'Guardando...' : 'Guardar' }}
-          </button>
-        </div>
       </div>
     </div>
 
@@ -654,13 +569,21 @@ function textoEstadoEtiqueta(estado) {
             </span>
           </div>
         </div>
+        <p v-if="errorDetalle" class="text-rojizo text-sm text-right mt-4">{{ errorDetalle }}</p>
         <div class="flex justify-end gap-3 mt-6">
           <button
             v-if="esDuenio"
             class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
-            @click="abrirEdicionImagen(imagenSeleccionada)"
+            @click="irASubirImagen(imagenSeleccionada)"
           >
             Editar
+          </button>
+          <button
+            v-if="esDuenio"
+            class="px-4 py-2 rounded-md text-sm text-rojizo border border-rojizo/40 hover:bg-rojizo/10 transition"
+            @click="eliminarImagenPortfolio"
+          >
+            Eliminar
           </button>
           <button class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition" @click="cerrarDetalleImagen">Cerrar</button>
         </div>

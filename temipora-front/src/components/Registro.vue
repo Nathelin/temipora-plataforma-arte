@@ -1,11 +1,19 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../servicios/api'
-import { acceptImagenes, esImagenPermitida } from '../servicios/archivos'
+import { acceptImagenes, validarImagen, procesarImagen, LIMITES_IMAGEN } from '../servicios/archivos'
+import { useAvisoActualizacion } from '../composables/useAvisoActualizacion'
 import fondo from '../assets/fondos/prueba.png'
 
 const router = useRouter()
+const {
+  mostrar: avisoMostrar,
+  fase: avisoFase,
+  detalle: avisoDetalle,
+  exito: avisoExito,
+  fallo: avisoFallo,
+} = useAvisoActualizacion()
 
 const paso = ref(1)
 const totalPasos = 4
@@ -37,6 +45,14 @@ const previewFoto = ref('')
 const cargando = ref(false)
 const error = ref('')
 const errores = ref([])
+const fase = ref('')
+const progreso = ref(0)
+
+const etiquetaRegistro = computed(() => {
+  if (fase.value === 'procesando') return 'Procesando imagen…'
+  if (fase.value === 'subiendo') return `Subiendo foto… ${progreso.value}%`
+  return cargando.value ? 'Registrando...' : 'Registrarse'
+})
 
 function validarPaso() {
   const errs = []
@@ -96,10 +112,11 @@ function anterior() {
 
 function onFileChange(event) {
   const file = event.target.files[0] || null
-  if (file && !esImagenPermitida(file)) {
+  const problema = file ? validarImagen(file) : ''
+  if (problema) {
     archivoFoto.value = null
     previewFoto.value = ''
-    error.value = 'El formato es inválido.'
+    error.value = problema
     event.target.value = ''
     return
   }
@@ -115,18 +132,43 @@ function onFileChange(event) {
 
 async function subirFoto() {
   if (!archivoFoto.value) return
+  fase.value = 'procesando'
+  avisoFase('procesando')
+  avisoDetalle('Procesando la imagen…')
+  const optimizado = await procesarImagen(archivoFoto.value, LIMITES_IMAGEN.avatar)
+  fase.value = 'subiendo'
+  avisoFase('subiendo', 0)
+  progreso.value = 0
   const form = new FormData()
-  form.append('archivo', archivoFoto.value)
-  const res = await api.post('/upload', form)
+  form.append('archivo', optimizado)
+  const res = await api.post('/upload', form, {
+    onUploadProgress: (e) => {
+      if (e.total) {
+        const pct = Math.round((e.loaded * 100) / e.total)
+        progreso.value = pct
+        avisoFase('subiendo', pct)
+      }
+    },
+  })
   urlFotoPerfil.value = res.data.url
 }
 
 async function registrarse() {
   cargando.value = true
   error.value = ''
+  progreso.value = 0
+  const conFoto = !!archivoFoto.value
+  if (conFoto) {
+    avisoMostrar('Completando tu registro…', 'Subiendo tu foto de perfil…')
+  }
   try {
     if (archivoFoto.value) {
       await subirFoto()
+    }
+    fase.value = ''
+    if (conFoto) {
+      avisoFase('guardando')
+      avisoDetalle('Creando tu cuenta…')
     }
 
     await api.post('/auth/registrarse', {
@@ -143,6 +185,7 @@ async function registrarse() {
       urlFotoPerfil: urlFotoPerfil.value || null,
     })
 
+    if (conFoto) avisoExito('Registro completado. Te llevamos al inicio de sesión.')
     router.push({ name: 'login' })
   } catch (e) {
     const data = e.response?.data
@@ -153,8 +196,11 @@ async function registrarse() {
     } else {
       error.value = 'No se pudo completar el registro. Intentalo de nuevo.'
     }
+    if (conFoto) avisoFallo(error.value)
   } finally {
     cargando.value = false
+    fase.value = ''
+    progreso.value = 0
   }
 }
 
@@ -367,11 +413,15 @@ const pasosRouter = [
           v-else
           type="button"
           :disabled="cargando"
-          class="px-6 py-2 rounded-md text-sm font-normal text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
+          class="px-6 py-2 rounded-md text-sm font-normal text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm min-w-44"
           @click="registrarse"
         >
-          {{ cargando ? 'Registrando...' : 'Registrarse' }}
+          {{ etiquetaRegistro }}
         </button>
+      </div>
+
+      <div v-if="fase === 'subiendo'" class="mt-4 h-1.5 w-full bg-rosa rounded-full overflow-hidden">
+        <div class="h-full bg-coral transition-all duration-150" :style="{ width: progreso + '%' }"></div>
       </div>
     </div>
   </div>

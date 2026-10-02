@@ -13,8 +13,10 @@ import Perfil from '../views/Perfil.vue'
 import Servicios from '../views/Servicios.vue'
 import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
 import ConfiguracionPrivacidad from '../views/ConfiguracionPrivacidad.vue'
+import ConfiguracionEtiquetas from '../views/ConfiguracionEtiquetas.vue'
 import ConfiguracionTerminos from '../views/ConfiguracionTerminos.vue'
 import ConfiguracionCuenta from '../views/ConfiguracionCuenta.vue'
+import PortfolioSubir from '../views/PortfolioSubir.vue'
 
 const routes = [
   {
@@ -43,12 +45,19 @@ const routes = [
         },
       },
       {
+        path: 'portfolio/subir',
+        name: 'portfolio-subir',
+        component: PortfolioSubir,
+        meta: { title: 'Subir imagen al portfolio', requiresArtist: true },
+      },
+      {
         path: 'configuracion',
         component: ConfiguracionLayout,
         children: [
           { path: '', redirect: '/configuracion/perfil' },
           { path: 'perfil', name: 'configuracion-perfil', component: ConfiguracionPerfil, meta: { title: 'Configuración - Perfil' } },
           { path: 'privacidad', name: 'configuracion-privacidad', component: ConfiguracionPrivacidad, meta: { title: 'Configuración - Privacidad' } },
+          { path: 'etiquetas', name: 'configuracion-etiquetas', component: ConfiguracionEtiquetas, meta: { title: 'Configuración - Mis etiquetas' } },
           { path: 'terminos', name: 'configuracion-terminos', component: ConfiguracionTerminos, meta: { title: 'Configuración - Términos' } },
           { path: 'cuenta', name: 'configuracion-cuenta', component: ConfiguracionCuenta, meta: { title: 'Configuración - Cuenta' } },
         ],
@@ -117,6 +126,13 @@ router.beforeEach((to, from, next) => {
   if (to.matched.some((r) => r.meta.requiresAdmin)) {
     if (!token || rol !== 'ADMIN') {
       next({ name: 'login' })
+      return
+    }
+  }
+
+  if (to.matched.some((r) => r.meta.requiresArtist)) {
+    if (!token || rol !== 'ARTISTA') {
+      next({ name: 'inicio' })
       return
     }
   }

@@ -1,7 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../servicios/api'
+import { acceptImagenes, validarImagen, procesarImagen, LIMITES_IMAGEN } from '../servicios/archivos'
+import { useAvisoActualizacion } from '../composables/useAvisoActualizacion'
 
 const router = useRouter()
 const nombreUsuario = localStorage.getItem('nombreUsuario') || ''
@@ -11,6 +13,16 @@ const error = ref('')
 const guardando = ref(false)
 const mensaje = ref('')
 const errorEdicion = ref('')
+const fase = ref('')
+const progreso = ref(0)
+
+const etiquetaBoton = computed(() => {
+  if (fase.value === 'procesando') return 'Procesando imagen…'
+  if (fase.value === 'subiendo-foto') return `Subiendo foto… ${progreso.value}%`
+  if (fase.value === 'subiendo-banner') return `Subiendo banner… ${progreso.value}%`
+  if (fase.value === 'guardando') return 'Guardando…'
+  return 'Guardar cambios'
+})
 
 const form = ref({
   nombreDisplay: '',
@@ -27,6 +39,14 @@ const editBanner = ref(null)
 const previewFoto = ref('')
 const previewBanner = ref('')
 const idUsuario = ref(null)
+
+const {
+  mostrar: avisoMostrar,
+  fase: avisoFase,
+  detalle: avisoDetalle,
+  exito: avisoExito,
+  fallo: avisoFallo,
+} = useAvisoActualizacion()
 
 function irAPerfil() {
   router.push({ name: 'perfil', params: { nombreUsuario } })
@@ -59,20 +79,54 @@ async function cargar() {
 
 function onFotoChange(e) {
   const f = e.target.files[0] || null
+  const problema = f ? validarImagen(f) : ''
+  if (problema) {
+    editFoto.value = null
+    previewFoto.value = ''
+    errorEdicion.value = problema
+    e.target.value = ''
+    return
+  }
+  errorEdicion.value = ''
   editFoto.value = f
   previewFoto.value = f ? URL.createObjectURL(f) : ''
 }
 
 function onBannerChange(e) {
   const f = e.target.files[0] || null
+  const problema = f ? validarImagen(f) : ''
+  if (problema) {
+    editBanner.value = null
+    previewBanner.value = ''
+    errorEdicion.value = problema
+    e.target.value = ''
+    return
+  }
+  errorEdicion.value = ''
   editBanner.value = f
   previewBanner.value = f ? URL.createObjectURL(f) : ''
 }
 
-async function subirArchivo(archivo) {
+async function subirArchivo(archivo, limite, faseSubida, etiqueta) {
+  fase.value = 'procesando'
+  avisoFase('procesando')
+  avisoDetalle('Procesando la imagen…')
+  const optimizado = await procesarImagen(archivo, limite)
+  fase.value = faseSubida
+  avisoFase('subiendo', 0)
+  avisoDetalle(etiqueta)
+  progreso.value = 0
   const fd = new FormData()
-  fd.append('archivo', archivo)
-  const res = await api.post('/upload', fd)
+  fd.append('archivo', optimizado)
+  const res = await api.post('/upload', fd, {
+    onUploadProgress: (e) => {
+      if (e.total) {
+        const pct = Math.round((e.loaded * 100) / e.total)
+        progreso.value = pct
+        avisoFase('subiendo', pct)
+      }
+    },
+  })
   return res.data.url
 }
 
@@ -80,11 +134,21 @@ async function guardar() {
   guardando.value = true
   mensaje.value = ''
   errorEdicion.value = ''
+  progreso.value = 0
+  const hayImagenes = !!(editFoto.value || editBanner.value)
+  if (hayImagenes) {
+    avisoMostrar('Actualizando tu perfil…', 'Esto puede tardar un momento. Puedes seguir navegando.')
+  }
   try {
     let urlFoto = null
     let urlBanner = null
-    if (editFoto.value) urlFoto = await subirArchivo(editFoto.value)
-    if (editBanner.value) urlBanner = await subirArchivo(editBanner.value)
+    if (editFoto.value) urlFoto = await subirArchivo(editFoto.value, LIMITES_IMAGEN.avatar, 'subiendo-foto', 'Subiendo tu foto de perfil…')
+    if (editBanner.value) urlBanner = await subirArchivo(editBanner.value, LIMITES_IMAGEN.banner, 'subiendo-banner', 'Subiendo tu banner…')
+    fase.value = 'guardando'
+    if (hayImagenes) {
+      avisoFase('guardando')
+      avisoDetalle('Guardando los cambios…')
+    }
 
     const payload = {
       nombreDisplay: form.value.nombreDisplay,
@@ -105,16 +169,26 @@ async function guardar() {
     form.value.pais = r.data.pais || ''
     form.value.urlFotoPerfil = r.data.urlFotoPerfil || ''
     form.value.urlBanner = r.data.urlBanner || ''
+    localStorage.setItem('urlFotoPerfil', form.value.urlFotoPerfil)
+    window.dispatchEvent(new CustomEvent('perfil-foto-actualizada', {
+      detail: { url: form.value.urlFotoPerfil },
+    }))
     previewFoto.value = ''
     previewBanner.value = ''
     editFoto.value = null
     editBanner.value = null
 
     mensaje.value = 'Perfil actualizado correctamente.'
+    if (hayImagenes) avisoExito('Tu perfil se actualizó correctamente.')
   } catch (e) {
-    errorEdicion.value = e.response?.data?.message || 'No se pudo guardar.'
+    errorEdicion.value = e.isAxiosError
+      ? (e.response?.data?.message || 'Ocurrió un error, inténtalo más tarde.')
+      : (e.message || 'No se pudo guardar.')
+    if (hayImagenes) avisoFallo(errorEdicion.value)
   } finally {
     guardando.value = false
+    fase.value = ''
+    progreso.value = 0
   }
 }
 
@@ -140,7 +214,7 @@ onMounted(cargar)
         </div>
         <div>
           <label class="block text-sm text-cafe mb-1">Foto de perfil</label>
-          <input type="file" accept="image/*" @change="onFotoChange"class="sr-only" />
+          <input id="foto-perfil" type="file" :accept="acceptImagenes" class="sr-only" @change="onFotoChange" />
 
            <label
                   for="foto-perfil"
@@ -161,7 +235,7 @@ onMounted(cargar)
         <div v-else-if="form.urlBanner" class="mb-2 w-full h-28 rounded-lg overflow-hidden bg-rosa/20">
           <img :src="form.urlBanner" alt="" class="w-full h-full object-cover" />
         </div>
-        <input type="file" accept="image/*" @change="onBannerChange" class="sr-only" />
+        <input id="banner-perfil" type="file" :accept="acceptImagenes" class="sr-only" @change="onBannerChange" />
           <label
             for="banner-perfil"
             class="inline-flex cursor-pointer items-center rounded-md border border-coral bg-coral/10 px-4 py-2 text-sm font-medium text-granate transition hover:bg-coral/20 focus-within:outline-none focus-within:ring-2 focus-within:ring-coral focus-within:ring-offset-2"
@@ -241,11 +315,15 @@ onMounted(cargar)
         </button>
         <button
           :disabled="guardando"
-          class="px-5 py-2.5 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
+          class="px-5 py-2.5 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm min-w-44"
           @click="guardar"
         >
-          {{ guardando ? 'Guardando...' : 'Guardar cambios' }}
+          {{ etiquetaBoton }}
         </button>
+      </div>
+
+      <div v-if="fase.startsWith('subiendo')" class="h-1.5 w-full bg-rosa rounded-full overflow-hidden">
+        <div class="h-full bg-coral transition-all duration-150" :style="{ width: progreso + '%' }"></div>
       </div>
     </div>
   </div>

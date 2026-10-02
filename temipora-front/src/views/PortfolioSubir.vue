@@ -1,15 +1,25 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../servicios/api'
-import { acceptImagenes, esImagenPermitida } from '../servicios/archivos'
+import { acceptImagenes, validarImagen, procesarImagen, LIMITES_IMAGEN } from '../servicios/archivos'
 import SelectorEtiquetas from '../components/SelectorEtiquetas.vue'
 import { useSubirImagen } from '../composables/useSubirImagen'
+import { useAvisoActualizacion } from '../composables/useAvisoActualizacion'
 
 const router = useRouter()
 const { estado, cerrar } = useSubirImagen()
+const {
+  mostrar: avisoMostrar,
+  fase: avisoFase,
+  detalle: avisoDetalle,
+  exito: avisoExito,
+  fallo: avisoFallo,
+} = useAvisoActualizacion()
 
 const guardando = ref(false)
+const fase = ref('')
+const progreso = ref(0)
 const error = ref('')
 const titulo = ref('')
 const descripcion = ref('')
@@ -66,12 +76,20 @@ onBeforeUnmount(() => {
   cerrar()
 })
 
+const etiquetaBoton = computed(() => {
+  if (fase.value === 'procesando') return 'Procesando imagen…'
+  if (fase.value === 'subiendo') return `Subiendo… ${progreso.value}%`
+  if (fase.value === 'guardando') return 'Guardando…'
+  return 'Guardar'
+})
+
 function onImagenChange(event) {
   const seleccionada = event.target.files[0] || null
-  if (seleccionada && !esImagenPermitida(seleccionada)) {
+  const problema = seleccionada ? validarImagen(seleccionada) : ''
+  if (problema) {
     archivo.value = null
     preview.value = ''
-    error.value = 'El formato de la imagen es inválido.'
+    error.value = problema
     event.target.value = ''
     return
   }
@@ -81,17 +99,29 @@ function onImagenChange(event) {
   preview.value = seleccionada ? URL.createObjectURL(seleccionada) : ''
 }
 
-async function subirArchivo(aSubir) {
+function subirArchivo(aSubir) {
   const form = new FormData()
   form.append('archivo', aSubir)
-  const res = await api.post('/upload', form)
-  return res.data.url
+  return api
+    .post('/upload', form, {
+      onUploadProgress: (e) => {
+        if (e.total) {
+          const pct = Math.round((e.loaded * 100) / e.total)
+          progreso.value = pct
+          avisoFase('subiendo', pct)
+        }
+      },
+    })
+    .then((res) => res.data.url)
 }
 
 async function guardar() {
   const enEdicion = estado.modo === 'editar'
-  if (!enEdicion && !archivo.value) {
-    error.value = 'Selecciona una imagen.'
+  const problema = archivo.value
+    ? validarImagen(archivo.value)
+    : (enEdicion ? '' : 'Selecciona una imagen.')
+  if (problema) {
+    error.value = problema
     return
   }
   if (!titulo.value.trim()) {
@@ -105,11 +135,27 @@ async function guardar() {
 
   guardando.value = true
   error.value = ''
+  progreso.value = 0
+  const conImagen = !!archivo.value
+  if (conImagen) {
+    avisoMostrar('Subiendo tu obra…', 'Esto puede tardar un momento. Puedes seguir navegando.')
+  }
   try {
     const idUsuario = localStorage.getItem('idUsuario')
     let url = enEdicion ? imagenEditando.value.url : null
     if (archivo.value) {
-      url = await subirArchivo(archivo.value)
+      fase.value = 'procesando'
+      avisoFase('procesando')
+      avisoDetalle('Procesando la imagen…')
+      const optimizado = await procesarImagen(archivo.value, LIMITES_IMAGEN.obra)
+      fase.value = 'subiendo'
+      avisoFase('subiendo', 0)
+      url = await subirArchivo(optimizado)
+    }
+    fase.value = 'guardando'
+    if (conImagen) {
+      avisoFase('guardando')
+      avisoDetalle('Publicando tu obra…')
     }
     const cuerpo = {
       titulo: titulo.value,
@@ -136,11 +182,21 @@ async function guardar() {
       }))
     }
     cerrar()
+    if (conImagen) {
+      avisoExito(enEdicion
+        ? 'Tu obra se actualizó en el portfolio.'
+        : 'Tu obra se publicó en tu portfolio.')
+    }
     irAlPortfolio()
   } catch (e) {
-    error.value = e.response?.data?.message || 'No se pudo guardar la imagen.'
+    error.value = e.isAxiosError
+      ? (e.response?.data?.message || 'Ocurrió un error, inténtalo más tarde.')
+      : (e.message || 'No se pudo guardar la imagen.')
+    if (conImagen) avisoFallo(error.value)
   } finally {
     guardando.value = false
+    fase.value = ''
+    progreso.value = 0
   }
 }
 </script>
@@ -222,6 +278,7 @@ async function guardar() {
         <button
           type="button"
           class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition"
+          :disabled="guardando"
           @click="cancelar"
         >
           Cancelar
@@ -229,11 +286,15 @@ async function guardar() {
         <button
           type="button"
           :disabled="guardando || (estado.modo === 'crear' && !archivo)"
-          class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
+          class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm min-w-40"
           @click="guardar"
         >
-          {{ guardando ? 'Guardando...' : 'Guardar' }}
+          {{ etiquetaBoton }}
         </button>
+      </div>
+
+      <div v-if="fase === 'subiendo'" class="mt-4 h-1.5 w-full bg-rosa rounded-full overflow-hidden">
+        <div class="h-full bg-coral transition-all duration-150" :style="{ width: progreso + '%' }"></div>
       </div>
     </div>
   </div>
