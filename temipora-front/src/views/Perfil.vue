@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { useSubirImagen } from '../composables/useSubirImagen'
@@ -43,7 +43,7 @@ async function cargarPerfil() {
     }
 
     if (data.rol === 'ARTISTA') {
-      await Promise.all([cargarPortfolio(true), cargarEtiquetasPortfolio()])
+      await Promise.all([cargarPortfolio(true), cargarEtiquetasPortfolio(), cargarTiposArte()])
     } else {
       totalPortfolio.value = 0
       etiquetasPortfolio.value = []
@@ -61,8 +61,9 @@ async function cargarPerfil() {
 
 const TAMANO_PAGINA = 20
 
-const filtros = ref({ titulo: '', etiqueta: '', medio: '', sensible: '', orden: 'RECIENTE' })
+const filtros = ref({ titulo: '', etiqueta: '', tipoArte: '', sensible: '', orden: 'RECIENTE' })
 const etiquetasPortfolio = ref([])
+const tiposArte = ref([])
 const paginaPortfolio = ref(0)
 const totalPortfolio = ref(0)
 const cargandoPortfolio = ref(false)
@@ -70,7 +71,7 @@ const errorListaPortfolio = ref('')
 
 const hayFiltrosActivos = computed(() => {
   const f = filtros.value
-  return !!(f.titulo.trim() || f.etiqueta || f.medio || f.sensible)
+  return !!(f.titulo.trim() || f.etiqueta || f.tipoArte || f.sensible)
 })
 
 const filtrosAbiertos = ref(false)
@@ -80,7 +81,7 @@ const cantidadFiltrosActivos = computed(() => {
   let total = 0
   if (f.titulo.trim()) total++
   if (f.etiqueta) total++
-  if (f.medio) total++
+  if (f.tipoArte) total++
   if (f.sensible) total++
   if (f.orden !== 'RECIENTE') total++
   return total
@@ -99,7 +100,7 @@ async function cargarPortfolio(resetear = true, pagina = 0) {
     const titulo = f.titulo.trim()
     if (titulo) params.titulo = titulo
     if (f.etiqueta) params.idEtiqueta = f.etiqueta
-    if (f.medio) params.medio = f.medio
+    if (f.tipoArte) params.idTipoArte = f.tipoArte
     if (f.sensible) params.sensible = f.sensible
 
     const res = await api.get(`/portfolio/${perfil.value.nombreUsuario}/paginado`, { params })
@@ -131,10 +132,19 @@ async function cargarEtiquetasPortfolio() {
   }
 }
 
+async function cargarTiposArte() {
+  try {
+    const res = await api.get('/tipos-arte')
+    tiposArte.value = res.data
+  } catch (e) {
+    tiposArte.value = []
+  }
+}
+
 function limpiarFiltros() {
   const f = filtros.value
   if (!hayFiltrosActivos.value && (f.orden || 'RECIENTE') === 'RECIENTE') return
-  filtros.value = { titulo: '', etiqueta: '', medio: '', sensible: '', orden: 'RECIENTE' }
+  filtros.value = { titulo: '', etiqueta: '', tipoArte: '', sensible: '', orden: 'RECIENTE' }
 }
 
 async function cargarMasPortfolio() {
@@ -149,7 +159,7 @@ watch(filtros, () => {
 }, { deep: true })
 
 watch(() => route.params.nombreUsuario, () => {
-  filtros.value = { titulo: '', etiqueta: '', medio: '', sensible: '', orden: 'RECIENTE' }
+  filtros.value = { titulo: '', etiqueta: '', tipoArte: '', sensible: '', orden: 'RECIENTE' }
   etiquetasPortfolio.value = []
   paginaPortfolio.value = 0
   totalPortfolio.value = 0
@@ -176,21 +186,93 @@ const { abrir } = useSubirImagen()
 
 const imagenSeleccionada = ref(null)
 const mostrarImagenSensible = ref(false)
+const zoomActivo = ref(false)
+const botonRevelar = ref(null)
 
-function abrirDetalleImagen(imagen) {
+const ETIQUETAS_SENSIBLE = {
+  VIOLENCIA: 'Violencia',
+  DESNUDOS: 'Desnudos',
+  GENERAL: 'Contenido sensible general',
+}
+
+function textoSensible(valor) {
+  return ETIQUETAS_SENSIBLE[valor] || valor || 'Contenido sensible'
+}
+
+function seleccionarImagen(imagen) {
   imagenSeleccionada.value = imagen
   mostrarImagenSensible.value = false
+  zoomActivo.value = false
   errorDetalle.value = ''
+  if (imagen?.requiereAdvertencia) {
+    nextTick(() => botonRevelar.value?.focus())
+  }
+}
+
+function abrirDetalleImagen(imagen) {
+  seleccionarImagen(imagen)
 }
 
 function cerrarDetalleImagen() {
   imagenSeleccionada.value = null
   mostrarImagenSensible.value = false
+  zoomActivo.value = false
 }
 
 function revelarImagenSensible() {
   mostrarImagenSensible.value = true
 }
+
+function ocultarImagenSensible() {
+  mostrarImagenSensible.value = false
+}
+
+const indiceSeleccionado = computed(() =>
+  perfil.value.portfolio.findIndex(o => o.idImagen === imagenSeleccionada.value?.idImagen),
+)
+
+const hayAnterior = computed(() => indiceSeleccionado.value > 0)
+const haySiguiente = computed(() =>
+  indiceSeleccionado.value >= 0 && indiceSeleccionado.value < perfil.value.portfolio.length - 1,
+)
+
+function irAnterior() {
+  if (!hayAnterior.value) return
+  seleccionarImagen(perfil.value.portfolio[indiceSeleccionado.value - 1])
+}
+
+function irSiguiente() {
+  if (!haySiguiente.value) return
+  seleccionarImagen(perfil.value.portfolio[indiceSeleccionado.value + 1])
+}
+
+function abrirZoom() {
+  const img = imagenSeleccionada.value
+  if (!img) return
+  if (img.requiereAdvertencia && !mostrarImagenSensible.value) return
+  zoomActivo.value = true
+}
+
+function cerrarZoom() {
+  zoomActivo.value = false
+}
+
+function manejarTeclaDetalle(event) {
+  if (!imagenSeleccionada.value) return
+  if (event.key === 'Escape') {
+    if (zoomActivo.value) {
+      zoomActivo.value = false
+    } else {
+      cerrarDetalleImagen()
+    }
+    return
+  }
+  if (event.key === 'ArrowLeft') irAnterior()
+  if (event.key === 'ArrowRight') irSiguiente()
+}
+
+onMounted(() => window.addEventListener('keydown', manejarTeclaDetalle))
+onBeforeUnmount(() => window.removeEventListener('keydown', manejarTeclaDetalle))
 
 const errorDetalle = ref('')
 
@@ -386,11 +468,12 @@ function irASubirImagen(imagen = null) {
                   </div>
 
                   <div>
-                    <label class="block text-xs text-cafe/60 mb-1">Medio</label>
-                    <select v-model="filtros.medio" class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none bg-blanco">
+                    <label class="block text-xs text-cafe/60 mb-1">Tipo de arte</label>
+                    <select v-model="filtros.tipoArte" class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none bg-blanco">
                       <option value="">Todos</option>
-                      <option value="TRADICIONAL">Tradicional</option>
-                      <option value="DIGITAL">Digital</option>
+                      <option v-for="t in tiposArte" :key="t.idTipoArte" :value="t.idTipoArte">
+                        {{ t.nombre }}
+                      </option>
                     </select>
                   </div>
 
@@ -455,11 +538,13 @@ function irASubirImagen(imagen = null) {
                       />
                       <span
                         v-if="obra.requiereAdvertencia"
-                        class="absolute inset-0 flex items-center justify-center bg-granate/10 text-3xl text-white drop-shadow"
-                        :title="`Contenido sensible: ${obra.contenidoSensible}`"
-                        :aria-label="`Contenido sensible: ${obra.contenidoSensible}`"
+                        class="absolute inset-0 flex items-center justify-center bg-granate/20 text-white drop-shadow"
+                        :title="`Contenido sensible: ${textoSensible(obra.contenidoSensible)}`"
+                        :aria-label="`Contenido sensible: ${textoSensible(obra.contenidoSensible)}`"
                       >
-                        ⚠
+                        <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                        </svg>
                       </span>
                     </div>
                   </div>
@@ -519,74 +604,192 @@ function irASubirImagen(imagen = null) {
     </div>
 
     <!-- Modal detalle de imagen -->
-    <div v-if="imagenSeleccionada" class="fixed inset-0 z-50 flex items-center justify-center bg-granate/40 px-4" @click.self="cerrarDetalleImagen">
-      <div class="w-full max-w-2xl bg-blanco rounded-2xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
-        <div class="relative overflow-hidden rounded-lg bg-rosa/20">
-          <img
-            :src="imagenSeleccionada.url"
-            :alt="imagenSeleccionada.titulo"
-            class="w-full max-h-[55vh] object-contain transition duration-200"
-            :class="imagenSeleccionada.requiereAdvertencia && !mostrarImagenSensible ? 'blur-[18px] scale-105' : ''"
-          />
-          <span
-            v-if="imagenSeleccionada.requiereAdvertencia && !mostrarImagenSensible"
-            class="absolute inset-0 flex items-center justify-center text-5xl text-white drop-shadow"
-            :title="`Contenido sensible: ${imagenSeleccionada.contenidoSensible}`"
-            :aria-label="`Contenido sensible: ${imagenSeleccionada.contenidoSensible}`"
-          >
-            ⚠
-          </span>
-        </div>
-        <div v-if="imagenSeleccionada.requiereAdvertencia && !mostrarImagenSensible" class="mt-4 rounded-lg bg-rosa/30 px-4 py-3 text-sm text-cafe">
-          <label>Esta imagen tiene contenido sensible categorizado como: {{ imagenSeleccionada.contenidoSensible.toLowerCase() }}.    </label>
-          <button
-            type="button"
-            class="mt-3 rounded-md bg-coral px-4 py-2 text-sm text-white hover:bg-rojizo transition"
-            @click="revelarImagenSensible"
-          >
-            Ver imagen
-          </button>
-        </div>
-        <h2 class="text-xl text-granate mt-5">{{ imagenSeleccionada.titulo }}</h2>
-        <p class="text-sm text-cafe mt-2">{{ imagenSeleccionada.descripcion }}</p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4 text-sm text-cafe/70">
-          <p><span class="text-rojizo">Medio:</span> {{ imagenSeleccionada.medio }}</p>
-          <p><span class="text-rojizo">Materiales:</span> {{ imagenSeleccionada.materiales || 'No especificados' }}</p>
-          <p><span class="text-rojizo">Subida:</span> {{ new Date(imagenSeleccionada.fechaSubida).toLocaleString() }}</p>
-          <p><span class="text-rojizo">Contenido sensible:</span> {{ imagenSeleccionada.contenidoSensible || 'No' }}</p>
-        </div>
-        <div v-if="imagenSeleccionada.etiquetas && imagenSeleccionada.etiquetas.length" class="mt-3">
-          <span class="text-sm text-rojizo">Etiquetas:</span>
-          <div class="flex flex-wrap gap-2 mt-1.5">
-            <span
-              v-for="e in imagenSeleccionada.etiquetas"
-              :key="e.idEtiqueta"
-              class="px-2.5 py-0.5 rounded-full text-xs"
-              :class="e.estado === 'PENDIENTE' ? 'bg-coral/15 text-coral' : 'bg-durazno/40 text-cafe'"
-              :title="e.estado === 'PENDIENTE' ? 'Pendiente de evaluación' : 'Etiqueta disponible'"
+    <div v-if="imagenSeleccionada" class="fixed inset-0 z-50 flex items-center justify-center bg-granate/40 px-4 py-6" @click.self="cerrarDetalleImagen">
+      <div class="relative w-full max-w-5xl bg-blanco rounded-2xl shadow-xl max-h-[92vh] overflow-y-auto lg:h-[85vh] lg:overflow-hidden">
+        <button
+          type="button"
+          class="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-blanco/90 text-xl leading-none text-cafe shadow ring-1 ring-rosa hover:bg-rosa/20 transition"
+          aria-label="Cerrar"
+          @click="cerrarDetalleImagen"
+        >
+          ×
+        </button>
+
+        <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] lg:h-full">
+          <!-- Columna imagen -->
+          <div class="relative flex items-center justify-center bg-cafe/5 p-4 min-h-[42vh] lg:min-h-0 lg:h-full overflow-hidden">
+            <img
+              :src="imagenSeleccionada.url"
+              :alt="imagenSeleccionada.titulo"
+              class="max-h-[45vh] max-w-full object-contain transition duration-200 lg:max-h-full"
+              :class="[
+                imagenSeleccionada.requiereAdvertencia && !mostrarImagenSensible ? 'blur-[18px] scale-105' : 'cursor-zoom-in',
+              ]"
+              @click="abrirZoom"
+            />
+            <!-- Gate de contenido sensible -->
+            <div
+              v-if="imagenSeleccionada.requiereAdvertencia && !mostrarImagenSensible"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-granate/30 px-6 text-center"
+              role="note"
+              aria-live="polite"
             >
-              {{ e.nombre }}<span v-if="e.estado === 'PENDIENTE'" class="opacity-70"> · pendiente</span>
+              <span class="flex h-12 w-12 items-center justify-center rounded-full bg-blanco/90 text-granate" aria-hidden="true">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                </svg>
+              </span>
+              <p class="text-sm font-medium text-white drop-shadow">Contenido sensible</p>
+              <span class="rounded-full bg-blanco/90 px-3 py-0.5 text-xs text-cafe">
+                {{ textoSensible(imagenSeleccionada.contenidoSensible) }}
+              </span>
+              <button
+                ref="botonRevelar"
+                type="button"
+                :aria-pressed="mostrarImagenSensible"
+                class="mt-1 rounded-md bg-coral px-4 py-2 text-sm text-white hover:bg-rojizo transition shadow-sm"
+                @click.stop="revelarImagenSensible"
+              >
+                Ver de todos modos
+              </button>
+            </div>
+
+            <!-- Aviso con la imagen sensible revelada -->
+            <div
+              v-if="imagenSeleccionada.requiereAdvertencia && mostrarImagenSensible"
+              class="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-granate/70 px-3 py-1 text-xs text-crema"
+            >
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.04 12.32a1 1 0 0 1 0-.64C3.43 7.51 7.36 4.5 12 4.5s8.57 3.01 9.96 7.18a1 1 0 0 1 0 .64C20.57 16.49 16.64 19.5 12 19.5s-8.57-3.01-9.96-7.18Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+              <span>Mostrando contenido sensible</span>
+              <button
+                type="button"
+                :aria-pressed="mostrarImagenSensible"
+                class="ml-1 underline hover:text-white"
+                @click.stop="ocultarImagenSensible"
+              >
+                Ocultar
+              </button>
+            </div>
+
+            <!-- Navegación entre imágenes -->
+            <button
+              v-if="hayAnterior"
+              type="button"
+              class="absolute left-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-blanco/90 text-2xl leading-none text-granate shadow ring-1 ring-rosa hover:bg-rosa/20 transition"
+              aria-label="Imagen anterior"
+              @click.stop="irAnterior"
+            >
+              ‹
+            </button>
+            <button
+              v-if="haySiguiente"
+              type="button"
+              class="absolute right-3 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-blanco/90 text-2xl leading-none text-granate shadow ring-1 ring-rosa hover:bg-rosa/20 transition"
+              aria-label="Imagen siguiente"
+              @click.stop="irSiguiente"
+            >
+              ›
+            </button>
+            <span
+              v-if="perfil.portfolio.length > 1"
+              class="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-granate/60 px-2.5 py-0.5 text-xs text-crema"
+            >
+              {{ indiceSeleccionado + 1 }} / {{ perfil.portfolio.length }}
             </span>
           </div>
+
+          <!-- Rail de detalles -->
+          <div class="flex flex-col border-t border-rosa/60 p-6 lg:h-full lg:overflow-y-auto lg:border-t-0 lg:border-l">
+            <div class="flex-1">
+              <h2 class="text-2xl text-granate pr-8">{{ imagenSeleccionada.titulo }}</h2>
+              <p v-if="!esDuenio" class="mt-2 text-sm text-cafe/60">Por {{ nombreParaMostrar }}</p>
+
+              <p v-if="imagenSeleccionada.descripcion" class="mt-4 text-sm text-cafe leading-relaxed whitespace-pre-wrap">{{ imagenSeleccionada.descripcion }}</p>
+
+              <dl class="mt-8 space-y-5 border-t border-rosa/60 pt-6 text-sm">
+                <div>
+                  <dt class="text-xs text-cafe/50">Tipo de arte</dt>
+                  <dd class="text-cafe">{{ imagenSeleccionada.tipoArte?.nombre || '—' }}</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-cafe/50">Fecha de subida</dt>
+                  <dd class="text-cafe">{{ new Date(imagenSeleccionada.fechaSubida).toLocaleString() }}</dd>
+                </div>
+                <div v-if="imagenSeleccionada.contenidoSensible">
+                  <dt class="text-xs text-cafe/50">Contenido sensible</dt>
+                  <dd class="text-cafe">{{ textoSensible(imagenSeleccionada.contenidoSensible) }}</dd>
+                </div>
+              </dl>
+
+              <div v-if="imagenSeleccionada.materiales && imagenSeleccionada.materiales.length" class="mt-8">
+                <p class="text-xs text-cafe/50 mb-2">Materiales y herramientas</p>
+                <div class="flex flex-wrap gap-2">
+                  <span
+                    v-for="m in imagenSeleccionada.materiales"
+                    :key="m.idMaterial"
+                    class="px-2.5 py-0.5 rounded-full text-xs bg-durazno/40 text-cafe"
+                    :title="m.nombreTipoArte ? `${m.nombre} · ${m.nombreTipoArte}` : m.nombre"
+                  >
+                    {{ m.nombre }}
+                  </span>
+                </div>
+              </div>
+
+              <div v-if="imagenSeleccionada.etiquetas && imagenSeleccionada.etiquetas.length" class="mt-8">
+                <p class="text-xs text-cafe/50 mb-2">Etiquetas</p>
+                <div class="flex flex-wrap gap-2">
+                  <span
+                    v-for="e in imagenSeleccionada.etiquetas"
+                    :key="e.idEtiqueta"
+                    class="px-2.5 py-0.5 rounded-full text-xs"
+                    :class="e.estado === 'PENDIENTE' ? 'bg-coral/15 text-coral' : 'bg-durazno/40 text-cafe'"
+                    :title="e.estado === 'PENDIENTE' ? 'Pendiente de evaluación' : 'Etiqueta disponible'"
+                  >
+                    {{ e.nombre }}<span v-if="e.estado === 'PENDIENTE'" class="opacity-70"> · pendiente</span>
+                  </span>
+                </div>
+              </div>
+
+              <p v-if="errorDetalle" class="mt-6 text-sm text-rojizo">{{ errorDetalle }}</p>
+            </div>
+
+            <div v-if="esDuenio" class="mt-8 flex flex-wrap justify-end gap-3 border-t border-rosa/60 pt-6">
+              <button
+                class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
+                @click="irASubirImagen(imagenSeleccionada)"
+              >
+                Editar
+              </button>
+              <button
+                class="px-4 py-2 rounded-md text-sm text-rojizo border border-rojizo/40 hover:bg-rojizo/10 transition"
+                @click="eliminarImagenPortfolio"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
         </div>
-        <p v-if="errorDetalle" class="text-rojizo text-sm text-right mt-4">{{ errorDetalle }}</p>
-        <div class="flex justify-end gap-3 mt-6">
-          <button
-            v-if="esDuenio"
-            class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
-            @click="irASubirImagen(imagenSeleccionada)"
-          >
-            Editar
-          </button>
-          <button
-            v-if="esDuenio"
-            class="px-4 py-2 rounded-md text-sm text-rojizo border border-rojizo/40 hover:bg-rojizo/10 transition"
-            @click="eliminarImagenPortfolio"
-          >
-            Eliminar
-          </button>
-          <button class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition" @click="cerrarDetalleImagen">Cerrar</button>
-        </div>
+      </div>
+
+      <!-- Zoom a pantalla completa -->
+      <div v-if="zoomActivo" class="fixed inset-0 z-[70] flex items-center justify-center bg-granate/95 p-4" @click="cerrarZoom">
+        <button
+          type="button"
+          class="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-blanco/10 text-2xl leading-none text-crema hover:bg-blanco/20 transition"
+          aria-label="Cerrar zoom"
+          @click.stop="cerrarZoom"
+        >
+          ×
+        </button>
+        <img
+          :src="imagenSeleccionada.url"
+          :alt="imagenSeleccionada.titulo"
+          class="max-h-[95vh] max-w-[95vw] object-contain"
+          @click.stop
+        />
       </div>
     </div>
 

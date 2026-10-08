@@ -126,7 +126,7 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
           </span>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto] gap-3">
           <input
             v-model="usernameSearch"
             type="search"
@@ -162,7 +162,7 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
           </select>
 
           <button
-            class="rounded-lg border border-rosa px-4 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
+            class="rounded-lg border border-rosa px-4 py-2.5 text-sm text-cafe hover:bg-rosa/20 transition"
             @click="limpiarFiltros"
           >
             Limpiar

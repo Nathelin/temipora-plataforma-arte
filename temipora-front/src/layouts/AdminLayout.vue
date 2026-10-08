@@ -14,9 +14,17 @@ const secciones = [
   { nombre: 'Usuarios', to: '/admin/usuarios', activa: true },
   { nombre: 'Productos', to: '/admin/tipos/producto', activa: true },
   { nombre: 'Servicios', to: '/admin/tipos/servicio', activa: true },
-  { nombre: 'Etiquetas', to: '/admin/etiquetas', activa: true },
+  {
+    nombre: 'Etiquetas y categorías',
+    base: '/admin/etiquetas',
+    subsecciones: [
+      { nombre: 'Etiquetas', to: '/admin/etiquetas' },
+      { nombre: 'Categorías', to: '/admin/etiquetas/categorias' },
+    ],
+  },
   {
     nombre: 'Arte',
+    base: '/admin/arte',
     subsecciones: [
       { nombre: 'Medios', to: '/admin/arte/medios' },
       { nombre: 'Tipos de arte', to: '/admin/arte/tipos' },
@@ -30,14 +38,26 @@ const secciones = [
 ]
 
 const esActiva = (to) => to && route.path === to
-const esRutaArte = () => route.path.startsWith('/admin/arte')
-const subMenuArteAbierto = ref(esRutaArte())
+
+const submenusAbiertos = ref(
+  Object.fromEntries(
+    secciones
+      .filter((s) => s.subsecciones)
+      .map((s) => [s.nombre, route.path.startsWith(s.base)]),
+  ),
+)
+
+const grupoActivo = (s) => s.subsecciones?.some((sub) => route.path === sub.to)
 
 watch(
   () => route.path,
   (ruta) => {
-    if (ruta.startsWith('/admin/arte')) subMenuArteAbierto.value = true
-  }
+    for (const s of secciones) {
+      if (s.subsecciones && ruta.startsWith(s.base)) {
+        submenusAbiertos.value[s.nombre] = true
+      }
+    }
+  },
 )
 
 function actualizarFotoPerfil(event) {
@@ -155,14 +175,14 @@ function cerrarSesion() {
               <template v-if="s.subsecciones">
                 <button
                   class="w-full flex items-center justify-between px-5 py-2 text-sm transition"
-                  :class="esRutaArte() ? 'bg-rosa/20 text-crema font-medium' : 'text-crema/70 hover:bg-rosa/10 hover:text-crema'"
-                  :aria-expanded="subMenuArteAbierto"
-                  @click="subMenuArteAbierto = !subMenuArteAbierto"
+                  :class="grupoActivo(s) ? 'bg-rosa/20 text-crema font-medium' : 'text-crema/70 hover:bg-rosa/10 hover:text-crema'"
+                  :aria-expanded="!!submenusAbiertos[s.nombre]"
+                  @click="submenusAbiertos[s.nombre] = !submenusAbiertos[s.nombre]"
                 >
                   <span>{{ s.nombre }}</span>
                   <svg
                     class="w-4 h-4 transition-transform"
-                    :class="subMenuArteAbierto ? 'rotate-90' : ''"
+                    :class="submenusAbiertos[s.nombre] ? 'rotate-90' : ''"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     aria-hidden="true"
@@ -174,7 +194,7 @@ function cerrarSesion() {
                     />
                   </svg>
                 </button>
-                <div v-if="subMenuArteAbierto" class="space-y-1 pb-1">
+                <div v-if="submenusAbiertos[s.nombre]" class="space-y-1 pb-1">
                   <router-link
                     v-for="sub in s.subsecciones"
                     :key="sub.to"

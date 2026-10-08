@@ -2,8 +2,6 @@
 import { ref, watch, computed } from 'vue'
 import api from '../servicios/api'
 
-const pestanaActiva = ref('etiquetas')
-
 const etiquetas = ref([])
 const categorias = ref([])
 const cargando = ref(true)
@@ -29,14 +27,6 @@ const nombre = ref('')
 const descripcion = ref('')
 const observaciones = ref('')
 const idCategoria = ref('')
-
-const modalCategoriaAbierto = ref(false)
-const editandoCategoria = ref(false)
-const idCategoriaEditando = ref(null)
-const nombreCategoria = ref('')
-const descripcionCategoria = ref('')
-const observacionesCategoria = ref('')
-const errorCategoria = ref('')
 
 async function cargar() {
   cargando.value = true
@@ -188,72 +178,6 @@ async function reactivarEtiqueta(e) {
   }
 }
 
-// ---------------------------------------------------------------
-// categorías
-// ---------------------------------------------------------------
-
-function abrirAltaCategoria() {
-  editandoCategoria.value = false
-  idCategoriaEditando.value = null
-  nombreCategoria.value = ''
-  descripcionCategoria.value = ''
-  observacionesCategoria.value = ''
-  errorCategoria.value = ''
-  modalCategoriaAbierto.value = true
-}
-
-function abrirEdicionCategoria(c) {
-  editandoCategoria.value = true
-  idCategoriaEditando.value = c.idCategoriaEtiqueta
-  nombreCategoria.value = c.nombre
-  descripcionCategoria.value = c.descripcion
-  observacionesCategoria.value = c.observaciones || ''
-  errorCategoria.value = ''
-  modalCategoriaAbierto.value = true
-}
-
-async function guardarCategoria() {
-  guardando.value = true
-  errorCategoria.value = ''
-  const payload = {
-    nombre: nombreCategoria.value,
-    descripcion: descripcionCategoria.value,
-    observaciones: observacionesCategoria.value || null,
-  }
-  try {
-    if (editandoCategoria.value) {
-      await api.put(`/admin/categorias-etiqueta/${idCategoriaEditando.value}`, payload)
-    } else {
-      await api.post('/admin/categorias-etiqueta', payload)
-    }
-    modalCategoriaAbierto.value = false
-    await cargar()
-  } catch (e) {
-    errorCategoria.value = e.response?.data?.message || 'No se pudo guardar la categoría.'
-  } finally {
-    guardando.value = false
-  }
-}
-
-function confirmarBajaCategoria(c) {
-  pedirConfirmacion({
-    titulo: '¿Dar de baja la categoría?',
-    mensaje: `La categoría "${c.nombre}" dejará de estar disponible para crear o editar etiquetas. Podrás reactivarla más adelante.`,
-    boton: 'Dar de baja',
-    ejecutar: () => api.delete(`/admin/categorias-etiqueta/${c.idCategoriaEtiqueta}`),
-  })
-}
-
-async function reactivarCategoria(c) {
-  errorAccion.value = ''
-  try {
-    await api.post(`/admin/categorias-etiqueta/${c.idCategoriaEtiqueta}/activar`)
-    await cargar()
-  } catch (e) {
-    errorAccion.value = e.response?.data?.message || 'No se pudo actualizar el estado.'
-  }
-}
-
 function chipEstado(estado) {
   return {
     VALIDA: 'bg-green-500/10 text-green-700',
@@ -274,7 +198,6 @@ function textoEstado(estado) {
 
 function cerrarModal() {
   modalEtiquetaAbierto.value = false
-  modalCategoriaAbierto.value = false
 }
 
 cargar()
@@ -285,36 +208,10 @@ cargar()
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-xl font-normal text-granate">Etiquetas</h1>
       <button
-        v-if="pestanaActiva === 'etiquetas'"
         class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
         @click="abrirAltaEtiqueta"
       >
         Dar de alta
-      </button>
-      <button
-        v-else
-        class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
-        @click="abrirAltaCategoria"
-      >
-        Dar de alta
-      </button>
-    </div>
-
-    <!-- Pestañas -->
-    <div class="flex items-center gap-6 border-b border-rosa mb-6">
-      <button
-        class="py-3 text-sm transition border-b-2"
-        :class="pestanaActiva === 'etiquetas' ? 'border-coral text-granate font-medium' : 'border-transparent text-cafe/60 hover:text-cafe'"
-        @click="pestanaActiva = 'etiquetas'"
-      >
-        Etiquetas
-      </button>
-      <button
-        class="py-3 text-sm transition border-b-2"
-        :class="pestanaActiva === 'categorias' ? 'border-coral text-granate font-medium' : 'border-transparent text-cafe/60 hover:text-cafe'"
-        @click="pestanaActiva = 'categorias'"
-      >
-        Categorías
       </button>
     </div>
 
@@ -325,10 +222,9 @@ cargar()
       <p v-if="errorAccion" class="text-rojizo text-sm mb-4">{{ errorAccion }}</p>
 
       <!-- ------------------------------------------------------- -->
-      <!-- Pestaña: etiquetas -->
+      <!-- Etiquetas -->
       <!-- ------------------------------------------------------- -->
-      <template v-if="pestanaActiva === 'etiquetas'">
-        <div class="flex flex-wrap items-end gap-4 mb-5">
+      <div class="flex flex-wrap items-end gap-4 mb-5">
           <div>
             <label class="block text-xs text-cafe/60 mb-1">Estado</label>
             <select
@@ -423,57 +319,6 @@ cargar()
             No hay etiquetas con los filtros seleccionados.
           </p>
         </div>
-      </template>
-
-      <!-- ------------------------------------------------------- -->
-      <!-- Pestaña: categorías -->
-      <!-- ------------------------------------------------------- -->
-      <template v-else-if="pestanaActiva === 'categorias'">
-        <div class="bg-blanco rounded-3xl overflow-hidden shadow-xl shadow-rosa/40">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm min-w-160">
-              <thead class="bg-rosa/40 text-granate">
-                <tr>
-                  <th class="px-5 py-3 font-normal text-sm">Nombre</th>
-                  <th class="px-5 py-3 font-normal text-sm">Descripción</th>
-                  <th class="px-5 py-3 font-normal text-sm">Estado</th>
-                  <th class="px-5 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="c in categorias" :key="c.idCategoriaEtiqueta" class="border-t border-rosa/50 hover:bg-rosa/20 transition">
-                  <td class="px-5 py-3 text-granate font-normal">{{ c.nombre }}</td>
-                  <td class="px-5 py-3 text-cafe">{{ c.descripcion }}</td>
-                  <td class="px-5 py-3">
-                    <span
-                      class="px-2.5 py-0.5 rounded-full text-xs font-normal"
-                      :class="c.activo ? 'bg-green-500/10 text-green-700' : 'bg-rojizo/10 text-rojizo'"
-                    >
-                      {{ c.activo ? 'Activa' : 'Inactiva' }}
-                    </span>
-                  </td>
-                  <td class="px-5 py-3 text-right whitespace-nowrap">
-                    <button class="text-rojizo hover:text-coral transition mr-3" @click="abrirEdicionCategoria(c)">
-                      Editar
-                    </button>
-                    <button
-                      class="text-cafe/50 hover:text-rojizo transition"
-                      @click="c.activo ? confirmarBajaCategoria(c) : reactivarCategoria(c)"
-                    >
-                      {{ c.activo ? 'Dar de baja' : 'Reactivar' }}
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <p v-if="!categorias.length" class="p-8 text-cafe/50 text-center">
-            No hay categorías registradas.
-          </p>
-        </div>
-      </template>
-
     </template>
 
     <!-- Modal de etiqueta -->
@@ -510,7 +355,7 @@ cargar()
               </option>
             </select>
             <p v-if="!categoriasParaEtiqueta.length" class="text-xs text-cafe/50 mt-1">
-              No hay categorías disponibles. Créala primero en la pestaña "Categorías".
+              No hay categorías disponibles. Créala primero en la sección "Categorías".
             </p>
           </div>
 
@@ -550,70 +395,6 @@ cargar()
             :disabled="guardando"
             class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
             @click="guardarEtiqueta"
-          >
-            {{ guardando ? 'Guardando...' : 'Guardar' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal de categoría -->
-    <div
-      v-if="modalCategoriaAbierto"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-granate/40 px-4"
-      @click.self="cerrarModal"
-    >
-      <div class="w-full max-w-lg bg-blanco rounded-2xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-lg text-granate mb-4">
-          {{ editandoCategoria ? 'Modificar categoría' : 'Dar de alta categoría' }}
-        </h2>
-
-        <div class="space-y-5">
-          <div>
-            <label class="block text-sm text-cafe mb-2">Nombre <span class="text-rojizo">*</span></label>
-            <input
-              v-model="nombreCategoria"
-              type="text"
-              maxlength="50"
-              class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm text-cafe mb-2">Descripción <span class="text-rojizo">*</span></label>
-            <textarea
-              v-model="descripcionCategoria"
-              rows="3"
-              maxlength="250"
-              class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"
-            ></textarea>
-            <p class="text-right text-xs text-cafe/50 mt-1">{{ descripcionCategoria.length }}/250</p>
-          </div>
-
-          <div>
-            <label class="block text-sm text-cafe mb-2">Observaciones (opcional)</label>
-            <textarea
-              v-model="observacionesCategoria"
-              rows="3"
-              maxlength="500"
-              class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"
-            ></textarea>
-          </div>
-
-          <p v-if="errorCategoria" class="text-rojizo text-sm">{{ errorCategoria }}</p>
-        </div>
-
-        <div class="flex items-center justify-end gap-3 mt-6">
-          <button
-            class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition"
-            @click="cerrarModal"
-          >
-            Cancelar
-          </button>
-          <button
-            :disabled="guardando"
-            class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
-            @click="guardarCategoria"
           >
             {{ guardando ? 'Guardando...' : 'Guardar' }}
           </button>
