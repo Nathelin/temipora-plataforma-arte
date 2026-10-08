@@ -9,7 +9,7 @@ const props = defineProps({
 const endpointBase = computed(() => props.tipo === 'producto' ? 'tipos-producto' : 'tipos-servicio')
 const campoId = computed(() => props.tipo === 'producto' ? 'idTipoProducto' : 'idTipoServicio')
 const etiquetaSingular = computed(() => props.tipo === 'producto' ? 'tipo de producto' : 'tipo de servicio')
-const titulo = computed(() => props.tipo === 'producto' ? 'Gestión de productos' : 'Gestión de servicios')
+const titulo = computed(() => props.tipo === 'producto' ? 'Tipos de producto' : 'Tipos de servicio')
 
 const tipos = ref([])
 const cargando = ref(true)

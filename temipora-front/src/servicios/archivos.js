@@ -8,6 +8,8 @@ export const LIMITES_IMAGEN = {
   obra: 1600,
 }
 
+export const MAX_IMAGENES_POR_LOTE = 20
+
 export function esImagenPermitida(archivo) {
   return Boolean(archivo) && formatosImagenPermitidos.includes(archivo.type)
 }
@@ -24,6 +26,11 @@ export function validarImagen(archivo) {
 }
 
 export const acceptImagenes = '.jpg,.jpeg,.png,.webp'
+
+export function nombreSinExtension(archivo) {
+  const base = (archivo.name || '').replace(/\.[^.]+$/, '').trim()
+  return (base || 'Imagen').slice(0, 100)
+}
 
 function decodificarConImg(archivo) {
   return new Promise((resolve, reject) => {

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
@@ -11,10 +11,18 @@ const menuAbierto = ref(false)
 const contenedorMenu = ref(null)
 
 const secciones = [
-  { nombre: 'Gestión de usuarios', to: '/admin/usuarios', activa: true },
-  { nombre: 'Gestión de productos', to: '/admin/tipos/producto', activa: true },
-  { nombre: 'Gestión de servicios', to: '/admin/tipos/servicio', activa: true },
-  { nombre: 'Gestión de etiquetas', to: '/admin/etiquetas', activa: true },
+  { nombre: 'Usuarios', to: '/admin/usuarios', activa: true },
+  { nombre: 'Productos', to: '/admin/tipos/producto', activa: true },
+  { nombre: 'Servicios', to: '/admin/tipos/servicio', activa: true },
+  { nombre: 'Etiquetas', to: '/admin/etiquetas', activa: true },
+  {
+    nombre: 'Arte',
+    subsecciones: [
+      { nombre: 'Medios', to: '/admin/arte/medios' },
+      { nombre: 'Tipos de arte', to: '/admin/arte/tipos' },
+      { nombre: 'Materiales', to: '/admin/arte/materiales' },
+    ],
+  },
   { nombre: 'Moderación', to: null, activa: false },
   { nombre: 'Sanciones', to: null, activa: false },
   { nombre: 'Notificaciones', to: null, activa: false },
@@ -22,6 +30,15 @@ const secciones = [
 ]
 
 const esActiva = (to) => to && route.path === to
+const esRutaArte = () => route.path.startsWith('/admin/arte')
+const subMenuArteAbierto = ref(esRutaArte())
+
+watch(
+  () => route.path,
+  (ruta) => {
+    if (ruta.startsWith('/admin/arte')) subMenuArteAbierto.value = true
+  }
+)
 
 function actualizarFotoPerfil(event) {
   urlFotoPerfil.value = event.detail?.url || ''
@@ -135,8 +152,42 @@ function cerrarSesion() {
         <nav class="flex-1 py-3">
           <div class="space-y-1">
             <template v-for="s in secciones" :key="s.nombre">
+              <template v-if="s.subsecciones">
+                <button
+                  class="w-full flex items-center justify-between px-5 py-2 text-sm transition"
+                  :class="esRutaArte() ? 'bg-rosa/20 text-crema font-medium' : 'text-crema/70 hover:bg-rosa/10 hover:text-crema'"
+                  :aria-expanded="subMenuArteAbierto"
+                  @click="subMenuArteAbierto = !subMenuArteAbierto"
+                >
+                  <span>{{ s.nombre }}</span>
+                  <svg
+                    class="w-4 h-4 transition-transform"
+                    :class="subMenuArteAbierto ? 'rotate-90' : ''"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </button>
+                <div v-if="subMenuArteAbierto" class="space-y-1 pb-1">
+                  <router-link
+                    v-for="sub in s.subsecciones"
+                    :key="sub.to"
+                    :to="sub.to"
+                    class="flex items-center gap-3 pl-9 pr-5 py-2 text-sm transition"
+                    :class="esActiva(sub.to) ? 'bg-rosa/20 text-crema font-medium' : 'text-crema/70 hover:bg-rosa/10 hover:text-crema'"
+                  >
+                    <span>{{ sub.nombre }}</span>
+                  </router-link>
+                </div>
+              </template>
               <router-link
-                v-if="s.activa"
+                v-else-if="s.activa"
                 :to="s.to"
                 class="flex items-center gap-3 px-5 py-2 text-sm transition"
                 :class="esActiva(s.to) ? 'bg-rosa/20 text-crema font-medium' : 'text-crema/70 hover:bg-rosa/10 hover:text-crema'"

@@ -123,13 +123,68 @@ async function guardarEtiqueta() {
   }
 }
 
-async function accionEtiqueta(e, accion) {
-  errorAccion.value = ''
+const modalConfirmacion = ref(null)
+
+function pedirConfirmacion({ titulo, mensaje, boton, ejecutar }) {
+  modalConfirmacion.value = { titulo, mensaje, boton, ejecutar, confirmando: false, error: '' }
+}
+
+function cerrarConfirmacion() {
+  if (modalConfirmacion.value && !modalConfirmacion.value.confirmando) {
+    modalConfirmacion.value = null
+  }
+}
+
+async function confirmarAccion() {
+  const c = modalConfirmacion.value
+  if (!c || c.confirmando) return
+  c.confirmando = true
+  c.error = ''
   try {
-    await api.post(`/admin/etiquetas/${e.idEtiqueta}/${accion}`)
+    await c.ejecutar()
+    modalConfirmacion.value = null
     await cargar()
   } catch (err) {
-    errorAccion.value = err.response?.data?.message || 'No se pudo completar la acción.'
+    c.error = err.response?.data?.message || 'No se pudo completar la acción.'
+    c.confirmando = false
+  }
+}
+
+function confirmarAccionEtiqueta(e, accion) {
+  const acciones = {
+    aprobar: {
+      titulo: '¿Aprobar la etiqueta?',
+      mensaje: `La etiqueta "${e.nombre}" pasará a estado Válida y quedará disponible en el selector y los filtros de toda la plataforma.`,
+      boton: 'Aprobar',
+    },
+    rechazar: {
+      titulo: '¿Rechazar la etiqueta?',
+      mensaje: `La etiqueta "${e.nombre}" pasará a estado Rechazada y se quitará de las imágenes donde ya fue asignada.`,
+      boton: 'Rechazar',
+    },
+    baja: {
+      titulo: '¿Dar de baja la etiqueta?',
+      mensaje: `La etiqueta "${e.nombre}" dejará de estar disponible para nuevas asignaciones. Podrás reactivarla más adelante desde esta lista.`,
+      boton: 'Dar de baja',
+    },
+  }
+  const def = acciones[accion]
+  if (!def) return
+  pedirConfirmacion({
+    titulo: def.titulo,
+    mensaje: def.mensaje,
+    boton: def.boton,
+    ejecutar: () => api.post(`/admin/etiquetas/${e.idEtiqueta}/${accion}`),
+  })
+}
+
+async function reactivarEtiqueta(e) {
+  errorAccion.value = ''
+  try {
+    await api.post(`/admin/etiquetas/${e.idEtiqueta}/reactivar`)
+    await cargar()
+  } catch (err) {
+    errorAccion.value = err.response?.data?.message || 'No se pudo reactivar la etiqueta.'
   }
 }
 
@@ -180,14 +235,19 @@ async function guardarCategoria() {
   }
 }
 
-async function alternarCategoria(c) {
+function confirmarBajaCategoria(c) {
+  pedirConfirmacion({
+    titulo: '¿Dar de baja la categoría?',
+    mensaje: `La categoría "${c.nombre}" dejará de estar disponible para crear o editar etiquetas. Podrás reactivarla más adelante.`,
+    boton: 'Dar de baja',
+    ejecutar: () => api.delete(`/admin/categorias-etiqueta/${c.idCategoriaEtiqueta}`),
+  })
+}
+
+async function reactivarCategoria(c) {
   errorAccion.value = ''
   try {
-    if (c.activo) {
-      await api.delete(`/admin/categorias-etiqueta/${c.idCategoriaEtiqueta}`)
-    } else {
-      await api.post(`/admin/categorias-etiqueta/${c.idCategoriaEtiqueta}/activar`)
-    }
+    await api.post(`/admin/categorias-etiqueta/${c.idCategoriaEtiqueta}/activar`)
     await cargar()
   } catch (e) {
     errorAccion.value = e.response?.data?.message || 'No se pudo actualizar el estado.'
@@ -223,7 +283,7 @@ cargar()
 <template>
   <div class="flex-1 w-full mx-auto px-4 sm:px-8 py-8">
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-normal text-granate">Gestión de etiquetas</h1>
+      <h1 class="text-xl font-normal text-granate">Etiquetas</h1>
       <button
         v-if="pestanaActiva === 'etiquetas'"
         class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
@@ -325,14 +385,14 @@ cargar()
                     <button
                       v-if="e.estado === 'PENDIENTE' || e.estado === 'RECHAZADA'"
                       class="text-green-700 hover:text-coral transition mr-3"
-                      @click="accionEtiqueta(e, 'aprobar')"
+                      @click="confirmarAccionEtiqueta(e, 'aprobar')"
                     >
                       Aprobar
                     </button>
                     <button
                       v-if="e.estado === 'PENDIENTE'"
                       class="text-rojizo hover:text-coral transition mr-3"
-                      @click="accionEtiqueta(e, 'rechazar')"
+                      @click="confirmarAccionEtiqueta(e, 'rechazar')"
                     >
                       Rechazar
                     </button>
@@ -340,9 +400,16 @@ cargar()
                       Editar
                     </button>
                     <button
+                      v-if="e.estado === 'INACTIVA'"
+                      class="text-green-700 hover:text-coral transition"
+                      @click="reactivarEtiqueta(e)"
+                    >
+                      Reactivar
+                    </button>
+                    <button
                       v-if="e.estado === 'VALIDA'"
                       class="text-cafe/50 hover:text-rojizo transition"
-                      @click="accionEtiqueta(e, 'baja')"
+                      @click="confirmarAccionEtiqueta(e, 'baja')"
                     >
                       Dar de baja
                     </button>
@@ -361,7 +428,7 @@ cargar()
       <!-- ------------------------------------------------------- -->
       <!-- Pestaña: categorías -->
       <!-- ------------------------------------------------------- -->
-      <template v-else>
+      <template v-else-if="pestanaActiva === 'categorias'">
         <div class="bg-blanco rounded-3xl overflow-hidden shadow-xl shadow-rosa/40">
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm min-w-160">
@@ -389,7 +456,10 @@ cargar()
                     <button class="text-rojizo hover:text-coral transition mr-3" @click="abrirEdicionCategoria(c)">
                       Editar
                     </button>
-                    <button class="text-cafe/50 hover:text-rojizo transition" @click="alternarCategoria(c)">
+                    <button
+                      class="text-cafe/50 hover:text-rojizo transition"
+                      @click="c.activo ? confirmarBajaCategoria(c) : reactivarCategoria(c)"
+                    >
                       {{ c.activo ? 'Dar de baja' : 'Reactivar' }}
                     </button>
                   </td>
@@ -403,6 +473,7 @@ cargar()
           </p>
         </div>
       </template>
+
     </template>
 
     <!-- Modal de etiqueta -->
@@ -545,6 +616,41 @@ cargar()
             @click="guardarCategoria"
           >
             {{ guardando ? 'Guardando...' : 'Guardar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de confirmación de acciones -->
+    <div
+      v-if="modalConfirmacion"
+      class="fixed inset-0 z-[80] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="absolute inset-0 bg-granate/40" aria-hidden="true" @click="cerrarConfirmacion"></div>
+
+      <div class="relative w-full max-w-md bg-blanco rounded-xl shadow-xl shadow-granate/20 border border-rosa p-6">
+        <h2 class="text-lg text-granate">{{ modalConfirmacion.titulo }}</h2>
+        <p class="mt-2 text-sm text-cafe/70">{{ modalConfirmacion.mensaje }}</p>
+        <p v-if="modalConfirmacion.error" class="mt-3 text-sm text-rojizo">{{ modalConfirmacion.error }}</p>
+
+        <div class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+          <button
+            type="button"
+            :disabled="modalConfirmacion.confirmando"
+            class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 disabled:opacity-50 transition"
+            @click="cerrarConfirmacion"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            :disabled="modalConfirmacion.confirmando"
+            class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
+            @click="confirmarAccion"
+          >
+            {{ modalConfirmacion.confirmando ? 'Procesando...' : modalConfirmacion.boton }}
           </button>
         </div>
       </div>
