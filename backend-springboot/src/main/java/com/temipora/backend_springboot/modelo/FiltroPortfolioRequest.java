@@ -11,7 +11,7 @@ public class FiltroPortfolioRequest {
 
     private String titulo;
     private Long idEtiqueta;
-    private String medio;
+    private Long idTipoArte;
     private String sensible;
     private String orden;
 }

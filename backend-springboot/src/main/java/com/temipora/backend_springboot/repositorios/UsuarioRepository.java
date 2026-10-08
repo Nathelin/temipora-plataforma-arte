@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.Usuario;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
@@ -19,6 +20,23 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     boolean existsByNombreUsuario(String nombreUsuario);
     boolean existsByNombreUsuarioIgnoreCase(String nombreUsuario);
     boolean existsByRol_Nombre(ERol nombre);
+
+    @Query("""
+        SELECT COUNT(u) > 0 FROM Usuario u
+        WHERE u.urlFotoPerfil = :url
+           OR u.urlFotoPerfilMiniatura = :url
+           OR u.urlBanner = :url
+        """)
+    boolean existeUrlEnPerfil(@Param("url") String url);
+
+    @Query("SELECT u.urlFotoPerfil FROM Usuario u WHERE u.urlFotoPerfil IS NOT NULL")
+    List<String> findUrlsFotoPerfil();
+
+    @Query("SELECT u.urlFotoPerfilMiniatura FROM Usuario u WHERE u.urlFotoPerfilMiniatura IS NOT NULL")
+    List<String> findUrlsFotoPerfilMiniatura();
+
+    @Query("SELECT u.urlBanner FROM Usuario u WHERE u.urlBanner IS NOT NULL")
+    List<String> findUrlsBanner();
 
     // Los patrones LIKE se arman en el servicio (sin null dentro de CONCAT):
     // en PostgreSQL un null sin tipo en ('%'||?||'%') resuelve como bytea y falla lower(bytea).

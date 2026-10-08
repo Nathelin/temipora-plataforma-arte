@@ -2,9 +2,11 @@ package com.temipora.backend_springboot.controladores;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -30,6 +32,7 @@ import com.temipora.backend_springboot.modelo.RegistroUsuarioDTO;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.servicios.FormatoArchivoInvalidoException;
+import com.temipora.backend_springboot.servicios.LimpiezaArchivosService;
 import com.temipora.backend_springboot.servicios.StorageService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -50,6 +53,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private StorageService storageService;
+
+    @MockitoBean
+    private LimpiezaArchivosService limpiezaArchivosService;
 
     @MockitoBean
     private UserDetailsService userDetailsService;
@@ -155,6 +161,45 @@ class AuthControllerTest {
                         "imagen".getBytes())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.url").value(""));
+    }
+
+    // ---------------------------------------------------------------
+    // DELETE /api/upload
+    // ---------------------------------------------------------------
+
+    @Test
+    void eliminarArchivos_listaValida_devuelveConteoDeEliminados() throws Exception {
+        when(limpiezaArchivosService.eliminar(anyList())).thenReturn(2);
+
+        mockMvc.perform(delete("/api/upload")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("[\"/uploads/a.webp\",\"/uploads/b.webp\"]"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.eliminados").value(2));
+
+        verify(limpiezaArchivosService).eliminar(anyList());
+    }
+
+    @Test
+    void eliminarArchivos_listaVacia_devuelve400SinLlamarAlServicio() throws Exception {
+        mockMvc.perform(delete("/api/upload")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("[]"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Debes indicar al menos una imagen."));
+
+        verify(limpiezaArchivosService, never()).eliminar(anyList());
+    }
+
+    @Test
+    void eliminarArchivos_ningunoReferenciado_devuelveCero() throws Exception {
+        when(limpiezaArchivosService.eliminar(anyList())).thenReturn(0);
+
+        mockMvc.perform(delete("/api/upload")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("[\"/uploads/abc.webp\"]"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.eliminados").value(0));
     }
 
     // ---------------------------------------------------------------

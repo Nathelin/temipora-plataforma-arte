@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 
-import com.temipora.backend_springboot.modelo.MedioPortfolio;
 import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.ImagenRepository;
 
@@ -31,7 +30,7 @@ class PortfolioQueriesTest {
 	@Test
 	void findParaVisor_portfolioInexistente_conTodosLosFiltros_devuelveVacio() {
 		var resultado = imagenRepository.findParaVisor(
-				-1L, 55L, "%obra%", 3L, MedioPortfolio.DIGITAL, true, true, true, PageRequest.of(0, 10));
+				-1L, 55L, "%obra%", 3L, 2L, true, true, true, PageRequest.of(0, 10));
 
 		assertThat(resultado.getContent()).isEmpty();
 	}

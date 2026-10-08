@@ -440,6 +440,54 @@ class EtiquetaServiceTest {
     }
 
     // ---------------------------------------------------------------
+    // reactivar
+    // ---------------------------------------------------------------
+
+    @Test
+    void reactivar_inactiva_pasaAValidaYRegistraQuienReactivo() {
+        Etiqueta inactiva = etiqueta(1L, "Acuarela", EtiquetaEstado.INACTIVA, estilo, admin, 0);
+        when(etiquetaRepository.findByIdEtiqueta(1L)).thenReturn(Optional.of(inactiva));
+        when(etiquetaRepository.findByNombreIgnoreCase("Acuarela")).thenReturn(Optional.of(inactiva));
+        when(etiquetaRepository.save(any(Etiqueta.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        EtiquetaDTO resultado = etiquetaService.reactivar(admin, 1L);
+
+        ArgumentCaptor<Etiqueta> captor = ArgumentCaptor.forClass(Etiqueta.class);
+        verify(etiquetaRepository).save(captor.capture());
+        Etiqueta guardada = captor.getValue();
+        assertThat(guardada.getEstado()).isEqualTo(EtiquetaEstado.VALIDA);
+        assertThat(guardada.getEvaluadoPor()).isSameAs(admin);
+        assertThat(guardada.getFechaEvaluacion()).isNotNull();
+        assertThat(resultado.getEstado()).isEqualTo(EtiquetaEstado.VALIDA);
+    }
+
+    @Test
+    void reactivar_noInactiva_lanzaError() {
+        when(etiquetaRepository.findByIdEtiqueta(1L))
+                .thenReturn(Optional.of(etiqueta(1L, "Pixel", EtiquetaEstado.VALIDA, estilo, admin, 0)));
+
+        assertThatThrownBy(() -> etiquetaService.reactivar(admin, 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Solo puede reactivarse una etiqueta dada de baja.");
+
+        verify(etiquetaRepository, never()).save(any(Etiqueta.class));
+    }
+
+    @Test
+    void reactivar_existeOtraEtiquetaMismoNombre_lanzaError() {
+        Etiqueta inactiva = etiqueta(1L, "Acuarela", EtiquetaEstado.INACTIVA, estilo, admin, 0);
+        Etiqueta duplicada = etiqueta(2L, "Acuarela", EtiquetaEstado.PENDIENTE, estilo, artista, 1);
+        when(etiquetaRepository.findByIdEtiqueta(1L)).thenReturn(Optional.of(inactiva));
+        when(etiquetaRepository.findByNombreIgnoreCase("Acuarela")).thenReturn(Optional.of(duplicada));
+
+        assertThatThrownBy(() -> etiquetaService.reactivar(admin, 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Ya existe una etiqueta pendiente de evaluación con ese nombre.");
+
+        verify(etiquetaRepository, never()).save(any(Etiqueta.class));
+    }
+
+    // ---------------------------------------------------------------
     // crearDesdeArtista (UC-54)
     // ---------------------------------------------------------------
 

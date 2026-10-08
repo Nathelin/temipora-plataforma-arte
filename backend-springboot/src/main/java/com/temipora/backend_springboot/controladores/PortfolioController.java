@@ -50,7 +50,7 @@ public class PortfolioController {
             @PathVariable String nombreUsuario,
             @RequestParam(required = false) String titulo,
             @RequestParam(required = false) Long idEtiqueta,
-            @RequestParam(required = false) String medio,
+            @RequestParam(required = false) Long idTipoArte,
             @RequestParam(required = false) String sensible,
             @RequestParam(required = false) String orden,
             Pageable pageable,
@@ -67,7 +67,7 @@ public class PortfolioController {
         FiltroPortfolioRequest filtro = new FiltroPortfolioRequest();
         filtro.setTitulo(titulo);
         filtro.setIdEtiqueta(idEtiqueta);
-        filtro.setMedio(medio);
+        filtro.setIdTipoArte(idTipoArte);
         filtro.setSensible(sensible);
         filtro.setOrden(orden);
 

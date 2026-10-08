@@ -141,7 +141,7 @@ class PortfolioControllerTest {
         mockMvc.perform(get("/api/portfolio/artista777/paginado")
                 .param("titulo", "obra")
                 .param("idEtiqueta", "3")
-                .param("medio", "DIGITAL")
+                .param("idTipoArte", "2")
                 .param("sensible", "true")
                 .param("orden", "ANTIGUO")
                 .header("Authorization", "Bearer " + token("cliente42", ERol.CLIENTE)))
@@ -152,7 +152,7 @@ class PortfolioControllerTest {
                 eq("artista777"), eq(55L), captor.capture(), any(Pageable.class));
         assertThat(captor.getValue().getTitulo()).isEqualTo("obra");
         assertThat(captor.getValue().getIdEtiqueta()).isEqualTo(3L);
-        assertThat(captor.getValue().getMedio()).isEqualTo("DIGITAL");
+        assertThat(captor.getValue().getIdTipoArte()).isEqualTo(2L);
         assertThat(captor.getValue().getSensible()).isEqualTo("true");
         assertThat(captor.getValue().getOrden()).isEqualTo("ANTIGUO");
     }
@@ -445,6 +445,6 @@ class PortfolioControllerTest {
 
     private String requestValido() {
         return "{\"titulo\":\"Mi obra\",\"descripcion\":\"Una obra\","
-                + "\"url\":\"https://x/img.png\",\"medio\":\"DIGITAL\"}";
+                + "\"url\":\"https://x/img.png\",\"idTipoArte\":1}";
     }
 }

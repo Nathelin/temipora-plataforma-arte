@@ -31,6 +31,7 @@ import com.temipora.backend_springboot.config.JwtUtils;
 import com.temipora.backend_springboot.config.SecurityConfig;
 import com.temipora.backend_springboot.controladores.AuthController;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.servicios.LimpiezaArchivosService;
 import com.temipora.backend_springboot.servicios.StorageService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -61,6 +62,9 @@ class JwtAuthenticationFilterTest {
 
     @MockitoBean
     private StorageService storageService;
+
+    @MockitoBean
+    private LimpiezaArchivosService limpiezaArchivosService;
 
     // ---------------------------------------------------------------
     // POST /api/auth/login

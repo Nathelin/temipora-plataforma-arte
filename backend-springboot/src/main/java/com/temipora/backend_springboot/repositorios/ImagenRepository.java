@@ -7,8 +7,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.Imagen;
-import com.temipora.backend_springboot.modelo.MedioPortfolio;
 import com.temipora.backend_springboot.modelo.Portfolio;
+import com.temipora.backend_springboot.modelo.TipoArte;
 
 import java.util.List;
 
@@ -16,8 +16,13 @@ public interface ImagenRepository extends JpaRepository<Imagen,Long>{
 
 	List<Imagen> findByPortfolioAndEstadoTrueOrderByFechaSubidaDesc(Portfolio portfolio);
 
-	boolean existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
-			Portfolio portfolio, String titulo, MedioPortfolio medio);
+	boolean existsByUrl(String url);
+
+	@Query("SELECT i.url FROM Imagen i WHERE i.url IS NOT NULL")
+	List<String> findUrls();
+
+	boolean existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+			Portfolio portfolio, String titulo, TipoArte tipoArte);
 
     @Query("""
         SELECT i FROM Imagen i
@@ -27,7 +32,7 @@ public interface ImagenRepository extends JpaRepository<Imagen,Long>{
           AND (:idEtiqueta IS NULL OR EXISTS (
                 SELECT ie FROM ImagenEtiqueta ie
                 WHERE ie.imagen = i AND ie.etiqueta.idEtiqueta = :idEtiqueta))
-          AND (:medio IS NULL OR i.medio = :medio)
+          AND (:idTipoArte IS NULL OR i.tipoArte.id = :idTipoArte)
           AND (:conSensible IS NULL
                OR (:conSensible = true AND i.contenidoSensible IS NOT NULL)
                OR (:conSensible = false AND i.contenidoSensible IS NULL))
@@ -42,7 +47,7 @@ public interface ImagenRepository extends JpaRepository<Imagen,Long>{
             @Param("viewerId") Long viewerId,
             @Param("titulo") String titulo,
             @Param("idEtiqueta") Long idEtiqueta,
-            @Param("medio") MedioPortfolio medio,
+            @Param("idTipoArte") Long idTipoArte,
             @Param("conSensible") Boolean conSensible,
             @Param("ocultarSensibles") boolean ocultarSensibles,
             @Param("ordenAsc") boolean ordenAsc,

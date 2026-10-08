@@ -19,6 +19,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 import com.temipora.backend_springboot.config.filters.JwtAuthenticationFilter;
 import com.temipora.backend_springboot.config.filters.JwtAuthorizationFilter;
 import com.temipora.backend_springboot.servicios.UsuarioService;
@@ -68,6 +70,15 @@ public class SecurityConfig {
                     "/error"
                 ).permitAll()
                 .anyRequest().authenticated()
+            )
+            .exceptionHandling(exception -> exception
+                // Sin token/expirado: 401 (no 403) para que el front cierre sesión y redirija al login
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    response.getWriter().write("{\"message\":\"No autenticado.\"}");
+                })
             )
             .addFilter(jwtAuthenticationFilter)
             .addFilterBefore(new JwtAuthorizationFilter(jwtUtils, userDetailsService),

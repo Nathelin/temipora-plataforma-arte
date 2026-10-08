@@ -38,16 +38,23 @@ import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 import com.temipora.backend_springboot.modelo.FiltroPortfolioRequest;
 import com.temipora.backend_springboot.modelo.Imagen;
 import com.temipora.backend_springboot.modelo.ImagenEtiqueta;
+import com.temipora.backend_springboot.modelo.ImagenMaterial;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioDTO;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioRequest;
-import com.temipora.backend_springboot.modelo.MedioPortfolio;
+import com.temipora.backend_springboot.modelo.Material;
+import com.temipora.backend_springboot.modelo.MaterialDTO;
+import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.Portfolio;
 import com.temipora.backend_springboot.modelo.Rol;
+import com.temipora.backend_springboot.modelo.TipoArte;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.ImagenEtiquetaRepository;
+import com.temipora.backend_springboot.repositorios.ImagenMaterialRepository;
 import com.temipora.backend_springboot.repositorios.ImagenRepository;
+import com.temipora.backend_springboot.repositorios.MaterialRepository;
 import com.temipora.backend_springboot.repositorios.PortfolioRepository;
+import com.temipora.backend_springboot.repositorios.TipoArteRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -68,10 +75,30 @@ class PortfolioServiceTest {
     @Mock
     private ImagenEtiquetaRepository imagenEtiquetaRepository;
 
+    @Mock
+    private TipoArteRepository tipoArteRepository;
+
+    @Mock
+    private MaterialRepository materialRepository;
+
+    @Mock
+    private ImagenMaterialRepository imagenMaterialRepository;
+
     @InjectMocks
     private PortfolioService portfolioService;
 
     private static final Pageable PAGEABLE = PageRequest.of(0, 10);
+
+    private final TipoArte tipoArte = TipoArte.builder()
+            .idTipoArte(1L)
+            .nombre("Digital")
+            .medio(medio(1L, "Digital"))
+            .activo(true)
+            .build();
+
+    private void stubTipoArte() {
+        when(tipoArteRepository.findByIdTipoArte(1L)).thenReturn(Optional.of(tipoArte));
+    }
 
     // ---------------------------------------------------------------
     // listar
@@ -335,8 +362,9 @@ class PortfolioServiceTest {
         when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
         when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.empty());
         when(portfolioRepository.save(any(Portfolio.class))).thenReturn(creado);
-        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
-                eq(creado), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(false);
+        stubTipoArte();
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                eq(creado), eq("Mi obra"), eq(tipoArte))).thenReturn(false);
         when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> {
             Imagen imagen = invocation.getArgument(0);
             imagen.setIdImagen(99L);
@@ -347,7 +375,6 @@ class PortfolioServiceTest {
         request.setTitulo("  Mi obra  ");
         request.setUrl("  https://x/img.png  ");
         request.setDescripcion("  Una obra  ");
-        request.setMateriales(null);
         request.setContenidoSensible(ContenidoSensible.DESNUDOS);
 
         ImagenPortfolioDTO dto = portfolioService.crear(7L, request);
@@ -362,25 +389,26 @@ class PortfolioServiceTest {
         assertThat(guardada.getTitulo()).isEqualTo("Mi obra");
         assertThat(guardada.getUrl()).isEqualTo("https://x/img.png");
         assertThat(guardada.getDescripcion()).isEqualTo("Una obra");
-        assertThat(guardada.getMateriales()).isNull();
         assertThat(guardada.getContenidoSensible()).isEqualTo(ContenidoSensible.DESNUDOS);
         assertThat(guardada.isEstado()).isTrue();
         assertThat(guardada.getFechaSubida()).isNotNull();
         assertThat(guardada.getPortfolio()).isSameAs(creado);
         assertThat(guardada.getUsuario()).isSameAs(artista);
+        assertThat(guardada.getTipoArte()).isSameAs(tipoArte);
 
         assertThat(dto.getIdImagen()).isEqualTo(99L);
         assertThat(dto.getTitulo()).isEqualTo("Mi obra");
     }
 
     @Test
-    void crear_conPortfolioExistente_loReutilizaYRecortaMateriales() {
+    void crear_conPortfolioExistente_loReutiliza() {
         Usuario artista = usuarioArtista(7L, "Artista777");
         Portfolio existente = portfolioDe(artista);
         when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
         when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(existente));
-        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
-                eq(existente), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(false);
+        stubTipoArte();
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                eq(existente), eq("Mi obra"), eq(tipoArte))).thenReturn(false);
         when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> {
             Imagen imagen = invocation.getArgument(0);
             imagen.setIdImagen(99L);
@@ -388,14 +416,12 @@ class PortfolioServiceTest {
         });
 
         ImagenPortfolioRequest request = requestValido();
-        request.setMateriales("  lapiz y acuarela  ");
 
         ImagenPortfolioDTO dto = portfolioService.crear(7L, request);
 
         verify(portfolioRepository, never()).save(any(Portfolio.class));
         ArgumentCaptor<Imagen> imagenCaptor = ArgumentCaptor.forClass(Imagen.class);
         verify(imagenRepository).save(imagenCaptor.capture());
-        assertThat(imagenCaptor.getValue().getMateriales()).isEqualTo("lapiz y acuarela");
         assertThat(imagenCaptor.getValue().getPortfolio()).isSameAs(existente);
         assertThat(dto.getIdImagen()).isEqualTo(99L);
     }
@@ -406,12 +432,13 @@ class PortfolioServiceTest {
         Portfolio existente = portfolioDe(artista);
         when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
         when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(existente));
-        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
-                eq(existente), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(true);
+        stubTipoArte();
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                eq(existente), eq("Mi obra"), eq(tipoArte))).thenReturn(true);
 
         assertThatThrownBy(() -> portfolioService.crear(7L, requestValido()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Ya existe una imagen con ese título y medio en el portfolio.");
+                .hasMessage("Ya existe una imagen con ese título y tipo de arte en el portfolio.");
 
         verify(imagenRepository, never()).save(any(Imagen.class));
     }
@@ -429,8 +456,9 @@ class PortfolioServiceTest {
         when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
         when(etiquetaRepository.findById(1L)).thenReturn(Optional.of(acuarela));
         when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(existente));
-        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
-                eq(existente), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(false);
+        stubTipoArte();
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                eq(existente), eq("Mi obra"), eq(tipoArte))).thenReturn(false);
         when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> {
             Imagen imagen = invocation.getArgument(0);
             imagen.setIdImagen(99L);
@@ -524,8 +552,9 @@ class PortfolioServiceTest {
         when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
         when(etiquetaRepository.findById(1L)).thenReturn(Optional.of(propia));
         when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(existente));
-        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
-                eq(existente), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(false);
+        stubTipoArte();
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                eq(existente), eq("Mi obra"), eq(tipoArte))).thenReturn(false);
         when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> {
             Imagen imagen = invocation.getArgument(0);
             imagen.setIdImagen(99L);
@@ -566,8 +595,9 @@ class PortfolioServiceTest {
         when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
         when(etiquetaRepository.findById(1L)).thenReturn(Optional.of(valida));
         when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(existente));
-        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
-                eq(existente), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(false);
+        stubTipoArte();
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                eq(existente), eq("Mi obra"), eq(tipoArte))).thenReturn(false);
         when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> {
             Imagen imagen = invocation.getArgument(0);
             imagen.setIdImagen(99L);
@@ -581,6 +611,136 @@ class PortfolioServiceTest {
 
         verify(etiquetaRepository).findById(1L);
         verify(imagenEtiquetaRepository).save(any(ImagenEtiqueta.class));
+    }
+
+    // ---------------------------------------------------------------
+    // crear y modificar con materiales
+    // ---------------------------------------------------------------
+
+    @Test
+    void crear_conMaterialesValidos_guardaLasFilasDeUnion() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio existente = portfolioDe(artista);
+        Material procreate = materialDe(1L, "Procreate", medio(1L, "Digital"));
+        Imagen[] guardada = new Imagen[1];
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(existente));
+        stubTipoArte();
+        when(materialRepository.findByIdMaterial(1L)).thenReturn(Optional.of(procreate));
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                eq(existente), eq("Mi obra"), eq(tipoArte))).thenReturn(false);
+        when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> {
+            Imagen imagen = invocation.getArgument(0);
+            imagen.setIdImagen(99L);
+            guardada[0] = imagen;
+            return imagen;
+        });
+        when(imagenMaterialRepository.findByImagenIdImagen(99L))
+                .thenAnswer(invocation -> List.of(filaMaterial(guardada[0], procreate)));
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsMaterial(List.of(1L));
+
+        ImagenPortfolioDTO dto = portfolioService.crear(7L, request);
+
+        ArgumentCaptor<ImagenMaterial> filaCaptor = ArgumentCaptor.forClass(ImagenMaterial.class);
+        verify(imagenMaterialRepository).save(filaCaptor.capture());
+        assertThat(filaCaptor.getValue().getMaterial()).isSameAs(procreate);
+        assertThat(filaCaptor.getValue().getImagen().getIdImagen()).isEqualTo(99L);
+        assertThat(dto.getMateriales()).extracting(MaterialDTO::getIdMaterial).containsExactly(1L);
+    }
+
+    @Test
+    void crear_masDeCincoMateriales_lanzaErrorAntesDeEscribir() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        stubTipoArte();
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsMaterial(List.of(1L, 2L, 3L, 4L, 5L, 6L));
+
+        assertThatThrownBy(() -> portfolioService.crear(7L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Una imagen puede tener como máximo 5 materiales.");
+
+        verify(portfolioRepository, never()).findByArtista(any());
+        verify(materialRepository, never()).findByIdMaterial(any());
+    }
+
+    @Test
+    void crear_materialDadaDeBaja_lanzaError() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        stubTipoArte();
+        Material viejo = materialDe(1L, "Viejo", medio(1L, "Digital"));
+        viejo.setActivo(false);
+        when(materialRepository.findByIdMaterial(1L)).thenReturn(Optional.of(viejo));
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsMaterial(List.of(1L));
+
+        assertThatThrownBy(() -> portfolioService.crear(7L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("El material 'Viejo' fue dado de baja y no puede asignarse a piezas nuevas.");
+
+        verify(portfolioRepository, never()).findByArtista(any());
+    }
+
+    @Test
+    void crear_materialDeOtroMedio_lanzaError() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        stubTipoArte();
+        Material oleo = materialDe(1L, "Óleo", medio(2L, "Tradicional"));
+        when(materialRepository.findByIdMaterial(1L)).thenReturn(Optional.of(oleo));
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsMaterial(List.of(1L));
+
+        assertThatThrownBy(() -> portfolioService.crear(7L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("El material 'Óleo' no corresponde al medio del tipo de arte seleccionado.");
+
+        verify(portfolioRepository, never()).findByArtista(any());
+    }
+
+    @Test
+    void modificar_reemplazaLosMateriales() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        Imagen imagen = imagenDe(portfolio, artista, "Obra 1", null);
+        Material procreate = materialDe(1L, "Procreate", medio(1L, "Digital"));
+        Material photoshop = materialDe(2L, "Photoshop", medio(1L, "Digital"));
+        List<ImagenMaterial> filas = new ArrayList<>(List.of(filaMaterial(imagen, procreate)));
+
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(imagenRepository.findById(5L)).thenReturn(Optional.of(imagen));
+        when(imagenEtiquetaRepository.findByImagenIdImagen(5L)).thenReturn(List.of());
+        when(imagenMaterialRepository.findByImagenIdImagen(5L))
+                .thenAnswer(invocation -> List.copyOf(filas));
+        stubTipoArte();
+        when(materialRepository.findByIdMaterial(2L)).thenReturn(Optional.of(photoshop));
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                eq(portfolio), eq("Mi obra"), eq(tipoArte))).thenReturn(false);
+        when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(imagenMaterialRepository.save(any(ImagenMaterial.class))).thenAnswer(invocation -> {
+            ImagenMaterial nueva = invocation.getArgument(0);
+            filas.add(nueva);
+            return nueva;
+        });
+        doAnswer(invocation -> {
+            filas.remove(invocation.getArgument(0));
+            return null;
+        }).when(imagenMaterialRepository).delete(any(ImagenMaterial.class));
+
+        ImagenPortfolioRequest request = requestValido();
+        request.setIdsMaterial(List.of(2L));
+
+        ImagenPortfolioDTO dto = portfolioService.modificar(7L, 5L, request);
+
+        verify(imagenMaterialRepository).delete(any(ImagenMaterial.class));
+        verify(materialRepository, never()).findByIdMaterial(1L);
+        assertThat(dto.getMateriales()).extracting(MaterialDTO::getNombre).containsExactly("Photoshop");
     }
 
     // ---------------------------------------------------------------
@@ -601,8 +761,9 @@ class PortfolioServiceTest {
         when(imagenRepository.findById(5L)).thenReturn(Optional.of(imagen));
         when(imagenEtiquetaRepository.findByImagenIdImagen(5L)).thenAnswer(invocation -> List.copyOf(filas));
         when(etiquetaRepository.findById(2L)).thenReturn(Optional.of(pixel));
-        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
-                eq(portfolio), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(false);
+        stubTipoArte();
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                eq(portfolio), eq("Mi obra"), eq(tipoArte))).thenReturn(false);
         when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(imagenEtiquetaRepository.save(any(ImagenEtiqueta.class))).thenAnswer(invocation -> {
             ImagenEtiqueta nueva = invocation.getArgument(0);
@@ -636,8 +797,9 @@ class PortfolioServiceTest {
         when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
         when(imagenRepository.findById(5L)).thenReturn(Optional.of(imagen));
         when(imagenEtiquetaRepository.findByImagenIdImagen(5L)).thenAnswer(invocation -> List.copyOf(filas));
-        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
-                eq(portfolio), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(false);
+        stubTipoArte();
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                eq(portfolio), eq("Mi obra"), eq(tipoArte))).thenReturn(false);
         when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ImagenPortfolioRequest request = requestValido();
@@ -673,36 +835,36 @@ class PortfolioServiceTest {
         when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
         when(imagenRepository.findById(5L)).thenReturn(Optional.of(imagen));
         when(imagenEtiquetaRepository.findByImagenIdImagen(5L)).thenReturn(List.of());
-        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(
-                eq(portfolio), eq("Mi obra"), eq(MedioPortfolio.DIGITAL))).thenReturn(true);
+        stubTipoArte();
+        when(imagenRepository.existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                eq(portfolio), eq("Mi obra"), eq(tipoArte))).thenReturn(true);
 
         assertThatThrownBy(() -> portfolioService.modificar(7L, 5L, requestValido()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Ya existe una imagen con ese título y medio en el portfolio.");
+                .hasMessage("Ya existe una imagen con ese título y tipo de arte en el portfolio.");
 
         verify(imagenRepository, never()).save(any(Imagen.class));
     }
 
     @Test
-    void modificar_tituloYMedioSinCambiar_noConsultaUnicidad() {
+    void modificar_tituloYTipoSinCambiar_noConsultaUnicidad() {
         Usuario artista = usuarioArtista(7L, "Artista777");
         Portfolio portfolio = portfolioDe(artista);
         Imagen imagen = imagenDe(portfolio, artista, "Obra 1", null);
         when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
         when(imagenRepository.findById(5L)).thenReturn(Optional.of(imagen));
         when(imagenEtiquetaRepository.findByImagenIdImagen(5L)).thenReturn(List.of());
+        stubTipoArte();
         when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ImagenPortfolioRequest request = requestValido();
         request.setTitulo("Obra 1");
-        request.setMateriales("  lapiz y acuarela  ");
 
         ImagenPortfolioDTO dto = portfolioService.modificar(7L, 5L, request);
 
         assertThat(dto.getTitulo()).isEqualTo("Obra 1");
-        assertThat(dto.getMateriales()).isEqualTo("lapiz y acuarela");
         verify(imagenRepository, never())
-                .existsByPortfolioAndTituloIgnoreCaseAndMedioAndEstadoTrue(any(), any(), any());
+                .existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(any(), any(), any());
     }
 
     @Test
@@ -764,6 +926,7 @@ class PortfolioServiceTest {
         verify(imagenRepository).save(imagenCaptor.capture());
         assertThat(imagenCaptor.getValue().isEstado()).isFalse();
         verify(imagenEtiquetaRepository).deleteByImagenIdImagen(5L);
+        verify(imagenMaterialRepository).deleteByImagenIdImagen(5L);
         assertThat(dto.getIdImagen()).isEqualTo(5L);
     }
 
@@ -845,12 +1008,12 @@ class PortfolioServiceTest {
         FiltroPortfolioRequest filtro = new FiltroPortfolioRequest();
         filtro.setTitulo("  Obra  ");
         filtro.setIdEtiqueta(3L);
-        filtro.setMedio("digital");
+        filtro.setIdTipoArte(2L);
         filtro.setSensible("si");
         filtro.setOrden("antiguo");
 
         when(imagenRepository.findParaVisor(
-                eq(10L), isNull(), eq("%obra%"), eq(3L), eq(MedioPortfolio.DIGITAL),
+                eq(10L), isNull(), eq("%obra%"), eq(3L), eq(2L),
                 eq(Boolean.TRUE), eq(false), eq(true), eq(PAGEABLE)))
                 .thenReturn(new PageImpl<>(List.of(imagen), PAGEABLE, 1));
 
@@ -865,7 +1028,6 @@ class PortfolioServiceTest {
     void listarParaVisor_filtrosEnBlanco_seTratanComoSinFiltro() {
         FiltroPortfolioRequest filtro = new FiltroPortfolioRequest();
         filtro.setTitulo("");
-        filtro.setMedio("");
         filtro.setSensible("");
         filtro.setOrden("");
 
@@ -880,32 +1042,20 @@ class PortfolioServiceTest {
     }
 
     @Test
-    void listarParaVisor_sensibleFalseMedioTradicionalYOrdenReciente_loPasaCorrecto() {
+    void listarParaVisor_sensibleFalseTipoArteYOrdenReciente_loPasaCorrecto() {
         FiltroPortfolioRequest filtro = new FiltroPortfolioRequest();
-        filtro.setMedio("TRADICIONAL");
+        filtro.setIdTipoArte(1L);
         filtro.setSensible("no");
         filtro.setOrden("RECIENTE");
 
         when(imagenRepository.findParaVisor(eq(10L), isNull(), isNull(), isNull(),
-                eq(MedioPortfolio.TRADICIONAL), eq(Boolean.FALSE), eq(false), eq(false), eq(PAGEABLE)))
+                eq(1L), eq(Boolean.FALSE), eq(false), eq(false), eq(PAGEABLE)))
                 .thenReturn(new PageImpl<>(List.of(), PAGEABLE, 0));
 
         Page<ImagenPortfolioDTO> resultado = portfolioService
                 .listarParaVisor(10L, null, filtro, PAGEABLE);
 
         assertThat(resultado.getContent()).isEmpty();
-    }
-
-    @Test
-    void listarParaVisor_medioInvalido_lanzaIllegalArgument() {
-        FiltroPortfolioRequest filtro = new FiltroPortfolioRequest();
-        filtro.setMedio("PINTURA");
-
-        assertThatThrownBy(() -> portfolioService.listarParaVisor(10L, null, filtro, PAGEABLE))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Medio no válido: PINTURA");
-
-        verify(imagenRepository, never()).findParaVisor(any(), any(), any(), any(), any(), any(), anyBoolean(), anyBoolean(), any());
     }
 
     @Test
@@ -1040,7 +1190,7 @@ class PortfolioServiceTest {
         imagen.setTitulo(titulo);
         imagen.setDescripcion("descripcion");
         imagen.setFechaSubida(LocalDateTime.of(2026, 1, 1, 10, 0));
-        imagen.setMedio(MedioPortfolio.DIGITAL);
+        imagen.setTipoArte(tipoArte);
         imagen.setEstado(true);
         imagen.setContenidoSensible(contenidoSensible);
         imagen.setPortfolio(portfolio);
@@ -1053,8 +1203,40 @@ class PortfolioServiceTest {
         request.setTitulo("Mi obra");
         request.setDescripcion("Una obra");
         request.setUrl("https://x/img.png");
-        request.setMedio(MedioPortfolio.DIGITAL);
+        request.setIdTipoArte(1L);
         return request;
+    }
+
+    private Material materialDe(Long id, String nombre, Medio medio) {
+        boolean digital = medio.getIdMedio() == 1L;
+        return Material.builder()
+                .idMaterial(id)
+                .nombre(nombre)
+                .descripcion("descripcion")
+                .tipoArte(TipoArte.builder()
+                        .idTipoArte(digital ? 1L : 2L)
+                        .nombre(digital ? "Digital" : "Tradicional")
+                        .medio(medio)
+                        .activo(true)
+                        .build())
+                .activo(true)
+                .fechaCreacion(LocalDateTime.of(2026, 1, 1, 10, 0))
+                .build();
+    }
+
+    private Medio medio(Long id, String nombre) {
+        return Medio.builder()
+                .idMedio(id)
+                .nombre(nombre)
+                .activo(true)
+                .build();
+    }
+
+    private ImagenMaterial filaMaterial(Imagen imagen, Material material) {
+        return ImagenMaterial.builder()
+                .imagen(imagen)
+                .material(material)
+                .build();
     }
 
     private Etiqueta etiquetaDe(Long id, String nombre, EtiquetaEstado estado, Usuario creador) {

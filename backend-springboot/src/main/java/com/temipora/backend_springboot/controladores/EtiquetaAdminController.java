@@ -76,6 +76,11 @@ public class EtiquetaAdminController {
         return etiquetaService.darDeBaja(id);
     }
 
+    @PostMapping("/{id}/reactivar")
+    public EtiquetaDTO reactivar(@PathVariable Long id, Authentication authentication) {
+        return etiquetaService.reactivar(usuarioActual(authentication), id);
+    }
+
     private Usuario usuarioActual(Authentication authentication) {
         return usuarioRepository.findByNombreUsuarioIgnoreCase(authentication.getName())
             .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + authentication.getName()));

@@ -17,14 +17,17 @@ public class ImagenPortfolioDTO {
     private String titulo;
     private String descripcion;
     private LocalDateTime fechaSubida;
-    private MedioPortfolio medio;
-    private String materiales;
+    private TipoArteDTO tipoArte;
     private ContenidoSensible contenidoSensible;
     private boolean requiereAdvertencia;
 
     @Builder.Default
     @Setter
     private List<EtiquetaDTO> etiquetas = List.of();
+
+    @Builder.Default
+    @Setter
+    private List<MaterialDTO> materiales = List.of();
 
     public static ImagenPortfolioDTO desdeImagen(Imagen imagen) {
         return desdeImagen(imagen, false);
@@ -38,8 +41,7 @@ public class ImagenPortfolioDTO {
             .titulo(imagen.getTitulo())
             .descripcion(imagen.getDescripcion())
             .fechaSubida(imagen.getFechaSubida())
-            .medio(imagen.getMedio())
-            .materiales(imagen.getMateriales())
+            .tipoArte(TipoArteDTO.desdeTipoArte(imagen.getTipoArte()))
             .contenidoSensible(imagen.getContenidoSensible())
             .requiereAdvertencia(requiereAdvertencia)
             .build();

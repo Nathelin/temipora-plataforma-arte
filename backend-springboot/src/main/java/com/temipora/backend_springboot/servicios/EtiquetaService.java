@@ -157,6 +157,22 @@ public class EtiquetaService {
         return EtiquetaDTO.desdeEtiqueta(etiquetaRepository.save(etiqueta));
     }
 
+    @Transactional
+    public EtiquetaDTO reactivar(Usuario admin, Long id) {
+        Etiqueta etiqueta = obtener(id);
+
+        if (etiqueta.getEstado() != EtiquetaEstado.INACTIVA) {
+            throw new IllegalArgumentException("Solo puede reactivarse una etiqueta dada de baja.");
+        }
+        validarNombreDisponible(etiqueta.getNombre(), id);
+
+        etiqueta.setEstado(EtiquetaEstado.VALIDA);
+        etiqueta.setEvaluadoPor(admin);
+        etiqueta.setFechaEvaluacion(LocalDateTime.now());
+
+        return EtiquetaDTO.desdeEtiqueta(etiquetaRepository.save(etiqueta));
+    }
+
     // ---------------------------------------------------------------
     // Artista (UC-54 alta propuesta, UC-59 re-solicitud)
     // ---------------------------------------------------------------

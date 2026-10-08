@@ -23,14 +23,14 @@ public class ImagenPortfolioRequest {
     @NotBlank(message = "La URL de la imagen es obligatoria.")
     private String url;
 
-    @NotNull(message = "El medio es obligatorio.")
-    private MedioPortfolio medio;
-
-    @Size(max = 500, message = "Los materiales no pueden superar los 500 caracteres.")
-    private String materiales;
+    @NotNull(message = "El tipo de arte es obligatorio.")
+    private Long idTipoArte;
 
     private ContenidoSensible contenidoSensible;
 
     @Size(max = 5, message = "Una imagen puede tener como máximo 5 etiquetas.")
     private List<Long> idsEtiqueta;
+
+    @Size(max = 5, message = "Una imagen puede tener como máximo 5 materiales.")
+    private List<Long> idsMaterial;
 }

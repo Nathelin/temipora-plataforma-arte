@@ -216,6 +216,32 @@ class EtiquetaAdminControllerTest {
                 .andExpect(jsonPath("$.estado").value("INACTIVA"));
     }
 
+    @Test
+    void reactivar_tokenDeAdmin_devuelve200() throws Exception {
+        stubUsuarioConRol("admin", ERol.ADMIN);
+        stubUsuarioActual(adminUsuario);
+        when(etiquetaService.reactivar(adminUsuario, 1L))
+                .thenReturn(dto(1L, "Acuarela", EtiquetaEstado.VALIDA, 0));
+
+        mockMvc.perform(post(BASE + "/1/reactivar")
+                .header("Authorization", "Bearer " + token("admin", ERol.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("VALIDA"));
+
+        verify(etiquetaService).reactivar(adminUsuario, 1L);
+    }
+
+    @Test
+    void reactivar_tokenDeCliente_devuelve403() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+
+        mockMvc.perform(post(BASE + "/1/reactivar")
+                .header("Authorization", "Bearer " + token("cliente42", ERol.CLIENTE)))
+                .andExpect(status().isForbidden());
+
+        verify(etiquetaService, never()).reactivar(any(), any());
+    }
+
     // ---------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------

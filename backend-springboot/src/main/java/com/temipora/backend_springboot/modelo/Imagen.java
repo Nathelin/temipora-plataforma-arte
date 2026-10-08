@@ -47,10 +47,9 @@ public class Imagen {
     private LocalDateTime fechaSubida;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
-    private MedioPortfolio medio;
-
-    private String materiales;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "idTipoArte", nullable = false)
+    private TipoArte tipoArte;
 
     // TODO: agregar las advertencias en imágenes propias....... hasta ahora solo están en ajenas
     @Enumerated(EnumType.STRING)
