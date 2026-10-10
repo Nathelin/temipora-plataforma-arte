@@ -1,0 +1,153 @@
+package com.temipora.backend_springboot.config.filters;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import com.jayway.jsonpath.JsonPath;
+import com.temipora.backend_springboot.config.JwtUtils;
+import com.temipora.backend_springboot.config.SecurityConfig;
+import com.temipora.backend_springboot.controladores.AuthController;
+import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.servicios.LimpiezaArchivosService;
+import com.temipora.backend_springboot.servicios.StorageService;
+import com.temipora.backend_springboot.servicios.UsuarioService;
+
+@WebMvcTest(controllers = AuthController.class)
+@Import({ SecurityConfig.class, JwtUtils.class })
+@TestPropertySource(properties = {
+        "jwt.secret=dGVtaXBvcmEtand0LXRlc3Qtc2VjcmV0LTMyYnl0ZXMtb2sh",
+        "jwt.time.expiration=3600000",
+        "storage.local.dir=target/test-uploads"
+})
+class JwtAuthenticationFilterTest {
+
+    private static final String URL_LOGIN = "/api/auth/login";
+
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private JwtUtils jwtUtils;
+
+    @MockitoBean
+    private UsuarioService usuarioService;
+
+    @MockitoBean
+    private UserDetailsService userDetailsService;
+
+    @MockitoBean
+    private StorageService storageService;
+
+    @MockitoBean
+    private LimpiezaArchivosService limpiezaArchivosService;
+
+    // ---------------------------------------------------------------
+    // POST /api/auth/login
+    // ---------------------------------------------------------------
+
+    @Test
+    void login_credencialesValidas_devuelve200ConTokenFirmado() throws Exception {
+        when(userDetailsService.loadUserByUsername("artista777"))
+                .thenReturn(User.withUsername("artista777")
+                        .password(passwordEncoder.encode("secreta123"))
+                        .authorities("ROLE_ARTISTA")
+                        .build());
+        when(usuarioService.getByNombreUsuario("artista777"))
+                .thenReturn(Usuario.builder()
+                        .idUsuario(7L)
+                        .nombreUsuario("artista777")
+                        .urlFotoPerfil("uploads/pfp.png")
+                        .build());
+
+        MvcResult resultado = mockMvc.perform(post(URL_LOGIN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nombreUsuario\":\"artista777\",\"contrasenia\":\"secreta123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.NombreUsuario").value("artista777"))
+                .andExpect(jsonPath("$.rol").value("ARTISTA"))
+                .andExpect(jsonPath("$.idUsuario").value(7))
+                .andExpect(jsonPath("$.urlFotoPerfil").value("uploads/pfp.png"))
+                .andExpect(jsonPath("$.token").isNotEmpty())
+                .andReturn();
+
+        String token = JsonPath.read(
+                resultado.getResponse().getContentAsString(), "$.token");
+        assertThat(jwtUtils.tokenEsValido(token)).isTrue();
+
+        verify(usuarioService).actualizarUltimaConexion("artista777");
+    }
+
+    @Test
+    void login_contraseniaIncorrecta_devuelve401SinActualizarUltimaConexion() throws Exception {
+        when(userDetailsService.loadUserByUsername("artista777"))
+                .thenReturn(User.withUsername("artista777")
+                        .password(passwordEncoder.encode("secreta123"))
+                        .authorities("ROLE_ARTISTA")
+                        .build());
+
+        mockMvc.perform(post(URL_LOGIN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nombreUsuario\":\"artista777\",\"contrasenia\":\"otraClave\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.error", containsString("Credenciales")));
+
+        verify(usuarioService, never()).actualizarUltimaConexion(any());
+        verify(usuarioService, never()).getByNombreUsuario(any());
+    }
+
+    @Test
+    void login_usuarioInexistente_devuelve401() throws Exception {
+        when(userDetailsService.loadUserByUsername("nadie"))
+                .thenThrow(new UsernameNotFoundException("nadie"));
+
+        mockMvc.perform(post(URL_LOGIN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nombreUsuario\":\"nadie\",\"contrasenia\":\"secreta123\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error", containsString("Credenciales")));
+
+        verify(usuarioService, never()).actualizarUltimaConexion(any());
+        verify(usuarioService, never()).getByNombreUsuario(any());
+    }
+
+    @Test
+    void login_bodyMalformado_devuelve401() throws Exception {
+        when(userDetailsService.loadUserByUsername(""))
+                .thenThrow(new UsernameNotFoundException("vacio"));
+
+        mockMvc.perform(post(URL_LOGIN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{nombreUsuario"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error", containsString("Credenciales")));
+
+        verify(usuarioService, never()).actualizarUltimaConexion(any());
+    }
+}
