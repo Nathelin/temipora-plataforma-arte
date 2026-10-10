@@ -25,7 +25,8 @@ public class UsuarioDTO {
     private String correo;
     private String telefono;
     private String sexo;
-    private String pais;
+    private Long idPais;
+    private String nombrePais;
     private LocalDate fechaNacimiento;
     private boolean estadoCuenta;
     private LocalDateTime fechaCreacion;
@@ -49,7 +50,8 @@ public class UsuarioDTO {
             .correo(usuario.getCorreo())
             .telefono(usuario.getTelefono())
             .sexo(usuario.getSexo())
-            .pais(usuario.getPais())
+            .idPais(usuario.getPais() != null ? usuario.getPais().getIdPais() : null)
+            .nombrePais(usuario.getPais() != null ? usuario.getPais().getNombre() : null)
             .fechaNacimiento(usuario.getFechaNacimiento())
             .estadoCuenta(usuario.isEstadoCuenta())
             .fechaCreacion(usuario.getFechaCreacion())

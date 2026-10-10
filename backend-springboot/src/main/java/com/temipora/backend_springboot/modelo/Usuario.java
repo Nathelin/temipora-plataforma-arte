@@ -87,10 +87,9 @@ public class Usuario {
     @Column(nullable = true, length = 20)
     private String telefono;
 
-    // TODO: sacar, en realidad tengo que relacionarlo con la tabla país
-    @Size(max = 60, message = "El país no puede superar los 60 caracteres")
-    @Column(nullable = true, length = 60)
-    private String pais;
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "id_pais")
+    private Pais pais;
 
     @Column(name = "fechaCreacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion;

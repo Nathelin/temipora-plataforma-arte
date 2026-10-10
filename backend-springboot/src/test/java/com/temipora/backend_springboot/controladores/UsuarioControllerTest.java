@@ -33,6 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.temipora.backend_springboot.config.JwtUtils;
 import com.temipora.backend_springboot.config.SecurityConfig;
+import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
@@ -189,6 +190,7 @@ class UsuarioControllerTest {
                 .idUsuario(7L)
                 .nombreDisplay("Nuevo")
                 .build();
+        when(usuarioService.nombreUsuario(7L)).thenReturn("cliente42");
         when(usuarioService.actualizarPerfil(eq(7L), any(ActualizarPerfilDTO.class)))
                 .thenReturn(actualizado);
 
@@ -204,6 +206,66 @@ class UsuarioControllerTest {
                 .forClass(ActualizarPerfilDTO.class);
         verify(usuarioService).actualizarPerfil(eq(7L), dtoCaptor.capture());
         assertThat(dtoCaptor.getValue().getNombreDisplay()).isEqualTo("Nuevo");
+    }
+
+    // ---------------------------------------------------------------
+    // PUT /api/usuarios/{idUsuario}/correo
+    // ---------------------------------------------------------------
+
+    @Test
+    void actualizarPerfil_tokenDeOtroUsuario_devuelve403YNoActualiza() throws Exception {
+        stubUsuarioConRol("intruso", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("intruso", ERol.CLIENTE.name());
+        when(usuarioService.nombreUsuario(7L)).thenReturn("CosmicCrap");
+
+        mockMvc.perform(put("/api/usuarios/7/perfil")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nombreDisplay\":\"Hackeado\"}"))
+                .andExpect(status().isForbidden());
+
+        verify(usuarioService, never()).actualizarPerfil(any(), any());
+    }
+
+    @Test
+    void cambiarCorreo_sinToken_devuelve401YNoLlamaAlServicio() throws Exception {
+        mockMvc.perform(put("/api/usuarios/7/correo")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"correo\":\"nuevo@mail.com\",\"contraseniaActual\":\"secreta123\"}"))
+                .andExpect(status().isUnauthorized());
+
+        verify(usuarioService, never()).cambiarCorreo(any(), any());
+    }
+
+    @Test
+    void cambiarCorreo_tokenValido_devuelve200YActualiza() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("cliente42", ERol.CLIENTE.name());
+        when(usuarioService.nombreUsuario(7L)).thenReturn("cliente42");
+        when(usuarioService.cambiarCorreo(eq(7L), any(ActualizarCorreoDTO.class)))
+                .thenReturn(UsuarioDTO.builder().idUsuario(7L).correo("nuevo@mail.com").build());
+
+        mockMvc.perform(put("/api/usuarios/7/correo")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"correo\":\"nuevo@mail.com\",\"contraseniaActual\":\"secreta123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.correo").value("nuevo@mail.com"));
+    }
+
+    @Test
+    void cambiarCorreo_tokenDeOtroUsuario_devuelve403() throws Exception {
+        stubUsuarioConRol("intruso", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("intruso", ERol.CLIENTE.name());
+        when(usuarioService.nombreUsuario(7L)).thenReturn("CosmicCrap");
+
+        mockMvc.perform(put("/api/usuarios/7/correo")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"correo\":\"nuevo@mail.com\",\"contraseniaActual\":\"secreta123\"}"))
+                .andExpect(status().isForbidden());
+
+        verify(usuarioService, never()).cambiarCorreo(any(), any());
     }
 
     // ---------------------------------------------------------------

@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.servicios;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,11 +13,14 @@ import java.util.NoSuchElementException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
+import com.temipora.backend_springboot.modelo.Pais;
 import com.temipora.backend_springboot.modelo.RegistroUsuarioDTO;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
+import com.temipora.backend_springboot.repositorios.PaisRepository;
 import com.temipora.backend_springboot.repositorios.RolRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -27,15 +31,21 @@ public class UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
     private final RolRepository rolRepository;
+    private final PaisRepository paisRepository;
+    private final TelefonoService telefonoService;
 
     public UsuarioService(
             UsuarioRepository usuarioRepository,
             PasswordEncoder passwordEncoder,
-            RolRepository rolRepository) {
+            RolRepository rolRepository,
+            PaisRepository paisRepository,
+            TelefonoService telefonoService) {
 
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.rolRepository = rolRepository;
+        this.paisRepository = paisRepository;
+        this.telefonoService = telefonoService;
     }
 
     public Usuario registrarUsuario(RegistroUsuarioDTO dto) {
@@ -100,11 +110,28 @@ public class UsuarioService {
         if (dto.getSexo() != null) {
             usuario.setSexo(dto.getSexo());
         }
-        if (dto.getTelefono() != null) {
-            usuario.setTelefono(dto.getTelefono());
+        if (dto.getIdPais() != null) {
+            Pais pais = paisRepository.findByIdPais(dto.getIdPais())
+                    .orElseThrow(() -> new IllegalArgumentException("País no encontrado: " + dto.getIdPais()));
+
+            boolean esElMismo = usuario.getPais() != null
+                    && usuario.getPais().getIdPais().equals(pais.getIdPais());
+
+            if (!pais.isEstado() && !esElMismo) {
+                throw new IllegalArgumentException(
+                        "El país '" + pais.getNombre() + "' fue dado de baja y no puede asignarse.");
+            }
+
+            usuario.setPais(pais);
         }
-        if (dto.getPais() != null) {
-            usuario.setPais(dto.getPais());
+        if (dto.getTelefono() != null) {
+            String telefono = dto.getTelefono().trim();
+            if (telefono.isEmpty()) {
+                usuario.setTelefono(null);
+            } else {
+                String codigoIso = usuario.getPais() != null ? usuario.getPais().getCodigoIso() : null;
+                usuario.setTelefono(telefonoService.validarYNormalizar(telefono, codigoIso));
+            }
         }
         if (dto.getPreferenciaSensible() != null) {
             usuario.setPreferenciaSensible(dto.getPreferenciaSensible());
@@ -127,6 +154,33 @@ public class UsuarioService {
                 rol,
                 pageable)
                 .map(UsuarioDTO::desdeUsuario);
+    }
+
+    public String nombreUsuario(Long idUsuario) {
+        return usuarioRepository.findByIdUsuario(idUsuario)
+                .map(Usuario::getNombreUsuario)
+                .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idUsuario));
+    }
+
+    @Transactional
+    public UsuarioDTO cambiarCorreo(Long idUsuario, ActualizarCorreoDTO dto) {
+        Usuario usuario = usuarioRepository.findByIdUsuario(idUsuario)
+                .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idUsuario));
+
+        if (!passwordEncoder.matches(dto.getContraseniaActual(), usuario.getContrasenia())) {
+            throw new IllegalArgumentException("La contraseña actual no es correcta.");
+        }
+
+        String nuevoCorreo = dto.getCorreo().trim();
+
+        usuarioRepository.findByCorreo(nuevoCorreo)
+                .filter(otro -> !otro.getIdUsuario().equals(idUsuario))
+                .ifPresent(otro -> {
+                    throw new IllegalArgumentException("Ya existe una cuenta con ese correo.");
+                });
+
+        usuario.setCorreo(nuevoCorreo);
+        return UsuarioDTO.desdeUsuario(usuarioRepository.save(usuario));
     }
 
     private String aPatronBusqueda(String texto) {

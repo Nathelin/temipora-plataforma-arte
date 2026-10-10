@@ -25,13 +25,16 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.Pais;
 import com.temipora.backend_springboot.modelo.RegistroUsuarioDTO;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
+import com.temipora.backend_springboot.repositorios.PaisRepository;
 import com.temipora.backend_springboot.repositorios.RolRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -46,6 +49,12 @@ class UsuarioServiceTest {
 
     @Mock
     private RolRepository rolRepository;
+
+    @Mock
+    private PaisRepository paisRepository;
+
+    @Mock
+    private TelefonoService telefonoService;
 
     @InjectMocks
     private UsuarioService usuarioService;
@@ -182,12 +191,13 @@ class UsuarioServiceTest {
         // biografia, sexo, pais, banner, preferenciaSensible quedan en null
 
         when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(telefonoService.validarYNormalizar("222222", null)).thenReturn("+222222");
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UsuarioDTO resultado = usuarioService.actualizarPerfil(1L, dto);
 
         assertThat(resultado.getNombreDisplay()).isEqualTo("Display nuevo");
-        assertThat(resultado.getTelefono()).isEqualTo("222222");
+        assertThat(resultado.getTelefono()).isEqualTo("+222222");
         assertThat(resultado.getBiografia()).isEqualTo("Bio vieja");
         assertThat(resultado.getSexo()).isEqualTo("M");
         assertThat(usuario.getPreferenciaSensible()).isEqualTo(EPreferenciaContenidoSensible.ADVERTIR);
@@ -220,10 +230,13 @@ class UsuarioServiceTest {
         dto.setUrlBanner("nuevo-banner.png");
         dto.setSexo("F");
         dto.setTelefono("333333");
-        dto.setPais("Argentina");
+        dto.setIdPais(1L);
         dto.setPreferenciaSensible(EPreferenciaContenidoSensible.OCULTAR);
 
+        Pais argentina = Pais.builder().idPais(1L).nombre("Argentina").codigoIso("AR").prefijoTelefonico("+54").estado(true).build();
         when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(paisRepository.findByIdPais(1L)).thenReturn(Optional.of(argentina));
+        when(telefonoService.validarYNormalizar("333333", "AR")).thenReturn("+54333333");
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UsuarioDTO resultado = usuarioService.actualizarPerfil(1L, dto);
@@ -233,10 +246,158 @@ class UsuarioServiceTest {
         assertThat(resultado.getUrlFotoPerfil()).isEqualTo("nueva-pfp.png");
         assertThat(resultado.getUrlBanner()).isEqualTo("nuevo-banner.png");
         assertThat(resultado.getSexo()).isEqualTo("F");
-        assertThat(resultado.getTelefono()).isEqualTo("333333");
-        assertThat(resultado.getPais()).isEqualTo("Argentina");
+        assertThat(resultado.getTelefono()).isEqualTo("+54333333");
+        assertThat(resultado.getIdPais()).isEqualTo(1L);
+        assertThat(resultado.getNombrePais()).isEqualTo("Argentina");
         assertThat(resultado.getPreferenciaSensible()).isEqualTo(EPreferenciaContenidoSensible.OCULTAR);
         verify(usuarioRepository).save(usuario);
+    }
+
+    @Test
+    void actualizarPerfil_paisDadoDeBajaDistinto_lanzaError() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        Pais inactivo = Pais.builder().idPais(2L).nombre("Narnia").estado(false).build();
+
+        ActualizarPerfilDTO dto = new ActualizarPerfilDTO();
+        dto.setIdPais(2L);
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(paisRepository.findByIdPais(2L)).thenReturn(Optional.of(inactivo));
+
+        assertThatThrownBy(() -> usuarioService.actualizarPerfil(1L, dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("El país 'Narnia' fue dado de baja y no puede asignarse.");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    void actualizarPerfil_conservaSuPaisInactivo_loPermite() {
+        Pais inactivo = Pais.builder().idPais(2L).nombre("Narnia").estado(false).build();
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        usuario.setPais(inactivo);
+
+        ActualizarPerfilDTO dto = new ActualizarPerfilDTO();
+        dto.setIdPais(2L);
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(paisRepository.findByIdPais(2L)).thenReturn(Optional.of(inactivo));
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UsuarioDTO resultado = usuarioService.actualizarPerfil(1L, dto);
+
+        assertThat(resultado.getNombrePais()).isEqualTo("Narnia");
+    }
+
+    @Test
+    void actualizarPerfil_paisInexistente_lanzaError() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+
+        ActualizarPerfilDTO dto = new ActualizarPerfilDTO();
+        dto.setIdPais(99L);
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(paisRepository.findByIdPais(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> usuarioService.actualizarPerfil(1L, dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("País no encontrado: 99");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    // ---------------------------------------------------------------
+    // nombreUsuario / cambiarCorreo
+    // ---------------------------------------------------------------
+
+    @Test
+    void nombreUsuario_existente_devuelveElNombre() {
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuarioDePrueba("Cosmiq")));
+
+        assertThat(usuarioService.nombreUsuario(1L)).isEqualTo("Cosmiq");
+    }
+
+    @Test
+    void nombreUsuario_inexistente_lanzaNoSuchElement() {
+        when(usuarioRepository.findByIdUsuario(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> usuarioService.nombreUsuario(99L))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("Usuario no encontrado: 99");
+    }
+
+    @Test
+    void cambiarCorreo_ok_actualizaElCorreo() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        ActualizarCorreoDTO dto = new ActualizarCorreoDTO();
+        dto.setCorreo("nuevo@mail.com");
+        dto.setContraseniaActual("secreta123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
+        when(usuarioRepository.findByCorreo("nuevo@mail.com")).thenReturn(Optional.empty());
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UsuarioDTO resultado = usuarioService.cambiarCorreo(1L, dto);
+
+        assertThat(resultado.getCorreo()).isEqualTo("nuevo@mail.com");
+        verify(usuarioRepository).save(usuario);
+    }
+
+    @Test
+    void cambiarCorreo_contraseniaIncorrecta_lanzaError() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        ActualizarCorreoDTO dto = new ActualizarCorreoDTO();
+        dto.setCorreo("nuevo@mail.com");
+        dto.setContraseniaActual("mala");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("mala", "$2a$10$hasheado")).thenReturn(false);
+
+        assertThatThrownBy(() -> usuarioService.cambiarCorreo(1L, dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("La contraseña actual no es correcta.");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    void cambiarCorreo_correoDeOtroUsuario_lanzaError() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        Usuario otro = usuarioDePrueba("Artista777");
+        otro.setIdUsuario(2L);
+        otro.setCorreo("ocupado@mail.com");
+
+        ActualizarCorreoDTO dto = new ActualizarCorreoDTO();
+        dto.setCorreo("ocupado@mail.com");
+        dto.setContraseniaActual("secreta123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
+        when(usuarioRepository.findByCorreo("ocupado@mail.com")).thenReturn(Optional.of(otro));
+
+        assertThatThrownBy(() -> usuarioService.cambiarCorreo(1L, dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Ya existe una cuenta con ese correo.");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    void cambiarCorreo_mismoCorreoPropio_loPermite() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        ActualizarCorreoDTO dto = new ActualizarCorreoDTO();
+        dto.setCorreo("cosmiq@mail.com");
+        dto.setContraseniaActual("secreta123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
+        when(usuarioRepository.findByCorreo("cosmiq@mail.com")).thenReturn(Optional.of(usuario));
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UsuarioDTO resultado = usuarioService.cambiarCorreo(1L, dto);
+
+        assertThat(resultado.getCorreo()).isEqualTo("cosmiq@mail.com");
     }
 
     // ---------------------------------------------------------------
