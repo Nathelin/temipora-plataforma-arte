@@ -1,9 +1,12 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { parsePhoneNumberFromString, getExampleNumber } from 'libphonenumber-js'
 import api from '../servicios/api'
 import { acceptImagenes, validarImagen, procesarImagen, LIMITES_IMAGEN } from '../servicios/archivos'
 import { useAvisoActualizacion } from '../composables/useAvisoActualizacion'
+import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
+import BarraGuardado from '../components/BarraGuardado.vue'
 
 const router = useRouter()
 const nombreUsuario = localStorage.getItem('nombreUsuario') || ''
@@ -29,9 +32,76 @@ const form = ref({
   biografia: '',
   sexo: '',
   telefono: '',
-  pais: '',
+  idPais: '',
   urlFotoPerfil: '',
   urlBanner: '',
+})
+
+const paises = ref([])
+
+const paisSeleccionado = computed(() =>
+  paises.value.find((p) => String(p.idPais) === form.value.idPais) || null,
+)
+const prefijoActual = computed(() => paisSeleccionado.value?.prefijoTelefonico || '')
+const ejemploTelefono = computed(() => {
+  const iso = paisSeleccionado.value?.codigoIso
+  if (!iso) return ''
+  try {
+    const ejemplo = getExampleNumber(iso)
+    return ejemplo ? ejemplo.formatNational() : ''
+  } catch {
+    return ''
+  }
+})
+
+function parseTelefono(valor) {
+  try {
+    return parsePhoneNumberFromString(valor, paisSeleccionado.value?.codigoIso || undefined)
+  } catch {
+    return undefined
+  }
+}
+
+function formatearTelefonoParaInput(valor) {
+  if (!valor) return ''
+  try {
+    const parsed = parsePhoneNumberFromString(valor)
+    return parsed ? parsed.formatNational() : valor
+  } catch {
+    return valor
+  }
+}
+
+function telefonoNormalizado() {
+  const tel = form.value.telefono.trim()
+  if (!tel) return ''
+  const parsed = parseTelefono(tel)
+  return parsed ? parsed.number : tel
+}
+
+const SEXOS_VALIDOS = ['Masculino', 'Femenino', 'Otro']
+
+function normalizarSexo(valor) {
+  const sexo = (valor || '').toString().trim()
+  if (!sexo) return null
+  if (sexo.toLowerCase() === 'no especificado') return null
+  return SEXOS_VALIDOS.includes(sexo) ? sexo : null
+}
+
+function sexoParaFormulario(valor) {
+  return normalizarSexo(valor) || ''
+}
+
+const telefonoError = computed(() => {
+  const tel = form.value.telefono.trim()
+  if (!tel) return ''
+  const parsed = parseTelefono(tel)
+  if (!parsed || !parsed.isValid()) {
+    return paisSeleccionado.value
+      ? 'El teléfono no es válido para el país seleccionado.'
+      : 'Seleccioná un país o ingresá el número con prefijo internacional (ej. +1...).'
+  }
+  return ''
 })
 
 const editFoto = ref(null)
@@ -39,6 +109,32 @@ const editBanner = ref(null)
 const previewFoto = ref('')
 const previewBanner = ref('')
 const idUsuario = ref(null)
+const arrastrandoFoto = ref(false)
+const arrastrandoBanner = ref(false)
+const estadoGuardado = ref(null)
+
+function datosComparables() {
+
+  return JSON.stringify({
+    nombreDisplay: form.value.nombreDisplay,
+    biografia: form.value.biografia,
+    sexo: sexoParaFormulario(form.value.sexo),
+    telefono: form.value.telefono,
+    idPais: form.value.idPais,
+  })
+}
+
+const hayCambios = computed(() => {
+  if (editFoto.value || editBanner.value) return true
+  if (estadoGuardado.value === null) return false
+  return estadoGuardado.value !== datosComparables()
+})
+
+const { actualizar: marcarCambios, limpiar: limpiarCambios } = useCambiosSinGuardar()
+
+watch(hayCambios, (pendiente) => {
+  marcarCambios(pendiente, 'Tenés cambios sin guardar en tu perfil. Si salís, se perderán.')
+})
 
 const {
   mostrar: avisoMostrar,
@@ -62,14 +158,15 @@ async function cargar() {
     form.value = {
       nombreDisplay: d.nombreDisplay || '',
       biografia: d.biografia || '',
-      sexo: d.sexo || '',
-      telefono: d.telefono || '',
-      pais: d.pais || '',
+      sexo: sexoParaFormulario(d.sexo),
+      telefono: formatearTelefonoParaInput(d.telefono),
+      idPais: d.idPais ? String(d.idPais) : '',
       urlFotoPerfil: d.urlFotoPerfil || '',
       urlBanner: d.urlBanner || '',
     }
     previewFoto.value = ''
     previewBanner.value = ''
+    estadoGuardado.value = datosComparables()
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo cargar el perfil.'
   } finally {
@@ -77,14 +174,21 @@ async function cargar() {
   }
 }
 
-function onFotoChange(e) {
-  const f = e.target.files[0] || null
+async function cargarPaises() {
+  try {
+    const res = await api.get('/paises')
+    paises.value = res.data
+  } catch (e) {
+    paises.value = []
+  }
+}
+
+function aplicarFoto(f) {
   const problema = f ? validarImagen(f) : ''
   if (problema) {
     editFoto.value = null
     previewFoto.value = ''
     errorEdicion.value = problema
-    e.target.value = ''
     return
   }
   errorEdicion.value = ''
@@ -92,19 +196,39 @@ function onFotoChange(e) {
   previewFoto.value = f ? URL.createObjectURL(f) : ''
 }
 
-function onBannerChange(e) {
-  const f = e.target.files[0] || null
+function aplicarBanner(f) {
   const problema = f ? validarImagen(f) : ''
   if (problema) {
     editBanner.value = null
     previewBanner.value = ''
     errorEdicion.value = problema
-    e.target.value = ''
     return
   }
   errorEdicion.value = ''
   editBanner.value = f
   previewBanner.value = f ? URL.createObjectURL(f) : ''
+}
+
+function onFotoChange(e) {
+  aplicarFoto(e.target.files[0] || null)
+  e.target.value = ''
+}
+
+function onBannerChange(e) {
+  aplicarBanner(e.target.files[0] || null)
+  e.target.value = ''
+}
+
+function onDropFoto(e) {
+  arrastrandoFoto.value = false
+  const f = e.dataTransfer?.files?.[0]
+  if (f) aplicarFoto(f)
+}
+
+function onDropBanner(e) {
+  arrastrandoBanner.value = false
+  const f = e.dataTransfer?.files?.[0]
+  if (f) aplicarBanner(f)
 }
 
 async function subirArchivo(archivo, limite, faseSubida, etiqueta) {
@@ -131,6 +255,10 @@ async function subirArchivo(archivo, limite, faseSubida, etiqueta) {
 }
 
 async function guardar() {
+  if (telefonoError.value) {
+    errorEdicion.value = telefonoError.value
+    return
+  }
   guardando.value = true
   mensaje.value = ''
   errorEdicion.value = ''
@@ -153,9 +281,9 @@ async function guardar() {
     const payload = {
       nombreDisplay: form.value.nombreDisplay,
       biografia: form.value.biografia,
-      sexo: form.value.sexo,
-      telefono: form.value.telefono,
-      pais: form.value.pais,
+      sexo: normalizarSexo(form.value.sexo),
+      telefono: telefonoNormalizado(),
+      ...(form.value.idPais ? { idPais: Number(form.value.idPais) } : {}),
       ...(urlFoto ? { urlFotoPerfil: urlFoto } : {}),
       ...(urlBanner ? { urlBanner } : {}),
     }
@@ -164,9 +292,9 @@ async function guardar() {
 
     form.value.nombreDisplay = r.data.nombreDisplay
     form.value.biografia = r.data.biografia
-    form.value.sexo = r.data.sexo || ''
-    form.value.telefono = r.data.telefono || ''
-    form.value.pais = r.data.pais || ''
+    form.value.sexo = sexoParaFormulario(r.data.sexo)
+    form.value.telefono = formatearTelefonoParaInput(r.data.telefono)
+    form.value.idPais = r.data.idPais ? String(r.data.idPais) : ''
     form.value.urlFotoPerfil = r.data.urlFotoPerfil || ''
     form.value.urlBanner = r.data.urlBanner || ''
     localStorage.setItem('urlFotoPerfil', form.value.urlFotoPerfil)
@@ -177,6 +305,7 @@ async function guardar() {
     previewBanner.value = ''
     editFoto.value = null
     editBanner.value = null
+    estadoGuardado.value = datosComparables()
 
     mensaje.value = 'Perfil actualizado correctamente.'
     if (hayImagenes) avisoExito('Tu perfil se actualizó correctamente.')
@@ -192,7 +321,23 @@ async function guardar() {
   }
 }
 
-onMounted(cargar)
+function antesDeSalir(event) {
+  if (hayCambios.value && !guardando.value) {
+    event.preventDefault()
+    event.returnValue = ''
+  }
+}
+
+onMounted(() => {
+  cargar()
+  cargarPaises()
+  window.addEventListener('beforeunload', antesDeSalir)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', antesDeSalir)
+  limpiarCambios()
+})
 </script>
 
 <template>
@@ -205,45 +350,81 @@ onMounted(cargar)
     <div v-else class="space-y-6">
       <!-- Foto de perfil -->
       <div class="flex items-center gap-5">
-        <div class="w-20 h-20 rounded-full overflow-hidden border-2 border-rosa bg-rosa/20 shrink-0">
-          <img v-if="previewFoto" :src="previewFoto" alt="" class="w-full h-full object-cover" />
-          <img v-else-if="form.urlFotoPerfil" :src="form.urlFotoPerfil" alt="" class="w-full h-full object-cover" />
-          <span v-else class="w-full h-full flex items-center justify-center text-2xl text-granate">
-            {{ (nombreUsuario || '?').charAt(0).toUpperCase() }}
+        <input id="foto-perfil" type="file" :accept="acceptImagenes" class="sr-only" @change="onFotoChange" />
+        <div class="relative shrink-0">
+          <label
+            for="foto-perfil"
+            class="group relative block w-20 h-20 cursor-pointer rounded-full overflow-hidden border-2 border-rosa bg-rosa/20 transition"
+            :class="arrastrandoFoto ? 'ring-2 ring-coral ring-offset-2' : ''"
+            @dragover.prevent="arrastrandoFoto = true"
+            @dragleave.prevent="arrastrandoFoto = false"
+            @drop.prevent="onDropFoto"
+          >
+            <img v-if="previewFoto" :src="previewFoto" alt="" class="w-full h-full object-cover" />
+            <img v-else-if="form.urlFotoPerfil" :src="form.urlFotoPerfil" alt="" class="w-full h-full object-cover" />
+            <span v-else class="w-full h-full flex items-center justify-center text-2xl text-granate">
+              {{ (nombreUsuario || '?').charAt(0).toUpperCase() }}
+            </span>
+            <span
+              class="absolute inset-0 flex items-center justify-center bg-granate/40 text-white opacity-0 transition group-hover:opacity-100"
+              aria-hidden="true"
+            >
+              <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z" />
+              </svg>
+            </span>
+          </label>
+          <span
+            class="pointer-events-none absolute -bottom-0.5 -right-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-coral text-white ring-2 ring-blanco"
+            aria-hidden="true"
+          >
+            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+            </svg>
           </span>
         </div>
-        <div>
-          <label class="block text-sm text-cafe mb-1">Foto de perfil</label>
-          <input id="foto-perfil" type="file" :accept="acceptImagenes" class="sr-only" @change="onFotoChange" />
-
-           <label
-                  for="foto-perfil"
-                  class="inline-flex cursor-pointer items-center rounded-md border border-coral bg-coral/10 px-4 py-2 text-sm font-medium text-granate transition hover:bg-coral/20 focus-within:outline-none focus-within:ring-2 focus-within:ring-coral focus-within:ring-offset-2"
-                >
-                  {{ editFoto ? 'Foto seleccionada' : 'Cambiar foto' }}
-                </label>
-                <p class="mt-1 text-xs text-cafe/60">JPG, PNG o WEBP</p>
+        <div class="text-sm">
+          <p class="text-cafe">Foto de perfil</p>
+          <p class="mt-0.5 text-xs text-cafe/60">
+            {{ editFoto
+              ? 'Foto seleccionada. Guardá para aplicarla.'
+              : 'Hacé click o arrastrá una imagen (JPG, PNG o WEBP).' }}
+          </p>
         </div>
       </div>
 
       <!-- Banner -->
       <div>
-        <label class="block text-sm text-cafe mb-2">Banner</label>
-        <div v-if="previewBanner" class="mb-2 w-full h-28 rounded-lg overflow-hidden bg-rosa/20">
-          <img :src="previewBanner" alt="" class="w-full h-full object-cover" />
-        </div>
-        <div v-else-if="form.urlBanner" class="mb-2 w-full h-28 rounded-lg overflow-hidden bg-rosa/20">
-          <img :src="form.urlBanner" alt="" class="w-full h-full object-cover" />
+        <div class="mb-2 flex items-center justify-between gap-3">
+          <label class="block text-sm text-cafe">Banner</label>
+          <span class="text-xs text-cafe/50">Hacé click o arrastrá (JPG, PNG o WEBP)</span>
         </div>
         <input id="banner-perfil" type="file" :accept="acceptImagenes" class="sr-only" @change="onBannerChange" />
-          <label
-            for="banner-perfil"
-            class="inline-flex cursor-pointer items-center rounded-md border border-coral bg-coral/10 px-4 py-2 text-sm font-medium text-granate transition hover:bg-coral/20 focus-within:outline-none focus-within:ring-2 focus-within:ring-coral focus-within:ring-offset-2"
+        <label
+          for="banner-perfil"
+          class="group relative block w-full h-28 sm:h-36 cursor-pointer rounded-lg overflow-hidden bg-rosa/20 transition"
+          :class="arrastrandoBanner ? 'ring-2 ring-coral ring-offset-2' : ''"
+          @dragover.prevent="arrastrandoBanner = true"
+          @dragleave.prevent="arrastrandoBanner = false"
+          @drop.prevent="onDropBanner"
+        >
+          <img v-if="previewBanner" :src="previewBanner" alt="" class="w-full h-full object-cover" />
+          <img v-else-if="form.urlBanner" :src="form.urlBanner" alt="" class="w-full h-full object-cover" />
+          <span v-else class="flex h-full w-full items-center justify-center text-sm text-cafe/50">
+            Sin banner
+          </span>
+          <span
+            class="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-md bg-blanco/90 px-3 py-1.5 text-xs font-medium text-granate shadow ring-1 ring-rosa transition group-hover:bg-rosa/30"
           >
-            {{ editBanner ? 'Banner seleccionado' : 'Cambiar banner' }}
-          </label>
-          <p class="mt-1 text-xs text-cafe/60">JPG, PNG o WEBP</p>
-        </div>
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0 0 21.75 19.5V4.5A1.5 1.5 0 0 0 20.25 3H3.75A1.5 1.5 0 0 0 2.25 4.5v15A1.5 1.5 0 0 0 3.75 21Z" />
+            </svg>
+            {{ editBanner ? 'Banner seleccionado' : 'Cambiar' }}
+          </span>
+        </label>
+        <p v-if="editBanner" class="mt-1 text-xs text-cafe/60">Banner seleccionado. Guardá para aplicarlo.</p>
+      </div>
 
 
       <!-- Nombre de display -->
@@ -285,46 +466,63 @@ onMounted(cargar)
         </div>
         <div>
           <label class="block text-sm text-cafe mb-2">Teléfono</label>
-          <input
-            v-model="form.telefono"
-            type="text"
-            maxlength="20"
-            class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
-          />
+          <div class="flex">
+            <span
+              v-if="prefijoActual"
+              class="inline-flex items-center rounded-l-lg border border-r-0 border-rosa bg-rosa/20 px-3 text-base text-cafe"
+            >
+              {{ prefijoActual }}
+            </span>
+            <input
+              v-model="form.telefono"
+              type="tel"
+              :placeholder="ejemploTelefono || 'Número de teléfono'"
+              class="pl-4 pr-4 block w-full border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset focus:outline-none"
+              :class="[
+                prefijoActual ? 'rounded-r-lg rounded-l-none' : 'rounded-lg',
+                telefonoError ? 'ring-rojizo focus:ring-rojizo' : 'ring-rosa focus:ring-coral',
+              ]"
+            />
+          </div>
+          <p v-if="telefonoError" class="text-xs text-rojizo mt-1">{{ telefonoError }}</p>
+          <p v-else class="text-xs text-cafe/50 mt-1">Se guarda en formato internacional.</p>
         </div>
         <div>
           <label class="block text-sm text-cafe mb-2">País</label>
-          <input
-            v-model="form.pais"
-            type="text"
-            maxlength="60"
+          <select
+            v-model="form.idPais"
             class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
-          />
+          >
+            <option value="">No especificado</option>
+            <option v-for="p in paises" :key="p.idPais" :value="String(p.idPais)">
+              {{ p.nombre }}
+            </option>
+          </select>
         </div>
       </div>
 
-      <p v-if="errorEdicion" class="text-rojizo text-sm">{{ errorEdicion }}</p>
-      <p v-if="mensaje" class="text-green-700 text-sm">{{ mensaje }}</p>
-
-      <div class="flex items-center justify-end gap-3 pt-2">
+      <BarraGuardado
+        :hay-cambios="hayCambios"
+        :guardando="guardando"
+        :bloqueado="!!telefonoError"
+        :texto="etiquetaBoton"
+        @guardar="guardar"
+      >
+        <template #aviso>
+          <p v-if="errorEdicion" class="text-rojizo text-sm">{{ errorEdicion }}</p>
+          <p v-else-if="mensaje" class="text-green-700 text-sm">{{ mensaje }}</p>
+          <div v-if="fase.startsWith('subiendo')" class="mt-2 h-1.5 w-full bg-rosa rounded-full overflow-hidden">
+            <div class="h-full bg-coral transition-all duration-150" :style="{ width: progreso + '%' }"></div>
+          </div>
+        </template>
         <button
+          type="button"
           class="inline-flex cursor-pointer items-center rounded-md border border-coral bg-coral/10 px-4 py-2 text-sm font-medium text-granate transition hover:bg-coral/20"
           @click="irAPerfil"
         >
           Ver mi perfil
         </button>
-        <button
-          :disabled="guardando"
-          class="px-5 py-2.5 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm min-w-44"
-          @click="guardar"
-        >
-          {{ etiquetaBoton }}
-        </button>
-      </div>
-
-      <div v-if="fase.startsWith('subiendo')" class="h-1.5 w-full bg-rosa rounded-full overflow-hidden">
-        <div class="h-full bg-coral transition-all duration-150" :style="{ width: progreso + '%' }"></div>
-      </div>
+      </BarraGuardado>
     </div>
   </div>
 </template>
