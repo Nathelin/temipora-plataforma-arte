@@ -68,7 +68,7 @@ class AuthControllerTest {
     void registrarse_contrasenasNoCoinciden_devuelve400SinLlamarAlServicio() throws Exception {
         mockMvc.perform(post("/api/auth/registrarse")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(registroJson("secreta123", "otraClave1")))
+                .content(registroJson("Secreta123", "OtraClave1")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Las contraseñas no coinciden."));
 
@@ -82,7 +82,7 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/registrarse")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(registroJson("secreta123", "secreta123")))
+                .content(registroJson("Secreta123", "Secreta123")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("El nombre de usuario ya está en uso."));
 
@@ -102,7 +102,7 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/registrarse")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(registroJson("secreta123", "secreta123")))
+                .content(registroJson("Secreta123", "Secreta123")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.idUsuario").value(1))
                 .andExpect(jsonPath("$.nombreUsuario").value("cosmiq"))

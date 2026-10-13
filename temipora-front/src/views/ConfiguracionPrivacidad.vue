@@ -1,7 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../servicios/api'
+import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
+import BarraGuardado from '../components/BarraGuardado.vue'
 
 const router = useRouter()
 const nombreUsuario = localStorage.getItem('nombreUsuario') || ''
@@ -17,6 +19,17 @@ const form = ref({
 })
 
 const idUsuario = ref(null)
+const estadoGuardado = ref(null)
+
+const hayCambios = computed(
+  () => estadoGuardado.value !== null && estadoGuardado.value !== form.value.preferenciaSensible,
+)
+
+const { actualizar: marcarCambios, limpiar: limpiarCambios } = useCambiosSinGuardar()
+
+watch(hayCambios, (pendiente) => {
+  marcarCambios(pendiente, 'Tenés cambios sin guardar en Privacidad y contenido. Si salís, se perderán.')
+})
 
 const opciones = [
   { value: 'ADVERTIR', label: 'Mostrar con advertencia'},
@@ -32,6 +45,7 @@ async function cargar() {
     const d = res.data
     idUsuario.value = d.idUsuario
     form.value.preferenciaSensible = d.preferenciaSensible || 'ADVERTIR'
+    estadoGuardado.value = form.value.preferenciaSensible
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo cargar la configuración.'
   } finally {
@@ -51,6 +65,7 @@ async function guardar() {
     const r = await api.put(`/usuarios/${idUsuario.value}/perfil`, payload)
 
     form.value.preferenciaSensible = r.data.preferenciaSensible
+    estadoGuardado.value = form.value.preferenciaSensible
     mensaje.value = 'Cambios guardados correctamente.'
   } catch (e) {
     errorEdicion.value = e.response?.data?.message || 'No se pudo guardar.'
@@ -60,6 +75,8 @@ async function guardar() {
 }
 
 onMounted(cargar)
+
+onBeforeUnmount(limpiarCambios)
 </script>
 
 <template>
@@ -99,18 +116,17 @@ onMounted(cargar)
         </div>
       </div>
 
-      <p v-if="errorEdicion" class="text-rojizo text-sm">{{ errorEdicion }}</p>
-      <p v-if="mensaje" class="text-green-700 text-sm">{{ mensaje }}</p>
-
-      <div class="flex justify-end pt-4">
-        <button
-          :disabled="guardando"
-          class="px-5 py-2.5 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
-          @click="guardar"
-        >
-          {{ guardando ? 'Guardando...' : 'Guardar cambios' }}
-        </button>
-      </div>
+      <BarraGuardado
+        :hay-cambios="hayCambios"
+        :guardando="guardando"
+        :texto="guardando ? 'Guardando…' : 'Guardar cambios'"
+        @guardar="guardar"
+      >
+        <template #aviso>
+          <p v-if="errorEdicion" class="text-rojizo text-sm">{{ errorEdicion }}</p>
+          <p v-else-if="mensaje" class="text-green-700 text-sm">{{ mensaje }}</p>
+        </template>
+      </BarraGuardado>
     </div>
   </div>
 </template>

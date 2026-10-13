@@ -31,6 +31,13 @@ const secciones = [
       { nombre: 'Materiales', to: '/admin/arte/materiales' },
     ],
   },
+  {
+    nombre: 'Ajustes generales',
+    base: '/admin/ajustes',
+    subsecciones: [
+      { nombre: 'Países', to: '/admin/ajustes/paises' },
+    ],
+  },
   { nombre: 'Moderación', to: null, activa: false },
   { nombre: 'Sanciones', to: null, activa: false },
   { nombre: 'Notificaciones', to: null, activa: false },

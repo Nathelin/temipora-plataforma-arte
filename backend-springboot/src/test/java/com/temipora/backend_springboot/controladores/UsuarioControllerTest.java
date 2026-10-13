@@ -269,6 +269,65 @@ class UsuarioControllerTest {
     }
 
     // ---------------------------------------------------------------
+    // PUT /api/usuarios/{idUsuario}/contrasenia
+    // ---------------------------------------------------------------
+
+    @Test
+    void cambiarContrasenia_sinToken_devuelve401YNoLlamaAlServicio() throws Exception {
+        mockMvc.perform(put("/api/usuarios/7/contrasenia")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"contraseniaActual\":\"Actual123\",\"contraseniaNueva\":\"Nueva123\",\"confirmarContrasenia\":\"Nueva123\"}"))
+                .andExpect(status().isUnauthorized());
+
+        verify(usuarioService, never()).cambiarContrasenia(any(), any());
+    }
+
+    @Test
+    void cambiarContrasenia_tokenValido_devuelve200() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("cliente42", ERol.CLIENTE.name());
+        when(usuarioService.nombreUsuario(7L)).thenReturn("cliente42");
+
+        mockMvc.perform(put("/api/usuarios/7/contrasenia")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"contraseniaActual\":\"Actual123\",\"contraseniaNueva\":\"Nueva123\",\"confirmarContrasenia\":\"Nueva123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Contraseña actualizada correctamente."));
+
+        verify(usuarioService).cambiarContrasenia(eq(7L), any());
+    }
+
+    @Test
+    void cambiarContrasenia_tokenDeOtroUsuario_devuelve403() throws Exception {
+        stubUsuarioConRol("intruso", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("intruso", ERol.CLIENTE.name());
+        when(usuarioService.nombreUsuario(7L)).thenReturn("CosmicCrap");
+
+        mockMvc.perform(put("/api/usuarios/7/contrasenia")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"contraseniaActual\":\"Actual123\",\"contraseniaNueva\":\"Nueva123\",\"confirmarContrasenia\":\"Nueva123\"}"))
+                .andExpect(status().isForbidden());
+
+        verify(usuarioService, never()).cambiarContrasenia(any(), any());
+    }
+
+    @Test
+    void cambiarContrasenia_contraseniaDebil_devuelve400SinLlamarAlServicio() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("cliente42", ERol.CLIENTE.name());
+
+        mockMvc.perform(put("/api/usuarios/7/contrasenia")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"contraseniaActual\":\"Actual123\",\"contraseniaNueva\":\"debil\",\"confirmarContrasenia\":\"debil\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(usuarioService, never()).cambiarContrasenia(any(), any());
+    }
+
+    // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------
 

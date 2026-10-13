@@ -3,6 +3,11 @@ import Login from '../components/Login.vue'
 import Usuarios from '../components/Usuarios.vue'
 import TiposAdmin from '../components/TiposAdmin.vue'
 import EtiquetasAdmin from '../components/EtiquetasAdmin.vue'
+import CategoriasEtiquetaAdmin from '../components/CategoriasEtiquetaAdmin.vue'
+import MediosAdmin from '../components/MediosAdmin.vue'
+import TiposArteAdmin from '../components/TiposArteAdmin.vue'
+import MaterialesAdmin from '../components/MaterialesAdmin.vue'
+import PaisesAdmin from '../components/PaisesAdmin.vue'
 import Registro from '../components/Registro.vue'
 import TOS from '../components/TOS.vue'
 import MainLayout from '../layouts/MainLayout.vue'
@@ -17,6 +22,9 @@ import ConfiguracionEtiquetas from '../views/ConfiguracionEtiquetas.vue'
 import ConfiguracionTerminos from '../views/ConfiguracionTerminos.vue'
 import ConfiguracionCuenta from '../views/ConfiguracionCuenta.vue'
 import PortfolioSubir from '../views/PortfolioSubir.vue'
+import { useSubirImagen } from '../composables/useSubirImagen'
+import { useConfirmacionSalida } from '../composables/useConfirmacionSalida'
+import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
 
 const routes = [
   {
@@ -95,7 +103,37 @@ const routes = [
         path: 'etiquetas',
         name: 'etiquetas-admin',
         component: EtiquetasAdmin,
-        meta: { title: 'Gestión de etiquetas' },
+        meta: { title: 'Etiquetas' },
+      },
+      {
+        path: 'etiquetas/categorias',
+        name: 'categorias-admin',
+        component: CategoriasEtiquetaAdmin,
+        meta: { title: 'Categorías' },
+      },
+      {
+        path: 'arte/medios',
+        name: 'medios-admin',
+        component: MediosAdmin,
+        meta: { title: 'Medios' },
+      },
+      {
+        path: 'arte/tipos',
+        name: 'tipos-arte-admin',
+        component: TiposArteAdmin,
+        meta: { title: 'Tipos de arte' },
+      },
+      {
+        path: 'arte/materiales',
+        name: 'materiales-admin',
+        component: MaterialesAdmin,
+        meta: { title: 'Materiales' },
+      },
+      {
+        path: 'ajustes/paises',
+        name: 'paises-admin',
+        component: PaisesAdmin,
+        meta: { title: 'Países' },
       },
     ],
   },
@@ -107,6 +145,46 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+const { subidaEnCurso, publicadasEnSesion, proteccionActiva } = useSubirImagen()
+const { pedir } = useConfirmacionSalida()
+const { hayCambios: hayCambiosConfig, mensaje: mensajeConfig, limpiar: limpiarConfig } = useCambiosSinGuardar()
+
+router.beforeEach(async (to, from) => {
+  const saliendoDeSubir = from.path === '/portfolio/subir' && to.path !== from.path
+  if (!saliendoDeSubir || !proteccionActiva.value) {
+    return true
+  }
+
+  let mensaje = ''
+  const publicadas = publicadasEnSesion.value
+  if (publicadas === 1) {
+    mensaje += 'Ya publicaste 1 imagen de este lote: esa información sí se guardó en tu portfolio. '
+  } else if (publicadas > 1) {
+    mensaje += `Ya publicaste ${publicadas} imágenes de este lote: esa información sí se guardó en tu portfolio. `
+  }
+  if (subidaEnCurso.value) {
+    mensaje += 'Hay imágenes en plena subida que se interrumpirán. '
+  }
+  mensaje += 'Las imágenes restantes no se publicarán y sus archivos subidos se eliminarán.'
+
+  return await pedir(mensaje)
+})
+
+router.beforeEach(async (to, from) => {
+  const saliendoDeConfig = from.path.startsWith('/configuracion') && to.path !== from.path
+  if (!saliendoDeConfig || !hayCambiosConfig.value) {
+    return true
+  }
+
+  const permitir = await pedir(mensajeConfig.value, {
+    titulo: '¿Salir sin guardar?',
+    textoConfirmar: 'Salir sin guardar',
+    textoCancelar: 'Seguir editando',
+  })
+  if (permitir) limpiarConfig()
+  return permitir
 })
 
 router.beforeEach((to, from, next) => {

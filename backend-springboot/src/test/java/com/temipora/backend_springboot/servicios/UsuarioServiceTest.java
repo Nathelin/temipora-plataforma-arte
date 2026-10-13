@@ -25,6 +25,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.temipora.backend_springboot.modelo.ActualizarContraseniaDTO;
 import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
@@ -398,6 +399,98 @@ class UsuarioServiceTest {
         UsuarioDTO resultado = usuarioService.cambiarCorreo(1L, dto);
 
         assertThat(resultado.getCorreo()).isEqualTo("cosmiq@mail.com");
+    }
+
+    // ---------------------------------------------------------------
+    // cambiarContrasenia
+    // ---------------------------------------------------------------
+
+    @Test
+    void cambiarContrasenia_ok_actualizaHasheando() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        ActualizarContraseniaDTO dto = new ActualizarContraseniaDTO();
+        dto.setContraseniaActual("Actual123");
+        dto.setContraseniaNueva("Nueva123");
+        dto.setConfirmarContrasenia("Nueva123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("Actual123", "$2a$10$hasheado")).thenReturn(true);
+        when(passwordEncoder.matches("Nueva123", "$2a$10$hasheado")).thenReturn(false);
+        when(passwordEncoder.encode("Nueva123")).thenReturn("$2a$10$nuevo");
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        usuarioService.cambiarContrasenia(1L, dto);
+
+        assertThat(usuario.getContrasenia()).isEqualTo("$2a$10$nuevo");
+        verify(usuarioRepository).save(usuario);
+    }
+
+    @Test
+    void cambiarContrasenia_actualIncorrecta_lanzaError() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        ActualizarContraseniaDTO dto = new ActualizarContraseniaDTO();
+        dto.setContraseniaActual("mala");
+        dto.setContraseniaNueva("Nueva123");
+        dto.setConfirmarContrasenia("Nueva123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("mala", "$2a$10$hasheado")).thenReturn(false);
+
+        assertThatThrownBy(() -> usuarioService.cambiarContrasenia(1L, dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("La contraseña actual no es correcta.");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    void cambiarContrasenia_noCoinciden_lanzaError() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        ActualizarContraseniaDTO dto = new ActualizarContraseniaDTO();
+        dto.setContraseniaActual("Actual123");
+        dto.setContraseniaNueva("Nueva123");
+        dto.setConfirmarContrasenia("Distinta123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("Actual123", "$2a$10$hasheado")).thenReturn(true);
+
+        assertThatThrownBy(() -> usuarioService.cambiarContrasenia(1L, dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Las contraseñas no coinciden.");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    void cambiarContrasenia_igualALaActual_lanzaError() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        ActualizarContraseniaDTO dto = new ActualizarContraseniaDTO();
+        dto.setContraseniaActual("Actual123");
+        dto.setContraseniaNueva("Actual123");
+        dto.setConfirmarContrasenia("Actual123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("Actual123", "$2a$10$hasheado")).thenReturn(true);
+
+        assertThatThrownBy(() -> usuarioService.cambiarContrasenia(1L, dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("La nueva contraseña debe ser distinta a la actual.");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    void cambiarContrasenia_usuarioInexistente_lanzaNoSuchElement() {
+        when(usuarioRepository.findByIdUsuario(99L)).thenReturn(Optional.empty());
+
+        ActualizarContraseniaDTO dto = new ActualizarContraseniaDTO();
+        dto.setContraseniaActual("Actual123");
+        dto.setContraseniaNueva("Nueva123");
+        dto.setConfirmarContrasenia("Nueva123");
+
+        assertThatThrownBy(() -> usuarioService.cambiarContrasenia(99L, dto))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("Usuario no encontrado: 99");
     }
 
     // ---------------------------------------------------------------
