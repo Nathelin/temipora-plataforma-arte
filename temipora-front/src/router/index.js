@@ -19,6 +19,7 @@ import Servicios from '../views/Servicios.vue'
 import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
 import ConfiguracionPrivacidad from '../views/ConfiguracionPrivacidad.vue'
 import ConfiguracionEtiquetas from '../views/ConfiguracionEtiquetas.vue'
+import ConfiguracionFormularioPedidos from '../views/ConfiguracionFormularioPedidos.vue'
 import ConfiguracionTerminos from '../views/ConfiguracionTerminos.vue'
 import ConfiguracionCuenta from '../views/ConfiguracionCuenta.vue'
 import PortfolioSubir from '../views/PortfolioSubir.vue'
@@ -66,6 +67,7 @@ const routes = [
           { path: 'perfil', name: 'configuracion-perfil', component: ConfiguracionPerfil, meta: { title: 'Configuración - Perfil' } },
           { path: 'privacidad', name: 'configuracion-privacidad', component: ConfiguracionPrivacidad, meta: { title: 'Configuración - Privacidad' } },
           { path: 'etiquetas', name: 'configuracion-etiquetas', component: ConfiguracionEtiquetas, meta: { title: 'Configuración - Mis etiquetas' } },
+          { path: 'formulario-pedidos', name: 'configuracion-formulario-pedidos', component: ConfiguracionFormularioPedidos, meta: { title: 'Configuración - Formulario de pedidos', requiresArtist: true } },
           { path: 'terminos', name: 'configuracion-terminos', component: ConfiguracionTerminos, meta: { title: 'Configuración - Términos' } },
           { path: 'cuenta', name: 'configuracion-cuenta', component: ConfiguracionCuenta, meta: { title: 'Configuración - Cuenta' } },
         ],
