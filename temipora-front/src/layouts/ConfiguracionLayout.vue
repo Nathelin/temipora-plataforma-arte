@@ -10,6 +10,7 @@ const secciones = [
   { nombre: 'Privacidad y contenido', to: '/configuracion/privacidad' },
   ...(esArtista ? [{ nombre: 'Mis etiquetas', to: '/configuracion/etiquetas' }] : []),
   ...(esArtista ? [{ nombre: 'Formulario de pedidos', to: '/configuracion/formulario-pedidos' }] : []),
+  ...(esArtista ? [{ nombre: 'Términos y condiciones', to: '/configuracion/terminos-artista' }] : []),
   { nombre: 'Términos de uso', to: '/configuracion/terminos' },
   { nombre: 'Cuenta y seguridad', to: '/configuracion/cuenta' },
 ]

@@ -18,7 +18,7 @@ import lombok.Setter;
 @Table(name = "CategoriaEtiqueta")
 @Getter
 @Setter
-@NoArgsConstructor
+@NoArgsConstructor 
 @AllArgsConstructor
 @Builder
 public class CategoriaEtiqueta {

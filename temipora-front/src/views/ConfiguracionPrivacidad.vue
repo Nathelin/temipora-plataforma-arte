@@ -34,7 +34,7 @@ watch(hayCambios, (pendiente) => {
 const opciones = [
   { value: 'ADVERTIR', label: 'Mostrar con advertencia'},
   { value: 'MOSTRAR_SIN_ADVERTENCIA', label: 'Mostrar todo sin advertencia'},
-  { value: 'OCULTAR', label: 'Ocultar contenido sensible', description: 'Oculta solo imágenes de otros usuarios. Tus propias imágenes aparecerán con una advertencia.' }
+  { value: 'OCULTAR', label: 'Ocultar contenido sensible', description: 'Oculta solo imágenes de otros usuarios.' }
 ]
 
 async function cargar() {

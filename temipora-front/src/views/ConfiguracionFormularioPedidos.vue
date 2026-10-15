@@ -268,8 +268,8 @@ onBeforeUnmount(() => {
 <template>
   <div class="bg-blanco rounded-3xl shadow-xl shadow-rosa/40 p-6 sm:p-8">
     <h2 class="text-lg text-granate mb-2">Formulario de pedidos</h2>
-    <p class="text-sm text-cafe/70 mb-6">
-      Armá las preguntas que querés que te responda un cliente al pedirte una comisión.
+    <p class="text-sm text-cafe/70 mb-6 pb-5">
+      Este es el formulario por defecto que usarán tus clientes para solicitar tus servicios.
     </p>
 
     <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
@@ -301,12 +301,12 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Lista de preguntas -->
-      <div v-if="preguntas.length" class="space-y-3">
+      <div v-if="preguntas.length" class="space-y-3 pt-5 pb-5">
         <div
           v-for="(p, i) in preguntas"
           :key="p.uid"
           draggable="true"
-          class="group flex items-start gap-3 rounded-xl border border-rosa/50 bg-rosa/5 p-4 transition"
+          class="pt-3 group flex items-start gap-3 rounded-xl border border-rosa/50 bg-rosa/5 p-4 transition"
           :class="arrastrando === i ? 'opacity-60 ring-2 ring-coral' : 'hover:bg-rosa/10'"
           @dragstart="onDragStart(i)"
           @dragover.prevent="onDragOver(i)"
@@ -325,7 +325,7 @@ onBeforeUnmount(() => {
               <span class="rounded-full bg-durazno/50 px-2.5 py-0.5 text-xs text-cafe">{{ nombreTipo(p.codigoTipo) }}</span>
               <span v-if="p.obligatoria" class="rounded-full bg-rojizo/10 px-2.5 py-0.5 text-xs text-rojizo">Obligatoria</span>
             </div>
-            <p class="mt-1.5 text-cafe" :class="p.codigoTipo === 'ENCABEZADO' ? 'font-medium text-granate' : ''">
+            <p class="pt-1 pb-1 mt-1.5 text-cafe" :class="p.codigoTipo === 'ENCABEZADO' ? 'font-medium text-granate' : ''">
               {{ p.enunciado }}
             </p>
             <p v-if="p.ayuda" class="mt-0.5 text-xs text-cafe/60">{{ p.ayuda }}</p>
@@ -396,7 +396,7 @@ onBeforeUnmount(() => {
       <!-- Vista previa -->
       <template v-else>
         <div class="space-y-5">
-          <p class="text-xs text-cafe/50">
+          <p class="text-xs text-cafe/50 pt-2 pb-5">
             Así lo verá el cliente. Es una vista previa: no se envían respuestas.
           </p>
 
@@ -434,7 +434,7 @@ onBeforeUnmount(() => {
               </div>
 
               <div v-else-if="p.codigoTipo === 'OPCIONES'" class="space-y-2">
-                <label v-for="(o, oi) in p.opciones" :key="oi" class="flex items-center gap-2 text-sm text-cafe">
+                <label v-for="(o, oi) in p.opciones" :key="oi" class="flex items-center gap-2 text-sm pb-1 pt-1 text-cafe">
                   <input type="radio" :name="'preview-' + p.uid" class="accent-coral" />
                   <span>{{ o }}</span>
                 </label>
