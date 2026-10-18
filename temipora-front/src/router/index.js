@@ -16,6 +16,7 @@ import ConfiguracionLayout from '../layouts/ConfiguracionLayout.vue'
 import Inicio from '../views/Inicio.vue'
 import Perfil from '../views/Perfil.vue'
 import Servicios from '../views/Servicios.vue'
+import ServicioDetalle from '../views/ServicioDetalle.vue'
 import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
 import ConfiguracionPrivacidad from '../views/ConfiguracionPrivacidad.vue'
 import ConfiguracionEtiquetas from '../views/ConfiguracionEtiquetas.vue'
@@ -23,6 +24,8 @@ import ConfiguracionFormularioPedidos from '../views/ConfiguracionFormularioPedi
 import ConfiguracionTerminosArtista from '../views/ConfiguracionTerminosArtista.vue'
 import ConfiguracionCuenta from '../views/ConfiguracionCuenta.vue'
 import PortfolioSubir from '../views/PortfolioSubir.vue'
+import MisServicios from '../views/MisServicios.vue'
+import ServicioForm from '../views/ServicioForm.vue'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useConfirmacionSalida } from '../composables/useConfirmacionSalida'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
@@ -39,6 +42,10 @@ const routes = [
       { path: 'productos', redirect: '/' },
       { path: 'servicios', name: 'servicios', component: Servicios,
         meta: { title: 'Servicios' }
+      },
+      { path: 'servicios/:id', name: 'servicio-detalle', component: ServicioDetalle,
+        props: (route) => ({ id: Number(route.params.id) }),
+        meta: { title: 'Detalle del servicio' }
       },
       { path: 'perfil/:nombreUsuario', name: 'perfil', component: Perfil,
         meta: { title: (route) => `Perfil de @${route.params.nombreUsuario}` }
@@ -58,6 +65,24 @@ const routes = [
         name: 'portfolio-subir',
         component: PortfolioSubir,
         meta: { title: 'Subir imagen al portfolio', requiresArtist: true },
+      },
+      {
+        path: 'mis-servicios',
+        name: 'mis-servicios',
+        component: MisServicios,
+        meta: { title: 'Mis servicios', requiresArtist: true },
+      },
+      {
+        path: 'mis-servicios/crear',
+        name: 'servicio-crear',
+        component: ServicioForm,
+        meta: { title: 'Crear servicio', requiresArtist: true },
+      },
+      {
+        path: 'mis-servicios/:id/editar',
+        name: 'servicio-editar',
+        component: ServicioForm,
+        meta: { title: 'Editar servicio', requiresArtist: true },
       },
       {
         path: 'configuracion',

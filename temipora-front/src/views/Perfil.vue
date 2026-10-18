@@ -3,6 +3,7 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { useSubirImagen } from '../composables/useSubirImagen'
+import TarjetaServicio from '../components/TarjetaServicio.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -43,7 +44,7 @@ async function cargarPerfil() {
     }
 
     if (data.rol === 'ARTISTA') {
-      await Promise.all([cargarPortfolio(true), cargarEtiquetasPortfolio(), cargarTiposArte()])
+      await Promise.all([cargarPortfolio(true), cargarEtiquetasPortfolio(), cargarTiposArte(), cargarServicios()])
     } else {
       totalPortfolio.value = 0
       etiquetasPortfolio.value = []
@@ -141,6 +142,33 @@ async function cargarTiposArte() {
   }
 }
 
+// ---------------------------------------------------------------
+// Servicios del artista
+// ---------------------------------------------------------------
+
+const cargandoServicios = ref(false)
+const errorServicios = ref('')
+
+async function cargarServicios() {
+  const nombre = perfil.value.nombreUsuario
+  if (perfil.value.rol !== 'ARTISTA' || !nombre) return
+  cargandoServicios.value = true
+  errorServicios.value = ''
+  try {
+    const res = await api.get(`/servicios/artista/${nombre}`)
+    if (perfil.value.nombreUsuario === nombre) {
+      perfil.value.servicios = res.data
+    }
+  } catch (e) {
+    if (perfil.value.nombreUsuario === nombre) {
+      perfil.value.servicios = []
+      errorServicios.value = 'No se pudieron cargar los servicios.'
+    }
+  } finally {
+    if (perfil.value.nombreUsuario === nombre) cargandoServicios.value = false
+  }
+}
+
 function limpiarFiltros() {
   const f = filtros.value
   if (!hayFiltrosActivos.value && (f.orden || 'RECIENTE') === 'RECIENTE') return
@@ -164,6 +192,8 @@ watch(() => route.params.nombreUsuario, () => {
   paginaPortfolio.value = 0
   totalPortfolio.value = 0
   errorListaPortfolio.value = ''
+  perfil.value.servicios = []
+  errorServicios.value = ''
 })
 
 watch(() => route.params.nombreUsuario, cargarPerfil, { immediate: true })
@@ -564,13 +594,28 @@ function irASubirImagen(imagen = null) {
               </div>
             </div>
 
-          <div v-if="tabActiva === 'servicios'" class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div v-for="s in perfil.servicios" :key="s.id" class="bg-blanco border border-rosa rounded-xl p-5">
-              <h3 class="text-granate">{{ s.titulo }}</h3>
-              <p class="text-sm text-cafe/70 mt-1">{{ s.descripcion }}</p>
-              <p class="text-sm text-rojizo mt-3">{{ s.precio }}</p>
+            <div v-if="tabActiva === 'servicios'" class="mt-6">
+              <p v-if="cargandoServicios && !perfil.servicios.length" class="text-sm text-cafe/60 py-8 text-center">
+                Cargando servicios...
+              </p>
+              <p v-else-if="errorServicios" class="text-sm text-rojizo py-8 text-center">
+                {{ errorServicios }}
+              </p>
+              <p v-else-if="!perfil.servicios.length" class="text-sm text-cafe/60 py-8">
+                Este artista todavía no ofrece servicios.
+                <button
+                  v-if="esDuenio"
+                  type="button"
+                  class="ml-2 underline text-granate hover:text-coral transition"
+                  @click="router.push('/mis-servicios/crear')"
+                >
+                  Creá tu primer servicio
+                </button>
+              </p>
+              <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <TarjetaServicio v-for="s in perfil.servicios" :key="s.idServicio" :servicio="s" />
+              </div>
             </div>
-          </div>
 
           <div v-if="tabActiva === 'productos'" class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div v-for="p in perfil.productos" :key="p.id" class="bg-blanco border border-rosa rounded-xl p-5">
@@ -775,7 +820,7 @@ function irASubirImagen(imagen = null) {
       </div>
 
       <!-- Zoom a pantalla completa -->
-      <div v-if="zoomActivo" class="fixed inset-0 z-[70] flex items-center justify-center bg-granate/95 p-4" @click="cerrarZoom">
+      <div v-if="zoomActivo" class="fixed inset-0 z-70 flex items-center justify-center bg-granate/95 p-4" @click="cerrarZoom">
         <button
           type="button"
           class="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-blanco/10 text-2xl leading-none text-crema hover:bg-blanco/20 transition"
