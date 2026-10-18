@@ -20,9 +20,12 @@ const ETIQUETAS_SENSIBLE = {
 }
 
 const esSensible = computed(() => !!servicio.value?.contenidoSensible)
-const textoSensible = computed(
-  () => ETIQUETAS_SENSIBLE[servicio.value?.contenidoSensible] || 'Contenido sensible',
-)
+const requiereAdvertencia = computed(() => !!servicio.value?.requiereAdvertencia)
+const tiposSensibles = computed(() => {
+  const tipos = servicio.value?.contenidosSensibles || []
+  return tipos.map((t) => ETIQUETAS_SENSIBLE[t] || t)
+})
+const textoSensible = computed(() => tiposSensibles.value.join(' · ') || 'Contenido sensible')
 const esDuenio = computed(() => {
   const actual = localStorage.getItem('nombreUsuario') || ''
   return actual.toLowerCase() === (servicio.value?.nombreArtista || '').toLowerCase()
@@ -98,10 +101,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
               :src="imagenActiva"
               :alt="servicio.nombre"
               class="w-full h-full object-cover transition duration-200"
-              :class="esSensible && !mostrarSensible ? 'blur-[18px] scale-105' : ''"
+              :class="requiereAdvertencia && !mostrarSensible ? 'blur-[18px] scale-105' : ''"
             />
             <div
-              v-if="esSensible && !mostrarSensible"
+              v-if="requiereAdvertencia && !mostrarSensible"
               class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-granate/30 text-center px-6"
             >
               <svg class="h-10 w-10 text-white drop-shadow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -118,7 +121,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
               </button>
             </div>
             <div
-              v-if="esSensible && mostrarSensible"
+              v-if="requiereAdvertencia && mostrarSensible"
               class="absolute left-3 top-3 rounded-full bg-granate/70 px-3 py-1 text-xs text-crema"
             >
               Mostrando contenido sensible
@@ -178,7 +181,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
             </div>
             <div v-if="esSensible" class="flex justify-between gap-3">
               <dt class="text-xs text-cafe/50">Contenido sensible</dt>
-              <dd class="text-coral">{{ textoSensible }}</dd>
+              <dd class="text-coral text-right">{{ textoSensible }}</dd>
             </div>
           </dl>
 

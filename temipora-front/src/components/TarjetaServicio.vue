@@ -16,9 +16,12 @@ const ETIQUETAS_SENSIBLE = {
 }
 
 const esSensible = computed(() => !!props.servicio.contenidoSensible)
-const textoSensible = computed(
-  () => ETIQUETAS_SENSIBLE[props.servicio.contenidoSensible] || 'Contenido sensible',
-)
+const requiereAdvertencia = computed(() => !!props.servicio.requiereAdvertencia)
+const tiposSensibles = computed(() => {
+  const tipos = props.servicio.contenidosSensibles || []
+  return tipos.map((t) => ETIQUETAS_SENSIBLE[t] || t).join(' · ')
+})
+const textoSensible = computed(() => tiposSensibles.value || 'Contenido sensible')
 
 function textoEntrega(s) {
   return `${s.tiempoEntregaValor} ${(s.tiempoEntregaUnidad || '').toLowerCase()}`
@@ -41,10 +44,10 @@ function irAlArtista() {
         :src="servicio.imagenPortada"
         :alt="servicio.nombre"
         class="w-full h-full object-cover transition duration-200"
-        :class="esSensible && !revelado ? 'blur-[18px] scale-105' : ''"
+        :class="requiereAdvertencia && !revelado ? 'blur-[18px] scale-105' : ''"
       />
       <span
-        v-if="esSensible && !revelado"
+        v-if="requiereAdvertencia && !revelado"
         class="absolute inset-0 flex items-center justify-center gap-2 bg-granate/20 text-white text-sm drop-shadow"
         :title="`Contenido sensible: ${textoSensible}`"
       >
@@ -88,7 +91,7 @@ function irAlArtista() {
       </div>
 
       <div
-        v-if="esSensible && !revelado"
+        v-if="requiereAdvertencia && !revelado"
         class="mt-auto pt-4 flex items-center justify-between gap-3 border-t border-rosa/40 mt-4"
       >
         <span class="text-xs text-cafe/50">Oculto por contenido sensible</span>
@@ -101,7 +104,7 @@ function irAlArtista() {
         </button>
       </div>
 
-      <div v-else-if="esSensible" class="mt-auto pt-4 flex items-center justify-between gap-3 border-t border-rosa/40 mt-4">
+      <div v-else-if="requiereAdvertencia" class="mt-auto pt-4 flex items-center justify-between gap-3 border-t border-rosa/40 mt-4">
         <span class="text-xs text-cafe/50">Mostrando contenido sensible</span>
         <button type="button" class="text-sm text-cafe/60 hover:text-rojizo transition" @click="revelado = false">
           Ocultar

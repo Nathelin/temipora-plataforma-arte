@@ -22,7 +22,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.temipora.backend_springboot.modelo.CategoriaEtiqueta;
 import com.temipora.backend_springboot.modelo.CategoriaEtiquetaDTO;
 import com.temipora.backend_springboot.modelo.CategoriaEtiquetaRequest;
-import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 import com.temipora.backend_springboot.repositorios.CategoriaEtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 

@@ -2,6 +2,7 @@ package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -33,7 +34,11 @@ public class ServicioRequest {
     @DecimalMin(value = "0", message = "El precio base no puede ser negativo")
     private BigDecimal precioBase;
 
-    private ContenidoSensible contenidoSensible;
+    private boolean contenidoSensible;
+
+    // Tipos de contenido sensible que pueden aparecer en el servicio.
+    // Solo tiene sentido si contenidoSensible es true; el servicio valida que no esté vacío en ese caso.
+    private Set<@NotNull ContenidoSensible> contenidosSensibles;
 
     @NotNull(message = "El tiempo estimado de entrega es obligatorio.")
     @Min(value = 1, message = "El tiempo de entrega debe ser al menos 1")

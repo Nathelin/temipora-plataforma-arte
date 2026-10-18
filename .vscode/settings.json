@@ -1,6 +1,6 @@
 {
     "java.configuration.updateBuildConfiguration": "interactive",
-    "java.compile.nullAnalysis.mode": "automatic",
+    "java.compile.nullAnalysis.mode": "disabled",
     "java.jdt.ls.java.home": "C:\\Program Files\\Microsoft\\jdk-21.0.9.10-hotspot",
     "java.configuration.runtimes": [
         {

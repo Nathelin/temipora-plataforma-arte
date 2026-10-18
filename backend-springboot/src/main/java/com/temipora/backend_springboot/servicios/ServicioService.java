@@ -2,8 +2,10 @@ package com.temipora.backend_springboot.servicios;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Set;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
 import com.temipora.backend_springboot.modelo.FiltroServicioRequest;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.Servicio;
@@ -52,30 +55,62 @@ public class ServicioService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServicioDTO> listarActivos(FiltroServicioRequest filtro) {
-        Specification<Servicio> spec = activos();
+    public List<ServicioDTO> listarActivos(FiltroServicioRequest filtro, Long viewerId) {
+        EPreferenciaContenidoSensible pref = preferenciaDe(viewerId);
+        boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
+
+        Specification<Servicio> spec = activos(ocultarSensibles);
         spec = aplicarFiltros(spec, filtro);
         return servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre")).stream()
-            .map(ServicioDTO::desdeServicio)
+            .map(s -> ServicioDTO.desdeServicio(s, requiereAdvertencia(s, pref, viewerId)))
             .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<ServicioDTO> listarActivosDeArtista(String nombreUsuario) {
-        Specification<Servicio> spec = activos()
+    public List<ServicioDTO> listarActivosDeArtista(String nombreUsuario, Long viewerId) {
+        EPreferenciaContenidoSensible pref = preferenciaDe(viewerId);
+        boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
+
+        Specification<Servicio> spec = activos(ocultarSensibles)
             .and((root, query, cb) ->
                 cb.equal(cb.lower(root.get("artista").get("nombreUsuario")),
                     nombreUsuario.trim().toLowerCase()));
         return servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre")).stream()
-            .map(ServicioDTO::desdeServicio)
+            .map(s -> ServicioDTO.desdeServicio(s, requiereAdvertencia(s, pref, viewerId)))
             .toList();
     }
 
-    private Specification<Servicio> activos() {
+    private Specification<Servicio> activos(boolean ocultarSensibles) {
         return (root, query, cb) -> {
             root.fetch("artista");
+            if (ocultarSensibles) {
+                return cb.and(
+                    cb.isTrue(root.get("estado")),
+                    cb.isFalse(root.get("contenidoSensible")));
+            }
             return cb.isTrue(root.get("estado"));
         };
+    }
+
+    private EPreferenciaContenidoSensible preferenciaDe(Long viewerId) {
+        if (viewerId == null) {
+            return EPreferenciaContenidoSensible.ADVERTIR;
+        }
+        return usuarioRepository.findByIdUsuario(viewerId)
+            .map(Usuario::getPreferenciaSensible)
+            .orElse(EPreferenciaContenidoSensible.ADVERTIR);
+    }
+
+    private boolean requiereAdvertencia(
+            Servicio s,
+            EPreferenciaContenidoSensible pref,
+            Long viewerId) {
+        boolean esDuenio = viewerId != null
+            && s.getArtista() != null
+            && s.getArtista().getIdUsuario().equals(viewerId);
+        return s.isContenidoSensible()
+            && pref == EPreferenciaContenidoSensible.ADVERTIR
+            && !esDuenio;
     }
 
     private Specification<Servicio> aplicarFiltros(Specification<Servicio> spec, FiltroServicioRequest f) {
@@ -98,8 +133,7 @@ public class ServicioService {
         if (f.getSensible() != null) {
             boolean sensible = f.getSensible();
             spec = spec.and((root, query, cb) ->
-                sensible ? cb.isNotNull(root.get("contenidoSensible"))
-                         : cb.isNull(root.get("contenidoSensible")));
+                cb.equal(root.get("contenidoSensible"), sensible));
         }
         if (f.getPrecioMin() != null) {
             BigDecimal min = f.getPrecioMin();
@@ -124,8 +158,17 @@ public class ServicioService {
     }
 
     @Transactional(readOnly = true)
-    public ServicioDTO obtener(Long idServicio) {
-        return ServicioDTO.desdeServicio(obtenerEntidad(idServicio));
+    public ServicioDTO obtener(Long idServicio, Long viewerId) {
+        Servicio servicio = obtenerEntidad(idServicio);
+        EPreferenciaContenidoSensible pref = preferenciaDe(viewerId);
+
+        boolean esDuenio = viewerId != null
+            && servicio.getArtista() != null
+            && servicio.getArtista().getIdUsuario().equals(viewerId);
+        if (!esDuenio && pref == EPreferenciaContenidoSensible.OCULTAR && servicio.isContenidoSensible()) {
+            throw new NoSuchElementException("Servicio no encontrado: " + idServicio);
+        }
+        return ServicioDTO.desdeServicio(servicio, requiereAdvertencia(servicio, pref, viewerId));
     }
 
     @Transactional
@@ -179,7 +222,12 @@ public class ServicioService {
         servicio.setNombre(r.getNombre().trim());
         servicio.setDescripcion(r.getDescripcion().trim());
         servicio.setPrecioBase(r.getPrecioBase());
-        servicio.setContenidoSensible(r.getContenidoSensible());
+        validarContenidoSensible(r);
+        servicio.setContenidoSensible(r.isContenidoSensible());
+        servicio.reemplazarContenidosSensibles(
+            r.isContenidoSensible() && r.getContenidosSensibles() != null
+                ? new HashSet<>(r.getContenidosSensibles())
+                : Set.of());
         servicio.setTiempoEntregaValor(r.getTiempoEntregaValor());
         servicio.setTiempoEntregaUnidad(r.getTiempoEntregaUnidad());
         servicio.setTiempoEntregaDias(r.getTiempoEntregaValor() * r.getTiempoEntregaUnidad().getFactorDias());
@@ -201,6 +249,14 @@ public class ServicioService {
             }
         }
         servicio.reemplazarImagenes(imagenes);
+    }
+
+    private void validarContenidoSensible(ServicioRequest r) {
+        if (r.isContenidoSensible()
+                && (r.getContenidosSensibles() == null || r.getContenidosSensibles().isEmpty())) {
+            throw new IllegalArgumentException(
+                "Seleccioná qué tipo de contenido sensible puede aparecer en el servicio.");
+        }
     }
 
     private void validarUnico(Long idArtista, Long idTipoServicio, String nombre, Long idExcluido) {

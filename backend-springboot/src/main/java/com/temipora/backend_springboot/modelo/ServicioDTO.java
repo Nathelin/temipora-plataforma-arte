@@ -26,7 +26,9 @@ public class ServicioDTO {
     private String nombre;
     private String descripcion;
     private BigDecimal precioBase;
-    private String contenidoSensible;
+    private boolean contenidoSensible;
+    private List<String> contenidosSensibles;
+    private boolean requiereAdvertencia;
     private Integer tiempoEntregaValor;
     private String tiempoEntregaUnidad;
     private Integer tiempoEntregaDias;
@@ -37,6 +39,10 @@ public class ServicioDTO {
     private boolean estado;
 
     public static ServicioDTO desdeServicio(Servicio s) {
+        return desdeServicio(s, false);
+    }
+
+    public static ServicioDTO desdeServicio(Servicio s, boolean requiereAdvertencia) {
         return ServicioDTO.builder()
             .idServicio(s.getIdServicio())
             .idArtista(s.getArtista() != null ? s.getArtista().getIdUsuario() : null)
@@ -48,7 +54,11 @@ public class ServicioDTO {
             .nombre(s.getNombre())
             .descripcion(s.getDescripcion())
             .precioBase(s.getPrecioBase())
-            .contenidoSensible(s.getContenidoSensible() != null ? s.getContenidoSensible().name() : null)
+            .contenidoSensible(s.isContenidoSensible())
+            .contenidosSensibles(s.getContenidosSensibles().stream()
+                .map(Enum::name)
+                .toList())
+            .requiereAdvertencia(requiereAdvertencia)
             .tiempoEntregaValor(s.getTiempoEntregaValor())
             .tiempoEntregaUnidad(s.getTiempoEntregaUnidad() != null ? s.getTiempoEntregaUnidad().name() : null)
             .tiempoEntregaDias(s.getTiempoEntregaDias())

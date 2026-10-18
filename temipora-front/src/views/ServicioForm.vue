@@ -30,7 +30,6 @@ const UNIDADES = [
 ]
 
 const SENSIBLES = [
-  { valor: '', texto: 'Sin contenido sensible' },
   { valor: 'VIOLENCIA', texto: 'Violencia' },
   { valor: 'DESNUDOS', texto: 'Desnudos' },
   { valor: 'GENERAL', texto: 'Contenido sensible general' },
@@ -42,7 +41,8 @@ const form = ref({
   idMedio: '',
   descripcion: '',
   precioBase: '',
-  contenidoSensible: '',
+  contenidoSensible: false,
+  contenidosSensibles: [],
   tiempoEntregaValor: '',
   tiempoEntregaUnidad: 'DIAS',
   cupos: '',
@@ -82,7 +82,8 @@ async function cargar() {
         idMedio: d.idMedio ? String(d.idMedio) : '',
         descripcion: d.descripcion || '',
         precioBase: d.precioBase ?? '',
-        contenidoSensible: d.contenidoSensible || '',
+        contenidoSensible: !!d.contenidoSensible,
+        contenidosSensibles: Array.isArray(d.contenidosSensibles) ? [...d.contenidosSensibles] : [],
         tiempoEntregaValor: d.tiempoEntregaValor ?? '',
         tiempoEntregaUnidad: d.tiempoEntregaUnidad || 'DIAS',
         cupos: d.cupos ?? '',
@@ -161,6 +162,9 @@ function validar() {
   if (form.value.precioBase === '' || Number(form.value.precioBase) < 0) return 'Ingresá un precio base válido.'
   if (!form.value.tiempoEntregaValor || Number(form.value.tiempoEntregaValor) < 1) return 'Ingresá el tiempo estimado de entrega.'
   if (form.value.cupos === '' || Number(form.value.cupos) < 0) return 'Ingresá la cantidad de cupos.'
+  if (form.value.contenidoSensible && !form.value.contenidosSensibles.length) {
+    return 'Marcá el servicio como sensible y elegí qué tipo de contenido puede aparecer.'
+  }
   return ''
 }
 
@@ -179,7 +183,8 @@ async function guardar() {
       nombre: form.value.nombre.trim(),
       descripcion: form.value.descripcion.trim(),
       precioBase: Number(form.value.precioBase),
-      contenidoSensible: form.value.contenidoSensible || null,
+      contenidoSensible: form.value.contenidoSensible,
+      contenidosSensibles: form.value.contenidoSensible ? form.value.contenidosSensibles : [],
       tiempoEntregaValor: Number(form.value.tiempoEntregaValor),
       tiempoEntregaUnidad: form.value.tiempoEntregaUnidad,
       cupos: Number(form.value.cupos),
@@ -292,11 +297,25 @@ onBeforeUnmount(() => {
         <!-- Clasificación -->
         <section>
           <h2 class="text-base text-granate mb-5">Clasificación</h2>
-          <label class="block text-sm text-cafe mb-2">Contenido sensible</label>
-          <select v-model="form.contenidoSensible"
-            class="block w-full rounded-lg border-0 py-2.5 px-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
-            <option v-for="op in SENSIBLES" :key="op.valor" :value="op.valor">{{ op.texto }}</option>
-          </select>
+          <label class="flex items-start gap-2 text-sm text-cafe">
+            <input v-model="form.contenidoSensible" type="checkbox" class="mt-0.5 accent-coral" />
+            <span>
+              Este servicio puede contener contenido sensible
+              <span class="block text-xs text-cafe/50 mt-0.5">
+                Si el resultado del servicio puede incluir desnudos, violencia u otro contenido sensible, marcá esta casilla.
+              </span>
+            </span>
+          </label>
+
+          <div v-if="form.contenidoSensible" class="mt-4 pl-6 border-l-2 border-rosa">
+            <p class="text-sm text-cafe mb-2">¿Qué tipo de contenido puede aparecer? <span class="text-rojizo">*</span></p>
+            <div class="space-y-2">
+              <label v-for="op in SENSIBLES" :key="op.valor" class="flex items-center gap-2 text-sm text-cafe">
+                <input v-model="form.contenidosSensibles" type="checkbox" :value="op.valor" class="accent-coral" />
+                <span>{{ op.texto }}</span>
+              </label>
+            </div>
+          </div>
         </section>
 
         <!-- Entrega y cupos -->

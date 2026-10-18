@@ -50,7 +50,8 @@ public class ServicioController {
             @RequestParam(required = false) Boolean sensible,
             @RequestParam(required = false) BigDecimal precioMin,
             @RequestParam(required = false) BigDecimal precioMax,
-            @RequestParam(required = false) Integer tiempoMaxDias) {
+            @RequestParam(required = false) Integer tiempoMaxDias,
+            Authentication authentication) {
         FiltroServicioRequest filtro = new FiltroServicioRequest();
         filtro.setNombre(nombre);
         filtro.setNombreArtista(nombreArtista);
@@ -59,17 +60,19 @@ public class ServicioController {
         filtro.setPrecioMin(precioMin);
         filtro.setPrecioMax(precioMax);
         filtro.setTiempoMaxDias(tiempoMaxDias);
-        return servicioService.listarActivos(filtro);
+        return servicioService.listarActivos(filtro, idVisor(authentication));
     }
 
     @GetMapping("/servicios/artista/{nombreUsuario}")
-    public List<ServicioDTO> listarPorArtista(@PathVariable String nombreUsuario) {
-        return servicioService.listarActivosDeArtista(nombreUsuario);
+    public List<ServicioDTO> listarPorArtista(
+            @PathVariable String nombreUsuario,
+            Authentication authentication) {
+        return servicioService.listarActivosDeArtista(nombreUsuario, idVisor(authentication));
     }
 
     @GetMapping("/servicios/{id}")
-    public ServicioDTO obtener(@PathVariable Long id) {
-        return servicioService.obtener(id);
+    public ServicioDTO obtener(@PathVariable Long id, Authentication authentication) {
+        return servicioService.obtener(id, idVisor(authentication));
     }
 
     @PostMapping("/servicios")
@@ -103,6 +106,13 @@ public class ServicioController {
     }
 
     private Long idAutenticado(Authentication authentication) {
+        return usuarioService.getByNombreUsuario(authentication.getName()).getIdUsuario();
+    }
+
+    private Long idVisor(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return null;
+        }
         return usuarioService.getByNombreUsuario(authentication.getName()).getIdUsuario();
     }
 }

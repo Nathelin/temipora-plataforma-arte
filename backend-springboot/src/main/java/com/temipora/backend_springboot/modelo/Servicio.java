@@ -2,10 +2,14 @@ package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -62,9 +66,15 @@ public class Servicio {
     @Column(name = "precio_base", nullable = false, precision = 12, scale = 2)
     private BigDecimal precioBase;
 
+    @Column(name = "contenido_sensible", nullable = false)
+    private boolean contenidoSensible = false;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "servicio_contenido_sensible",
+        joinColumns = @JoinColumn(name = "id_servicio"))
     @Enumerated(EnumType.STRING)
-    @Column(name = "contenido_sensible", length = 20)
-    private ContenidoSensible contenidoSensible;
+    @Column(name = "contenido", nullable = false, length = 20)
+    private Set<ContenidoSensible> contenidosSensibles = new HashSet<>();
 
     @Column(name = "tiempo_entrega_valor")
     private Integer tiempoEntregaValor;
@@ -97,6 +107,13 @@ public class Servicio {
         for (ServicioImagen img : nuevas) {
             img.setServicio(this);
             this.imagenes.add(img);
+        }
+    }
+
+    public void reemplazarContenidosSensibles(Set<ContenidoSensible> nuevos) {
+        this.contenidosSensibles.clear();
+        if (nuevos != null) {
+            this.contenidosSensibles.addAll(nuevos);
         }
     }
 }
