@@ -61,6 +61,7 @@ function validarPaso() {
     if (nombreUsuarioEnUso.value) errs.push('El nombre de usuario ya está en uso.')
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.value)) errs.push('El correo no es válido.')
     if (contrasenia.value.length < 8) errs.push('La contraseña debe tener al menos 8 caracteres.')
+    if (!/[A-Z]/.test(contrasenia.value) || !/\d/.test(contrasenia.value)) errs.push('La contraseña debe incluir al menos una mayúscula y un número.')
     if (contrasenia.value !== confirmarContrasenia.value) errs.push('Las contraseñas no coinciden.')
     if (!acceptaTOS.value) errs.push('Debés aceptar los términos y condiciones.')
   }
@@ -259,7 +260,9 @@ const pasosRouter = [
           <label class="block text-sm text-cafe mb-2">Nombre de usuario<span class="text-rojizo">*</span></label>
           <input
             v-model="nombreUsuario"
+            name="nombreUsuario"
             type="text"
+            autocomplete="username"
             @blur="onNombreUsuarioBlur"
             @input="nombreUsuarioEnUso = false"
             class="pl-4 pr-4 block w-full rounded-lg border-0 py-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
@@ -268,14 +271,16 @@ const pasosRouter = [
         </div>
         <div>
           <label class="block text-sm text-cafe mb-2">Correo electrónico<span class="text-rojizo">*</span></label>
-          <input v-model="correo" type="email" class="pl-4 pr-4 block w-full rounded-lg border-0 py-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
+          <input v-model="correo" name="correo" type="email" autocomplete="email" class="pl-4 pr-4 block w-full rounded-lg border-0 py-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
         </div>
         <div>
           <label class="block text-sm text-cafe mb-2">Contraseña<span class="text-rojizo">*</span></label>
           <div class="relative">
             <input
               v-model="contrasenia"
+              name="contrasenia"
               :type="verContrasenia ? 'text' : 'password'"
+              autocomplete="new-password"
               class="pl-4 pr-14 block w-full rounded-lg border-0 py-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
             />
             <button
@@ -286,13 +291,16 @@ const pasosRouter = [
               {{ verContrasenia ? 'Ocultar' : 'Ver' }}
             </button>
           </div>
+          <p class="mt-1 text-xs text-cafe/60">Mínimo 8 caracteres, con al menos una mayúscula y un número.</p>
         </div>
         <div>
           <label class="block text-sm text-cafe mb-2">Confirmar contraseña<span class="text-rojizo">*</span></label>
           <div class="relative">
             <input
               v-model="confirmarContrasenia"
+              name="confirmarContrasenia"
               :type="verConfirmar ? 'text' : 'password'"
+              autocomplete="new-password"
               class="pl-4 pr-14 block w-full rounded-lg border-0 py-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
             />
             <button

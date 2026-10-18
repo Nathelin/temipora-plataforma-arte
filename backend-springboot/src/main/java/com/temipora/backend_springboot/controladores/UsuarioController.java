@@ -1,5 +1,7 @@
 package com.temipora.backend_springboot.controladores;
 
+import java.util.Map;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.temipora.backend_springboot.modelo.ActualizarContraseniaDTO;
 import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
 import com.temipora.backend_springboot.modelo.ERol;
@@ -71,6 +74,18 @@ public class UsuarioController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return ResponseEntity.ok(usuarioService.cambiarCorreo(idUsuario, dto));
+    }
+
+    @PutMapping("/usuarios/{idUsuario}/contrasenia")
+    public ResponseEntity<Map<String, String>> cambiarContrasenia(
+            @PathVariable Long idUsuario,
+            @Valid @RequestBody ActualizarContraseniaDTO dto,
+            Authentication authentication) {
+        if (esOtroUsuario(idUsuario, authentication)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        usuarioService.cambiarContrasenia(idUsuario, dto);
+        return ResponseEntity.ok(Map.of("message", "Contraseña actualizada correctamente."));
     }
 
     private boolean esOtroUsuario(Long idUsuario, Authentication authentication) {

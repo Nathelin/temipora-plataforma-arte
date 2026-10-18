@@ -149,11 +149,18 @@ function irAInicio() {
                   Producto <span class="text-xs">· Próximamente</span>
                 </button>
                 <button
-                  disabled
-                  class="w-full text-left px-4 py-2 text-sm text-cafe/40 cursor-not-allowed"
-                  aria-disabled="true"
+                  class="w-full text-left px-4 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
+                  role="menuitem"
+                  @click="subirAbierto = false; router.push('/mis-servicios/crear')"
                 >
-                  Servicio <span class="text-xs">· Próximamente</span>
+                  Servicio
+                </button>
+                <button
+                  class="w-full text-left px-4 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
+                  role="menuitem"
+                  @click="subirAbierto = false; router.push('/mis-servicios')"
+                >
+                  Mis servicios
                 </button>
               </div>
             </div>

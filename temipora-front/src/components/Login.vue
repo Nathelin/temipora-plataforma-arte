@@ -67,7 +67,9 @@ async function iniciarSesion() {
             <input
               id="nombreUsuario"
               v-model="nombreUsuario"
+              name="nombreUsuario"
               type="text"
+              autocomplete="username"
               required
               class="pl-4 pr-4 block w-full rounded-lg border-0 py-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa placeholder:text-cafe/40 focus:ring-2 focus:ring-inset focus:ring-coral"
             />
@@ -82,6 +84,7 @@ async function iniciarSesion() {
             <input
               id="contrasenia"
               v-model="contrasenia"
+              name="contrasenia"
               :type="verContrasenia ? 'text' : 'password'"
               autocomplete="current-password"
               required

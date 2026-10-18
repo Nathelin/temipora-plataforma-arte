@@ -170,7 +170,7 @@ const subtituloPagina = computed(() => {
     return 'Actualiza los datos de la imagen. La URL se conserva si no seleccionas un archivo nuevo.'
   }
   if (vista.value === 'seleccion') {
-    return `Elige una o varias imágenes a la vez (hasta ${MAX_IMAGENES_POR_LOTE}). Después completas los datos de cada una.`
+    return `Elige una o varias imágenes a la vez (hasta ${MAX_IMAGENES_POR_LOTE}).`
   }
   if (vista.value === 'subiendo') {
     return 'Optimizando y subiendo cada imagen. Puedes seguir navegando mientras tanto.'
@@ -609,7 +609,7 @@ function urlsSinPublicar() {
       </button>
 
       <h1 class="mt-4 text-2xl text-granate">{{ tituloPagina }}</h1>
-      <p class="mt-1 mb-6 text-sm text-cafe/60">{{ subtituloPagina }}</p>
+      <p class="mt-1 mb-6 text-sm pb-5 text-cafe/60">{{ subtituloPagina }}</p>
 
       <!-- ==================================================== -->
       <!-- Vista: selección (solo creación)                     -->
@@ -622,7 +622,7 @@ function urlsSinPublicar() {
           @dragleave.prevent="arrastrando = false"
           @drop.prevent="onDrop"
         >
-          <p class="text-sm text-cafe/70 mb-4">Arrastra tus imágenes hasta aquí</p>
+          <p class="pt-10 pb-2 text-sm text-cafe/70 mb-4">Arrastra tus imágenes hasta aquí</p>
           <input
             id="portfolio-lote"
             type="file"
@@ -637,7 +637,7 @@ function urlsSinPublicar() {
           >
             Elegir imágenes
           </label>
-          <p class="mt-4 text-xs text-cafe/50">
+          <p class="pt-2 pb-10 mt-4 text-xs text-cafe/50">
             JPG, PNG o WEBP · hasta 5MB cada una · máximo {{ MAX_IMAGENES_POR_LOTE }} por lote
           </p>
         </div>
@@ -676,7 +676,7 @@ function urlsSinPublicar() {
             <button
               type="button"
               :disabled="subiendoLote"
-              class="px-5 py-2.5 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
+              class="px-5 py-2.5 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition"
               @click="iniciarSubida"
             >
               Subir imágenes ({{ lote.length }})
@@ -757,7 +757,7 @@ function urlsSinPublicar() {
             <button
               v-if="!subiendoLote && fallidas"
               type="button"
-              class="px-5 py-2.5 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
+              class="px-5 py-2.5 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition"
               @click="subirLote"
             >
               Reintentar fallidas
@@ -816,27 +816,27 @@ function urlsSinPublicar() {
                 <p class="text-granate">{{ actual.datos.titulo }}</p>
               </div>
               <div>
-                <p class="text-xs text-cafe/60">Descripción</p>
+                <p class="text-xs text-cafe/60 pt-3">Descripción</p>
                 <p class="text-cafe whitespace-pre-wrap">{{ actual.datos.descripcion }}</p>
               </div>
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <p class="text-xs text-cafe/60">Tipo de arte</p>
+                  <p class="text-xs text-cafe/60 pt-3">Tipo de arte</p>
                   <p class="text-cafe">{{ nombreTipoArte(actual.datos.idTipoArte) }}</p>
                 </div>
                 <div>
-                  <p class="text-xs text-cafe/60">Contenido sensible</p>
+                  <p class="text-xs text-cafe/60 pt-3">Contenido sensible</p>
                   <p class="text-cafe">{{ actual.datos.contenidoSensible || 'No' }}</p>
                 </div>
               </div>
               <div>
-                <p class="text-xs text-cafe/60">Materiales y herramientas</p>
+                <p class="text-xs text-cafe/60 pt-3">Materiales y herramientas</p>
                 <p class="text-cafe">
                   {{ actual.datos.materiales.length ? actual.datos.materiales.map(m => m.nombre).join(', ') : '—' }}
                 </p>
               </div>
               <div>
-                <p class="text-xs text-cafe/60">Etiquetas</p>
+                <p class="text-xs text-cafe/60 pt-3">Etiquetas</p>
                 <p class="text-cafe">
                   {{ actual.datos.etiquetas.length ? actual.datos.etiquetas.map(e => e.nombre).join(', ') : '—' }}
                 </p>
@@ -847,20 +847,20 @@ function urlsSinPublicar() {
             <template v-else>
               <div>
                 <label class="block text-sm text-cafe mb-2">Título <span class="text-rojizo">*</span></label>
-                <input v-model="actual.datos.titulo" type="text" maxlength="100" required class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
+                <input v-model="actual.datos.titulo" type="text" maxlength="100" required class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
               </div>
 
               <div>
-                <label class="block text-sm text-cafe mb-2">Descripción <span class="text-rojizo">*</span></label>
-                <textarea v-model="actual.datos.descripcion" rows="5" maxlength="1000" required class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"></textarea>
+                <label class="block text-sm text-cafe mb-2 pt-3">Descripción <span class="text-rojizo">*</span></label>
+                <textarea v-model="actual.datos.descripcion" rows="5" maxlength="1000" required class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"></textarea>
               </div>
 
               <div>
-                <label class="block text-sm text-cafe mb-2">Tipo de arte <span class="text-rojizo">*</span></label>
+                <label class="block text-sm text-cafe mb-2 pt-3">Tipo de arte <span class="text-rojizo">*</span></label>
                 <select
                   v-model="actual.datos.idTipoArte"
                   :disabled="tiposCargando || !!tiposError"
-                  class="block w-full rounded-lg border-0 py-2.5 px-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none disabled:opacity-60"
+                  class="block w-full rounded-lg border-0 py-2.5 px-3 text-base text-cafe ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none disabled:opacity-60"
                   @change="onTipoArteCambiado"
                 >
                   <option value="" disabled>{{ tiposCargando ? 'Cargando tipos de arte...' : 'Selecciona un tipo de arte' }}</option>
@@ -872,8 +872,8 @@ function urlsSinPublicar() {
               </div>
 
               <div>
-                <label class="block text-sm text-cafe mb-2">Contenido sensible</label>
-                <select v-model="actual.datos.contenidoSensible" class="block w-full rounded-lg border-0 py-2.5 px-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
+                <label class="block text-sm text-cafe mb-2 pt-3">Contenido sensible</label>
+                <select v-model="actual.datos.contenidoSensible" class="block w-full rounded-lg border-0 py-2.5 px-3 text-base text-cafe ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
                   <option value="">Sin contenido sensible</option>
                   <option value="VIOLENCIA">Violencia</option>
                   <option value="DESNUDOS">Desnudos</option>
@@ -881,9 +881,9 @@ function urlsSinPublicar() {
                 </select>
               </div>
 
-              <SelectorMateriales v-model="actual.datos.materiales" :id-medio="idMedioActual" />
+              <SelectorMateriales v-model="actual.datos.materiales" :id-medio="idMedioActual" class="pt-3" />
 
-              <SelectorEtiquetas v-model="actual.datos.etiquetas" />
+              <SelectorEtiquetas v-model="actual.datos.etiquetas" class="pt-3" />
 
               <p v-if="error" class="text-rojizo text-sm">{{ error }}</p>
             </template>
@@ -947,7 +947,7 @@ function urlsSinPublicar() {
             <button
               type="button"
               :disabled="guardando || subiendoLote"
-              class="px-5 py-2.5 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm min-w-48"
+              class="px-5 py-2.5 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition min-w-48"
               @click="accionPrincipal"
             >
               {{ etiquetaBoton }}

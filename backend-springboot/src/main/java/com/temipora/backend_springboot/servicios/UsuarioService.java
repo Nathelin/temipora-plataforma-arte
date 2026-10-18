@@ -13,6 +13,7 @@ import java.util.NoSuchElementException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.ActualizarContraseniaDTO;
 import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
 import com.temipora.backend_springboot.modelo.Pais;
@@ -181,6 +182,25 @@ public class UsuarioService {
 
         usuario.setCorreo(nuevoCorreo);
         return UsuarioDTO.desdeUsuario(usuarioRepository.save(usuario));
+    }
+
+    @Transactional
+    public void cambiarContrasenia(Long idUsuario, ActualizarContraseniaDTO dto) {
+        Usuario usuario = usuarioRepository.findByIdUsuario(idUsuario)
+                .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idUsuario));
+
+        if (!passwordEncoder.matches(dto.getContraseniaActual(), usuario.getContrasenia())) {
+            throw new IllegalArgumentException("La contraseña actual no es correcta.");
+        }
+        if (!dto.getContraseniaNueva().equals(dto.getConfirmarContrasenia())) {
+            throw new IllegalArgumentException("Las contraseñas no coinciden.");
+        }
+        if (passwordEncoder.matches(dto.getContraseniaNueva(), usuario.getContrasenia())) {
+            throw new IllegalArgumentException("La nueva contraseña debe ser distinta a la actual.");
+        }
+
+        usuario.setContrasenia(passwordEncoder.encode(dto.getContraseniaNueva()));
+        usuarioRepository.save(usuario);
     }
 
     private String aPatronBusqueda(String texto) {

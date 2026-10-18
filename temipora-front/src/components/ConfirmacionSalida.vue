@@ -1,7 +1,7 @@
 <script setup>
 import { useConfirmacionSalida } from '../composables/useConfirmacionSalida'
 
-const { pendiente, mensaje, responder } = useConfirmacionSalida()
+const { pendiente, mensaje, titulo, textoConfirmar, textoCancelar, responder } = useConfirmacionSalida()
 </script>
 
 <template>
@@ -19,7 +19,7 @@ const { pendiente, mensaje, responder } = useConfirmacionSalida()
     ></div>
 
     <div class="relative w-full max-w-md bg-blanco rounded-xl shadow-xl shadow-granate/20 border border-rosa p-6">
-      <h2 id="titulo-confirmacion-salida" class="text-lg text-granate">¿Salir sin publicar?</h2>
+      <h2 id="titulo-confirmacion-salida" class="text-lg text-granate">{{ titulo }}</h2>
       <p class="mt-2 text-sm text-cafe/70">{{ mensaje }}</p>
 
       <div class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
@@ -28,14 +28,14 @@ const { pendiente, mensaje, responder } = useConfirmacionSalida()
           class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition"
           @click="responder(true)"
         >
-          Salir sin publicar
+          {{ textoConfirmar }}
         </button>
         <button
           type="button"
           class="px-5 py-2.5 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
           @click="responder(false)"
         >
-          Quedarme
+          {{ textoCancelar }}
         </button>
       </div>
     </div>

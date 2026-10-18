@@ -78,13 +78,13 @@ class ManejoGlobalErroresTest {
     }
 
     @Test
-    void violacionDeIntegridad_devuelve409ConMensajeDeImagen() {
+    void violacionDeIntegridad_devuelve409ConMensajeGenerico() {
         ResponseEntity<Map<String, String>> respuesta = manejo.manejarIntegridadDatos(
                 new DataIntegrityViolationException("could not execute statement"));
 
         assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(respuesta.getBody()).containsEntry("message",
-                "La imagen no pudo guardarse porque sus datos no son compatibles con la base de datos.");
+                "Los datos no se pudieron guardar porque no son compatibles con la base de datos.");
     }
 
     // Spring 7 exige un MethodParameter real en los constructores de estas excepciones

@@ -27,6 +27,12 @@ public class TipoServicioService {
             .toList();
     }
 
+    public List<TipoServicioDTO> listarActivos() {
+        return tipoServicioRepository.findByActivoTrueOrderByNombreAsc().stream()
+            .map(TipoServicioDTO::desdeTipoServicio)
+            .toList();
+    }
+
     public TipoServicioDTO crear(TipoServicioRequest request) {
         validarNombreUnico(request.getNombre(), null);
 

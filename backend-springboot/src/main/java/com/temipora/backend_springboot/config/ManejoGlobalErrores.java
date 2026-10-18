@@ -41,6 +41,6 @@ public class ManejoGlobalErrores {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, String>> manejarIntegridadDatos(DataIntegrityViolationException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(Map.of("message", "La imagen no pudo guardarse porque sus datos no son compatibles con la base de datos."));
+            .body(Map.of("message", "Los datos no se pudieron guardar porque no son compatibles con la base de datos."));
     }
 }
