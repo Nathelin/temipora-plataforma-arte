@@ -30,6 +30,7 @@ import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Pais;
 import com.temipora.backend_springboot.modelo.RegistroUsuarioDTO;
 import com.temipora.backend_springboot.modelo.Rol;
@@ -56,6 +57,9 @@ class UsuarioServiceTest {
 
     @Mock
     private TelefonoService telefonoService;
+
+    @Mock
+    private MonedaService monedaService;
 
     @InjectMocks
     private UsuarioService usuarioService;
@@ -98,6 +102,7 @@ class UsuarioServiceTest {
         Rol rolCliente = Rol.builder().idRol(3L).nombre(ERol.CLIENTE).build();
         when(rolRepository.findByNombre(ERol.CLIENTE)).thenReturn(Optional.of(rolCliente));
         when(passwordEncoder.encode("secreta123")).thenReturn("$2a$10$hasheado");
+        when(monedaService.predeterminada()).thenReturn(Moneda.builder().idMoneda(1L).codigo("ARS").build());
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Usuario guardado = usuarioService.registrarUsuario(dto);

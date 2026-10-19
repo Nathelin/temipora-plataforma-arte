@@ -3,8 +3,11 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { acceptImagenes, validarImagen, procesarImagen, LIMITES_IMAGEN } from '../servicios/archivos'
+import { formatearPrecio } from '../servicios/moneda'
+import { useMonedas } from '../composables/useMonedas'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
 import BarraGuardado from '../components/BarraGuardado.vue'
+import SelectorPortfolio from '../components/SelectorPortfolio.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -20,8 +23,12 @@ const subiendoPortada = ref(false)
 const subiendoEjemplo = ref(false)
 const estadoGuardado = ref(null)
 
+const selectorAbierto = ref(false)
+const selectorModo = ref('ejemplos')
+
 const tipos = ref([])
 const medios = ref([])
+const { monedas, cargar: cargarMonedas, predeterminada } = useMonedas()
 
 const UNIDADES = [
   { valor: 'DIAS', texto: 'Días' },
@@ -41,6 +48,7 @@ const form = ref({
   idMedio: '',
   descripcion: '',
   precioBase: '',
+  idMoneda: '',
   contenidoSensible: false,
   contenidosSensibles: [],
   tiempoEntregaValor: '',
@@ -50,6 +58,10 @@ const form = ref({
   imagenPortada: '',
   imagenes: [],
 })
+
+const monedaSeleccionada = computed(
+  () => monedas.value.find((m) => String(m.idMoneda) === form.value.idMoneda) || null,
+)
 
 const tituloPagina = computed(() => (esEdicion.value ? 'Editar servicio' : 'Crear servicio'))
 const subtituloPagina = computed(() => 'Completá los datos de tu servicio.')
@@ -69,6 +81,7 @@ async function cargar() {
     const [tiposRes, mediosRes] = await Promise.all([
       api.get('/tipos-servicio'),
       api.get('/medios'),
+      cargarMonedas(),
     ])
     tipos.value = tiposRes.data
     medios.value = mediosRes.data
@@ -82,6 +95,7 @@ async function cargar() {
         idMedio: d.idMedio ? String(d.idMedio) : '',
         descripcion: d.descripcion || '',
         precioBase: d.precioBase ?? '',
+        idMoneda: d.idMoneda ? String(d.idMoneda) : '',
         contenidoSensible: !!d.contenidoSensible,
         contenidosSensibles: Array.isArray(d.contenidosSensibles) ? [...d.contenidosSensibles] : [],
         tiempoEntregaValor: d.tiempoEntregaValor ?? '',
@@ -91,6 +105,9 @@ async function cargar() {
         imagenPortada: d.imagenPortada || '',
         imagenes: Array.isArray(d.imagenes) ? [...d.imagenes] : [],
       }
+    } else {
+      const pred = predeterminada()
+      form.value.idMoneda = pred ? String(pred.idMoneda) : ''
     }
     estadoGuardado.value = instantanea()
   } catch (e) {
@@ -154,12 +171,33 @@ function quitarEjemplo(indice) {
   form.value.imagenes.splice(indice, 1)
 }
 
+function abrirSelectorPortfolio(modo) {
+  selectorModo.value = modo
+  selectorAbierto.value = true
+}
+
+function cerrarSelectorPortfolio() {
+  selectorAbierto.value = false
+}
+
+function onSeleccionPortfolio(urls) {
+  if (selectorModo.value === 'portada') {
+    if (urls[0]) form.value.imagenPortada = urls[0]
+  } else {
+    for (const url of urls) {
+      if (!form.value.imagenes.includes(url)) form.value.imagenes.push(url)
+    }
+  }
+  selectorAbierto.value = false
+}
+
 function validar() {
   if (!form.value.nombre.trim()) return 'El nombre es obligatorio.'
   if (!form.value.idTipoServicio) return 'Elegí un tipo de servicio.'
   if (!form.value.idMedio) return 'Elegí un medio.'
   if (!form.value.descripcion.trim()) return 'La descripción es obligatoria.'
   if (form.value.precioBase === '' || Number(form.value.precioBase) < 0) return 'Ingresá un precio base válido.'
+  if (!form.value.idMoneda) return 'Elegí una moneda.'
   if (!form.value.tiempoEntregaValor || Number(form.value.tiempoEntregaValor) < 1) return 'Ingresá el tiempo estimado de entrega.'
   if (form.value.cupos === '' || Number(form.value.cupos) < 0) return 'Ingresá la cantidad de cupos.'
   if (form.value.contenidoSensible && !form.value.contenidosSensibles.length) {
@@ -183,6 +221,7 @@ async function guardar() {
       nombre: form.value.nombre.trim(),
       descripcion: form.value.descripcion.trim(),
       precioBase: Number(form.value.precioBase),
+      idMoneda: Number(form.value.idMoneda),
       contenidoSensible: form.value.contenidoSensible,
       contenidosSensibles: form.value.contenidoSensible ? form.value.contenidosSensibles : [],
       tiempoEntregaValor: Number(form.value.tiempoEntregaValor),
@@ -286,10 +325,20 @@ onBeforeUnmount(() => {
                 class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"></textarea>
               <p class="text-right text-xs text-cafe/50 mt-1">{{ form.descripcion.length }}/250</p>
             </div>
-            <div>
-              <label class="block text-sm text-cafe mb-2">Precio base <span class="text-rojizo">*</span></label>
-              <input v-model="form.precioBase" type="number" min="0" step="0.01"
-                class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
+            <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_12rem] gap-6">
+              <div>
+                <label class="block text-sm text-cafe mb-2">Precio base <span class="text-rojizo">*</span></label>
+                <input v-model="form.precioBase" type="number" min="0" step="0.01"
+                  class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
+              </div>
+              <div>
+                <label class="block text-sm text-cafe mb-2">Moneda <span class="text-rojizo">*</span></label>
+                <select v-model="form.idMoneda"
+                  class="block w-full rounded-lg border-0 py-2.5 px-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
+                  <option v-for="m in monedas" :key="m.idMoneda" :value="String(m.idMoneda)">{{ m.nombre }} ({{ m.codigo }})</option>
+                </select>
+                <p class="text-xs text-cafe/50 mt-1">Otros usuarios verán el precio en su moneda preferida.</p>
+              </div>
             </div>
           </div>
         </section>
@@ -357,11 +406,18 @@ onBeforeUnmount(() => {
               <div v-if="form.imagenPortada" class="mb-2 w-full h-40 rounded-lg overflow-hidden bg-rosa/20">
                 <img :src="form.imagenPortada" alt="" class="w-full h-full object-cover" />
               </div>
-              <input id="servicio-portada" type="file" :accept="acceptImagenes" class="sr-only" @change="onPortadaChange" />
-              <label for="servicio-portada"
-                class="inline-flex cursor-pointer items-center rounded-md border border-coral bg-coral/10 px-4 py-2 text-sm font-medium text-granate hover:bg-coral/20 transition">
-                {{ subiendoPortada ? 'Subiendo…' : (form.imagenPortada ? 'Cambiar portada' : 'Subir portada') }}
-              </label>
+              <div class="flex flex-wrap items-center gap-3">
+                <input id="servicio-portada" type="file" :accept="acceptImagenes" class="sr-only" @change="onPortadaChange" />
+                <label for="servicio-portada"
+                  class="inline-flex cursor-pointer items-center rounded-md border border-coral bg-coral/10 px-4 py-2 text-sm font-medium text-granate hover:bg-coral/20 transition">
+                  {{ subiendoPortada ? 'Subiendo…' : (form.imagenPortada ? 'Cambiar portada' : 'Subir portada') }}
+                </label>
+                <button type="button"
+                  class="inline-flex items-center rounded-md border border-rosa px-4 py-2 text-sm font-medium text-cafe hover:bg-rosa/20 transition"
+                  @click="abrirSelectorPortfolio('portada')">
+                  Elegir del portfolio
+                </button>
+              </div>
             </div>
 
             <div>
@@ -374,11 +430,18 @@ onBeforeUnmount(() => {
                     aria-label="Quitar imagen" @click="quitarEjemplo(i)">✕</button>
                 </div>
               </div>
-              <input id="servicio-ejemplos" type="file" :accept="acceptImagenes" multiple class="sr-only" @change="onEjemplosChange" />
-              <label for="servicio-ejemplos"
-                class="inline-flex cursor-pointer items-center rounded-md border border-coral bg-coral/10 px-4 py-2 text-sm font-medium text-granate hover:bg-coral/20 transition">
-                {{ subiendoEjemplo ? 'Subiendo…' : 'Agregar imágenes' }}
-              </label>
+              <div class="flex flex-wrap items-center gap-3">
+                <input id="servicio-ejemplos" type="file" :accept="acceptImagenes" multiple class="sr-only" @change="onEjemplosChange" />
+                <label for="servicio-ejemplos"
+                  class="inline-flex cursor-pointer items-center rounded-md border border-coral bg-coral/10 px-4 py-2 text-sm font-medium text-granate hover:bg-coral/20 transition">
+                  {{ subiendoEjemplo ? 'Subiendo…' : 'Agregar imágenes' }}
+                </label>
+                <button type="button"
+                  class="inline-flex items-center rounded-md border border-rosa px-4 py-2 text-sm font-medium text-cafe hover:bg-rosa/20 transition"
+                  @click="abrirSelectorPortfolio('ejemplos')">
+                  Elegir del portfolio
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -410,7 +473,7 @@ onBeforeUnmount(() => {
             <p class="text-cafe/60">{{ nombreTipo || 'Tipo' }} · {{ nombreMedio || 'Medio' }}</p>
             <p class="text-cafe/80 whitespace-pre-wrap">{{ form.descripcion || 'Descripción…' }}</p>
             <div class="pt-2 space-y-1 text-cafe/70">
-              <p>Precio: <span class="text-granate">{{ form.precioBase !== '' ? form.precioBase : '—' }}</span></p>
+              <p>Precio: <span class="text-granate">{{ form.precioBase !== '' ? formatearPrecio(form.precioBase, monedaSeleccionada?.codigo || 'ARS') : '—' }}</span></p>
               <p>Entrega: {{ form.tiempoEntregaValor ? `${form.tiempoEntregaValor} ${UNIDADES.find(u => u.valor === form.tiempoEntregaUnidad)?.texto?.toLowerCase()}` : '—' }}</p>
               <p>Cupos: {{ form.cupos !== '' ? form.cupos : '—' }}</p>
             </div>
@@ -418,5 +481,13 @@ onBeforeUnmount(() => {
         </div>
       </aside>
     </div>
+
+    <SelectorPortfolio
+      v-if="selectorAbierto"
+      :modo="selectorModo"
+      :seleccionadas="selectorModo === 'portada' ? (form.imagenPortada ? [form.imagenPortada] : []) : form.imagenes"
+      @cerrar="cerrarSelectorPortfolio"
+      @seleccionar="onSeleccionPortfolio"
+    />
   </div>
 </template>

@@ -66,6 +66,10 @@ public class Servicio {
     @Column(name = "precio_base", nullable = false, precision = 12, scale = 2)
     private BigDecimal precioBase;
 
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "id_moneda", nullable = false)
+    private Moneda moneda;
+
     @Column(name = "contenido_sensible", nullable = false)
     private boolean contenidoSensible = false;
 

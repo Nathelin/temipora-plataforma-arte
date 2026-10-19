@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.ETiempoEntregaUnidad;
 import com.temipora.backend_springboot.modelo.Medio;
+import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.ServicioRequest;
@@ -46,6 +47,12 @@ class ServicioServiceTest {
     @Mock
     private MedioRepository medioRepository;
 
+    @Mock
+    private ConversionMonedaService conversionMonedaService;
+
+    @Mock
+    private MonedaService monedaService;
+
     @InjectMocks
     private ServicioService servicioService;
 
@@ -67,6 +74,7 @@ class ServicioServiceTest {
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
         when(medioRepository.findByIdMedio(2L)).thenReturn(Optional.of(medio(2L, "Digital")));
+        when(monedaService.obtener(3L)).thenReturn(moneda(3L, "ARS"));
         when(servicioRepository.save(any(Servicio.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ServicioRequest request = request();
@@ -110,6 +118,7 @@ class ServicioServiceTest {
             .thenReturn(false);
         when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
         when(medioRepository.findByIdMedio(2L)).thenReturn(Optional.of(medio(2L, "Digital")));
+        when(monedaService.obtener(3L)).thenReturn(moneda(3L, "ARS"));
         when(servicioRepository.save(any(Servicio.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ServicioDTO dto = servicioService.modificar(1L, 5L, request());
@@ -161,6 +170,7 @@ class ServicioServiceTest {
         ServicioRequest r = new ServicioRequest();
         r.setIdTipoServicio(1L);
         r.setIdMedio(2L);
+        r.setIdMoneda(3L);
         r.setNombre("Ilustración");
         r.setDescripcion("desc");
         r.setPrecioBase(new BigDecimal("100.00"));
@@ -169,6 +179,10 @@ class ServicioServiceTest {
         r.setCupos(5);
         r.setImagenes(List.of("a.png", "b.png"));
         return r;
+    }
+
+    private Moneda moneda(Long id, String codigo) {
+        return Moneda.builder().idMoneda(id).codigo(codigo).nombre(codigo).build();
     }
 
     private TipoServicio tipoServicio(Long id, String nombre) {

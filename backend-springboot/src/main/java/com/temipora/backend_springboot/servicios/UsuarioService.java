@@ -34,19 +34,22 @@ public class UsuarioService {
     private final RolRepository rolRepository;
     private final PaisRepository paisRepository;
     private final TelefonoService telefonoService;
+    private final MonedaService monedaService;
 
     public UsuarioService(
             UsuarioRepository usuarioRepository,
             PasswordEncoder passwordEncoder,
             RolRepository rolRepository,
             PaisRepository paisRepository,
-            TelefonoService telefonoService) {
+            TelefonoService telefonoService,
+            MonedaService monedaService) {
 
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.rolRepository = rolRepository;
         this.paisRepository = paisRepository;
         this.telefonoService = telefonoService;
+        this.monedaService = monedaService;
     }
 
     public Usuario registrarUsuario(RegistroUsuarioDTO dto) {
@@ -70,6 +73,7 @@ public class UsuarioService {
                 .urlFotoPerfil(dto.getUrlFotoPerfil())
                 .estadoCuenta(true)
                 .fechaCreacion(LocalDateTime.now())
+                .monedaPreferida(monedaService.predeterminada())
                 .rol(rol)
                 .build();
 
@@ -136,6 +140,9 @@ public class UsuarioService {
         }
         if (dto.getPreferenciaSensible() != null) {
             usuario.setPreferenciaSensible(dto.getPreferenciaSensible());
+        }
+        if (dto.getIdMonedaPreferida() != null) {
+            usuario.setMonedaPreferida(monedaService.obtener(dto.getIdMonedaPreferida()));
         }
 
         return UsuarioDTO.desdeUsuario(usuarioRepository.save(usuario));

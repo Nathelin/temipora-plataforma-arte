@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../servicios/api'
+import { formatearPrecio } from '../servicios/moneda'
 
 const router = useRouter()
 const servicios = ref([])
@@ -83,7 +84,7 @@ onMounted(cargar)
             <p class="mt-1 text-xs text-cafe/60">{{ s.nombreTipoServicio }} · {{ s.nombreMedio }}</p>
             <p class="mt-3 text-cafe whitespace-pre-wrap line-clamp-2">{{ s.descripcion }}</p>
             <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-cafe/70">
-              <span>Precio: <span class="text-granate">{{ s.precioBase }}</span></span>
+              <span>Precio: <span class="text-granate">{{ formatearPrecio(s.precioBase, s.moneda) }}</span></span>
               <span>Entrega: {{ textoEntrega(s) }}</span>
               <span>Cupos: {{ s.cupos }}</span>
             </div>

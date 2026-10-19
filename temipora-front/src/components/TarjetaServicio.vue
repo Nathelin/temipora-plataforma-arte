@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { formatearPrecio } from '../servicios/moneda'
 
 const props = defineProps({
   servicio: { type: Object, required: true },
@@ -22,6 +23,16 @@ const tiposSensibles = computed(() => {
   return tipos.map((t) => ETIQUETAS_SENSIBLE[t] || t).join(' · ')
 })
 const textoSensible = computed(() => tiposSensibles.value || 'Contenido sensible')
+
+const precioMostrado = computed(() =>
+  formatearPrecio(
+    props.servicio.precioBaseMostrado ?? props.servicio.precioBase,
+    props.servicio.monedaMostrada ?? props.servicio.moneda,
+  ),
+)
+const precioConvertido = computed(
+  () => !!props.servicio.monedaMostrada && props.servicio.monedaMostrada !== props.servicio.moneda,
+)
 
 function textoEntrega(s) {
   return `${s.tiempoEntregaValor} ${(s.tiempoEntregaUnidad || '').toLowerCase()}`
@@ -85,7 +96,10 @@ function irAlArtista() {
       <p class="mt-3 text-sm text-cafe whitespace-pre-wrap line-clamp-2">{{ servicio.descripcion }}</p>
 
       <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-cafe/70">
-        <span>Precio: <span class="text-granate">{{ servicio.precioBase }}</span></span>
+        <span>
+          Precio: <span class="text-granate">{{ precioMostrado }}</span>
+          <span v-if="precioConvertido" class="text-cafe/40" :title="`Precio original: ${formatearPrecio(servicio.precioBase, servicio.moneda)}`">≈</span>
+        </span>
         <span>Entrega: {{ textoEntrega(servicio) }}</span>
         <span>Cupos: {{ servicio.cupos }}</span>
       </div>

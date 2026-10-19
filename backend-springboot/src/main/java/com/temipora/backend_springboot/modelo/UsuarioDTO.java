@@ -35,6 +35,8 @@ public class UsuarioDTO {
     private String urlFotoPerfilMiniatura;
     private String urlBanner;
     private EPreferenciaContenidoSensible preferenciaSensible;
+    private Long idMonedaPreferida;
+    private String monedaPreferida;
     private String rol;
 
     public static UsuarioDTO desdeUsuario(Usuario usuario) {
@@ -60,6 +62,10 @@ public class UsuarioDTO {
             .urlFotoPerfilMiniatura(usuario.getUrlFotoPerfilMiniatura())
             .urlBanner(usuario.getUrlBanner())
             .preferenciaSensible(usuario.getPreferenciaSensible())
+            .idMonedaPreferida(usuario.getMonedaPreferida() != null
+                ? usuario.getMonedaPreferida().getIdMoneda() : null)
+            .monedaPreferida(usuario.getMonedaPreferida() != null
+                ? usuario.getMonedaPreferida().getCodigo() : null)
             .rol(usuario.getRol() != null ? usuario.getRol().getNombre().name() : null)
             .build();
     }

@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.servicios;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -16,6 +17,7 @@ import org.springframework.validation.annotation.Validated;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
 import com.temipora.backend_springboot.modelo.FiltroServicioRequest;
 import com.temipora.backend_springboot.modelo.Medio;
+import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.ServicioImagen;
@@ -35,16 +37,22 @@ public class ServicioService {
     private final UsuarioRepository usuarioRepository;
     private final TipoServicioRepository tipoServicioRepository;
     private final MedioRepository medioRepository;
+    private final ConversionMonedaService conversionMonedaService;
+    private final MonedaService monedaService;
 
     public ServicioService(
             ServicioRepository servicioRepository,
             UsuarioRepository usuarioRepository,
             TipoServicioRepository tipoServicioRepository,
-            MedioRepository medioRepository) {
+            MedioRepository medioRepository,
+            ConversionMonedaService conversionMonedaService,
+            MonedaService monedaService) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.tipoServicioRepository = tipoServicioRepository;
         this.medioRepository = medioRepository;
+        this.conversionMonedaService = conversionMonedaService;
+        this.monedaService = monedaService;
     }
 
     @Transactional(readOnly = true)
@@ -58,11 +66,12 @@ public class ServicioService {
     public List<ServicioDTO> listarActivos(FiltroServicioRequest filtro, Long viewerId) {
         EPreferenciaContenidoSensible pref = preferenciaDe(viewerId);
         boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
+        Moneda moneda = monedaPreferidaDe(viewerId);
 
         Specification<Servicio> spec = activos(ocultarSensibles);
         spec = aplicarFiltros(spec, filtro);
         return servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre")).stream()
-            .map(s -> ServicioDTO.desdeServicio(s, requiereAdvertencia(s, pref, viewerId)))
+            .map(s -> aDTO(s, requiereAdvertencia(s, pref, viewerId), moneda))
             .toList();
     }
 
@@ -70,13 +79,14 @@ public class ServicioService {
     public List<ServicioDTO> listarActivosDeArtista(String nombreUsuario, Long viewerId) {
         EPreferenciaContenidoSensible pref = preferenciaDe(viewerId);
         boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
+        Moneda moneda = monedaPreferidaDe(viewerId);
 
         Specification<Servicio> spec = activos(ocultarSensibles)
             .and((root, query, cb) ->
                 cb.equal(cb.lower(root.get("artista").get("nombreUsuario")),
                     nombreUsuario.trim().toLowerCase()));
         return servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre")).stream()
-            .map(s -> ServicioDTO.desdeServicio(s, requiereAdvertencia(s, pref, viewerId)))
+            .map(s -> aDTO(s, requiereAdvertencia(s, pref, viewerId), moneda))
             .toList();
     }
 
@@ -99,6 +109,25 @@ public class ServicioService {
         return usuarioRepository.findByIdUsuario(viewerId)
             .map(Usuario::getPreferenciaSensible)
             .orElse(EPreferenciaContenidoSensible.ADVERTIR);
+    }
+
+    private Moneda monedaPreferidaDe(Long viewerId) {
+        if (viewerId != null) {
+            Moneda preferida = usuarioRepository.findByIdUsuario(viewerId)
+                .map(Usuario::getMonedaPreferida)
+                .orElse(null);
+            if (preferida != null) {
+                return preferida;
+            }
+        }
+        return monedaService.predeterminada();
+    }
+
+    private ServicioDTO aDTO(Servicio s, boolean requiereAdvertencia, Moneda monedaDestino) {
+        BigDecimal factor = monedaDestino != null
+            ? conversionMonedaService.factor(s.getMoneda(), monedaDestino, LocalDateTime.now())
+            : null;
+        return ServicioDTO.desdeServicio(s, requiereAdvertencia, monedaDestino, factor);
     }
 
     private boolean requiereAdvertencia(
@@ -168,7 +197,7 @@ public class ServicioService {
         if (!esDuenio && pref == EPreferenciaContenidoSensible.OCULTAR && servicio.isContenidoSensible()) {
             throw new NoSuchElementException("Servicio no encontrado: " + idServicio);
         }
-        return ServicioDTO.desdeServicio(servicio, requiereAdvertencia(servicio, pref, viewerId));
+        return aDTO(servicio, requiereAdvertencia(servicio, pref, viewerId), monedaPreferidaDe(viewerId));
     }
 
     @Transactional
@@ -222,6 +251,7 @@ public class ServicioService {
         servicio.setNombre(r.getNombre().trim());
         servicio.setDescripcion(r.getDescripcion().trim());
         servicio.setPrecioBase(r.getPrecioBase());
+        servicio.setMoneda(resolverMoneda(r.getIdMoneda()));
         validarContenidoSensible(r);
         servicio.setContenidoSensible(r.isContenidoSensible());
         servicio.reemplazarContenidosSensibles(
@@ -285,5 +315,17 @@ public class ServicioService {
 
     private String limpiar(String valor) {
         return valor != null && !valor.isBlank() ? valor.trim() : null;
+    }
+
+    private Moneda resolverMoneda(Long idMoneda) {
+        if (idMoneda != null) {
+            return monedaService.obtener(idMoneda);
+        }
+        Moneda predeterminada = monedaService.predeterminada();
+        if (predeterminada == null) {
+            throw new IllegalStateException(
+                "No hay monedas configuradas en el sistema.");
+        }
+        return predeterminada;
     }
 }

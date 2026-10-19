@@ -34,6 +34,9 @@ public class ServicioRequest {
     @DecimalMin(value = "0", message = "El precio base no puede ser negativo")
     private BigDecimal precioBase;
 
+    // Moneda del precio base. Si no se especifica, se usa la moneda predeterminada.
+    private Long idMoneda;
+
     private boolean contenidoSensible;
 
     // Tipos de contenido sensible que pueden aparecer en el servicio.

@@ -36,6 +36,8 @@ const secciones = [
     base: '/admin/ajustes',
     subsecciones: [
       { nombre: 'Países', to: '/admin/ajustes/paises' },
+      { nombre: 'Monedas', to: '/admin/ajustes/monedas' },
+      { nombre: 'Cotización', to: '/admin/ajustes/cotizacion' },
     ],
   },
   { nombre: 'Moderación', to: null, activa: false },

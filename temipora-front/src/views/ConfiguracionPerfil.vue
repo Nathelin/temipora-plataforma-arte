@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { parsePhoneNumberFromString, getExampleNumber } from 'libphonenumber-js'
 import api from '../servicios/api'
+import { useMonedas } from '../composables/useMonedas'
 import { acceptImagenes, validarImagen, procesarImagen, LIMITES_IMAGEN } from '../servicios/archivos'
 import { useAvisoActualizacion } from '../composables/useAvisoActualizacion'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
@@ -35,9 +36,11 @@ const form = ref({
   idPais: '',
   urlFotoPerfil: '',
   urlBanner: '',
+  idMonedaPreferida: '',
 })
 
 const paises = ref([])
+const { monedas, cargar: cargarMonedas } = useMonedas()
 
 const paisSeleccionado = computed(() =>
   paises.value.find((p) => String(p.idPais) === form.value.idPais) || null,
@@ -121,6 +124,7 @@ function datosComparables() {
     sexo: sexoParaFormulario(form.value.sexo),
     telefono: form.value.telefono,
     idPais: form.value.idPais,
+    idMonedaPreferida: form.value.idMonedaPreferida,
   })
 }
 
@@ -152,6 +156,7 @@ async function cargar() {
   cargando.value = true
   error.value = ''
   try {
+    await cargarMonedas()
     const res = await api.get(`/perfil/${nombreUsuario}`)
     const d = res.data
     idUsuario.value = d.idUsuario
@@ -163,6 +168,9 @@ async function cargar() {
       idPais: d.idPais ? String(d.idPais) : '',
       urlFotoPerfil: d.urlFotoPerfil || '',
       urlBanner: d.urlBanner || '',
+      idMonedaPreferida: d.idMonedaPreferida != null
+        ? String(d.idMonedaPreferida)
+        : (monedas.value.find((m) => m.codigo === d.monedaPreferida)?.idMoneda ?? ''),
     }
     previewFoto.value = ''
     previewBanner.value = ''
@@ -284,6 +292,7 @@ async function guardar() {
       sexo: normalizarSexo(form.value.sexo),
       telefono: telefonoNormalizado(),
       ...(form.value.idPais ? { idPais: Number(form.value.idPais) } : {}),
+      ...(form.value.idMonedaPreferida ? { idMonedaPreferida: Number(form.value.idMonedaPreferida) } : {}),
       ...(urlFoto ? { urlFotoPerfil: urlFoto } : {}),
       ...(urlBanner ? { urlBanner } : {}),
     }
@@ -297,6 +306,9 @@ async function guardar() {
     form.value.idPais = r.data.idPais ? String(r.data.idPais) : ''
     form.value.urlFotoPerfil = r.data.urlFotoPerfil || ''
     form.value.urlBanner = r.data.urlBanner || ''
+    form.value.idMonedaPreferida = r.data.idMonedaPreferida != null
+      ? String(r.data.idMonedaPreferida)
+      : (monedas.value.find((m) => m.codigo === r.data.monedaPreferida)?.idMoneda ?? '')
     localStorage.setItem('urlFotoPerfil', form.value.urlFotoPerfil)
     window.dispatchEvent(new CustomEvent('perfil-foto-actualizada', {
       detail: { url: form.value.urlFotoPerfil },
@@ -499,6 +511,18 @@ onBeforeUnmount(() => {
             </option>
           </select>
         </div>
+      </div>
+
+      <!-- Moneda preferida -->
+      <div>
+        <label class="block text-sm text-cafe mb-2">Moneda preferida</label>
+        <select
+          v-model="form.idMonedaPreferida"
+          class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+        >
+          <option v-for="m in monedas" :key="m.idMoneda" :value="String(m.idMoneda)">{{ m.nombre }} ({{ m.codigo }})</option>
+        </select>
+        <p class="text-xs text-cafe/50 mt-1">Los precios de los servicios se mostrarán convertidos a esta moneda.</p>
       </div>
 
       <BarraGuardado
