@@ -14,12 +14,15 @@
   --color-acento-suave: #c2185b;
   --color-acento-hover: #9a1047;
   --color-acento-contraste: #ffffff;
+  --color-accion: #4a1d2e;
+  --color-accion-hover: #c2185b;
   --color-inverso: #4a1d2e;
   --color-inverso-suave: #ffc2d1;
   --color-inverso-contraste: #fff6f1;
   --color-decorativo-1: #ff8a7a;
   --color-decorativo-2: #ffd9c7;
   --color-decorativo-3: #ffe8a3;
+  --color-tinta: #4a1d2e;
 
   /* Alias de compatibilidad con la paleta anterior */
   --color-crema: #fff6f1;
@@ -68,12 +71,15 @@
     --color-acento-suave: #ff9fbc;
     --color-acento-hover: #d81b60;
     --color-acento-contraste: #ffffff;
+    --color-accion: #c2185b;
+    --color-accion-hover: #d81b60;
     --color-inverso: #1a0b12;
     --color-inverso-suave: #ffc2d1;
     --color-inverso-contraste: #fff6f1;
     --color-decorativo-1: #ff8a7a;
     --color-decorativo-2: #ffd9c7;
     --color-decorativo-3: #ffe8a3;
+    --color-tinta: #4a1d2e;
 
     --color-crema: #241018;
     --color-rosa: #7a3a52;

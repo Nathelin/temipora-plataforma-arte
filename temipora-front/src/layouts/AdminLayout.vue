@@ -10,6 +10,7 @@ const router = useRouter()
 const nombreUsuario = ref(localStorage.getItem('nombreUsuario') || '')
 const urlFotoPerfil = ref(localStorage.getItem('urlFotoPerfil') || '')
 const menuAbierto = ref(false)
+const menuAdminAbierto = ref(false)
 const contenedorMenu = ref(null)
 
 const secciones = [
@@ -63,6 +64,7 @@ const grupoActivo = (s) => s.subsecciones?.some((sub) => route.path === sub.to)
 watch(
   () => route.path,
   (ruta) => {
+    menuAdminAbierto.value = false
     for (const s of secciones) {
       if (s.subsecciones && ruta.startsWith(s.base)) {
         submenusAbiertos.value[s.nombre] = true
@@ -88,6 +90,7 @@ function manejarClickExterior(event) {
 function manejarTecla(event) {
   if (event.key === 'Escape') {
     menuAbierto.value = false
+    menuAdminAbierto.value = false
   }
 }
 
@@ -119,9 +122,25 @@ function cerrarSesion() {
 
 <template>
   <div class="flex min-h-screen w-full flex-col bg-blanco text-cafe">
-    <header class="sticky top-0 z-20 border-b border-rosa/40 bg-blanco/95 backdrop-blur-md">
+    <header class="sticky top-0 z-50 border-b border-rosa/40 bg-blanco/95 backdrop-blur-md">
       <div class="flex h-14 w-full items-center justify-between px-4 sm:h-16 sm:px-8">
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3 sm:gap-4">
+          <button
+            type="button"
+            class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rosa/60 bg-blanco/70 text-granate transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 md:hidden"
+            :aria-expanded="menuAdminAbierto"
+            aria-controls="menu-admin"
+            :aria-label="menuAdminAbierto ? 'Cerrar menú de administración' : 'Abrir menú de administración'"
+            @click="menuAdminAbierto = !menuAdminAbierto"
+          >
+            <svg v-if="!menuAdminAbierto" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+            <svg v-else class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+
           <router-link
             to="/"
             class="group inline-flex items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-4 focus-visible:ring-offset-blanco"
@@ -150,11 +169,11 @@ function cerrarSesion() {
               v-if="urlFotoPerfil"
               :src="urlFotoPerfil"
               alt=""
-              class="h-[34px] w-[34px] rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-rosa/70"
+              class="h-8.5 w-8.5 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-rosa/70"
             />
             <span
               v-else
-              class="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-rosa text-sm font-bold text-granate shadow-sm ring-1 ring-white/70"
+              class="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-rosa text-sm font-bold text-granate shadow-sm ring-1 ring-white/70"
             >
               {{ (nombreUsuario || '?').charAt(0).toUpperCase() }}
             </span>
@@ -196,9 +215,20 @@ function cerrarSesion() {
       </div>
     </header>
 
+    <div
+      v-if="menuAdminAbierto"
+      class="fixed inset-x-0 bottom-0 top-14 z-30 bg-granate/40 backdrop-blur-sm sm:top-16 md:hidden"
+      aria-hidden="true"
+      @click="menuAdminAbierto = false"
+    ></div>
+
     <div class="flex flex-1">
       <!-- Sidebar -->
-      <aside class="sticky top-14 flex h-[calc(100vh-3.5rem)] min-h-[calc(100vh-3.5rem)] w-60 shrink-0 flex-col bg-granate text-inverso-contraste sm:top-16 sm:h-[calc(100vh-4rem)] sm:min-h-[calc(100vh-4rem)]">
+      <aside
+        id="menu-admin"
+        class="fixed bottom-0 left-0 top-14 z-40 flex w-72 max-w-[85vw] shrink-0 flex-col overflow-y-auto bg-granate text-inverso-contraste transition-transform duration-300 sm:top-16 md:sticky md:bottom-auto md:top-16 md:z-auto md:h-[calc(100vh-4rem)] md:min-h-[calc(100vh-4rem)] md:w-60 md:max-w-none md:translate-x-0"
+        :class="menuAdminAbierto ? 'translate-x-0' : '-translate-x-full'"
+      >
         <div class="border-b border-blanco/10 px-5 py-3">
           <p class="text-xs uppercase tracking-wider text-inverso-contraste/50">Panel de administración</p>
         </div>

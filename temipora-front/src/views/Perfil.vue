@@ -348,56 +348,61 @@ function irASubirImagen(imagen = null) {
     </div>
     <template v-else>
     <!-- Banner -->
-    <div class="relative h-48 sm:h-64 bg-coral/20 w-full z-0">
+    <div class="relative h-44 w-full overflow-hidden bg-gradient-to-br from-rosa via-durazno to-mantequilla sm:h-64">
+      <div class="absolute -left-10 top-6 h-44 w-44 rounded-full bg-white/20 blur-2xl" aria-hidden="true"></div>
+      <div class="absolute right-10 top-8 h-28 w-28 rounded-full bg-coral/20 blur-xl" aria-hidden="true"></div>
+      <svg class="absolute bottom-5 right-8 h-12 w-12 text-coral/40" viewBox="0 0 70 70" fill="currentColor" aria-hidden="true">
+        <path d="M35 4 L41 28 L66 35 L41 42 L35 66 L29 42 L4 35 L29 28Z" />
+      </svg>
       <img
         v-if="perfil.urlBanner"
         :src="perfil.urlBanner"
         alt="Banner"
-        class="w-full h-full object-cover"
+        class="h-full w-full object-cover"
       />
-
+      <div v-if="perfil.urlBanner" class="absolute inset-0 bg-gradient-to-t from-granate/35 via-transparent to-transparent" aria-hidden="true"></div>
     </div>
 
-    <div class="max-w-screen-2xl mx-auto px-4 sm:px-8">
-      <div class="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 pb-6 border-b border-rosa pt-2 sm:pt-4">
-        <div class="relative w-40 sm:w-48 h-10 sm:h-12 shrink-0 z-10">
-          <div class="absolute bottom-0 left-0 w-40 h-40 sm:w-48 sm:h-48 rounded-full overflow-hidden border-4 border-blanco bg-coral/20 shadow-md">
+    <div class="mx-auto max-w-screen-2xl px-4 sm:px-8">
+      <div class="flex flex-col gap-4 border-b border-borde/50 pb-8 pt-2 sm:flex-row sm:items-end sm:gap-6 sm:pt-4">
+        <div class="relative z-10 h-8 w-36 shrink-0 sm:h-10 sm:w-44">
+          <div class="absolute bottom-0 left-0 h-36 w-36 overflow-hidden rounded-full border-4 border-white bg-coral/20 shadow-xl ring-4 ring-rosa/30 sm:h-44 sm:w-44">
             <img
               v-if="perfil.urlFotoPerfil"
               :src="perfil.urlFotoPerfil"
               alt="Perfil"
-              class="w-full h-full object-cover"
+              class="h-full w-full object-cover"
             />
             <span
               v-else
-              class="w-full h-full flex items-center justify-center text-5xl text-granate"
+              class="flex h-full w-full items-center justify-center font-display text-5xl font-extrabold text-granate"
             >
               {{ fotoInicial(perfil.nombreUsuario) }}
             </span>
           </div>
         </div>
 
-        <div class="flex-1 mt-2 sm:mt-0">
-          <h1 class="text-2xl sm:text-3xl font-medium text-granate">{{ nombreParaMostrar }}</h1>
-          <p class="text-sm text-cafe/60 mb-3">@{{ perfil.nombreUsuario }}</p>
+        <div class="mt-2 flex-1 sm:mt-0">
+          <h1 class="font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">{{ nombreParaMostrar }}</h1>
+          <p class="mt-2 text-sm text-cafe/60">@{{ perfil.nombreUsuario }}</p>
 
-          <div class="max-w-2xl flex items-start gap-3">
-            <p class="text-sm text-cafe leading-relaxed line-clamp-3">
+          <div class="mt-3 flex max-w-2xl items-start gap-3">
+            <p class="line-clamp-3 text-sm leading-relaxed text-cafe/80">
               {{ perfil.biografia || 'Sin biografía.' }}
             </p>
           </div>
         </div>
 
-        <div class="flex items-center gap-3 shrink-0 mt-4 sm:mt-0 pb-1 sm:pb-3">
+        <div class="mt-4 flex shrink-0 items-center gap-3 pb-1 sm:mt-0 sm:pb-3">
           <button v-if="esDuenio"
-            class="px-4 py-2 rounded-md text-sm text-granate border border-rosa bg-blanco hover:bg-rosa/20 transition"
+            class="inline-flex min-h-10 items-center rounded-full border border-borde/60 bg-superficie px-5 text-sm font-semibold text-granate transition hover:bg-rosa/25"
             @click="irAConfiguracion('privacidad')"
           >
             Preferencias
           </button>
           <button
             v-if="esDuenio"
-            class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
+            class="inline-flex min-h-10 items-center rounded-full bg-coral px-5 text-sm font-bold text-white shadow-sm transition hover:bg-rojizo"
             @click="irAConfiguracion('perfil')"
           >
             Editar perfil
@@ -408,24 +413,24 @@ function irASubirImagen(imagen = null) {
       <!-- Pestañas -->
       <div class="pb-6">
         <template v-if="esArtista">
-          <div class="flex items-center gap-6 border-b border-rosa">
+          <div class="flex flex-wrap items-center gap-2 border-b border-borde/50 pb-3">
             <button
-              class="py-3 text-sm transition border-b-2"
-              :class="tabActiva === 'portfolio' ? 'border-coral text-granate font-medium' : 'border-transparent text-cafe/60 hover:text-cafe'"
+              class="rounded-full px-5 py-2.5 text-sm font-semibold transition"
+              :class="tabActiva === 'portfolio' ? 'bg-coral text-white shadow-sm' : 'text-cafe/60 hover:bg-rosa/25 hover:text-granate'"
               @click="tabActiva = 'portfolio'"
             >
               Portfolio
             </button>
             <button
-              class="py-3 text-sm transition border-b-2"
-              :class="tabActiva === 'servicios' ? 'border-coral text-granate font-medium' : 'border-transparent text-cafe/60 hover:text-cafe'"
+              class="rounded-full px-5 py-2.5 text-sm font-semibold transition"
+              :class="tabActiva === 'servicios' ? 'bg-coral text-white shadow-sm' : 'text-cafe/60 hover:bg-rosa/25 hover:text-granate'"
               @click="tabActiva = 'servicios'"
             >
               Servicios
             </button>
             <button
-              class="py-3 text-sm transition border-b-2"
-              :class="tabActiva === 'productos' ? 'border-coral text-granate font-medium' : 'border-transparent text-cafe/60 hover:text-cafe'"
+              class="rounded-full px-5 py-2.5 text-sm font-semibold transition"
+              :class="tabActiva === 'productos' ? 'bg-coral text-white shadow-sm' : 'text-cafe/60 hover:bg-rosa/25 hover:text-granate'"
               @click="tabActiva = 'productos'"
             >
               Productos
@@ -434,14 +439,14 @@ function irASubirImagen(imagen = null) {
 
             <div v-if="tabActiva === 'portfolio'" class="mt-6">
               <!-- Barra compacta de filtros (siempre inicia colapsada) -->
-              <div class="mb-5 bg-blanco border border-rosa rounded-xl p-3">
+              <div class="mb-6 rounded-[24px] border border-borde/60 bg-superficie p-4 shadow-[0_10px_28px_rgba(74,29,46,0.06)]">
                 <div class="flex flex-wrap items-center gap-3">
                   <div class="flex-1 min-w-44 relative">
                     <input
                       v-model="filtros.titulo"
                       type="text"
                       placeholder="Buscar por título..."
-                      class="pl-4 pr-9 block w-full rounded-lg border-0 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+                      class="block w-full rounded-full border-0 bg-crema py-2.5 pl-4 pr-9 text-sm text-texto ring-1 ring-inset ring-borde/60 placeholder:text-cafe/40 focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
                     />
                     <button
                       v-if="filtros.titulo"
@@ -456,7 +461,7 @@ function irASubirImagen(imagen = null) {
 
                   <button
                     type="button"
-                    class="px-3 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition"
+                    class="inline-flex min-h-10 items-center rounded-full border border-borde/60 bg-crema px-4 text-sm font-semibold text-cafe transition hover:bg-rosa/25"
                     :aria-expanded="filtrosAbiertos"
                     @click="filtrosAbiertos = !filtrosAbiertos"
                   >
@@ -472,7 +477,7 @@ function irASubirImagen(imagen = null) {
 
                   <button
                     type="button"
-                    class="px-3 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition"
+                    class="inline-flex min-h-10 items-center rounded-full border border-borde/60 bg-crema px-4 text-sm font-semibold text-cafe transition hover:bg-rosa/25"
                     @click="limpiarFiltros"
                   >
                     Limpiar
@@ -489,7 +494,7 @@ function irASubirImagen(imagen = null) {
                 >
                   <div>
                     <label class="block text-xs text-cafe/60 mb-1">Etiqueta</label>
-                    <select v-model="filtros.etiqueta" class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none bg-blanco">
+                    <select v-model="filtros.etiqueta" class="block w-full rounded-2xl border-0 bg-crema py-2.5 pl-4 pr-8 text-sm text-texto ring-1 ring-inset ring-borde/60 focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
                       <option value="">Todas</option>
                       <option v-for="e in etiquetasPortfolio" :key="e.idEtiqueta" :value="e.idEtiqueta">
                         {{ e.nombre }}
@@ -499,7 +504,7 @@ function irASubirImagen(imagen = null) {
 
                   <div>
                     <label class="block text-xs text-cafe/60 mb-1">Tipo de arte</label>
-                    <select v-model="filtros.tipoArte" class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none bg-blanco">
+                    <select v-model="filtros.tipoArte" class="block w-full rounded-2xl border-0 bg-crema py-2.5 pl-4 pr-8 text-sm text-texto ring-1 ring-inset ring-borde/60 focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
                       <option value="">Todos</option>
                       <option v-for="t in tiposArte" :key="t.idTipoArte" :value="t.idTipoArte">
                         {{ t.nombre }}
@@ -509,7 +514,7 @@ function irASubirImagen(imagen = null) {
 
                   <div>
                     <label class="block text-xs text-cafe/60 mb-1">Contenido sensible</label>
-                    <select v-model="filtros.sensible" class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none bg-blanco">
+                    <select v-model="filtros.sensible" class="block w-full rounded-2xl border-0 bg-crema py-2.5 pl-4 pr-8 text-sm text-texto ring-1 ring-inset ring-borde/60 focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
                       <option value="">Todos</option>
                       <option value="true">Con contenido sensible</option>
                       <option value="false">Sin contenido sensible</option>
@@ -518,7 +523,7 @@ function irASubirImagen(imagen = null) {
 
                   <div>
                     <label class="block text-xs text-cafe/60 mb-1">Orden</label>
-                    <select v-model="filtros.orden" class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none bg-blanco">
+                    <select v-model="filtros.orden" class="block w-full rounded-2xl border-0 bg-crema py-2.5 pl-4 pr-8 text-sm text-texto ring-1 ring-inset ring-borde/60 focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
                       <option value="RECIENTE">Más recientes</option>
                       <option value="ANTIGUO">Más antiguos</option>
                     </select>
@@ -550,35 +555,33 @@ function irASubirImagen(imagen = null) {
                 </button>
               </p>
 
-              <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              <div v-else class="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 md:grid-cols-4">
                 <button
                   v-for="obra in perfil.portfolio"
                   :key="obra.idImagen"
-                  class="rounded-xl overflow-hidden bg-rosa/20 aspect-square flex flex-col text-left hover:ring-2 hover:ring-coral transition"
+                  class="group aspect-square overflow-hidden rounded-[22px] border border-borde/60 bg-superficie p-2 text-left shadow-[0_10px_26px_rgba(74,29,46,0.07)] transition duration-300 hover:-translate-y-1 hover:border-coral/40 hover:shadow-[0_18px_38px_rgba(194,24,91,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
                   @click="abrirDetalleImagen(obra)"
                 >
-                  <div class="min-h-0 flex-1 bg-coral/20">
-                    <div class="relative w-full h-full">
-                      <img
-                        v-if="obra.url"
-                        :src="obra.url"
-                        :alt="obra.titulo"
-                        class="w-full h-full object-cover transition duration-200"
-                        :class="obra.requiereAdvertencia ? 'blur-[18px] scale-105' : ''"
-                      />
-                      <span
-                        v-if="obra.requiereAdvertencia"
-                        class="absolute inset-0 flex items-center justify-center bg-granate/20 text-white drop-shadow"
-                        :title="`Contenido sensible: ${textoSensible(obra.contenidoSensible)}`"
-                        :aria-label="`Contenido sensible: ${textoSensible(obra.contenidoSensible)}`"
-                      >
-                        <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-                        </svg>
-                      </span>
-                    </div>
+                  <div class="relative h-[calc(100%-2.25rem)] min-h-0 overflow-hidden rounded-[16px] bg-coral/20">
+                    <img
+                      v-if="obra.url"
+                      :src="obra.url"
+                      :alt="obra.titulo"
+                      class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+                      :class="obra.requiereAdvertencia ? 'blur-[18px] scale-105' : ''"
+                    />
+                    <span
+                      v-if="obra.requiereAdvertencia"
+                      class="absolute inset-0 flex items-center justify-center bg-granate/20 text-white drop-shadow"
+                      :title="`Contenido sensible: ${textoSensible(obra.contenidoSensible)}`"
+                      :aria-label="`Contenido sensible: ${textoSensible(obra.contenidoSensible)}`"
+                    >
+                      <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                      </svg>
+                    </span>
                   </div>
-                  <div class="shrink-0 bg-rosa/20 p-3 text-sm text-cafe truncate">{{ obra.titulo }}</div>
+                  <div class="truncate px-2 pb-1 pt-2.5 text-sm font-semibold text-granate">{{ obra.titulo }}</div>
                 </button>
               </div>
 
@@ -586,7 +589,7 @@ function irASubirImagen(imagen = null) {
                 <button
                   type="button"
                   :disabled="cargandoPortfolio"
-                  class="px-4 py-2 rounded-md text-sm text-granate border border-rosa hover:bg-rosa/20 disabled:opacity-50 transition"
+                  class="inline-flex min-h-10 items-center rounded-full border border-borde/60 bg-superficie px-5 text-sm font-semibold text-granate transition hover:bg-rosa/25 disabled:opacity-50"
                   @click="cargarMasPortfolio"
                 >
                   {{ cargandoPortfolio ? 'Cargando...' : 'Cargar más' }}
@@ -612,28 +615,36 @@ function irASubirImagen(imagen = null) {
                   Creá tu primer servicio
                 </button>
               </p>
-              <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div v-else class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 <TarjetaServicio v-for="s in perfil.servicios" :key="s.idServicio" :servicio="s" />
               </div>
             </div>
 
-          <div v-if="tabActiva === 'productos'" class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div v-for="p in perfil.productos" :key="p.id" class="bg-blanco border border-rosa rounded-xl p-5">
-              <h3 class="text-granate">{{ p.titulo }}</h3>
-              <p class="text-sm text-cafe/70 mt-1">{{ p.descripcion }}</p>
-              <p class="text-sm text-rojizo mt-3">{{ p.precio }}</p>
+          <div v-if="tabActiva === 'productos'" class="mt-6">
+            <p v-if="!perfil.productos.length" class="rounded-3xl border border-dashed border-borde bg-superficie px-6 py-14 text-center text-sm text-cafe/60">
+              Este artista todavía no tiene productos publicados.
+            </p>
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div v-for="p in perfil.productos" :key="p.id" class="rounded-[22px] border border-borde/60 bg-superficie p-5 shadow-sm">
+                <h3 class="text-granate">{{ p.titulo }}</h3>
+                <p class="text-sm text-cafe/70 mt-1">{{ p.descripcion }}</p>
+                <p class="text-sm text-rojizo mt-3">{{ p.precio }}</p>
+              </div>
             </div>
           </div>
         </template>
 
         <template v-else>
-          <div class="flex items-center gap-6 border-b border-rosa">
-            <button class="py-3 text-sm transition border-b-2 border-coral text-granate font-medium">
+          <div class="flex flex-wrap items-center gap-2 border-b border-borde/50 pb-3">
+            <button class="rounded-full bg-coral px-5 py-2.5 text-sm font-semibold text-white shadow-sm">
               Pedidos
             </button>
           </div>
 
-          <div class="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          <p v-if="!perfil.pedidos.length" class="mt-6 rounded-3xl border border-dashed border-borde bg-superficie px-6 py-14 text-center text-sm text-cafe/60">
+            Todavía no hay pedidos para mostrar.
+          </p>
+          <div v-else class="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             <div v-for="pedido in perfil.pedidos" :key="pedido.id" class="rounded-xl overflow-hidden bg-rosa/20 aspect-square flex flex-col">
               <div class="flex-1 bg-coral/20">
                 <img v-if="pedido.url" :src="pedido.url" alt="" class="w-full h-full object-cover" />

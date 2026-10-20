@@ -103,21 +103,21 @@ function irAPerfil() {
           <nav class="hidden items-center gap-6 md:flex" aria-label="Navegación principal">
             <router-link
               to="/servicios"
-              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-[2px] after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
             >
               Explorar
             </router-link>
             <router-link
               v-if="estaLogueado && esArtista"
               to="/mis-servicios"
-              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-[2px] after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
             >
               Mis servicios
             </router-link>
             <router-link
               v-if="estaLogueado && esAdmin"
               :to="{ name: 'usuarios' }"
-              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-[2px] after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
             >
               Panel
             </router-link>
@@ -202,11 +202,11 @@ function irAPerfil() {
                   v-if="urlFotoPerfil"
                   :src="urlFotoPerfil"
                   alt=""
-                  class="h-[34px] w-[34px] rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-rosa/70"
+                  class="h-8.5 w-8.5 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-rosa/70"
                 />
                 <span
                   v-else
-                  class="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-rosa text-sm font-bold text-granate shadow-sm ring-1 ring-white/70"
+                  class="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-rosa text-sm font-bold text-granate shadow-sm ring-1 ring-white/70"
                 >
                   {{ (nombreUsuario || '?').charAt(0).toUpperCase() }}
                 </span>
@@ -273,7 +273,7 @@ function irAPerfil() {
 
             <div
               v-if="menuMovilAbierto"
-              class="absolute right-0 z-50 mt-3 w-[17rem] origin-top-right rounded-3xl border border-rosa/50 bg-blanco p-2 shadow-[0_18px_40px_rgba(74,29,46,0.18)]"
+              class="absolute right-0 z-50 mt-3 w-68 origin-top-right rounded-3xl border border-rosa/50 bg-blanco p-2 shadow-[0_18px_40px_rgba(74,29,46,0.18)]"
             >
               <router-link
                 to="/servicios"
