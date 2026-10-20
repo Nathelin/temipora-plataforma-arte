@@ -702,7 +702,7 @@ function irASubirImagen(imagen = null) {
             <!-- Aviso con la imagen sensible revelada -->
             <div
               v-if="imagenSeleccionada.requiereAdvertencia && mostrarImagenSensible"
-              class="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-granate/70 px-3 py-1 text-xs text-crema"
+              class="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-granate/70 px-3 py-1 text-xs text-inverso-contraste"
             >
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.04 12.32a1 1 0 0 1 0-.64C3.43 7.51 7.36 4.5 12 4.5s8.57 3.01 9.96 7.18a1 1 0 0 1 0 .64C20.57 16.49 16.64 19.5 12 19.5s-8.57-3.01-9.96-7.18Z" />
@@ -740,7 +740,7 @@ function irASubirImagen(imagen = null) {
             </button>
             <span
               v-if="perfil.portfolio.length > 1"
-              class="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-granate/60 px-2.5 py-0.5 text-xs text-crema"
+              class="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-granate/60 px-2.5 py-0.5 text-xs text-inverso-contraste"
             >
               {{ indiceSeleccionado + 1 }} / {{ perfil.portfolio.length }}
             </span>
@@ -823,7 +823,7 @@ function irASubirImagen(imagen = null) {
       <div v-if="zoomActivo" class="fixed inset-0 z-70 flex items-center justify-center bg-granate/95 p-4" @click="cerrarZoom">
         <button
           type="button"
-          class="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-blanco/10 text-2xl leading-none text-crema hover:bg-blanco/20 transition"
+          class="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-2xl leading-none text-inverso-contraste hover:bg-white/20 transition"
           aria-label="Cerrar zoom"
           @click.stop="cerrarZoom"
         >

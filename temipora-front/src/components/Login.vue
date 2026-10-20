@@ -49,7 +49,7 @@ async function iniciarSesion() {
     class="min-h-screen w-full flex items-stretch justify-end px-4 py-4 sm:px-8 sm:py-6 sm:pr-10 bg-cover bg-center"
     :style="{ backgroundImage: `url(${fondo})` }"
   >
-    <div class="w-full max-w-md rounded-3xl bg-white px-8 py-10 shadow-xl flex flex-col justify-start">
+    <div class="w-full max-w-md rounded-3xl bg-superficie px-8 py-10 shadow-xl flex flex-col justify-start">
       <div class="sm:mx-auto sm:w-full sm:max-w-sm flex flex-col items-center pt-6">
         <img :src="welcomeLogo" alt="Bienvenido a Temipora" class="w-20 h-20 object-contain mb-4" />
         <h2 class="text-center text-2xl font-normal leading-9 tracking-tight text-granate">

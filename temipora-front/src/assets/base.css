@@ -8,11 +8,12 @@
 body {
   min-height: 100vh;
   overflow-x: hidden;
-  color: #6b4a4a;
-  background: #fff8f2;
-  line-height: 1.5;
+  color: var(--color-cafe, #6e3b4d);
+  background: var(--color-crema, #fff6f1);
+  line-height: 1.55;
   font-family:
-    'Segoe UI',
+    'DM Sans Variable',
+    ui-sans-serif,
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
@@ -24,5 +25,5 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.005em;
 }

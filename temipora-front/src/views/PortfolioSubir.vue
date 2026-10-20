@@ -656,7 +656,7 @@ function urlsSinPublicar() {
               </div>
               <button
                 type="button"
-                class="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 text-cafe hover:text-rojizo flex items-center justify-center text-xs leading-none transition"
+                class="absolute top-1 right-1 w-6 h-6 rounded-full bg-superficie/90 text-cafe hover:text-rojizo flex items-center justify-center text-xs leading-none transition"
                 :aria-label="`Quitar ${item.datos.titulo}`"
                 @click="quitarDelLote(item)"
               >
@@ -726,13 +726,13 @@ function urlsSinPublicar() {
               </span>
               <span
                 v-else-if="item.url"
-                class="absolute bottom-0.5 right-0.5 text-xs bg-white/90 rounded px-1 text-green-700 leading-none"
+                class="absolute bottom-0.5 right-0.5 text-xs bg-superficie/90 rounded px-1 text-green-700 leading-none"
               >
                 ✓
               </span>
               <span
                 v-else-if="subiendoLote && i === lote.findIndex(it => !it.url)"
-                class="absolute inset-0 flex items-center justify-center bg-white/60"
+                class="absolute inset-0 flex items-center justify-center bg-superficie/60"
               >
                 <span class="inline-block w-5 h-5 border-2 border-coral border-t-transparent rounded-full animate-spin"></span>
               </span>
@@ -790,12 +790,12 @@ function urlsSinPublicar() {
               @click="irAIndice(i)"
             >
               <img :src="item.preview" :alt="item.datos.titulo" class="w-full h-full object-cover" />
-              <span class="absolute top-0.5 left-0.5 text-[10px] bg-white/85 rounded px-1 text-cafe leading-none">
+              <span class="absolute top-0.5 left-0.5 text-[10px] bg-superficie/85 rounded px-1 text-cafe leading-none">
                 {{ i + 1 }}
               </span>
               <span
                 v-if="item.estado === 'guardada'"
-                class="absolute bottom-0.5 right-0.5 text-xs bg-white/90 rounded px-1 text-green-700 leading-none"
+                class="absolute bottom-0.5 right-0.5 text-xs bg-superficie/90 rounded px-1 text-green-700 leading-none"
               >
                 ✓
               </span>

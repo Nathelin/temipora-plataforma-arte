@@ -1,6 +1,8 @@
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import BrandLogo from '../components/BrandLogo.vue'
+import ThemeToggle from '../components/ThemeToggle.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -116,56 +118,79 @@ function cerrarSesion() {
 </script>
 
 <template>
-  <div class="min-h-screen w-full bg-crema text-cafe flex flex-col">
-    <header class="bg-blanco border-b border-rosa sticky top-0 z-20">
-      <div class="w-full px-4 sm:px-8 h-10 flex items-center justify-between">
-        <router-link to="/" class="text-xl font-normal text-granate">
-          Temipora
-        </router-link>
+  <div class="flex min-h-screen w-full flex-col bg-blanco text-cafe">
+    <header class="sticky top-0 z-20 border-b border-rosa/40 bg-blanco/95 backdrop-blur-md">
+      <div class="flex h-14 w-full items-center justify-between px-4 sm:h-16 sm:px-8">
+        <div class="flex items-center gap-4">
+          <router-link
+            to="/"
+            class="group inline-flex items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-4 focus-visible:ring-offset-blanco"
+            aria-label="Temipora, ir a la plataforma"
+          >
+            <BrandLogo />
+          </router-link>
+          <span class="hidden h-5 w-px bg-rosa/60 sm:block" aria-hidden="true"></span>
+          <span class="hidden text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/50 sm:block">
+            Administración
+          </span>
+        </div>
 
-        <div ref="contenedorMenu" class="relative">
-          <button class="flex items-center gap-2" aria-haspopup="menu" :aria-expanded="menuAbierto" @click="alternarMenu">
+        <div class="flex items-center gap-2.5">
+          <ThemeToggle />
+
+          <div ref="contenedorMenu" class="relative">
+            <button
+              class="flex min-h-10 items-center gap-2 rounded-full p-0.5 pr-1.5 transition hover:bg-rosa/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+            aria-haspopup="menu"
+            :aria-expanded="menuAbierto"
+            aria-label="Abrir menú de usuario"
+            @click="alternarMenu"
+          >
             <img
               v-if="urlFotoPerfil"
               :src="urlFotoPerfil"
-              alt="Perfil"
-              class="w-8 h-8 rounded-full object-cover border border-rosa"
+              alt=""
+              class="h-[34px] w-[34px] rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-rosa/70"
             />
             <span
               v-else
-              class="w-8 h-8 rounded-full bg-coral/20 text-granate flex items-center justify-center text-sm"
+              class="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-rosa text-sm font-bold text-granate shadow-sm ring-1 ring-white/70"
             >
               {{ (nombreUsuario || '?').charAt(0).toUpperCase() }}
             </span>
-            <span class="text-sm text-cafe hidden sm:inline">{{ nombreUsuario }}</span>
+            <span class="hidden text-sm font-semibold text-cafe sm:inline">{{ nombreUsuario }}</span>
+            <svg class="hidden h-4 w-4 text-cafe/50 transition-transform sm:block" :class="menuAbierto ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+            </svg>
           </button>
 
           <div
             v-if="menuAbierto"
-            class="absolute right-0 mt-2 w-52 rounded-lg bg-blanco shadow-lg border border-rosa overflow-hidden z-40"
+            class="absolute right-0 z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-rosa/50 bg-blanco p-1.5 shadow-[0_18px_40px_rgba(74,29,46,0.16)]"
             role="menu"
           >
             <button
-              class="w-full text-left px-4 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
+              class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
               role="menuitem"
               @click="menuAbierto = false; irAPerfil()"
             >
               Perfil
             </button>
             <button
-              class="w-full text-left px-4 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
+              class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
               role="menuitem"
               @click="menuAbierto = false; router.push({ name: 'inicio' })"
             >
               Ver plataforma
             </button>
             <button
-              class="w-full text-left px-4 py-2 text-sm text-rojizo hover:bg-rosa/20 transition"
+              class="mt-1 w-full rounded-xl border-t border-rosa/30 px-3.5 py-2.5 text-left text-sm text-rojizo transition hover:bg-rosa/20"
               role="menuitem"
               @click="menuAbierto = false; cerrarSesion()"
             >
               Cerrar sesión
             </button>
+          </div>
           </div>
         </div>
       </div>
@@ -173,9 +198,9 @@ function cerrarSesion() {
 
     <div class="flex flex-1">
       <!-- Sidebar -->
-      <aside class="w-60 shrink-0 bg-granate text-crema flex flex-col min-h-[calc(100vh-2.5rem)] sticky top-10 h-[calc(100vh-2.5rem)]">
-        <div class="px-5 py-3 border-b border-rosa/20">
-          <p class="text-xs uppercase tracking-wider text-rosa/70">Panel de administración</p>
+      <aside class="sticky top-14 flex h-[calc(100vh-3.5rem)] min-h-[calc(100vh-3.5rem)] w-60 shrink-0 flex-col bg-granate text-inverso-contraste sm:top-16 sm:h-[calc(100vh-4rem)] sm:min-h-[calc(100vh-4rem)]">
+        <div class="border-b border-blanco/10 px-5 py-3">
+          <p class="text-xs uppercase tracking-wider text-inverso-contraste/50">Panel de administración</p>
         </div>
 
         <nav class="flex-1 py-3">
@@ -184,7 +209,7 @@ function cerrarSesion() {
               <template v-if="s.subsecciones">
                 <button
                   class="w-full flex items-center justify-between px-5 py-2 text-sm transition"
-                  :class="grupoActivo(s) ? 'bg-rosa/20 text-crema font-medium' : 'text-crema/70 hover:bg-rosa/10 hover:text-crema'"
+                  :class="grupoActivo(s) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
                   :aria-expanded="!!submenusAbiertos[s.nombre]"
                   @click="submenusAbiertos[s.nombre] = !submenusAbiertos[s.nombre]"
                 >
@@ -209,7 +234,7 @@ function cerrarSesion() {
                     :key="sub.to"
                     :to="sub.to"
                     class="flex items-center gap-3 pl-9 pr-5 py-2 text-sm transition"
-                    :class="esActiva(sub.to) ? 'bg-rosa/20 text-crema font-medium' : 'text-crema/70 hover:bg-rosa/10 hover:text-crema'"
+                    :class="esActiva(sub.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
                   >
                     <span>{{ sub.nombre }}</span>
                   </router-link>
@@ -219,13 +244,13 @@ function cerrarSesion() {
                 v-else-if="s.activa"
                 :to="s.to"
                 class="flex items-center gap-3 px-5 py-2 text-sm transition"
-                :class="esActiva(s.to) ? 'bg-rosa/20 text-crema font-medium' : 'text-crema/70 hover:bg-rosa/10 hover:text-crema'"
+                :class="esActiva(s.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
               >
                 <span>{{ s.nombre }}</span>
               </router-link>
               <div
                 v-else
-                class="flex items-center gap-3 px-5 py-2 text-sm text-crema/30 cursor-not-allowed select-none"
+                class="flex items-center gap-3 px-5 py-2 text-sm text-inverso-contraste/30 cursor-not-allowed select-none"
                 :title="'Próximamente'"
               >
                 <span>{{ s.nombre }}</span>
@@ -236,7 +261,7 @@ function cerrarSesion() {
       </aside>
 
       <!-- Contenido -->
-      <main class="flex-1 min-w-0">
+      <main class="min-w-0 flex-1 bg-blanco">
         <router-view />
       </main>
     </div>

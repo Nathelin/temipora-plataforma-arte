@@ -426,7 +426,7 @@ onBeforeUnmount(() => {
                 <div v-for="(url, i) in form.imagenes" :key="i" class="relative aspect-square rounded-lg overflow-hidden bg-rosa/20 border border-rosa">
                   <img :src="url" alt="" class="w-full h-full object-cover" />
                   <button type="button"
-                    class="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 text-cafe hover:text-rojizo flex items-center justify-center text-xs leading-none transition"
+                    class="absolute top-1 right-1 w-6 h-6 rounded-full bg-superficie/90 text-cafe hover:text-rojizo flex items-center justify-center text-xs leading-none transition"
                     aria-label="Quitar imagen" @click="quitarEjemplo(i)">✕</button>
                 </div>
               </div>
