@@ -13,17 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import com.temipora.backend_springboot.modelo.DerechoTermino;
-import com.temipora.backend_springboot.modelo.TemaTermino;
 import com.temipora.backend_springboot.modelo.TerminoDerecho;
 import com.temipora.backend_springboot.modelo.TerminoDerechoRequest;
-import com.temipora.backend_springboot.modelo.TerminoTema;
-import com.temipora.backend_springboot.modelo.TerminoTemaRequest;
 import com.temipora.backend_springboot.modelo.Terminos;
 import com.temipora.backend_springboot.modelo.TerminosDTO;
 import com.temipora.backend_springboot.modelo.TerminosRequest;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
-import com.temipora.backend_springboot.repositorios.TemaTerminoRepository;
 import com.temipora.backend_springboot.repositorios.TerminosRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -34,17 +30,14 @@ public class TerminosService {
     private static final String DERECHO_PERSONAL = "PERSONAL";
 
     private final TerminosRepository terminosRepository;
-    private final TemaTerminoRepository temaTerminoRepository;
     private final DerechoTerminoRepository derechoTerminoRepository;
     private final UsuarioRepository usuarioRepository;
 
     public TerminosService(
             TerminosRepository terminosRepository,
-            TemaTerminoRepository temaTerminoRepository,
             DerechoTerminoRepository derechoTerminoRepository,
             UsuarioRepository usuarioRepository) {
         this.terminosRepository = terminosRepository;
-        this.temaTerminoRepository = temaTerminoRepository;
         this.derechoTerminoRepository = derechoTerminoRepository;
         this.usuarioRepository = usuarioRepository;
     }
@@ -92,8 +85,7 @@ public class TerminosService {
         if (terminos.getIdTerminos() != null) {
             terminos.setVersion(terminos.getVersion() + 1);
             // Borra los hijos existentes ANTES de insertar los nuevos: si no, Hibernate
-            // inserta primero y choca con el UNIQUE (id_terminos, id_tema_termino/id_derecho_termino).
-            terminos.getTerminoTemas().clear();
+            // inserta primero y choca con el UNIQUE (id_terminos, id_derecho_termino).
             terminos.getTerminoDerechos().clear();
             terminosRepository.flush();
         }
@@ -104,8 +96,8 @@ public class TerminosService {
         terminos.setUsoArtista(limpiar(request.getUsoArtista()));
         terminos.setUsoCliente(limpiar(request.getUsoCliente()));
         terminos.setPagoExtra(limpiar(request.getPagoExtra()));
-        terminos.setTiempoEntrega(limpiar(request.getTiempoEntrega()));
-        terminos.reemplazarTemas(construirTemas(request.getTemas()));
+        terminos.setQueDibuja(limpiar(request.getQueDibuja()));
+        terminos.setQueNoDibuja(limpiar(request.getQueNoDibuja()));
         terminos.reemplazarDerechos(construirDerechos(request.getDerechos()));
         terminos.setFechaActualizacion(LocalDateTime.now());
 
@@ -121,38 +113,6 @@ public class TerminosService {
         nuevo.setIdServicio(idServicio);
         nuevo.setVersion(1);
         return nuevo;
-    }
-
-    private List<TerminoTema> construirTemas(List<TerminoTemaRequest> requests) {
-        List<TerminoTema> lista = new ArrayList<>();
-        if (requests == null) {
-            return lista;
-        }
-        Set<String> vistos = new LinkedHashSet<>();
-        for (TerminoTemaRequest r : requests) {
-            TerminoTema terminoTema = new TerminoTema();
-            terminoTema.setEstado(r.getEstado());
-
-            if (r.getIdTemaTermino() != null) {
-                if (!vistos.add("t" + r.getIdTemaTermino())) {
-                    continue;
-                }
-                TemaTermino tema = temaTerminoRepository.findByIdTemaTermino(r.getIdTemaTermino())
-                    .orElseThrow(() -> new IllegalArgumentException("Tema no encontrado: " + r.getIdTemaTermino()));
-                terminoTema.setTema(tema);
-            } else {
-                String nombre = r.getNombre() == null ? "" : r.getNombre().trim();
-                if (nombre.isEmpty()) {
-                    throw new IllegalArgumentException("El tema personalizado necesita un nombre.");
-                }
-                if (!vistos.add("c" + nombre.toLowerCase())) {
-                    continue;
-                }
-                terminoTema.setNombrePersonalizado(nombre);
-            }
-            lista.add(terminoTema);
-        }
-        return lista;
     }
 
     private List<TerminoDerecho> construirDerechos(List<TerminoDerechoRequest> requests) {
@@ -186,11 +146,11 @@ public class TerminosService {
                 r.getPoliticaCancelaciones(),
                 r.getUsoArtista(),
                 r.getUsoCliente(),
-                r.getTiempoEntrega())
+                r.getQueDibuja(),
+                r.getQueNoDibuja())
             .anyMatch(s -> s != null && !s.isBlank());
 
-        boolean hayEstructura = (r.getTemas() != null && !r.getTemas().isEmpty())
-            || (r.getDerechos() != null && !r.getDerechos().isEmpty());
+        boolean hayEstructura = r.getDerechos() != null && !r.getDerechos().isEmpty();
 
         if (!hayTexto && !hayEstructura) {
             throw new IllegalArgumentException("Completá al menos una sección de tus términos.");

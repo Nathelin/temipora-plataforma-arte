@@ -3,13 +3,50 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
+import VistaPreviaTerminos from '../components/VistaPreviaTerminos.vue'
 
 const route = useRoute()
 const router = useRouter()
 
 const servicio = ref(null)
+const terminos = ref(null)
 const cargando = ref(true)
 const error = ref('')
+
+const CAMPOS_TERMINOS = [
+  'informacionGeneral',
+  'politicaRevisiones',
+  'politicaCancelaciones',
+  'usoArtista',
+  'usoCliente',
+  'queDibuja',
+  'queNoDibuja',
+]
+
+const terminosParaMostrar = computed(() => {
+  const t = terminos.value
+  if (!t) return null
+  const form = {}
+  for (const key of CAMPOS_TERMINOS) form[key] = t[key] || ''
+  form.pagoExtra = t.pagoExtra || ''
+  const estadoDerechos = {}
+  for (const d of t.derechos || []) {
+    estadoDerechos[d.idDerechoTermino] = {
+      disponible: !!d.disponible,
+      porcentajeExtra: d.porcentajeExtra,
+    }
+  }
+  return { form, estadoDerechos }
+})
+
+const derechosTerminos = computed(() => terminos.value?.derechos || [])
+const hayTerminos = computed(() => {
+  const t = terminos.value
+  if (!t) return false
+  const hayTexto = [...CAMPOS_TERMINOS, 'pagoExtra']
+    .some((k) => (t[k] || '').trim())
+  return hayTexto || (t.derechos || []).some((d) => d.disponible)
+})
 
 const mostrarSensible = ref(false)
 const indiceImagen = ref(0)
@@ -82,6 +119,12 @@ async function cargar() {
   try {
     const res = await api.get(`/servicios/${route.params.id}`)
     servicio.value = res.data
+    try {
+      const terminosRes = await api.get(`/servicios/${route.params.id}/terminos-publicos`)
+      terminos.value = terminosRes.data
+    } catch {
+      terminos.value = null
+    }
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo cargar el servicio.'
   } finally {
@@ -245,6 +288,26 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
           </p>
         </aside>
       </div>
+
+      <section v-if="hayTerminos" class="mt-10 rounded-2xl border border-rosa/50 bg-blanco p-6 sm:p-8">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-xl text-granate">Términos y condiciones</h2>
+          <span
+            class="rounded-full px-3 py-1 text-xs"
+            :class="terminos.propio ? 'bg-coral/10 text-granate' : 'bg-rosa/30 text-cafe/70'"
+          >
+            {{ terminos.propio ? 'De este servicio' : 'Generales del artista' }}
+          </span>
+        </div>
+        <div class="mt-6">
+          <VistaPreviaTerminos
+            :terminos="terminosParaMostrar"
+            :derechos-catalogo="derechosTerminos"
+            :mostrar-aviso="false"
+            :ocultar-vacios="true"
+          />
+        </div>
+      </section>
     </template>
   </div>
 </template>

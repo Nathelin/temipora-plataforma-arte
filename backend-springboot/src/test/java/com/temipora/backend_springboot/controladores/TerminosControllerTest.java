@@ -26,7 +26,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.temipora.backend_springboot.config.JwtUtils;
 import com.temipora.backend_springboot.config.SecurityConfig;
 import com.temipora.backend_springboot.modelo.ERol;
-import com.temipora.backend_springboot.modelo.TerminoTemaDTO;
 import com.temipora.backend_springboot.modelo.TerminosDTO;
 import com.temipora.backend_springboot.servicios.TerminosService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
@@ -87,7 +86,7 @@ class TerminosControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").value(2))
                 .andExpect(jsonPath("$.informacionGeneral").value("Hola"))
-                .andExpect(jsonPath("$.temas[0].estado").value("SI"));
+                .andExpect(jsonPath("$.queDibuja").value("OCs, fanart"));
     }
 
     @Test
@@ -99,7 +98,7 @@ class TerminosControllerTest {
         mockMvc.perform(put(BASE)
                 .header("Authorization", "Bearer " + token("artista1", ERol.ARTISTA))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"informacionGeneral\":\"Hola\",\"temas\":[{\"idTemaTermino\":1,\"estado\":\"SI\"}]," +
+                .content("{\"informacionGeneral\":\"Hola\",\"queDibuja\":\"OCs, fanart\",\"queNoDibuja\":\"Mecha\"," +
                         "\"derechos\":[{\"idDerechoTermino\":1,\"disponible\":true,\"porcentajeExtra\":50}]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.informacionGeneral").value("Hola"));
@@ -155,11 +154,8 @@ class TerminosControllerTest {
                 .idTerminos(1L)
                 .version(2)
                 .informacionGeneral("Hola")
-                .temas(List.of(TerminoTemaDTO.builder()
-                        .idTemaTermino(1L)
-                        .nombre("NSFW")
-                        .estado("SI")
-                        .build()))
+                .queDibuja("OCs, fanart")
+                .queNoDibuja("Mecha")
                 .derechos(List.of())
                 .build();
     }

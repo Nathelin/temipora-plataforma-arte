@@ -84,6 +84,12 @@ public class ServicioConfiguracionController {
         return terminosService.obtenerServicio(idServicio, idArtista);
     }
 
+    @GetMapping("/terminos-publicos")
+    public TerminosDTO obtenerTerminosPublicos(@PathVariable Long idServicio) {
+        Long idArtista = servicioService.obtener(idServicio, null).getIdArtista();
+        return terminosService.obtenerServicio(idServicio, idArtista);
+    }
+
     @PutMapping("/terminos")
     @PreAuthorize("hasRole('ARTISTA')")
     public TerminosDTO guardarTerminos(

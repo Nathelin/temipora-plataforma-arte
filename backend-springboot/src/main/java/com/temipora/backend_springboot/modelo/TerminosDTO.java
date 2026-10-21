@@ -26,8 +26,8 @@ public class TerminosDTO {
     private String usoArtista;
     private String usoCliente;
     private String pagoExtra;
-    private String tiempoEntrega;
-    private List<TerminoTemaDTO> temas;
+    private String queDibuja;
+    private String queNoDibuja;
     private List<TerminoDerechoDTO> derechos;
 
     public static TerminosDTO desdeTerminos(Terminos terminos) {
@@ -35,11 +35,6 @@ public class TerminosDTO {
     }
 
     public static TerminosDTO desdeTerminos(Terminos terminos, boolean propio) {
-        List<TerminoTemaDTO> temas = terminos.getTerminoTemas().stream()
-            .sorted(Comparator.comparing(t -> t.getTema() != null ? t.getTema().getOrden() : Integer.MAX_VALUE))
-            .map(TerminoTemaDTO::desdeTerminoTema)
-            .toList();
-
         List<TerminoDerechoDTO> derechos = terminos.getTerminoDerechos().stream()
             .sorted(Comparator.comparing(d -> d.getDerecho() != null ? d.getDerecho().getOrden() : 0))
             .map(TerminoDerechoDTO::desdeTerminoDerecho)
@@ -56,8 +51,8 @@ public class TerminosDTO {
             .usoArtista(terminos.getUsoArtista())
             .usoCliente(terminos.getUsoCliente())
             .pagoExtra(terminos.getPagoExtra())
-            .tiempoEntrega(terminos.getTiempoEntrega())
-            .temas(temas)
+            .queDibuja(terminos.getQueDibuja())
+            .queNoDibuja(terminos.getQueNoDibuja())
             .derechos(derechos)
             .build();
     }
@@ -65,7 +60,6 @@ public class TerminosDTO {
     public static TerminosDTO vacio() {
         return TerminosDTO.builder()
             .version(0)
-            .temas(List.of())
             .derechos(List.of())
             .build();
     }

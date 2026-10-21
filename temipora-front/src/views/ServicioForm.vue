@@ -79,7 +79,6 @@ const indiceImagenArrastrada = ref(null)
 const tipos = ref([])
 const medios = ref([])
 const tiposCampo = ref([])
-const temasCatalogo = ref([])
 const derechosCatalogo = ref([])
 const idUsuario = ref(null)
 const { monedas, cargar: cargarMonedas, predeterminada } = useMonedas()
@@ -102,6 +101,8 @@ const SECCIONES_TERMINOS = [
   'politicaCancelaciones',
   'usoArtista',
   'usoCliente',
+  'queDibuja',
+  'queNoDibuja',
 ]
 
 const form = ref({
@@ -164,8 +165,9 @@ const resumenTerminos = computed(() => {
     || f.politicaCancelaciones
     || f.usoArtista
     || f.usoCliente
-    || f.tiempoEntrega
-    || 'Sin texto general; se usan los temas y derechos definidos.'
+    || f.queDibuja
+    || f.queNoDibuja
+    || 'Sin texto general; se usan los derechos definidos.'
 })
 
 function crearTerminosVacios() {
@@ -177,10 +179,9 @@ function crearTerminosVacios() {
       usoArtista: '',
       usoCliente: '',
       pagoExtra: '',
-      tiempoEntrega: '',
+      queDibuja: '',
+      queNoDibuja: '',
     },
-    estadosTemas: {},
-    temasPersonalizados: [],
     estadoDerechos: {},
   }
 }
@@ -206,17 +207,9 @@ function construirTerminos(data) {
     usoArtista: data.usoArtista || '',
     usoCliente: data.usoCliente || '',
     pagoExtra: data.pagoExtra || '',
-    tiempoEntrega: data.tiempoEntrega || '',
+    queDibuja: data.queDibuja || '',
+    queNoDibuja: data.queNoDibuja || '',
   }
-
-  const temasGuardados = data.temas || []
-  for (const t of temasCatalogo.value) {
-    const encontrado = temasGuardados.find((x) => !x.personalizado && x.idTemaTermino === t.idTemaTermino)
-    resultado.estadosTemas[t.idTemaTermino] = encontrado?.estado || ''
-  }
-  resultado.temasPersonalizados = temasGuardados
-    .filter((x) => x.personalizado)
-    .map((x, i) => ({ uid: i + 1, nombre: x.nombre || '', estado: x.estado || '' }))
 
   const derechosGuardados = data.derechos || []
   for (const d of derechosCatalogo.value) {
@@ -246,11 +239,10 @@ async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    const [tiposRes, mediosRes, tiposCampoRes, temasRes, derechosRes, perfilRes] = await Promise.all([
+    const [tiposRes, mediosRes, tiposCampoRes, derechosRes, perfilRes] = await Promise.all([
       api.get('/tipos-servicio'),
       api.get('/medios'),
       api.get('/tipos-campo'),
-      api.get('/temas-termino'),
       api.get('/derechos-termino'),
       api.get(`/perfil/${nombreUsuario}`),
       cargarMonedas(),
@@ -258,7 +250,6 @@ async function cargar() {
     tipos.value = tiposRes.data
     medios.value = mediosRes.data
     tiposCampo.value = tiposCampoRes.data
-    temasCatalogo.value = temasRes.data
     derechosCatalogo.value = derechosRes.data
     idUsuario.value = perfilRes.data.idUsuario
 
@@ -483,13 +474,11 @@ function validarFormulario() {
 
 function hayContenidoTerminos() {
   const t = configTerminos.value
-  const hayTexto = [...SECCIONES_TERMINOS, 'tiempoEntrega']
+  const hayTexto = SECCIONES_TERMINOS
     .some((k) => (t.form[k] || '').trim())
-  const hayTemas = Object.values(t.estadosTemas).some((v) => v)
-    || t.temasPersonalizados.some((x) => x.nombre.trim() && x.estado)
   const hayDerechos = derechosCatalogo.value
     .some((d) => d.codigo !== 'PERSONAL' && t.estadoDerechos[d.idDerechoTermino]?.disponible)
-  return hayTexto || hayTemas || hayDerechos
+  return hayTexto || hayDerechos
 }
 
 function validarTerminos() {
@@ -563,15 +552,8 @@ function payloadTerminos() {
     usoArtista: t.form.usoArtista || null,
     usoCliente: t.form.usoCliente || null,
     pagoExtra: t.form.pagoExtra || null,
-    tiempoEntrega: t.form.tiempoEntrega || null,
-    temas: [
-      ...temasCatalogo.value
-        .filter((tema) => t.estadosTemas[tema.idTemaTermino])
-        .map((tema) => ({ idTemaTermino: tema.idTemaTermino, estado: t.estadosTemas[tema.idTemaTermino] })),
-      ...t.temasPersonalizados
-        .filter((tema) => tema.nombre.trim() && tema.estado)
-        .map((tema) => ({ nombre: tema.nombre.trim(), estado: tema.estado })),
-    ],
+    queDibuja: t.form.queDibuja || null,
+    queNoDibuja: t.form.queNoDibuja || null,
     derechos: derechosCatalogo.value.map((derecho) => {
       const estado = t.estadoDerechos[derecho.idDerechoTermino]
       return {
@@ -801,7 +783,7 @@ onBeforeUnmount(() => {
                 class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"></textarea>
               <p class="text-right text-xs text-cafe/50 mt-1">{{ form.descripcion.length }}/250</p>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_12rem] gap-6">
+            <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_13rem] gap-6">
               <div>
                 <label class="block text-sm text-cafe mb-2">Precio base <span class="text-rojizo">*</span></label>
                 <input v-model="form.precioBase" type="number" min="0" step="0.01"
@@ -1164,7 +1146,6 @@ onBeforeUnmount(() => {
               <div v-if="verTerminosGlobal" class="p-5 sm:p-6">
                 <VistaPreviaTerminos
                   :terminos="configTerminosGlobal"
-                  :temas-catalogo="temasCatalogo"
                   :derechos-catalogo="derechosCatalogo"
                   :mostrar-aviso="false"
                 />
@@ -1195,13 +1176,11 @@ onBeforeUnmount(() => {
                 <EditorTerminos
                   v-if="modoTerminos === 'editar'"
                   v-model="configTerminos"
-                  :temas-catalogo="temasCatalogo"
                   :derechos-catalogo="derechosCatalogo"
                 />
                 <VistaPreviaTerminos
                   v-else
                   :terminos="configTerminos"
-                  :temas-catalogo="temasCatalogo"
                   :derechos-catalogo="derechosCatalogo"
                   :mostrar-aviso="false"
                 />
@@ -1339,7 +1318,6 @@ onBeforeUnmount(() => {
                 <div v-if="verTerminosRevision" class="mt-3 rounded-xl border border-rosa/50 bg-rosa/5 p-4">
                   <VistaPreviaTerminos
                     :terminos="terminosVisible"
-                    :temas-catalogo="temasCatalogo"
                     :derechos-catalogo="derechosCatalogo"
                     :mostrar-aviso="false"
                   />

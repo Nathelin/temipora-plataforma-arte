@@ -1,8 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 
-const props = defineProps({
-  temasCatalogo: { type: Array, default: () => [] },
+defineProps({
   derechosCatalogo: { type: Array, default: () => [] },
 })
 
@@ -24,43 +23,7 @@ const PLANTILLA = {
   usoCliente: 'El uso por defecto es personal. Para uso comercial (contenido o merchandising) hay un costo extra detallado en los derechos.',
 }
 
-const OPCIONES_ESTADO = [
-  { valor: 'SI', texto: 'Sí' },
-  { valor: 'NO', texto: 'No' },
-  { valor: 'CONSULTAR', texto: 'Consultar' },
-]
-
 const modal = ref({ abierto: false, titulo: '', descripcion: '' })
-
-function siguienteUid() {
-  return datos.value.temasPersonalizados.reduce(
-    (max, t) => Math.max(max, Number(t.uid) || 0),
-    0,
-  ) + 1
-}
-
-function setEstado(idTema, opcion) {
-  const actual = datos.value.estadosTemas[idTema]
-  datos.value.estadosTemas[idTema] = actual === opcion ? '' : opcion
-}
-
-function setEstadoPersonalizado(tema, opcion) {
-  tema.estado = tema.estado === opcion ? '' : opcion
-}
-
-function agregarTema() {
-  datos.value.temasPersonalizados.push({ uid: siguienteUid(), nombre: '', estado: '' })
-}
-
-function quitarTema(uidTema) {
-  datos.value.temasPersonalizados = datos.value.temasPersonalizados.filter((t) => t.uid !== uidTema)
-}
-
-function chipActivo(valor) {
-  if (valor === 'SI') return 'bg-green-600 text-white'
-  if (valor === 'NO') return 'bg-rojizo text-white'
-  return 'bg-coral text-white'
-}
 
 function abrirDescripcion(titulo, descripcion) {
   modal.value = { abierto: true, titulo, descripcion }
@@ -91,16 +54,30 @@ function usarPlantilla() {
         ></textarea>
       </div>
 
-      <div>
-        <label class="block text-sm text-cafe mb-2">Tiempo estimado de entrega</label>
-        <input
-          v-model="datos.form.tiempoEntrega"
-          type="text"
-          maxlength="120"
-          placeholder="Ej.: 2 a 4 semanas"
-          class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
-        />
+      <div class="border-t border-rosa/40 pt-6">
+        <h3 class="text-base text-granate mb-1">¿Qué dibujo?</h3>
+        <p class="text-sm text-cafe/60 mb-3">Contale al cliente qué temas, estilos o personajes hacés. Escribilo como una lista simple.</p>
+        <textarea
+          v-model="datos.form.queDibuja"
+          rows="4"
+          maxlength="2000"
+          placeholder="Ej.: OCs, fanart, ships, furries/anthro, chibi, personajes humanos, fondos simples, gore leve."
+          class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"
+        ></textarea>
       </div>
+
+      <div>
+        <h3 class="text-base text-granate mb-1">¿Qué no dibujo?</h3>
+        <p class="text-sm text-cafe/60 mb-3">Sé claro con lo que no hacés para evitar pedidos que no puedas tomar.</p>
+        <textarea
+          v-model="datos.form.queNoDibuja"
+          rows="4"
+          maxlength="2000"
+          placeholder="Ej.: mecha, gore explícito, contenido sexual, contenido con menores, personas reales, franquicias que no conozco."
+          class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"
+        ></textarea>
+      </div>
+
     </div>
 
     <div>
@@ -148,72 +125,6 @@ function usarPlantilla() {
           <p v-if="d.requierePiezaUnica" class="mt-1 text-xs text-cafe/50">Solo aplica a piezas únicas (adoptables o pintura tradicional única).</p>
         </div>
       </div>
-    </div>
-
-    <div>
-      <h3 class="text-base text-granate mb-1">¿Qué hago y qué no?</h3>
-      <p class="text-sm text-cafe/60 mb-4">Marcá tu disponibilidad para cada tema y sumá los que quieras.</p>
-      <div class="space-y-3">
-        <div v-for="t in temasCatalogo" :key="t.idTemaTermino" class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rosa/50 px-4 py-3.5">
-          <div class="flex items-center gap-2">
-            <span class="text-sm text-cafe">{{ t.nombre }}</span>
-            <button
-              v-if="t.descripcion"
-              type="button"
-              class="flex h-5 w-5 items-center justify-center rounded-full text-cafe/40 hover:bg-rosa/20 hover:text-cafe transition"
-              :aria-label="`Qué significa ${t.nombre}`"
-              @click="abrirDescripcion(t.nombre, t.descripcion)"
-            >
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-              </svg>
-            </button>
-          </div>
-          <div class="inline-flex rounded-md border border-rosa p-0.5 text-xs">
-            <button
-              v-for="op in OPCIONES_ESTADO"
-              :key="op.valor"
-              type="button"
-              class="rounded px-2.5 py-1 transition"
-              :class="datos.estadosTemas[t.idTemaTermino] === op.valor ? chipActivo(op.valor) : 'text-cafe/60 hover:bg-rosa/20'"
-              @click="setEstado(t.idTemaTermino, op.valor)"
-            >
-              {{ op.texto }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div v-for="t in datos.temasPersonalizados" :key="t.uid" class="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-rosa/50 bg-rosa/5 px-4 py-2.5">
-        <input
-          v-model="t.nombre"
-          type="text"
-          maxlength="120"
-          placeholder="Tema propio"
-          class="min-w-40 flex-1 rounded-lg border-0 py-1.5 px-3 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
-        />
-        <div class="inline-flex rounded-md border border-rosa p-0.5 text-xs">
-          <button
-            v-for="op in OPCIONES_ESTADO"
-            :key="op.valor"
-            type="button"
-            class="rounded px-2.5 py-1 transition"
-            :class="t.estado === op.valor ? chipActivo(op.valor) : 'text-cafe/60 hover:bg-rosa/20'"
-            @click="setEstadoPersonalizado(t, op.valor)"
-          >
-            {{ op.texto }}
-          </button>
-        </div>
-        <button type="button" class="text-cafe/50 hover:text-rojizo transition" aria-label="Quitar tema" @click="quitarTema(t.uid)">
-          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <button type="button" class="mt-2 text-sm text-coral hover:text-rojizo transition" @click="agregarTema">
-        + Agregar tema propio
-      </button>
     </div>
 
     <div>

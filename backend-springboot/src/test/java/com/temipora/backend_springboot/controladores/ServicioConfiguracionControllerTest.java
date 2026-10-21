@@ -29,6 +29,7 @@ import com.temipora.backend_springboot.config.SecurityConfig;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.FormularioDTO;
 import com.temipora.backend_springboot.modelo.PreguntaDTO;
+import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.TerminosDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.servicios.FormularioService;
@@ -125,6 +126,18 @@ class ServicioConfiguracionControllerTest {
     }
 
     @Test
+    void obtenerTerminosPublicos_sinToken_devuelve200() throws Exception {
+        when(servicioService.obtener(7L, null))
+            .thenReturn(ServicioDTO.builder().idServicio(7L).idArtista(5L).build());
+        when(terminosService.obtenerServicio(7L, 5L)).thenReturn(terminos());
+
+        mockMvc.perform(get(BASE + "/terminos-publicos"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.queDibuja").value("OCs, fanart"))
+            .andExpect(jsonPath("$.queNoDibuja").value("Mecha"));
+    }
+
+    @Test
     void guardarTerminos_tokenValido_devuelve200() throws Exception {
         autenticarArtista();
         when(terminosService.guardarServicio(eq(7L), eq(5L), any())).thenReturn(terminos());
@@ -188,7 +201,8 @@ class ServicioConfiguracionControllerTest {
             .propio(true)
             .version(1)
             .informacionGeneral("Hola")
-            .temas(List.of())
+            .queDibuja("OCs, fanart")
+            .queNoDibuja("Mecha")
             .derechos(List.of())
             .build();
     }

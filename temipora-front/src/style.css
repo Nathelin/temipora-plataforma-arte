@@ -92,6 +92,25 @@
     --color-blanco: #321923;
     --color-mantequilla: #ffe8a3;
   }
+
+  /* Controles de formulario: fondo oscuro y texto claro en modo noche.
+     Las utilidades de fondo y texto de Tailwind siguen teniendo prioridad. */
+  [data-theme='noche'] select,
+  [data-theme='noche'] input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']):not([type='submit']):not([type='button']):not([type='reset']):not([type='image']),
+  [data-theme='noche'] textarea {
+    background-color: var(--color-superficie-alt);
+    color: var(--color-texto);
+  }
+
+  [data-theme='noche'] select option,
+  [data-theme='noche'] select optgroup {
+    background-color: var(--color-superficie-alt);
+    color: var(--color-texto);
+  }
+
+  [data-theme='noche'] select option:disabled {
+    color: var(--color-texto-suave);
+  }
 }
 
 /* Ajustes de contraste para clases de la paleta anterior en modo noche. */

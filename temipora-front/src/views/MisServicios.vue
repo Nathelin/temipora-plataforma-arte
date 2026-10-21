@@ -543,10 +543,10 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
                 </span>
               </div>
               <p class="mt-1 text-xs text-cafe/60">{{ s.nombreTipoServicio }} · {{ s.nombreMedio }}</p>
-              <p v-if="s.descripcionTipoServicio" class="mt-1 line-clamp-2 text-xs leading-relaxed text-cafe/50">
+              <!--p v-if="s.descripcionTipoServicio" class="mt-1 line-clamp-2 text-xs leading-relaxed text-cafe/50">
                 <span class="font-semibold text-cafe/70">{{ s.nombreTipoServicio }}:</span>
                 {{ s.descripcionTipoServicio }}
-              </p>
+              </p-->
               <p class="mt-3 text-cafe whitespace-pre-wrap line-clamp-2">{{ s.descripcion }}</p>
               <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-cafe/70">
                 <span>Precio: <span class="text-granate">{{ formatearPrecio(s.precioBaseMostrado ?? s.precioBase, s.monedaMostrada ?? s.moneda) }}</span></span>
@@ -554,7 +554,7 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
                 <span>Cupos disponibles: {{ s.cupos }}</span>
               </div>
 
-              <div class="mt-auto pt-4 flex items-center justify-end gap-3 border-t border-rosa/40 mt-4">
+              <div class="mt-auto pt-4 flex items-center justify-end gap-3 border-t border-rosa/40">
                 <router-link :to="`/mis-servicios/${s.idServicio}/editar`" class="text-sm text-coral hover:text-rojizo transition">
                   Editar
                 </router-link>

@@ -9,6 +9,7 @@ const props = defineProps({
 
 const router = useRouter()
 const revelado = ref(false)
+const mostrarInfoTipo = ref(false)
 
 const ETIQUETAS_SENSIBLE = {
   VIOLENCIA: 'Violencia',
@@ -93,21 +94,37 @@ function irAlArtista() {
         Por @{{ servicio.nombreArtista }}
       </button>
 
-      <div class="mt-3 flex flex-wrap gap-1.5">
+      <div class="mt-3 flex flex-wrap items-center gap-1.5">
         <span
           v-if="servicio.nombreTipoServicio"
           class="rounded-full bg-rosa/30 px-2.5 py-1 text-[11px] font-semibold text-cafe"
-          :title="servicio.descripcionTipoServicio || servicio.nombreTipoServicio"
         >
           {{ servicio.nombreTipoServicio }}
         </span>
+        <button
+          v-if="servicio.descripcionTipoServicio"
+          type="button"
+          class="flex h-5 w-5 items-center justify-center rounded-full text-cafe/40 transition hover:bg-rosa/20 hover:text-cafe"
+          :aria-label="`Qué incluye ${servicio.nombreTipoServicio}`"
+          :aria-expanded="mostrarInfoTipo"
+          :aria-controls="`info-tipo-${servicio.idServicio}`"
+          :title="`Qué incluye ${servicio.nombreTipoServicio}`"
+          @click="mostrarInfoTipo = !mostrarInfoTipo"
+        >
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+          </svg>
+        </button>
         <span v-if="servicio.nombreMedio" class="rounded-full bg-durazno/50 px-2.5 py-1 text-[11px] font-semibold text-cafe">
           {{ servicio.nombreMedio }}
         </span>
       </div>
 
-      <p v-if="servicio.descripcionTipoServicio" class="mt-2 line-clamp-2 text-xs leading-relaxed text-cafe/55">
-        <span class="font-semibold text-cafe/70">{{ servicio.nombreTipoServicio }}:</span>
+      <p
+        v-if="mostrarInfoTipo && servicio.descripcionTipoServicio"
+        :id="`info-tipo-${servicio.idServicio}`"
+        class="mt-2 rounded-lg bg-rosa/15 px-3 py-2 text-xs leading-relaxed text-cafe/70"
+      >
         {{ servicio.descripcionTipoServicio }}
       </p>
 

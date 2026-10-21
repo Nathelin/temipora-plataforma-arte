@@ -20,10 +20,11 @@ public class TerminosRequest {
     @Size(max = 250, message = "El pago extra no puede superar los 250 caracteres")
     private String pagoExtra;
 
-    @Size(max = 120, message = "El tiempo de entrega no puede superar los 120 caracteres")
-    private String tiempoEntrega;
+    @Size(max = 2000, message = "Qué dibujás no puede superar los 2000 caracteres")
+    private String queDibuja;
 
-    private List<@Valid TerminoTemaRequest> temas;
+    @Size(max = 2000, message = "Qué no dibujás no puede superar los 2000 caracteres")
+    private String queNoDibuja;
 
     private List<@Valid TerminoDerechoRequest> derechos;
 }
