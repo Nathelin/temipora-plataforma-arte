@@ -351,9 +351,6 @@ function irASubirImagen(imagen = null) {
     <div class="relative h-44 w-full overflow-hidden bg-gradient-to-br from-rosa via-durazno to-mantequilla sm:h-64">
       <div class="absolute -left-10 top-6 h-44 w-44 rounded-full bg-white/20 blur-2xl" aria-hidden="true"></div>
       <div class="absolute right-10 top-8 h-28 w-28 rounded-full bg-coral/20 blur-xl" aria-hidden="true"></div>
-      <svg class="absolute bottom-5 right-8 h-12 w-12 text-coral/40" viewBox="0 0 70 70" fill="currentColor" aria-hidden="true">
-        <path d="M35 4 L41 28 L66 35 L41 42 L35 66 L29 42 L4 35 L29 28Z" />
-      </svg>
       <img
         v-if="perfil.urlBanner"
         :src="perfil.urlBanner"

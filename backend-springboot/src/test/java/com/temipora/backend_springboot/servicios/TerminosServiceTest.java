@@ -80,6 +80,67 @@ class TerminosServiceTest {
     }
 
     // ---------------------------------------------------------------
+    // términos por servicio
+    // ---------------------------------------------------------------
+
+    @Test
+    void obtenerServicio_conTerminosPropios_devuelvePropio() {
+        Terminos propios = terminos(1L, 2, "Solo para este servicio");
+        propios.setIdServicio(7L);
+        when(terminosRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+            .thenReturn(Optional.of(propios));
+
+        TerminosDTO dto = terminosService.obtenerServicio(7L, 5L);
+
+        assertThat(dto.isPropio()).isTrue();
+        assertThat(dto.getIdServicio()).isEqualTo(7L);
+        assertThat(dto.getInformacionGeneral()).isEqualTo("Solo para este servicio");
+    }
+
+    @Test
+    void obtenerServicio_sinTerminosPropios_devuelveLosGlobales() {
+        Terminos globales = terminos(1L, 2, "Global");
+        when(terminosRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+            .thenReturn(Optional.empty());
+        when(terminosRepository.findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(5L))
+            .thenReturn(Optional.of(globales));
+
+        TerminosDTO dto = terminosService.obtenerServicio(7L, 5L);
+
+        assertThat(dto.isPropio()).isFalse();
+        assertThat(dto.getInformacionGeneral()).isEqualTo("Global");
+    }
+
+    @Test
+    void guardarServicio_creaTerminosPropios() {
+        when(terminosRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+            .thenReturn(Optional.empty());
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+        when(terminosRepository.save(any(Terminos.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TerminosRequest request = requestVacio();
+        request.setInformacionGeneral("Propios");
+
+        TerminosDTO dto = terminosService.guardarServicio(7L, 5L, request);
+
+        assertThat(dto.isPropio()).isTrue();
+        assertThat(dto.getIdServicio()).isEqualTo(7L);
+        assertThat(dto.getVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void eliminarServicio_borraLosTerminosPropios() {
+        Terminos propios = terminos(1L, 1, "Propios");
+        propios.setIdServicio(7L);
+        when(terminosRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+            .thenReturn(Optional.of(propios));
+
+        terminosService.eliminarServicio(7L, 5L);
+
+        verify(terminosRepository).delete(propios);
+    }
+
+    // ---------------------------------------------------------------
     // guardarGlobal
     // ---------------------------------------------------------------
 

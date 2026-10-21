@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -15,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
+import com.temipora.backend_springboot.modelo.Etiqueta;
+import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 import com.temipora.backend_springboot.modelo.FiltroServicioRequest;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.Moneda;
@@ -24,6 +27,7 @@ import com.temipora.backend_springboot.modelo.ServicioImagen;
 import com.temipora.backend_springboot.modelo.ServicioRequest;
 import com.temipora.backend_springboot.modelo.TipoServicio;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.TipoServicioRepository;
@@ -37,6 +41,9 @@ public class ServicioService {
     private final UsuarioRepository usuarioRepository;
     private final TipoServicioRepository tipoServicioRepository;
     private final MedioRepository medioRepository;
+    private final EtiquetaRepository etiquetaRepository;
+    private final FormularioService formularioService;
+    private final TerminosService terminosService;
     private final ConversionMonedaService conversionMonedaService;
     private final MonedaService monedaService;
 
@@ -45,12 +52,18 @@ public class ServicioService {
             UsuarioRepository usuarioRepository,
             TipoServicioRepository tipoServicioRepository,
             MedioRepository medioRepository,
+            EtiquetaRepository etiquetaRepository,
+            FormularioService formularioService,
+            TerminosService terminosService,
             ConversionMonedaService conversionMonedaService,
             MonedaService monedaService) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.tipoServicioRepository = tipoServicioRepository;
         this.medioRepository = medioRepository;
+        this.etiquetaRepository = etiquetaRepository;
+        this.formularioService = formularioService;
+        this.terminosService = terminosService;
         this.conversionMonedaService = conversionMonedaService;
         this.monedaService = monedaService;
     }
@@ -194,6 +207,9 @@ public class ServicioService {
         boolean esDuenio = viewerId != null
             && servicio.getArtista() != null
             && servicio.getArtista().getIdUsuario().equals(viewerId);
+        if (!esDuenio && !servicio.isEstado()) {
+            throw new NoSuchElementException("Servicio no encontrado: " + idServicio);
+        }
         if (!esDuenio && pref == EPreferenciaContenidoSensible.OCULTAR && servicio.isContenidoSensible()) {
             throw new NoSuchElementException("Servicio no encontrado: " + idServicio);
         }
@@ -212,7 +228,9 @@ public class ServicioService {
         servicio.setEstado(true);
         aplicar(servicio, request);
 
-        return ServicioDTO.desdeServicio(servicioRepository.save(servicio));
+        Servicio guardado = servicioRepository.save(servicio);
+        guardarConfiguracion(guardado.getIdServicio(), idArtista, request);
+        return ServicioDTO.desdeServicio(guardado);
     }
 
     @Transactional
@@ -221,7 +239,9 @@ public class ServicioService {
         verificarDuenio(servicio, idArtista);
         validarUnico(idArtista, request.getIdTipoServicio(), request.getNombre(), idServicio);
         aplicar(servicio, request);
-        return ServicioDTO.desdeServicio(servicioRepository.save(servicio));
+        Servicio guardado = servicioRepository.save(servicio);
+        guardarConfiguracion(idServicio, idArtista, request);
+        return ServicioDTO.desdeServicio(guardado);
     }
 
     @Transactional
@@ -241,6 +261,11 @@ public class ServicioService {
     }
 
     private void aplicar(Servicio servicio, ServicioRequest r) {
+        validarImagenes(r);
+        if (r.getPrecioBase() == null || r.getPrecioBase().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("El precio base debe ser mayor a cero.");
+        }
+
         TipoServicio tipo = tipoServicioRepository.findByIdTipoServicio(r.getIdTipoServicio())
             .orElseThrow(() -> new IllegalArgumentException("Tipo de servicio no encontrado: " + r.getIdTipoServicio()));
         Medio medio = medioRepository.findByIdMedio(r.getIdMedio())
@@ -279,6 +304,68 @@ public class ServicioService {
             }
         }
         servicio.reemplazarImagenes(imagenes);
+        servicio.reemplazarEtiquetas(cargarEtiquetas(servicio.getArtista(), r.getIdsEtiquetas()));
+    }
+
+    private void guardarConfiguracion(Long idServicio, Long idArtista, ServicioRequest request) {
+        if (request.getFormulario() != null) {
+            formularioService.guardarServicio(idServicio, idArtista, request.getFormulario());
+        }
+        if (request.getTerminos() != null) {
+            terminosService.guardarServicio(idServicio, idArtista, request.getTerminos());
+        }
+    }
+
+    private void validarImagenes(ServicioRequest r) {
+        if (limpiar(r.getImagenPortada()) == null) {
+            throw new IllegalArgumentException("La imagen de portada es obligatoria.");
+        }
+        boolean hayEjemplo = r.getImagenes() != null
+            && r.getImagenes().stream().anyMatch(url -> limpiar(url) != null);
+        if (!hayEjemplo) {
+            throw new IllegalArgumentException("Debés agregar al menos una imagen de ejemplo.");
+        }
+    }
+
+    private Set<Etiqueta> cargarEtiquetas(Usuario artista, Set<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Set.of();
+        }
+        if (ids.size() > 5) {
+            throw new IllegalArgumentException("Un servicio puede tener como máximo 5 etiquetas.");
+        }
+
+        Set<Etiqueta> etiquetas = new LinkedHashSet<>();
+        for (Long id : ids) {
+            if (id == null) {
+                continue;
+            }
+            Etiqueta etiqueta = etiquetaRepository.findByIdEtiqueta(id)
+                .orElseThrow(() -> new NoSuchElementException("Etiqueta no encontrada: " + id));
+            validarEtiquetaAsignable(etiqueta, artista);
+            etiquetas.add(etiqueta);
+        }
+        return etiquetas;
+    }
+
+    private void validarEtiquetaAsignable(Etiqueta etiqueta, Usuario artista) {
+        boolean propiaPendiente = etiqueta.getEstado() == EtiquetaEstado.PENDIENTE
+            && etiqueta.getCreadoPor() != null
+            && artista != null
+            && etiqueta.getCreadoPor().getIdUsuario().equals(artista.getIdUsuario());
+        if (etiqueta.getEstado() == EtiquetaEstado.VALIDA || propiaPendiente) {
+            return;
+        }
+        if (etiqueta.getEstado() == EtiquetaEstado.INACTIVA) {
+            throw new IllegalArgumentException(
+                "La etiqueta '" + etiqueta.getNombre() + "' fue dada de baja y no puede asignarse a un servicio.");
+        }
+        if (etiqueta.getEstado() == EtiquetaEstado.RECHAZADA) {
+            throw new IllegalArgumentException(
+                "La etiqueta '" + etiqueta.getNombre() + "' fue rechazada y no puede asignarse a un servicio.");
+        }
+        throw new IllegalArgumentException(
+            "La etiqueta '" + etiqueta.getNombre() + "' está pendiente de evaluación y solo su creador puede asignarla.");
     }
 
     private void validarContenidoSensible(ServicioRequest r) {
@@ -300,6 +387,11 @@ public class ServicioService {
         if (existe) {
             throw new IllegalArgumentException("Ya tenés un servicio con ese nombre y tipo.");
         }
+    }
+
+    @Transactional(readOnly = true)
+    public void verificarPropietario(Long idServicio, Long idArtista) {
+        verificarDuenio(obtenerEntidad(idServicio), idArtista);
     }
 
     private void verificarDuenio(Servicio servicio, Long idArtista) {

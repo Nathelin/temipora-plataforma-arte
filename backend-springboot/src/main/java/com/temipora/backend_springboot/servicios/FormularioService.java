@@ -52,23 +52,56 @@ public class FormularioService {
 
     @Transactional
     public FormularioDTO guardarGlobal(Long idArtista, FormularioRequest request) {
-        List<Pregunta> preguntas = construirPreguntas(request.getPreguntas());
-        validarAlMenosUnaEntrada(preguntas);
-
+        List<Pregunta> preguntas = validarPreguntas(request);
         Formulario formulario = formularioRepository
             .findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalse(idArtista)
-            .orElseGet(() -> {
-                Usuario artista = usuarioRepository.findByIdUsuario(idArtista)
-                    .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idArtista));
-                Formulario nuevo = new Formulario();
-                nuevo.setArtista(artista);
-                nuevo.setEsSistema(false);
-                return nuevo;
-            });
+            .orElseGet(() -> nuevoFormulario(idArtista, null));
+        return guardar(formulario, preguntas);
+    }
 
+    @Transactional(readOnly = true)
+    public FormularioDTO obtenerServicio(Long idServicio, Long idArtista) {
+        return formularioRepository.findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
+            .map(formulario -> FormularioDTO.desdeFormulario(formulario, true))
+            .orElseGet(() -> obtenerGlobal(idArtista));
+    }
+
+    @Transactional
+    public FormularioDTO guardarServicio(Long idServicio, Long idArtista, FormularioRequest request) {
+        List<Pregunta> preguntas = validarPreguntas(request);
+        Formulario formulario = formularioRepository
+            .findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
+            .orElseGet(() -> nuevoFormulario(idArtista, idServicio));
+        return guardar(formulario, preguntas);
+    }
+
+    @Transactional
+    public void eliminarServicio(Long idServicio, Long idArtista) {
+        formularioRepository.findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
+            .ifPresent(formularioRepository::delete);
+    }
+
+    private List<Pregunta> validarPreguntas(FormularioRequest request) {
+        List<Pregunta> preguntas = construirPreguntas(request.getPreguntas());
+        validarAlMenosUnaEntrada(preguntas);
+        return preguntas;
+    }
+
+    private FormularioDTO guardar(Formulario formulario, List<Pregunta> preguntas) {
         formulario.reemplazarPreguntas(preguntas);
         formulario.setFechaActualizacion(LocalDateTime.now());
-        return FormularioDTO.desdeFormulario(formularioRepository.save(formulario));
+        Formulario guardado = formularioRepository.save(formulario);
+        return FormularioDTO.desdeFormulario(guardado, guardado.getIdServicio() != null);
+    }
+
+    private Formulario nuevoFormulario(Long idArtista, Long idServicio) {
+        Usuario artista = usuarioRepository.findByIdUsuario(idArtista)
+            .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idArtista));
+        Formulario nuevo = new Formulario();
+        nuevo.setArtista(artista);
+        nuevo.setIdServicio(idServicio);
+        nuevo.setEsSistema(false);
+        return nuevo;
     }
 
     private List<Pregunta> construirPreguntas(List<PreguntaRequest> requests) {

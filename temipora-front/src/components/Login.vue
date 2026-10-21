@@ -50,7 +50,7 @@ async function iniciarSesion() {
     :style="{ backgroundImage: `url(${fondo})` }"
   >
     <div class="w-full max-w-md rounded-3xl bg-superficie px-8 py-10 shadow-xl flex flex-col justify-start">
-      <div class="sm:mx-auto sm:w-full sm:max-w-sm flex flex-col items-center pt-6">
+      <div class="sm:mx-auto sm:w-full sm:max-w-sm flex flex-col items-center mt-12">
         <img :src="welcomeLogo" alt="Bienvenido a Temipora" class="w-20 h-20 object-contain mb-4" />
         <h2 class="text-center text-2xl font-normal leading-9 tracking-tight text-granate">
           Inicia sesión
@@ -58,7 +58,7 @@ async function iniciarSesion() {
         <p class="text-center text-sm text-cafe/60 mt-1">Nos alegra verte de nuevo</p>
       </div>
 
-      <form class="mt-16 space-y-16 sm:pt-5" @submit.prevent="iniciarSesion">
+      <form class="space-y-2 sm:pt-5" @submit.prevent="iniciarSesion">
         <div>
           <label for="nombreUsuario" class="block text-sm font-normal leading-6 text-cafe">
             Nombre de usuario
@@ -115,7 +115,7 @@ async function iniciarSesion() {
         </div>
       </form>
 
-      <p class="mt-auto pt-8 text-center text-sm text-cafe/70">
+      <p class="mt-auto text-center text-sm text-cafe/70">
         ¿No tenés cuenta?
         <router-link to="/registrarse" class="text-rojizo hover:text-coral underline">
           Registrarse

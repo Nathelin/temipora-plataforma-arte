@@ -149,15 +149,15 @@ onMounted(cargar)
 
 <template>
   <div class="bg-blanco rounded-3xl shadow-xl shadow-rosa/40 p-6 sm:p-8">
-    <h2 class="text-lg text-granate mb-6">Cuenta y seguridad</h2>
+    <h2 class="text-lg text-granate font-bold">Cuenta y seguridad</h2>
 
     <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
 
-    <div v-else class="space-y-8">
+    <div v-else class="space-y-4">
       <!-- Correo actual -->
       <div>
-        <h3 class="text-base text-granate mb-4 pt-5 pb-2">Correo electrónico</h3>
+        <h3 class="text-base text-granate pt-5">Correo electrónico</h3>
         <div class="rounded-xl border border-rosa/40 bg-rosa/10 px-4 py-3">
           <p class="text-xs text-cafe/50 mb-0.5">Correo actual</p>
           <p class="text-sm text-cafe">{{ correoActual || '—' }}</p>
@@ -166,14 +166,14 @@ onMounted(cargar)
 
       <!-- Cambio de correo -->
       <div>
-        <h3 class="text-base text-granate mb-2 pt-6">Cambiar correo</h3>
-        <p class="text-sm text-cafe/70 mb-5">
+        <h3 class="text-base text-granate pt-2">Cambiar correo</h3>
+        <p class="text-sm text-cafe/70">
           Por seguridad, ingresa tu contraseña para confirmar el cambio de correo.
         </p>
 
         <div class="space-y-5">
           <div>
-            <label class="block text-sm text-cafe mb-2 pt-4">Nuevo correo <span class="text-rojizo">*</span></label>
+            <label class="block text-sm text-cafe pt-4">Nuevo correo <span class="text-rojizo">*</span></label>
             <input
               v-model="nuevoCorreo"
               name="nuevoCorreo"
@@ -191,8 +191,8 @@ onMounted(cargar)
           </div>
 
           <div>
-            <label class="block text-sm text-cafe mb-2 pt-4">Contraseña actual <span class="text-rojizo">*</span></label>
-            <div class="relative pb-2">
+            <label class="block text-sm text-cafe">Contraseña actual <span class="text-rojizo">*</span></label>
+            <div class="relative">
               <input
                 v-model="contraseniaActual"
                 name="contraseniaConfirmacionCorreo"
@@ -229,14 +229,14 @@ onMounted(cargar)
 
       <!-- Cambio de contraseña -->
       <div>
-        <h3 class="text-base text-granate mb-2 pt-6">Contraseña</h3>
-        <p class="text-sm text-cafe/70 mb-5">
+        <h3 class="text-base text-granate ">Contraseña</h3>
+        <p class="text-sm text-cafe/70">
           Debe tener al menos 8 caracteres e incluir una mayúscula y un número.
         </p>
 
         <div class="space-y-5">
           <div>
-            <label class="block text-sm text-cafe mb-2 pt-4">Contraseña actual <span class="text-rojizo">*</span></label>
+            <label class="block text-sm text-cafe pt-4">Contraseña actual <span class="text-rojizo">*</span></label>
             <div class="relative">
               <input
                 v-model="claveActual"
@@ -258,7 +258,7 @@ onMounted(cargar)
           </div>
 
           <div>
-            <label class="block text-sm text-cafe mb-2 pt-4">Nueva contraseña <span class="text-rojizo">*</span></label>
+            <label class="block text-sm text-cafe ">Nueva contraseña <span class="text-rojizo">*</span></label>
             <div class="relative">
               <input
                 v-model="claveNueva"
@@ -288,7 +288,7 @@ onMounted(cargar)
           </div>
 
           <div>
-            <label class="block text-sm text-cafe mb-2 pt-4">Confirmar nueva contraseña <span class="text-rojizo">*</span></label>
+            <label class="block text-sm text-cafe">Confirmar nueva contraseña <span class="text-rojizo">*</span></label>
             <div class="relative">
               <input
                 v-model="claveConfirmar"

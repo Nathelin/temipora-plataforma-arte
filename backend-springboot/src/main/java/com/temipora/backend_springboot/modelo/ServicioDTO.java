@@ -2,6 +2,7 @@ package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Comparator;
 import java.util.List;
 
 import lombok.AllArgsConstructor;
@@ -43,6 +44,7 @@ public class ServicioDTO {
     private boolean habilitarCuposTrasEntrega;
     private String imagenPortada;
     private List<String> imagenes;
+    private List<EtiquetaDTO> etiquetas;
     private boolean estado;
 
     public static ServicioDTO desdeServicio(Servicio s) {
@@ -96,6 +98,11 @@ public class ServicioDTO {
             .habilitarCuposTrasEntrega(s.isHabilitarCuposTrasEntrega())
             .imagenPortada(s.getImagenPortada())
             .imagenes(s.getImagenes().stream().map(ServicioImagen::getUrl).toList())
+            .etiquetas(s.getEtiquetas().stream()
+                .map(ServicioEtiqueta::getEtiqueta)
+                .sorted(Comparator.comparing(Etiqueta::getNombre, String.CASE_INSENSITIVE_ORDER))
+                .map(EtiquetaDTO::desdeEtiqueta)
+                .toList())
             .estado(s.isEstado())
             .build();
     }

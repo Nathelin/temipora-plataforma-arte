@@ -43,7 +43,7 @@ class ServicioControllerTest {
 
     private static final String JSON_VALIDO = "{\"idTipoServicio\":1,\"idMedio\":2,\"nombre\":\"Ilustración\"," +
             "\"descripcion\":\"desc\",\"precioBase\":100,\"tiempoEntregaValor\":2,\"tiempoEntregaUnidad\":\"SEMANAS\"," +
-            "\"cupos\":5,\"imagenes\":[\"a.png\"]}";
+            "\"cupos\":5,\"imagenPortada\":\"portada.png\",\"imagenes\":[\"a.png\"]}";
 
     @Autowired
     private MockMvc mockMvc;

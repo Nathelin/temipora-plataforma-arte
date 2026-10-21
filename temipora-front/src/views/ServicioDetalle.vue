@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
+import { formatearPrecio } from '../servicios/moneda'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,13 +32,33 @@ const esDuenio = computed(() => {
   return actual.toLowerCase() === (servicio.value?.nombreArtista || '').toLowerCase()
 })
 
-const imagenActiva = computed(() => {
+const precioMostrado = computed(() =>
+  formatearPrecio(
+    servicio.value?.precioBaseMostrado ?? servicio.value?.precioBase,
+    servicio.value?.monedaMostrada ?? servicio.value?.moneda,
+  ),
+)
+const precioConvertido = computed(
+  () =>
+    !!servicio.value?.monedaMostrada &&
+    servicio.value.monedaMostrada !== servicio.value.moneda,
+)
+
+const galeria = computed(() => {
   const s = servicio.value
-  if (!s) return ''
-  const galeria = s.imagenes || []
-  if (galeria.length) return galeria[indiceImagen.value]
-  return s.imagenPortada || ''
+  if (!s) return []
+  const portada = s.imagenPortada ? [{ url: s.imagenPortada, portada: true }] : []
+  const ejemplos = (s.imagenes || [])
+    .filter((url) => url && url !== s.imagenPortada)
+    .map((url) => ({ url, portada: false }))
+  return [...portada, ...ejemplos]
 })
+
+const imagenActiva = computed(() => galeria.value[indiceImagen.value] || null)
+const activaEsPortada = computed(() => !!imagenActiva.value?.portada)
+const mostrarBlur = computed(
+  () => requiereAdvertencia.value && activaEsPortada.value && !mostrarSensible.value,
+)
 
 function textoEntrega(s) {
   return `${s.tiempoEntregaValor} ${(s.tiempoEntregaUnidad || '').toLowerCase()}`
@@ -45,7 +66,6 @@ function textoEntrega(s) {
 
 function seleccionarImagen(i) {
   indiceImagen.value = i
-  mostrarSensible.value = false
 }
 
 function irAlArtista() {
@@ -98,13 +118,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
           <div class="relative rounded-2xl overflow-hidden bg-rosa/20 aspect-video">
             <img
               v-if="imagenActiva"
-              :src="imagenActiva"
+              :src="imagenActiva.url"
               :alt="servicio.nombre"
               class="w-full h-full object-cover transition duration-200"
-              :class="requiereAdvertencia && !mostrarSensible ? 'blur-[18px] scale-105' : ''"
+              :class="mostrarBlur ? 'blur-[18px] scale-105' : ''"
             />
             <div
-              v-if="requiereAdvertencia && !mostrarSensible"
+              v-if="mostrarBlur"
               class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-granate/30 text-center px-6"
             >
               <svg class="h-10 w-10 text-white drop-shadow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -121,8 +141,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
               </button>
             </div>
             <div
-              v-if="requiereAdvertencia && mostrarSensible"
-              class="absolute left-3 top-3 rounded-full bg-granate/70 px-3 py-1 text-xs text-crema"
+              v-if="requiereAdvertencia && activaEsPortada && mostrarSensible"
+              class="absolute left-3 top-3 rounded-full bg-granate/70 px-3 py-1 text-xs text-inverso-contraste"
             >
               Mostrando contenido sensible
               <button type="button" class="ml-2 underline hover:text-white" @click="mostrarSensible = false">
@@ -131,16 +151,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
             </div>
           </div>
 
-          <div v-if="(servicio.imagenes || []).length" class="mt-3 grid grid-cols-5 sm:grid-cols-8 gap-2">
+          <div v-if="galeria.length > 1" class="mt-3 grid grid-cols-5 sm:grid-cols-8 gap-2">
             <button
-              v-for="(url, i) in servicio.imagenes"
+              v-for="(img, i) in galeria"
               :key="i"
               type="button"
-              class="aspect-square rounded-lg overflow-hidden bg-rosa/20 border-2 transition"
+              class="relative aspect-square rounded-lg overflow-hidden bg-rosa/20 border-2 transition"
               :class="indiceImagen === i ? 'border-coral' : 'border-transparent hover:border-rosa'"
+              :aria-label="img.portada ? 'Ver portada' : `Ver imagen de ejemplo ${i}`"
               @click="seleccionarImagen(i)"
             >
-              <img :src="url" alt="" class="w-full h-full object-cover" />
+              <img :src="img.url" alt="" class="w-full h-full object-cover" />
+              <span
+                v-if="img.portada"
+                class="absolute bottom-0 inset-x-0 bg-granate/60 text-white text-[10px] px-1 py-0.5 text-center"
+              >
+                Portada
+              </span>
             </button>
           </div>
 
@@ -159,8 +186,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
 
         <!-- Datos del servicio -->
         <aside class="lg:sticky lg:top-16 h-fit rounded-2xl border border-rosa/50 bg-blanco p-6">
-          <p class="text-2xl text-granate">{{ servicio.precioBase }}</p>
-          <p class="mt-1 text-xs text-cafe/50">Precio base</p>
+          <p class="text-2xl text-granate">{{ precioMostrado }}</p>
+          <p class="mt-1 text-xs text-cafe/50">
+            Precio base
+            <span v-if="precioConvertido"> · equivalente</span>
+          </p>
+          <p v-if="precioConvertido" class="mt-1 text-xs text-cafe/50">
+            El artista lo cargó como {{ formatearPrecio(servicio.precioBase, servicio.moneda) }}
+          </p>
 
           <dl class="mt-6 space-y-4 text-sm border-t border-rosa/60 pt-6">
             <div class="flex justify-between gap-3">

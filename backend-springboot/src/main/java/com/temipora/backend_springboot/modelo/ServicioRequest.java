@@ -4,9 +4,11 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -31,7 +33,7 @@ public class ServicioRequest {
     private String descripcion;
 
     @NotNull(message = "El precio base es obligatorio.")
-    @DecimalMin(value = "0", message = "El precio base no puede ser negativo")
+    @DecimalMin(value = "0", inclusive = false, message = "El precio base debe ser mayor a cero")
     private BigDecimal precioBase;
 
     // Moneda del precio base. Si no se especifica, se usa la moneda predeterminada.
@@ -56,8 +58,20 @@ public class ServicioRequest {
 
     private boolean habilitarCuposTrasEntrega;
 
+    @NotBlank(message = "La imagen de portada es obligatoria.")
     @Size(max = 255, message = "La URL de portada no puede superar los 255 caracteres")
     private String imagenPortada;
 
-    private List<@Size(max = 255, message = "La URL no puede superar los 255 caracteres") String> imagenes;
+    @NotEmpty(message = "Debés agregar al menos una imagen de ejemplo.")
+    private List<@NotBlank(message = "La URL de la imagen no puede estar vacía.")
+        @Size(max = 255, message = "La URL no puede superar los 255 caracteres") String> imagenes;
+
+    @Size(max = 5, message = "Un servicio puede tener como máximo 5 etiquetas.")
+    private Set<@NotNull(message = "El id de la etiqueta no puede ser nulo.") Long> idsEtiquetas;
+
+    @Valid
+    private FormularioRequest formulario;
+
+    @Valid
+    private TerminosRequest terminos;
 }

@@ -265,9 +265,9 @@ onBeforeUnmount(() => {
 <template>
   <div class="bg-blanco rounded-3xl shadow-xl shadow-rosa/40 p-6 sm:p-8">
     <div class="mb-6">
-      <h2 class="text-lg text-granate">Términos y condiciones</h2>
-      <p class="text-sm text-cafe/70 mt-1">
-        Dejá en claro qué ofrecés y qué no. Se usan por defecto en tus productos y servicios.
+      <h2 class="text-lg text-granate font-bold">Términos y condiciones</h2>
+      <p class="text-sm text-cafe/70">
+        Define los usos que permites sobre tu arte. Se usan por defecto en tus productos y servicios.
       </p>
       <p v-if="version" class="text-xs text-cafe/50 mt-1">Versión {{ version }}</p>
     </div>
@@ -276,7 +276,7 @@ onBeforeUnmount(() => {
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
 
     <div v-else class="space-y-10">
-      <div class="mt-8 inline-flex rounded-lg border border-rosa p-0.5 text-sm">
+      <div class="inline-flex rounded-lg border border-rosa p-0.5 text-sm">
         <button type="button" class="rounded-md px-3 py-1.5 transition" :class="modo === 'editar' ? 'bg-coral text-white' : 'text-cafe hover:bg-rosa/20'" @click="modo = 'editar'">Editar</button>
         <button type="button" class="rounded-md px-3 py-1.5 transition" :class="modo === 'preview' ? 'bg-coral text-white' : 'text-cafe hover:bg-rosa/20'" @click="modo = 'preview'">Vista previa</button>
       </div>
@@ -290,7 +290,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Secciones de texto -->
-        <div class="space-y-8 pt-2">
+        <div class="space-y-8">
           <div v-for="s in secciones" :key="s.key">
             <label class="block text-sm text-cafe mb-2">{{ s.label }}</label>
             <textarea
@@ -302,7 +302,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Plazos -->
-        <div class="pt-2">
+        <div>
           <label class="block text-sm text-cafe mb-2">Tiempo estimado de entrega</label>
           <input v-model="form.tiempoEntrega" type="text" maxlength="120" placeholder="Ej.: 2 a 4 semanas"
             class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />

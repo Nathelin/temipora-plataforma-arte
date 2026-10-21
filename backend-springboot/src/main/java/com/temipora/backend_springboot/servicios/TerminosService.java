@@ -60,18 +60,35 @@ public class TerminosService {
     @Transactional
     public TerminosDTO guardarGlobal(Long idArtista, TerminosRequest request) {
         validarContenido(request);
-
         Terminos terminos = terminosRepository
             .findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(idArtista)
-            .orElseGet(() -> {
-                Usuario artista = usuarioRepository.findByIdUsuario(idArtista)
-                    .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idArtista));
-                Terminos nuevo = new Terminos();
-                nuevo.setArtista(artista);
-                nuevo.setVersion(1);
-                return nuevo;
-            });
+            .orElseGet(() -> nuevoTerminos(idArtista, null));
+        return guardar(terminos, request);
+    }
 
+    @Transactional(readOnly = true)
+    public TerminosDTO obtenerServicio(Long idServicio, Long idArtista) {
+        return terminosRepository.findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
+            .map(terminos -> TerminosDTO.desdeTerminos(terminos, true))
+            .orElseGet(() -> obtenerGlobal(idArtista));
+    }
+
+    @Transactional
+    public TerminosDTO guardarServicio(Long idServicio, Long idArtista, TerminosRequest request) {
+        validarContenido(request);
+        Terminos terminos = terminosRepository
+            .findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
+            .orElseGet(() -> nuevoTerminos(idArtista, idServicio));
+        return guardar(terminos, request);
+    }
+
+    @Transactional
+    public void eliminarServicio(Long idServicio, Long idArtista) {
+        terminosRepository.findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
+            .ifPresent(terminosRepository::delete);
+    }
+
+    private TerminosDTO guardar(Terminos terminos, TerminosRequest request) {
         if (terminos.getIdTerminos() != null) {
             terminos.setVersion(terminos.getVersion() + 1);
             // Borra los hijos existentes ANTES de insertar los nuevos: si no, Hibernate
@@ -92,7 +109,18 @@ public class TerminosService {
         terminos.reemplazarDerechos(construirDerechos(request.getDerechos()));
         terminos.setFechaActualizacion(LocalDateTime.now());
 
-        return TerminosDTO.desdeTerminos(terminosRepository.save(terminos));
+        Terminos guardados = terminosRepository.save(terminos);
+        return TerminosDTO.desdeTerminos(guardados, guardados.getIdServicio() != null);
+    }
+
+    private Terminos nuevoTerminos(Long idArtista, Long idServicio) {
+        Usuario artista = usuarioRepository.findByIdUsuario(idArtista)
+            .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idArtista));
+        Terminos nuevo = new Terminos();
+        nuevo.setArtista(artista);
+        nuevo.setIdServicio(idServicio);
+        nuevo.setVersion(1);
+        return nuevo;
     }
 
     private List<TerminoTema> construirTemas(List<TerminoTemaRequest> requests) {

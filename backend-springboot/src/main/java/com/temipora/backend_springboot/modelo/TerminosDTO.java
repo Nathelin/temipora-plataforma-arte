@@ -17,6 +17,8 @@ import lombok.Setter;
 public class TerminosDTO {
 
     private Long idTerminos;
+    private Long idServicio;
+    private boolean propio;
     private Integer version;
     private String informacionGeneral;
     private String politicaRevisiones;
@@ -29,6 +31,10 @@ public class TerminosDTO {
     private List<TerminoDerechoDTO> derechos;
 
     public static TerminosDTO desdeTerminos(Terminos terminos) {
+        return desdeTerminos(terminos, false);
+    }
+
+    public static TerminosDTO desdeTerminos(Terminos terminos, boolean propio) {
         List<TerminoTemaDTO> temas = terminos.getTerminoTemas().stream()
             .sorted(Comparator.comparing(t -> t.getTema() != null ? t.getTema().getOrden() : Integer.MAX_VALUE))
             .map(TerminoTemaDTO::desdeTerminoTema)
@@ -41,6 +47,8 @@ public class TerminosDTO {
 
         return TerminosDTO.builder()
             .idTerminos(terminos.getIdTerminos())
+            .idServicio(terminos.getIdServicio())
+            .propio(propio)
             .version(terminos.getVersion())
             .informacionGeneral(terminos.getInformacionGeneral())
             .politicaRevisiones(terminos.getPoliticaRevisiones())

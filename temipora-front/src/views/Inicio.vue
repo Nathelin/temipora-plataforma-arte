@@ -94,20 +94,7 @@ const ctaFinal = computed(() => {
             </router-link>
           </p>
 
-          <div class="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-medium text-cafe/70">
-            <span class="inline-flex items-center gap-2">
-              <span class="h-2 w-2 rounded-full bg-coral-vivo" aria-hidden="true"></span>
-              Portfolios
-            </span>
-            <span class="inline-flex items-center gap-2">
-              <span class="h-2 w-2 rounded-full bg-durazno" aria-hidden="true"></span>
-              Comisiones
-            </span>
-            <span class="inline-flex items-center gap-2">
-              <span class="h-2 w-2 rounded-full bg-mantequilla" aria-hidden="true"></span>
-              Comunidad
-            </span>
-          </div>
+
         </div>
 
         <div class="relative mx-auto h-90 w-full max-w-135 sm:h-110 lg:h-130">

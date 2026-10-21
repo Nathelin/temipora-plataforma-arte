@@ -27,6 +27,7 @@ import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.ServicioRequest;
 import com.temipora.backend_springboot.modelo.TipoServicio;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.TipoServicioRepository;
@@ -46,6 +47,15 @@ class ServicioServiceTest {
 
     @Mock
     private MedioRepository medioRepository;
+
+    @Mock
+    private EtiquetaRepository etiquetaRepository;
+
+    @Mock
+    private FormularioService formularioService;
+
+    @Mock
+    private TerminosService terminosService;
 
     @Mock
     private ConversionMonedaService conversionMonedaService;
@@ -97,6 +107,65 @@ class ServicioServiceTest {
             .hasMessage("Ya tenés un servicio con ese nombre y tipo.");
 
         verify(servicioRepository, never()).save(any(Servicio.class));
+    }
+
+    @Test
+    void crear_sinImagenDePortada_lanzaError() {
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+            .thenReturn(false);
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+
+        ServicioRequest request = request();
+        request.setImagenPortada(" ");
+
+        assertThatThrownBy(() -> servicioService.crear(5L, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("La imagen de portada es obligatoria.");
+
+        verify(servicioRepository, never()).save(any(Servicio.class));
+    }
+
+    @Test
+    void crear_sinImagenesDeEjemplo_lanzaError() {
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+            .thenReturn(false);
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+
+        ServicioRequest request = request();
+        request.setImagenes(List.of(" "));
+
+        assertThatThrownBy(() -> servicioService.crear(5L, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Debés agregar al menos una imagen de ejemplo.");
+
+        verify(servicioRepository, never()).save(any(Servicio.class));
+    }
+
+    @Test
+    void crear_precioCero_lanzaError() {
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+            .thenReturn(false);
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+
+        ServicioRequest request = request();
+        request.setPrecioBase(BigDecimal.ZERO);
+
+        assertThatThrownBy(() -> servicioService.crear(5L, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("El precio base debe ser mayor a cero.");
+
+        verify(servicioRepository, never()).save(any(Servicio.class));
+    }
+
+    @Test
+    void obtener_servicioInactivoDeOtroUsuario_lanzaNoSuchElement() {
+        Servicio servicio = servicio(1L, 5L);
+        servicio.setEstado(false);
+        when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio));
+
+        assertThatThrownBy(() -> servicioService.obtener(1L, 99L))
+            .isInstanceOf(NoSuchElementException.class)
+            .hasMessage("Servicio no encontrado: 1");
     }
 
     @Test
@@ -177,6 +246,7 @@ class ServicioServiceTest {
         r.setTiempoEntregaValor(2);
         r.setTiempoEntregaUnidad(ETiempoEntregaUnidad.SEMANAS);
         r.setCupos(5);
+        r.setImagenPortada("portada.png");
         r.setImagenes(List.of("a.png", "b.png"));
         return r;
     }

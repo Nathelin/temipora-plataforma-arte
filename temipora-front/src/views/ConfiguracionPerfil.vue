@@ -354,7 +354,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="bg-blanco rounded-3xl shadow-xl shadow-rosa/40 p-6 sm:p-8">
-    <h2 class="text-lg text-granate mb-6">Mi perfil</h2>
+    <h2 class="text-lg text-granate mb-6 font-bold">Mi perfil</h2>
 
     <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
@@ -408,7 +408,7 @@ onBeforeUnmount(() => {
 
       <!-- Banner -->
       <div>
-        <div class="mb-2 flex items-center justify-between gap-3">
+        <div class="flex items-center justify-between gap-3">
           <label class="block text-sm text-cafe">Banner</label>
           <span class="text-xs text-cafe/50">Hacé click o arrastrá (JPG, PNG o WEBP)</span>
         </div>
@@ -441,7 +441,7 @@ onBeforeUnmount(() => {
 
       <!-- Nombre de display -->
       <div>
-        <label class="block text-sm text-cafe mb-2">Nombre de display</label>
+        <label class="block text-sm text-cafe">Nombre de display</label>
         <input
           v-model="form.nombreDisplay"
           type="text"
@@ -452,20 +452,20 @@ onBeforeUnmount(() => {
 
       <!-- Biografía -->
       <div>
-        <label class="block text-sm text-cafe mb-2">Biografía</label>
+        <label class="block text-sm text-cafe">Biografía</label>
         <textarea
           v-model="form.biografia"
           rows="4"
           maxlength="500"
           class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"
         ></textarea>
-        <p class="text-right text-xs text-cafe/50 mt-1">{{ form.biografia.length }}/500</p>
+        <p class="text-right text-xs text-cafe/50">{{ form.biografia.length }}/500</p>
       </div>
 
       <!-- Datos personales -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label class="block text-sm text-cafe mb-2">Sexo</label>
+          <label class="block text-sm text-cafe">Sexo</label>
           <select
             v-model="form.sexo"
             class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
@@ -477,7 +477,7 @@ onBeforeUnmount(() => {
           </select>
         </div>
         <div>
-          <label class="block text-sm text-cafe mb-2">Teléfono</label>
+          <label class="block text-sm text-cafe">Teléfono</label>
           <div class="flex">
             <span
               v-if="prefijoActual"
@@ -500,7 +500,7 @@ onBeforeUnmount(() => {
           <p v-else class="text-xs text-cafe/50 mt-1">Se guarda en formato internacional.</p>
         </div>
         <div>
-          <label class="block text-sm text-cafe mb-2">País</label>
+          <label class="block text-sm text-cafe">País</label>
           <select
             v-model="form.idPais"
             class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
@@ -515,7 +515,7 @@ onBeforeUnmount(() => {
 
       <!-- Moneda preferida -->
       <div>
-        <label class="block text-sm text-cafe mb-2">Moneda preferida</label>
+        <label class="block text-sm text-cafe">Moneda preferida</label>
         <select
           v-model="form.idMonedaPreferida"
           class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
