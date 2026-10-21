@@ -70,8 +70,9 @@ public class ServicioService {
 
     @Transactional(readOnly = true)
     public List<ServicioDTO> listarMios(Long idArtista) {
+        Moneda moneda = monedaPreferidaDe(idArtista);
         return servicioRepository.findByArtistaIdUsuarioOrderByNombreAsc(idArtista).stream()
-            .map(ServicioDTO::desdeServicio)
+            .map(s -> aDTO(s, false, moneda))
             .toList();
     }
 

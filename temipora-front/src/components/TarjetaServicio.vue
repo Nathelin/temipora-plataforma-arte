@@ -94,13 +94,22 @@ function irAlArtista() {
       </button>
 
       <div class="mt-3 flex flex-wrap gap-1.5">
-        <span v-if="servicio.nombreTipoServicio" class="rounded-full bg-rosa/30 px-2.5 py-1 text-[11px] font-semibold text-cafe">
+        <span
+          v-if="servicio.nombreTipoServicio"
+          class="rounded-full bg-rosa/30 px-2.5 py-1 text-[11px] font-semibold text-cafe"
+          :title="servicio.descripcionTipoServicio || servicio.nombreTipoServicio"
+        >
           {{ servicio.nombreTipoServicio }}
         </span>
         <span v-if="servicio.nombreMedio" class="rounded-full bg-durazno/50 px-2.5 py-1 text-[11px] font-semibold text-cafe">
           {{ servicio.nombreMedio }}
         </span>
       </div>
+
+      <p v-if="servicio.descripcionTipoServicio" class="mt-2 line-clamp-2 text-xs leading-relaxed text-cafe/55">
+        <span class="font-semibold text-cafe/70">{{ servicio.nombreTipoServicio }}:</span>
+        {{ servicio.descripcionTipoServicio }}
+      </p>
 
       <p class="mt-3 line-clamp-2 text-sm leading-relaxed text-cafe/75">{{ servicio.descripcion }}</p>
 

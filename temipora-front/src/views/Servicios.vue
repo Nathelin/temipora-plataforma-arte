@@ -18,6 +18,11 @@ const filtros = ref({
   tiempoMaxDias: '',
 })
 
+const descripcionTipoSeleccionado = computed(() => {
+  if (!filtros.value.idTipoServicio) return ''
+  return tipos.value.find((t) => String(t.idTipoServicio) === filtros.value.idTipoServicio)?.descripcion || ''
+})
+
 let secuencia = 0
 
 async function cargar() {
@@ -195,6 +200,9 @@ onMounted(async () => {
               {{ t.nombre }}
             </option>
           </select>
+          <p v-if="descripcionTipoSeleccionado" class="mt-2 text-xs leading-relaxed text-cafe/60">
+            {{ descripcionTipoSeleccionado }}
+          </p>
         </div>
         <div>
           <label class="mb-1.5 block text-xs font-semibold text-cafe/60">Contenido sensible</label>

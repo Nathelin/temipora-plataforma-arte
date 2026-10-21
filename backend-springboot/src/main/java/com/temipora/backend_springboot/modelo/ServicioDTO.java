@@ -23,6 +23,7 @@ public class ServicioDTO {
     private String nombreArtista;
     private Long idTipoServicio;
     private String nombreTipoServicio;
+    private String descripcionTipoServicio;
     private Long idMedio;
     private String nombreMedio;
     private String nombre;
@@ -77,6 +78,7 @@ public class ServicioDTO {
             .nombreArtista(s.getArtista() != null ? s.getArtista().getNombreUsuario() : null)
             .idTipoServicio(s.getTipoServicio() != null ? s.getTipoServicio().getIdTipoServicio() : null)
             .nombreTipoServicio(s.getTipoServicio() != null ? s.getTipoServicio().getNombre() : null)
+            .descripcionTipoServicio(s.getTipoServicio() != null ? s.getTipoServicio().getDescripcion() : null)
             .idMedio(s.getMedio() != null ? s.getMedio().getIdMedio() : null)
             .nombreMedio(s.getMedio() != null ? s.getMedio().getNombre() : null)
             .nombre(s.getNombre())

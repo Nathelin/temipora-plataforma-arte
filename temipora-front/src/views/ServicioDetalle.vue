@@ -198,7 +198,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
           <dl class="mt-6 space-y-4 text-sm border-t border-rosa/60 pt-6">
             <div class="flex justify-between gap-3">
               <dt class="text-xs text-cafe/50">Tipo</dt>
-              <dd class="text-cafe">{{ servicio.nombreTipoServicio }}</dd>
+              <dd class="text-right text-cafe">
+                <span class="block">{{ servicio.nombreTipoServicio }}</span>
+                <span v-if="servicio.descripcionTipoServicio" class="mt-1 block text-xs leading-relaxed text-cafe/60">
+                  {{ servicio.descripcionTipoServicio }}
+                </span>
+              </dd>
             </div>
             <div class="flex justify-between gap-3">
               <dt class="text-xs text-cafe/50">Medio</dt>

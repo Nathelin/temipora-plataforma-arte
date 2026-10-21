@@ -153,7 +153,9 @@ const monedaSeleccionada = computed(
 const tituloPagina = computed(() => (esEdicion.value ? 'Editar servicio' : 'Crear servicio'))
 const subtituloPagina = computed(() => 'Completá los datos de tu servicio paso a paso.')
 
-const nombreTipo = computed(() => tipos.value.find((t) => String(t.idTipoServicio) === form.value.idTipoServicio)?.nombre || '')
+const tipoSeleccionado = computed(() => tipos.value.find((t) => String(t.idTipoServicio) === form.value.idTipoServicio) || null)
+const nombreTipo = computed(() => tipoSeleccionado.value?.nombre || '')
+const descripcionTipo = computed(() => tipoSeleccionado.value?.descripcion || '')
 const nombreMedio = computed(() => medios.value.find((m) => String(m.idMedio) === form.value.idMedio)?.nombre || '')
 const resumenTerminos = computed(() => {
   const f = terminosVisible.value.form
@@ -739,7 +741,7 @@ onBeforeUnmount(() => {
             </button>
             <span
               v-if="i < PASOS.length - 1"
-              class="mt-[18px] h-px flex-1 transition"
+              class="mt-4.5 h-px flex-1 transition"
               :class="p.n < paso ? 'bg-coral/50' : 'bg-rosa/70'"
             ></span>
           </li>
@@ -776,6 +778,13 @@ onBeforeUnmount(() => {
                   <option value="" disabled>Elegí un tipo</option>
                   <option v-for="t in tipos" :key="t.idTipoServicio" :value="String(t.idTipoServicio)">{{ t.nombre }}</option>
                 </select>
+                <p v-if="descripcionTipo" class="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-cafe/60">
+                  <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-coral" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 11v5m0-8h.01" />
+                  </svg>
+                  <span>{{ descripcionTipo }}</span>
+                </p>
               </div>
               <div>
                 <label class="block text-sm text-cafe mb-2">Medio <span class="text-rojizo">*</span></label>
@@ -886,8 +895,8 @@ onBeforeUnmount(() => {
                 @drop.prevent="onPortadaDrop"
               >
                 <template v-if="form.imagenPortada">
-                  <img :src="form.imagenPortada" alt="Portada del servicio" class="aspect-[16/9] w-full object-cover" />
-                  <div class="absolute inset-x-0 bottom-0 flex flex-wrap items-center gap-2 bg-gradient-to-t from-granate/75 to-transparent p-4 pt-10">
+                  <img :src="form.imagenPortada" alt="Portada del servicio" class="aspect-video w-full object-cover" />
+                  <div class="absolute inset-x-0 bottom-0 flex flex-wrap items-center gap-2 bg-linear-to-t from-granate/75 to-transparent p-4 pt-10">
                     <label for="servicio-portada"
                       class="inline-flex cursor-pointer items-center rounded-md bg-blanco/95 px-3 py-1.5 text-xs font-medium text-granate shadow-sm hover:bg-blanco transition">
                       {{ subiendoPortada ? 'Subiendo…' : 'Cambiar portada' }}
@@ -904,7 +913,7 @@ onBeforeUnmount(() => {
                     </button>
                   </div>
                 </template>
-                <div v-else class="flex aspect-[16/9] flex-col items-center justify-center gap-3 p-8 text-center">
+                <div v-else class="flex aspect-video flex-col items-center justify-center gap-3 p-8 text-center">
                   <span class="flex h-12 w-12 items-center justify-center rounded-full bg-coral/10 text-coral">
                     <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 7.5m0 0L7.5 12M12 7.5V21" />
@@ -1216,6 +1225,7 @@ onBeforeUnmount(() => {
                       <p class="text-xs uppercase tracking-wide text-cafe/50">Servicio</p>
                       <h3 class="mt-1 text-xl text-granate">{{ form.nombre || 'Sin nombre' }}</h3>
                       <p class="text-sm text-cafe/60">{{ nombreTipo || 'Tipo' }} · {{ nombreMedio || 'Medio' }}</p>
+                      <p v-if="descripcionTipo" class="mt-1 text-xs leading-relaxed text-cafe/50">{{ descripcionTipo }}</p>
                     </div>
                     <button type="button" class="text-sm text-coral hover:text-rojizo transition" @click="irAEditar(1)">
                       Editar

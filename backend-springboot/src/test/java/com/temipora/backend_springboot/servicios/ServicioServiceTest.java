@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -78,6 +79,27 @@ class ServicioServiceTest {
     }
 
     @Test
+    void listarMios_conviertePrecioAMonedaPreferidaDelArtista() {
+        Servicio servicio = servicio(1L, 5L);
+        servicio.setPrecioBase(new BigDecimal("100.00"));
+        servicio.setMoneda(moneda(3L, "ARS"));
+
+        Usuario artista = usuario(5L);
+        artista.setMonedaPreferida(moneda(2L, "USD"));
+
+        when(servicioRepository.findByArtistaIdUsuarioOrderByNombreAsc(5L))
+            .thenReturn(List.of(servicio));
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(artista));
+        when(conversionMonedaService.factor(any(Moneda.class), any(Moneda.class), any(LocalDateTime.class)))
+            .thenReturn(new BigDecimal("0.5"));
+
+        List<ServicioDTO> resultado = servicioService.listarMios(5L);
+
+        assertThat(resultado.get(0).getPrecioBaseMostrado()).isEqualByComparingTo("50.00");
+        assertThat(resultado.get(0).getMonedaMostrada()).isEqualTo("USD");
+    }
+
+    @Test
     void crear_ok_calculaDiasYGuarda() {
         when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
             .thenReturn(false);
@@ -95,6 +117,7 @@ class ServicioServiceTest {
         assertThat(dto.isEstado()).isTrue();
         assertThat(dto.getImagenes()).containsExactly("a.png", "b.png");
         assertThat(dto.getNombreTipoServicio()).isEqualTo("Ilustración digital");
+        assertThat(dto.getDescripcionTipoServicio()).isEqualTo("d");
     }
 
     @Test
