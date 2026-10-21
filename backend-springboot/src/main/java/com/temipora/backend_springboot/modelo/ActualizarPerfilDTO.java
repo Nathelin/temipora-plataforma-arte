@@ -21,9 +21,6 @@ public class ActualizarPerfilDTO {
     @Size(max = 15, message = "El sexo no puede superar los 15 caracteres")
     private String sexo;
 
-    @Size(max = 20, message = "El teléfono no puede superar los 20 caracteres")
-    private String telefono;
-
     private Long idPais;
 
     private EPreferenciaContenidoSensible preferenciaSensible;

@@ -16,7 +16,9 @@ import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.ActualizarContraseniaDTO;
 import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
+import com.temipora.backend_springboot.modelo.ActualizarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.Pais;
+import com.temipora.backend_springboot.modelo.QuitarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.RegistroUsuarioDTO;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
@@ -129,15 +131,6 @@ public class UsuarioService {
 
             usuario.setPais(pais);
         }
-        if (dto.getTelefono() != null) {
-            String telefono = dto.getTelefono().trim();
-            if (telefono.isEmpty()) {
-                usuario.setTelefono(null);
-            } else {
-                String codigoIso = usuario.getPais() != null ? usuario.getPais().getCodigoIso() : null;
-                usuario.setTelefono(telefonoService.validarYNormalizar(telefono, codigoIso));
-            }
-        }
         if (dto.getPreferenciaSensible() != null) {
             usuario.setPreferenciaSensible(dto.getPreferenciaSensible());
         }
@@ -208,6 +201,62 @@ public class UsuarioService {
 
         usuario.setContrasenia(passwordEncoder.encode(dto.getContraseniaNueva()));
         usuarioRepository.save(usuario);
+    }
+
+    @Transactional
+    public UsuarioDTO cambiarTelefono(Long idUsuario, ActualizarTelefonoDTO dto) {
+        Usuario usuario = usuarioRepository.findByIdUsuario(idUsuario)
+                .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idUsuario));
+
+        if (!passwordEncoder.matches(dto.getContraseniaActual(), usuario.getContrasenia())) {
+            throw new IllegalArgumentException("La contraseña actual no es correcta.");
+        }
+
+        String codigoIso = usuario.getPais() != null ? usuario.getPais().getCodigoIso() : null;
+        String telefonoAnterior = usuario.getTelefono();
+
+        if (telefonoAnterior != null && !telefonoAnterior.isBlank()) {
+            if (dto.getTelefonoActual() == null || dto.getTelefonoActual().isBlank()) {
+                throw new IllegalArgumentException("Debés ingresar tu teléfono actual.");
+            }
+            String telefonoActual = normalizarTelefonoActual(dto.getTelefonoActual(), codigoIso);
+            if (!telefonoActual.equals(telefonoAnterior)) {
+                throw new IllegalArgumentException("El teléfono actual no coincide con el registrado.");
+            }
+        }
+
+        String telefonoNuevo = telefonoService.validarYNormalizar(dto.getTelefonoNuevo(), codigoIso);
+
+        if (telefonoNuevo.equals(telefonoAnterior)) {
+            throw new IllegalArgumentException("El nuevo teléfono debe ser distinto al actual.");
+        }
+
+        usuarioRepository.findByTelefono(telefonoNuevo)
+                .filter(otro -> !otro.getIdUsuario().equals(idUsuario))
+                .ifPresent(otro -> {
+                    throw new IllegalArgumentException("Ya existe una cuenta con ese teléfono.");
+                });
+
+        usuario.setTelefono(telefonoNuevo);
+        return UsuarioDTO.desdeUsuario(usuarioRepository.save(usuario));
+    }
+
+    @Transactional
+    public UsuarioDTO quitarTelefono(Long idUsuario, QuitarTelefonoDTO dto) {
+        Usuario usuario = usuarioRepository.findByIdUsuario(idUsuario)
+                .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idUsuario));
+
+        if (!passwordEncoder.matches(dto.getContraseniaActual(), usuario.getContrasenia())) {
+            throw new IllegalArgumentException("La contraseña actual no es correcta.");
+        }
+
+        usuario.setTelefono(null);
+        return UsuarioDTO.desdeUsuario(usuarioRepository.save(usuario));
+    }
+
+    private String normalizarTelefonoActual(String telefono, String codigoIso) {
+        String region = telefono.trim().startsWith("+") ? null : codigoIso;
+        return telefonoService.validarYNormalizar(telefono, region);
     }
 
     private String aPatronBusqueda(String texto) {

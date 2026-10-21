@@ -28,10 +28,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.temipora.backend_springboot.modelo.ActualizarContraseniaDTO;
 import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
+import com.temipora.backend_springboot.modelo.ActualizarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Pais;
+import com.temipora.backend_springboot.modelo.QuitarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.RegistroUsuarioDTO;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
@@ -188,24 +190,24 @@ class UsuarioServiceTest {
         Usuario usuario = usuarioDePrueba("Cosmiq");
         usuario.setNombreDisplay("Display original");
         usuario.setBiografia("Bio vieja");
-        usuario.setTelefono("111111");
+        usuario.setTelefono("+16502530000");
         usuario.setSexo("M");
 
         ActualizarPerfilDTO dto = new ActualizarPerfilDTO();
         dto.setNombreDisplay("Display nuevo");
-        dto.setTelefono("222222");
         // biografia, sexo, pais, banner, preferenciaSensible quedan en null
 
         when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
-        when(telefonoService.validarYNormalizar("222222", null)).thenReturn("+222222");
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UsuarioDTO resultado = usuarioService.actualizarPerfil(1L, dto);
 
         assertThat(resultado.getNombreDisplay()).isEqualTo("Display nuevo");
-        assertThat(resultado.getTelefono()).isEqualTo("+222222");
+        assertThat(resultado.isTieneTelefono()).isTrue();
+        assertThat(resultado.getTelefonoEnmascarado()).isEqualTo("+1 ******0000");
         assertThat(resultado.getBiografia()).isEqualTo("Bio vieja");
         assertThat(resultado.getSexo()).isEqualTo("M");
+        assertThat(usuario.getTelefono()).isEqualTo("+16502530000");
         assertThat(usuario.getPreferenciaSensible()).isEqualTo(EPreferenciaContenidoSensible.ADVERTIR);
     }
 
@@ -235,14 +237,12 @@ class UsuarioServiceTest {
         dto.setUrlFotoPerfil("nueva-pfp.png");
         dto.setUrlBanner("nuevo-banner.png");
         dto.setSexo("F");
-        dto.setTelefono("333333");
         dto.setIdPais(1L);
         dto.setPreferenciaSensible(EPreferenciaContenidoSensible.OCULTAR);
 
         Pais argentina = Pais.builder().idPais(1L).nombre("Argentina").codigoIso("AR").prefijoTelefonico("+54").estado(true).build();
         when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
         when(paisRepository.findByIdPais(1L)).thenReturn(Optional.of(argentina));
-        when(telefonoService.validarYNormalizar("333333", "AR")).thenReturn("+54333333");
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UsuarioDTO resultado = usuarioService.actualizarPerfil(1L, dto);
@@ -252,7 +252,6 @@ class UsuarioServiceTest {
         assertThat(resultado.getUrlFotoPerfil()).isEqualTo("nueva-pfp.png");
         assertThat(resultado.getUrlBanner()).isEqualTo("nuevo-banner.png");
         assertThat(resultado.getSexo()).isEqualTo("F");
-        assertThat(resultado.getTelefono()).isEqualTo("+54333333");
         assertThat(resultado.getIdPais()).isEqualTo(1L);
         assertThat(resultado.getNombrePais()).isEqualTo("Argentina");
         assertThat(resultado.getPreferenciaSensible()).isEqualTo(EPreferenciaContenidoSensible.OCULTAR);
@@ -310,6 +309,27 @@ class UsuarioServiceTest {
                 .hasMessage("País no encontrado: 99");
 
         verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    void actualizarPerfil_cambiaPais_conservaElTelefonoExistente() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        usuario.setTelefono("+16502530000");
+        Pais argentina = Pais.builder().idPais(1L).nombre("Argentina").codigoIso("AR").estado(true).build();
+
+        ActualizarPerfilDTO dto = new ActualizarPerfilDTO();
+        dto.setIdPais(1L);
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(paisRepository.findByIdPais(1L)).thenReturn(Optional.of(argentina));
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UsuarioDTO resultado = usuarioService.actualizarPerfil(1L, dto);
+
+        assertThat(usuario.getTelefono()).isEqualTo("+16502530000");
+        assertThat(resultado.isTieneTelefono()).isTrue();
+        assertThat(resultado.getTelefonoEnmascarado()).isEqualTo("+1 ******0000");
+        verify(telefonoService, never()).validarYNormalizar(any(), any());
     }
 
     // ---------------------------------------------------------------
@@ -404,6 +424,212 @@ class UsuarioServiceTest {
         UsuarioDTO resultado = usuarioService.cambiarCorreo(1L, dto);
 
         assertThat(resultado.getCorreo()).isEqualTo("cosmiq@mail.com");
+    }
+
+    // ---------------------------------------------------------------
+    // cambiarTelefono / quitarTelefono
+    // ---------------------------------------------------------------
+
+    @Test
+    void cambiarTelefono_ok_actualizaYDevuelveEnmascarado() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        usuario.setTelefono("+16502530000");
+        ActualizarTelefonoDTO dto = new ActualizarTelefonoDTO();
+        dto.setTelefonoActual("+16502530000");
+        dto.setTelefonoNuevo("+5491123456789");
+        dto.setContraseniaActual("secreta123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
+        when(telefonoService.validarYNormalizar("+16502530000", null)).thenReturn("+16502530000");
+        when(telefonoService.validarYNormalizar("+5491123456789", null)).thenReturn("+5491123456789");
+        when(usuarioRepository.findByTelefono("+5491123456789")).thenReturn(Optional.empty());
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UsuarioDTO resultado = usuarioService.cambiarTelefono(1L, dto);
+
+        assertThat(usuario.getTelefono()).isEqualTo("+5491123456789");
+        assertThat(resultado.isTieneTelefono()).isTrue();
+        assertThat(resultado.getTelefonoEnmascarado()).isEqualTo("+54 *******6789");
+        verify(usuarioRepository).save(usuario);
+    }
+
+    @Test
+    void cambiarTelefono_contraseniaIncorrecta_lanzaError() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        usuario.setTelefono("+16502530000");
+        ActualizarTelefonoDTO dto = new ActualizarTelefonoDTO();
+        dto.setTelefonoActual("+16502530000");
+        dto.setTelefonoNuevo("+5491123456789");
+        dto.setContraseniaActual("mala");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("mala", "$2a$10$hasheado")).thenReturn(false);
+
+        assertThatThrownBy(() -> usuarioService.cambiarTelefono(1L, dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("La contraseña actual no es correcta.");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    void cambiarTelefono_sinTelefonoActual_cuandoYaTiene_lanzaError() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        usuario.setTelefono("+16502530000");
+        ActualizarTelefonoDTO dto = new ActualizarTelefonoDTO();
+        dto.setTelefonoNuevo("+5491123456789");
+        dto.setContraseniaActual("secreta123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
+
+        assertThatThrownBy(() -> usuarioService.cambiarTelefono(1L, dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Debés ingresar tu teléfono actual.");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    void cambiarTelefono_telefonoActualNoCoincide_lanzaError() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        usuario.setTelefono("+16502530000");
+        ActualizarTelefonoDTO dto = new ActualizarTelefonoDTO();
+        dto.setTelefonoActual("+16509999999");
+        dto.setTelefonoNuevo("+5491123456789");
+        dto.setContraseniaActual("secreta123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
+        when(telefonoService.validarYNormalizar("+16509999999", null)).thenReturn("+16509999999");
+
+        assertThatThrownBy(() -> usuarioService.cambiarTelefono(1L, dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("El teléfono actual no coincide con el registrado.");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    void cambiarTelefono_mismoNumero_lanzaError() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        usuario.setTelefono("+16502530000");
+        ActualizarTelefonoDTO dto = new ActualizarTelefonoDTO();
+        dto.setTelefonoActual("+16502530000");
+        dto.setTelefonoNuevo("+16502530000");
+        dto.setContraseniaActual("secreta123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
+        when(telefonoService.validarYNormalizar("+16502530000", null)).thenReturn("+16502530000");
+
+        assertThatThrownBy(() -> usuarioService.cambiarTelefono(1L, dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("El nuevo teléfono debe ser distinto al actual.");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    void cambiarTelefono_numeroDeOtroUsuario_lanzaError() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        Usuario otro = usuarioDePrueba("Artista777");
+        otro.setIdUsuario(2L);
+        otro.setTelefono("+5491123456789");
+        ActualizarTelefonoDTO dto = new ActualizarTelefonoDTO();
+        dto.setTelefonoNuevo("+5491123456789");
+        dto.setContraseniaActual("secreta123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
+        when(telefonoService.validarYNormalizar("+5491123456789", null)).thenReturn("+5491123456789");
+        when(usuarioRepository.findByTelefono("+5491123456789")).thenReturn(Optional.of(otro));
+
+        assertThatThrownBy(() -> usuarioService.cambiarTelefono(1L, dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Ya existe una cuenta con ese teléfono.");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    void cambiarTelefono_sinTelefonoPrevio_noExigeTelefonoActual() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        ActualizarTelefonoDTO dto = new ActualizarTelefonoDTO();
+        dto.setTelefonoNuevo("+5491123456789");
+        dto.setContraseniaActual("secreta123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
+        when(telefonoService.validarYNormalizar("+5491123456789", null)).thenReturn("+5491123456789");
+        when(usuarioRepository.findByTelefono("+5491123456789")).thenReturn(Optional.empty());
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UsuarioDTO resultado = usuarioService.cambiarTelefono(1L, dto);
+
+        assertThat(usuario.getTelefono()).isEqualTo("+5491123456789");
+        assertThat(resultado.isTieneTelefono()).isTrue();
+    }
+
+    @Test
+    void cambiarTelefono_usuarioInexistente_lanzaNoSuchElement() {
+        when(usuarioRepository.findByIdUsuario(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> usuarioService.cambiarTelefono(99L, new ActualizarTelefonoDTO()))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessage("Usuario no encontrado: 99");
+    }
+
+    @Test
+    void quitarTelefono_ok_eliminaElTelefono() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        usuario.setTelefono("+16502530000");
+        QuitarTelefonoDTO dto = new QuitarTelefonoDTO();
+        dto.setContraseniaActual("secreta123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UsuarioDTO resultado = usuarioService.quitarTelefono(1L, dto);
+
+        assertThat(usuario.getTelefono()).isNull();
+        assertThat(resultado.isTieneTelefono()).isFalse();
+        assertThat(resultado.getTelefonoEnmascarado()).isNull();
+    }
+
+    @Test
+    void quitarTelefono_contraseniaIncorrecta_lanzaError() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        usuario.setTelefono("+16502530000");
+        QuitarTelefonoDTO dto = new QuitarTelefonoDTO();
+        dto.setContraseniaActual("mala");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("mala", "$2a$10$hasheado")).thenReturn(false);
+
+        assertThatThrownBy(() -> usuarioService.quitarTelefono(1L, dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("La contraseña actual no es correcta.");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+    }
+
+    @Test
+    void quitarTelefono_sinTelefonoPrevio_esIdempotente() {
+        Usuario usuario = usuarioDePrueba("Cosmiq");
+        QuitarTelefonoDTO dto = new QuitarTelefonoDTO();
+        dto.setContraseniaActual("secreta123");
+
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UsuarioDTO resultado = usuarioService.quitarTelefono(1L, dto);
+
+        assertThat(resultado.isTieneTelefono()).isFalse();
+        assertThat(resultado.getTelefonoEnmascarado()).isNull();
     }
 
     // ---------------------------------------------------------------

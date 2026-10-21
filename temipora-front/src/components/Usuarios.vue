@@ -236,7 +236,7 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
                         <p><span class="text-rojizo">Nombre:</span> {{ u.nombre || '—' }}</p>
                         <p><span class="text-rojizo">Apellido:</span> {{ u.apellido || '—' }}</p>
                         <p><span class="text-rojizo">Correo:</span> {{ u.correo || '—' }}</p>
-                        <p><span class="text-rojizo">Teléfono:</span> {{ u.telefono || '—' }}</p>
+                        <p><span class="text-rojizo">Teléfono:</span> {{ u.telefonoEnmascarado || '—' }}</p>
                         <p><span class="text-rojizo">Sexo:</span> {{ u.sexo || '—' }}</p>
                         <p><span class="text-rojizo">Nacimiento:</span> {{ u.fechaNacimiento || '—' }}</p>
                         <p>

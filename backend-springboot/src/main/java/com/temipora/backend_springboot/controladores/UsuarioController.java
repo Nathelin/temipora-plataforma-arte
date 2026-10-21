@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -19,7 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.temipora.backend_springboot.modelo.ActualizarContraseniaDTO;
 import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
+import com.temipora.backend_springboot.modelo.ActualizarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.QuitarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
 import com.temipora.backend_springboot.servicios.UsuarioService;
@@ -74,6 +77,28 @@ public class UsuarioController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return ResponseEntity.ok(usuarioService.cambiarCorreo(idUsuario, dto));
+    }
+
+    @PutMapping("/usuarios/{idUsuario}/telefono")
+    public ResponseEntity<UsuarioDTO> cambiarTelefono(
+            @PathVariable Long idUsuario,
+            @Valid @RequestBody ActualizarTelefonoDTO dto,
+            Authentication authentication) {
+        if (esOtroUsuario(idUsuario, authentication)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(usuarioService.cambiarTelefono(idUsuario, dto));
+    }
+
+    @DeleteMapping("/usuarios/{idUsuario}/telefono")
+    public ResponseEntity<UsuarioDTO> quitarTelefono(
+            @PathVariable Long idUsuario,
+            @Valid @RequestBody QuitarTelefonoDTO dto,
+            Authentication authentication) {
+        if (esOtroUsuario(idUsuario, authentication)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(usuarioService.quitarTelefono(idUsuario, dto));
     }
 
     @PutMapping("/usuarios/{idUsuario}/contrasenia")
