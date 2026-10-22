@@ -21,6 +21,7 @@ import Favoritos from '../views/Favoritos.vue'
 import Servicios from '../views/Servicios.vue'
 import ServicioDetalle from '../views/ServicioDetalle.vue'
 import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
+import ConfiguracionApariencia from '../views/ConfiguracionApariencia.vue'
 import ConfiguracionPrivacidad from '../views/ConfiguracionPrivacidad.vue'
 import ConfiguracionEtiquetas from '../views/ConfiguracionEtiquetas.vue'
 import ConfiguracionFormularioPedidos from '../views/ConfiguracionFormularioPedidos.vue'
@@ -99,6 +100,7 @@ const routes = [
         children: [
           { path: '', redirect: '/configuracion/perfil' },
           { path: 'perfil', name: 'configuracion-perfil', component: ConfiguracionPerfil, meta: { title: 'Configuración - Perfil' } },
+          { path: 'apariencia', name: 'configuracion-apariencia', component: ConfiguracionApariencia, meta: { title: 'Configuración - Apariencia' } },
           { path: 'privacidad', name: 'configuracion-privacidad', component: ConfiguracionPrivacidad, meta: { title: 'Configuración - Privacidad' } },
           { path: 'etiquetas', name: 'configuracion-etiquetas', component: ConfiguracionEtiquetas, meta: { title: 'Configuración - Mis etiquetas' } },
           { path: 'formulario-pedidos', name: 'configuracion-formulario-pedidos', component: ConfiguracionFormularioPedidos, meta: { title: 'Configuración - Formulario de pedidos', requiresArtist: true } },

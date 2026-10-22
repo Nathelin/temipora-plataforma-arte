@@ -657,7 +657,7 @@ function irASubirImagen(imagen = null) {
                 <button
                   v-for="obra in perfil.portfolio"
                   :key="obra.idImagen"
-                  class="group aspect-square overflow-hidden rounded-[22px] border border-borde/60 bg-superficie p-2 text-left shadow-[0_10px_26px_rgba(74,29,46,0.07)] transition duration-300 hover:-translate-y-1 hover:border-coral/40 hover:shadow-[0_18px_38px_rgba(194,24,91,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+                  class="group aspect-square overflow-hidden rounded-[22px] border border-borde/60 bg-superficie p-2 text-left shadow-[0_10px_26px_rgba(74,29,46,0.07)] transition duration-300 hover:-translate-y-1 hover:border-coral/40 hover:shadow-[0_18px_38px_var(--sombra-acento)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
                   @click="abrirDetalleImagen(obra)"
                 >
                   <div class="relative h-[calc(100%-2.25rem)] min-h-0 overflow-hidden rounded-2xl bg-coral/20">

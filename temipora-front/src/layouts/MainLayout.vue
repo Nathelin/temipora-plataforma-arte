@@ -144,7 +144,7 @@ function irAPerfil() {
             </router-link>
             <router-link
               to="/registrarse"
-              class="hidden min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(194,24,91,0.22)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema sm:inline-flex"
+              class="hidden min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema sm:inline-flex"
             >
               Únete
             </router-link>
@@ -154,7 +154,7 @@ function irAPerfil() {
             <!-- Botón Subir (solo artistas) -->
             <div v-if="esArtista" ref="contenedorSubir" class="relative hidden md:block">
               <button
-                class="inline-flex min-h-10 items-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(194,24,91,0.22)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema"
+                class="inline-flex min-h-10 items-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema"
                 aria-haspopup="menu"
                 :aria-expanded="subirAbierto"
                 @click="subirAbierto = !subirAbierto"

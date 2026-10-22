@@ -23,6 +23,7 @@
   --color-decorativo-2: #ffd9c7;
   --color-decorativo-3: #ffe8a3;
   --color-tinta: #4a1d2e;
+  --sombra-acento: rgba(194, 24, 91, 0.22);
 
   /* Alias de compatibilidad con la paleta anterior */
   --color-crema: #fff6f1;
@@ -58,7 +59,7 @@
     color: var(--color-granate);
   }
 
-  [data-theme='noche'] {
+  [data-theme='medianoche'] {
     color-scheme: dark;
 
     --color-fondo: #241018;
@@ -80,6 +81,7 @@
     --color-decorativo-2: #ffd9c7;
     --color-decorativo-3: #ffe8a3;
     --color-tinta: #4a1d2e;
+    --sombra-acento: rgba(194, 24, 91, 0.28);
 
     --color-crema: #241018;
     --color-rosa: #7a3a52;
@@ -93,69 +95,141 @@
     --color-mantequilla: #ffe8a3;
   }
 
-  /* Controles de formulario: fondo oscuro y texto claro en modo noche.
+  [data-theme='cielo'] {
+    color-scheme: light;
+
+    --color-fondo: #eef4ff;
+    --color-superficie: #ffffff;
+    --color-superficie-alt: #e3edff;
+    --color-texto: #102a4c;
+    --color-texto-suave: #44618a;
+    --color-borde: #c2d8f7;
+    --color-acento: #1f6feb;
+    --color-acento-suave: #1f6feb;
+    --color-acento-hover: #1554b8;
+    --color-acento-contraste: #ffffff;
+    --color-accion: #102a4c;
+    --color-accion-hover: #1f6feb;
+    --color-inverso: #0b1f3a;
+    --color-inverso-suave: #c2d8f7;
+    --color-inverso-contraste: #eef4ff;
+    --color-decorativo-1: #7fb4ff;
+    --color-decorativo-2: #d6e6ff;
+    --color-decorativo-3: #ffe7a8;
+    --color-tinta: #102a4c;
+    --sombra-acento: rgba(31, 111, 235, 0.22);
+
+    --color-crema: #eef4ff;
+    --color-rosa: #c2d8f7;
+    --color-durazno: #d6e6ff;
+    --color-coral: #1f6feb;
+    --color-coral-vivo: #7fb4ff;
+    --color-rojizo: #1554b8;
+    --color-granate: #102a4c;
+    --color-cafe: #44618a;
+    --color-blanco: #ffffff;
+    --color-mantequilla: #ffe7a8;
+  }
+
+  [data-theme='oceano'] {
+    color-scheme: dark;
+
+    --color-fondo: #0b1726;
+    --color-superficie: #122239;
+    --color-superficie-alt: #19304d;
+    --color-texto: #eef5ff;
+    --color-texto-suave: #b7cbe6;
+    --color-borde: #2c4a70;
+    --color-acento: #1f6feb;
+    --color-acento-suave: #8ec6ff;
+    --color-acento-hover: #4a94e0;
+    --color-acento-contraste: #ffffff;
+    --color-accion: #1f6feb;
+    --color-accion-hover: #4a94e0;
+    --color-inverso: #07101c;
+    --color-inverso-suave: #c2d8f7;
+    --color-inverso-contraste: #eef5ff;
+    --color-decorativo-1: #7fb4ff;
+    --color-decorativo-2: #d6e6ff;
+    --color-decorativo-3: #ffe7a8;
+    --color-tinta: #07101c;
+    --sombra-acento: rgba(31, 111, 235, 0.3);
+
+    --color-crema: #0b1726;
+    --color-rosa: #2c4a70;
+    --color-durazno: #d6e6ff;
+    --color-coral: #1f6feb;
+    --color-coral-vivo: #7fb4ff;
+    --color-rojizo: #4a94e0;
+    --color-granate: #07101c;
+    --color-cafe: #b7cbe6;
+    --color-blanco: #122239;
+    --color-mantequilla: #ffe7a8;
+  }
+
+  /* Controles de formulario: fondo y texto adaptados a los temas oscuros.
      Las utilidades de fondo y texto de Tailwind siguen teniendo prioridad. */
-  [data-theme='noche'] select,
-  [data-theme='noche'] input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']):not([type='submit']):not([type='button']):not([type='reset']):not([type='image']),
-  [data-theme='noche'] textarea {
+  [data-oscuro='true'] select,
+  [data-oscuro='true'] input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']):not([type='submit']):not([type='button']):not([type='reset']):not([type='image']),
+  [data-oscuro='true'] textarea {
     background-color: var(--color-superficie-alt);
     color: var(--color-texto);
   }
 
-  [data-theme='noche'] select option,
-  [data-theme='noche'] select optgroup {
+  [data-oscuro='true'] select option,
+  [data-oscuro='true'] select optgroup {
     background-color: var(--color-superficie-alt);
     color: var(--color-texto);
   }
 
-  [data-theme='noche'] select option:disabled {
+  [data-oscuro='true'] select option:disabled {
     color: var(--color-texto-suave);
   }
 }
 
-/* Ajustes de contraste para clases de la paleta anterior en modo noche. */
-[data-theme='noche'] .text-granate {
+/* Ajustes de contraste para clases de la paleta anterior en temas oscuros. */
+[data-oscuro='true'] .text-granate {
   color: var(--color-texto);
 }
 
-[data-theme='noche'] .hover\:text-granate:hover {
+[data-oscuro='true'] .hover\:text-granate:hover {
   color: var(--color-texto);
 }
 
-[data-theme='noche'] .text-coral {
+[data-oscuro='true'] .text-coral {
   color: var(--color-acento-suave);
 }
 
-[data-theme='noche'] .hover\:text-coral:hover {
+[data-oscuro='true'] .hover\:text-coral:hover {
   color: var(--color-acento-suave);
 }
 
-[data-theme='noche'] .text-rojizo {
-  color: #ff9fbc;
+[data-oscuro='true'] .text-rojizo {
+  color: var(--color-acento-suave);
 }
 
-[data-theme='noche'] .hover\:text-rojizo:hover {
-  color: #ff9fbc;
+[data-oscuro='true'] .hover\:text-rojizo:hover {
+  color: var(--color-acento-suave);
 }
 
-[data-theme='noche'] .text-rosa {
+[data-oscuro='true'] .text-rosa {
   color: var(--color-inverso-suave);
 }
 
-[data-theme='noche'] .text-rosa\/80 {
+[data-oscuro='true'] .text-rosa\/80 {
   color: color-mix(in oklab, var(--color-inverso-suave) 80%, transparent);
 }
 
-[data-theme='noche'] .hover\:text-rosa:hover {
+[data-oscuro='true'] .hover\:text-rosa:hover {
   color: var(--color-inverso-suave);
 }
 
-[data-theme='noche'] .bg-durazno\/40,
-[data-theme='noche'] .bg-durazno\/50 {
+[data-oscuro='true'] .bg-durazno\/40,
+[data-oscuro='true'] .bg-durazno\/50 {
   background-color: color-mix(in oklab, var(--color-decorativo-2) 18%, transparent);
 }
 
-[data-theme='noche'] .text-green-700,
-[data-theme='noche'] .text-green-600 {
+[data-oscuro='true'] .text-green-700,
+[data-oscuro='true'] .text-green-600 {
   color: #86efac;
 }

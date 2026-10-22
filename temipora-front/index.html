@@ -3,22 +3,59 @@
   <head>
     <meta charset="UTF-8">
     <link rel="icon" href="/icon.ico">
+    <meta name="theme-color" content="#fff6f1">
     <script>
       (function () {
+        function prefiereOscuro() {
+          try {
+            return window.matchMedia('(prefers-color-scheme: dark)').matches
+          } catch (error) {
+            return false
+          }
+        }
+
+        var familia = 'calida'
+        var modo = 'sistema'
+
         try {
           var guardado = localStorage.getItem('temipora-tema')
-          var sistema = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'noche' : 'claro'
-          var tema = guardado === 'noche' || guardado === 'claro' ? guardado : sistema
-          document.documentElement.dataset.theme = tema
-          document.documentElement.style.colorScheme = tema === 'noche' ? 'dark' : 'light'
+          if (guardado === 'claro' || guardado === 'noche') {
+            modo = guardado === 'noche' ? 'oscuro' : 'claro'
+          } else if (guardado) {
+            var datos = JSON.parse(guardado)
+            if (
+              (datos.familia === 'calida' || datos.familia === 'azul') &&
+              (datos.modo === 'claro' || datos.modo === 'oscuro' || datos.modo === 'sistema')
+            ) {
+              familia = datos.familia
+              modo = datos.modo
+            }
+          }
         } catch (error) {
-          document.documentElement.dataset.theme = 'claro'
+          /* almacenamiento no disponible o dato inválido */
         }
+
+        var oscuro = modo === 'sistema' ? prefiereOscuro() : modo === 'oscuro'
+        var tema = familia === 'azul'
+          ? (oscuro ? 'oceano' : 'cielo')
+          : (oscuro ? 'medianoche' : 'amanecer')
+        var colores = {
+          amanecer: '#fff6f1',
+          medianoche: '#241018',
+          cielo: '#eef4ff',
+          oceano: '#0b1726',
+        }
+
+        document.documentElement.dataset.theme = tema
+        document.documentElement.dataset.oscuro = oscuro ? 'true' : 'false'
+        document.documentElement.style.colorScheme = oscuro ? 'dark' : 'light'
+
+        var meta = document.querySelector('meta[name="theme-color"]')
+        if (meta) meta.setAttribute('content', colores[tema])
       })()
     </script>
     <link href="/src/style.css" rel="stylesheet">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#fff6f1">
     <title>Temipora</title>
   </head>
   <body>
