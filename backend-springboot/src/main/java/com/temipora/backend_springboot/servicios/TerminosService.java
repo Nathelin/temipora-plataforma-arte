@@ -77,8 +77,27 @@ public class TerminosService {
 
     @Transactional
     public void eliminarServicio(Long idServicio, Long idArtista) {
+        if (!tieneGlobalValido(idArtista)) {
+            throw new IllegalArgumentException(
+                "Antes de quitar los términos propios, completá tus términos globales.");
+        }
         terminosRepository.findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
             .ifPresent(terminosRepository::delete);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean tieneGlobalValido(Long idArtista) {
+        return terminosRepository
+            .findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(idArtista)
+            .map(this::tieneContenido)
+            .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean tieneTerminosValidos(Long idServicio, Long idArtista) {
+        return terminosRepository.findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
+            .map(this::tieneContenido)
+            .orElseGet(() -> tieneGlobalValido(idArtista));
     }
 
     private TerminosDTO guardar(Terminos terminos, TerminosRequest request) {
@@ -150,11 +169,25 @@ public class TerminosService {
                 r.getQueNoDibuja())
             .anyMatch(s -> s != null && !s.isBlank());
 
-        boolean hayEstructura = r.getDerechos() != null && !r.getDerechos().isEmpty();
-
-        if (!hayTexto && !hayEstructura) {
+        if (!hayTexto) {
             throw new IllegalArgumentException("Completá al menos una sección de tus términos.");
         }
+    }
+
+    private boolean tieneContenido(Terminos terminos) {
+        return Stream.of(
+                terminos.getInformacionGeneral(),
+                terminos.getPoliticaRevisiones(),
+                terminos.getPoliticaCancelaciones(),
+                terminos.getUsoArtista(),
+                terminos.getUsoCliente(),
+                terminos.getQueDibuja(),
+                terminos.getQueNoDibuja())
+            .anyMatch(this::hayTexto);
+    }
+
+    private boolean hayTexto(String valor) {
+        return valor != null && !valor.isBlank();
     }
 
     private String limpiar(String valor) {

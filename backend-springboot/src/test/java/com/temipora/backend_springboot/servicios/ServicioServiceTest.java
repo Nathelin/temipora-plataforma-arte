@@ -107,6 +107,7 @@ class ServicioServiceTest {
         when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
         when(medioRepository.findByIdMedio(2L)).thenReturn(Optional.of(medio(2L, "Digital")));
         when(monedaService.obtener(3L)).thenReturn(moneda(3L, "ARS"));
+        when(terminosService.tieneGlobalValido(5L)).thenReturn(true);
         when(servicioRepository.save(any(Servicio.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ServicioRequest request = request();
@@ -118,6 +119,23 @@ class ServicioServiceTest {
         assertThat(dto.getImagenes()).containsExactly("a.png", "b.png");
         assertThat(dto.getNombreTipoServicio()).isEqualTo("Ilustración digital");
         assertThat(dto.getDescripcionTipoServicio()).isEqualTo("d");
+    }
+
+    @Test
+    void crear_sinTerminosGlobales_lanzaError() {
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+            .thenReturn(false);
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+        when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
+        when(medioRepository.findByIdMedio(2L)).thenReturn(Optional.of(medio(2L, "Digital")));
+        when(monedaService.obtener(3L)).thenReturn(moneda(3L, "ARS"));
+        when(terminosService.tieneGlobalValido(5L)).thenReturn(false);
+
+        assertThatThrownBy(() -> servicioService.crear(5L, request()))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Completá tus términos de uso y servicio antes de publicar el servicio.");
+
+        verify(servicioRepository, never()).save(any(Servicio.class));
     }
 
     @Test
@@ -227,11 +245,29 @@ class ServicioServiceTest {
         when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
         when(medioRepository.findByIdMedio(2L)).thenReturn(Optional.of(medio(2L, "Digital")));
         when(monedaService.obtener(3L)).thenReturn(moneda(3L, "ARS"));
+        when(terminosService.tieneTerminosValidos(1L, 5L)).thenReturn(true);
         when(servicioRepository.save(any(Servicio.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ServicioDTO dto = servicioService.modificar(1L, 5L, request());
 
         assertThat(dto.getNombre()).isEqualTo("Ilustración");
+    }
+
+    @Test
+    void modificar_sinTerminosValidos_lanzaError() {
+        when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio(1L, 5L)));
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndIdServicioNot(5L, 1L, "Ilustración", 1L))
+            .thenReturn(false);
+        when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
+        when(medioRepository.findByIdMedio(2L)).thenReturn(Optional.of(medio(2L, "Digital")));
+        when(monedaService.obtener(3L)).thenReturn(moneda(3L, "ARS"));
+        when(terminosService.tieneTerminosValidos(1L, 5L)).thenReturn(false);
+
+        assertThatThrownBy(() -> servicioService.modificar(1L, 5L, request()))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Completá tus términos de uso y servicio antes de publicar el servicio.");
+
+        verify(servicioRepository, never()).save(any(Servicio.class));
     }
 
     @Test
@@ -260,6 +296,18 @@ class ServicioServiceTest {
         ServicioDTO dto = servicioService.darDeBaja(1L, 5L);
 
         assertThat(dto.isEstado()).isFalse();
+    }
+
+    @Test
+    void darDeAlta_sinTerminosValidos_lanzaError() {
+        when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio(1L, 5L)));
+        when(terminosService.tieneTerminosValidos(1L, 5L)).thenReturn(false);
+
+        assertThatThrownBy(() -> servicioService.darDeAlta(1L, 5L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Completá tus términos de uso y servicio antes de publicar el servicio.");
+
+        verify(servicioRepository, never()).save(any(Servicio.class));
     }
 
     // ---------------------------------------------------------------

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { acceptImagenes, validarImagen, procesarImagen, LIMITES_IMAGEN } from '../servicios/archivos'
 import { formatearPrecio, formatearMonto, formatearMontoEnEdicion, parsearMonto } from '../servicios/moneda'
+import { hayContenidoTerminos } from '../servicios/terminos'
 import { useMonedas } from '../composables/useMonedas'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
 import SelectorPortfolio from '../components/SelectorPortfolio.vue'
@@ -12,6 +13,8 @@ import EditorFormularioPedidos from '../components/EditorFormularioPedidos.vue'
 import EditorTerminos from '../components/EditorTerminos.vue'
 import VistaPreviaFormulario from '../components/VistaPreviaFormulario.vue'
 import VistaPreviaTerminos from '../components/VistaPreviaTerminos.vue'
+import AvisoCompletitudTerminos from '../components/AvisoCompletitudTerminos.vue'
+import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -95,16 +98,6 @@ const SENSIBLES = [
   { valor: 'GENERAL', texto: 'Contenido sensible general' },
 ]
 
-const SECCIONES_TERMINOS = [
-  'informacionGeneral',
-  'politicaRevisiones',
-  'politicaCancelaciones',
-  'usoArtista',
-  'usoCliente',
-  'queDibuja',
-  'queNoDibuja',
-]
-
 const form = ref({
   nombre: '',
   idTipoServicio: '',
@@ -130,8 +123,18 @@ const formularioInicialPropio = ref(false)
 const terminosInicialPropio = ref(false)
 const configFormulario = ref({ preguntas: [] })
 const configTerminos = ref(crearTerminosVacios())
-const configFormularioGlobal = ref({ preguntas: [] })
+const configFormularioGlobal = ref({ preguntas: [], esSistema: false })
 const configTerminosGlobal = ref(crearTerminosVacios())
+
+const modalTerminosGlobal = ref(false)
+const modoTerminosGlobal = ref('editar')
+const configTerminosGlobalEdicion = ref(crearTerminosVacios())
+const instantaneaTerminosGlobal = ref('')
+const guardandoTerminosGlobal = ref(false)
+const errorTerminosGlobal = ref('')
+const confirmandoTerminosGlobal = ref(false)
+const confirmandoCambioFormulario = ref(false)
+const confirmandoCambioTerminos = ref(false)
 
 const modoFormulario = ref('editar')
 const modoTerminos = ref('editar')
@@ -146,6 +149,12 @@ const formularioVisible = computed(
 )
 const terminosVisible = computed(
   () => (personalizarTerminos.value ? configTerminos.value : configTerminosGlobal.value),
+)
+const terminosGlobalTieneContenido = computed(
+  () => hayContenidoTerminos(configTerminosGlobal.value),
+)
+const hayCambiosTerminosGlobal = computed(
+  () => instantaneaTerminosGlobal.value !== JSON.stringify(configTerminosGlobalEdicion.value),
 )
 const monedaSeleccionada = computed(
   () => monedas.value.find((m) => String(m.idMoneda) === form.value.idMoneda) || null,
@@ -183,6 +192,13 @@ function crearTerminosVacios() {
       queNoDibuja: '',
     },
     estadoDerechos: {},
+  }
+}
+
+function clonarTerminos(terminos) {
+  return {
+    form: { ...crearTerminosVacios().form, ...(terminos?.form || {}) },
+    estadoDerechos: JSON.parse(JSON.stringify(terminos?.estadoDerechos || {})),
   }
 }
 
@@ -257,7 +273,10 @@ async function cargar() {
       api.get(`/usuarios/${idUsuario.value}/formulario-pedidos`),
       api.get(`/usuarios/${idUsuario.value}/terminos`),
     ])
-    configFormularioGlobal.value = { preguntas: mapearPreguntas(formularioGlobalRes.data) }
+    configFormularioGlobal.value = {
+      preguntas: mapearPreguntas(formularioGlobalRes.data),
+      esSistema: !!formularioGlobalRes.data.esSistema,
+    }
     configTerminosGlobal.value = construirTerminos(terminosGlobalRes.data)
 
     if (esEdicion.value) {
@@ -417,16 +436,42 @@ function onSeleccionPortfolio(urls) {
   selectorAbierto.value = false
 }
 
-function elegirFormulario(personalizado) {
+function aplicarEleccionFormulario(personalizado) {
   personalizarFormulario.value = personalizado
   if (personalizado) modoFormulario.value = 'editar'
   else verFormularioGlobal.value = true
 }
 
-function elegirTerminos(personalizado) {
+function elegirFormulario(personalizado) {
+  if (!personalizado && personalizarFormulario.value && formularioInicialPropio.value) {
+    confirmandoCambioFormulario.value = true
+    return
+  }
+  aplicarEleccionFormulario(personalizado)
+}
+
+function confirmarCambioFormulario() {
+  confirmandoCambioFormulario.value = false
+  aplicarEleccionFormulario(false)
+}
+
+function aplicarEleccionTerminos(personalizado) {
   personalizarTerminos.value = personalizado
   if (personalizado) modoTerminos.value = 'editar'
   else verTerminosGlobal.value = true
+}
+
+function elegirTerminos(personalizado) {
+  if (!personalizado && personalizarTerminos.value && terminosInicialPropio.value) {
+    confirmandoCambioTerminos.value = true
+    return
+  }
+  aplicarEleccionTerminos(personalizado)
+}
+
+function confirmarCambioTerminos() {
+  confirmandoCambioTerminos.value = false
+  aplicarEleccionTerminos(false)
 }
 
 function posicionSegunSignificativos(texto, cantidad) {
@@ -502,20 +547,13 @@ function validarFormulario() {
   return errs
 }
 
-function hayContenidoTerminos() {
-  const t = configTerminos.value
-  const hayTexto = SECCIONES_TERMINOS
-    .some((k) => (t.form[k] || '').trim())
-  const hayDerechos = derechosCatalogo.value
-    .some((d) => d.codigo !== 'PERSONAL' && t.estadoDerechos[d.idDerechoTermino]?.disponible)
-  return hayTexto || hayDerechos
-}
-
 function validarTerminos() {
-  if (!personalizarTerminos.value) return []
-  return hayContenidoTerminos()
-    ? []
-    : ['Completá al menos una sección de los términos personalizados.']
+  if (hayContenidoTerminos(terminosVisible.value)) return []
+  return [
+    personalizarTerminos.value
+      ? 'Completá al menos una sección de los términos personalizados.'
+      : 'Tus términos globales están vacíos. Completalos antes de publicar el servicio.',
+  ]
 }
 
 function validarPasoActual() {
@@ -573,8 +611,7 @@ function porcentajeExtraDe(derecho, estado) {
   return Number.isNaN(numero) ? null : numero
 }
 
-function payloadTerminos() {
-  const t = configTerminos.value
+function payloadTerminosDe(t) {
   return {
     informacionGeneral: t.form.informacionGeneral || null,
     politicaRevisiones: t.form.politicaRevisiones || null,
@@ -592,6 +629,57 @@ function payloadTerminos() {
         porcentajeExtra: porcentajeExtraDe(derecho, estado),
       }
     }),
+  }
+}
+
+function abrirModalTerminosGlobal() {
+  configTerminosGlobalEdicion.value = clonarTerminos(configTerminosGlobal.value)
+  modoTerminosGlobal.value = 'editar'
+  errorTerminosGlobal.value = ''
+  confirmandoTerminosGlobal.value = false
+  instantaneaTerminosGlobal.value = JSON.stringify(configTerminosGlobalEdicion.value)
+  modalTerminosGlobal.value = true
+}
+
+function cerrarModalTerminosGlobal() {
+  if (guardandoTerminosGlobal.value) return
+  modalTerminosGlobal.value = false
+  confirmandoTerminosGlobal.value = false
+}
+
+function solicitarGuardarTerminosGlobal() {
+  errorTerminosGlobal.value = ''
+  if (!hayContenidoTerminos(configTerminosGlobalEdicion.value)) {
+    errorTerminosGlobal.value = 'Completá al menos una sección de tus términos.'
+    return
+  }
+  if (!hayCambiosTerminosGlobal.value) return
+  confirmandoTerminosGlobal.value = true
+}
+
+async function guardarTerminosGlobal() {
+  confirmandoTerminosGlobal.value = false
+  errorTerminosGlobal.value = ''
+  guardandoTerminosGlobal.value = true
+  try {
+    const habiaCambiosEnServicio = hayCambios.value
+    const r = await api.put(
+      `/usuarios/${idUsuario.value}/terminos`,
+      payloadTerminosDe(configTerminosGlobalEdicion.value),
+    )
+    const nuevosGlobales = construirTerminos(r.data)
+    configTerminosGlobal.value = nuevosGlobales
+    if (!personalizarTerminos.value) {
+      configTerminos.value = clonarTerminos(nuevosGlobales)
+    }
+    if (!habiaCambiosEnServicio) {
+      estadoGuardado.value = instantanea()
+    }
+    modalTerminosGlobal.value = false
+  } catch (e) {
+    errorTerminosGlobal.value = e.response?.data?.message || 'No se pudieron guardar los términos globales.'
+  } finally {
+    guardandoTerminosGlobal.value = false
   }
 }
 
@@ -642,7 +730,7 @@ async function guardar() {
       }
     }
     if (personalizarTerminos.value) {
-      payload.terminos = payloadTerminos()
+      payload.terminos = payloadTerminosDe(configTerminos.value)
     }
 
     let idFinal = idServicio.value
@@ -1069,6 +1157,11 @@ onBeforeUnmount(() => {
               </button>
             </div>
 
+            <div v-if="!personalizarFormulario && configFormularioGlobal.esSistema" class="rounded-xl border border-coral/40 bg-coral/10 px-4 py-3 text-sm text-cafe/80">
+              Estás usando el <strong class="text-granate">formulario de pedidos por defecto del sistema</strong>.
+              Podés publicar igual, pero conviene personalizarlo desde Configuración para pedir la información que necesitás.
+            </div>
+
             <div v-if="formularioInicialPropio && !personalizarFormulario" class="rounded-xl border border-coral/30 bg-coral/5 px-4 py-3 text-sm text-cafe/80">
               Al guardar se eliminará la personalización que tenía este servicio y se usará tu formulario global.
             </div>
@@ -1164,6 +1257,19 @@ onBeforeUnmount(() => {
               </button>
             </div>
 
+            <div v-if="!personalizarTerminos && !terminosGlobalTieneContenido" class="rounded-xl border border-rojizo/30 bg-rojizo/5 px-4 py-3 text-sm text-cafe/80">
+              <p class="text-rojizo">Tus términos globales todavía están vacíos.</p>
+              <p class="mt-1">Completalos antes de publicar o personalizá los términos de este servicio.</p>
+              <button type="button" class="mt-3 rounded-md border border-coral bg-blanco px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-coral/10" @click="abrirModalTerminosGlobal">
+                Completar términos globales
+              </button>
+            </div>
+
+            <AvisoCompletitudTerminos
+              v-if="!personalizarTerminos && terminosGlobalTieneContenido"
+              :terminos="configTerminosGlobal"
+            />
+
             <div v-if="terminosInicialPropio && !personalizarTerminos" class="rounded-xl border border-coral/30 bg-coral/5 px-4 py-3 text-sm text-cafe/80">
               Al guardar se eliminarán los términos propios de este servicio y se usarán tus términos globales.
             </div>
@@ -1171,9 +1277,14 @@ onBeforeUnmount(() => {
             <div v-if="!personalizarTerminos" class="overflow-hidden rounded-2xl border border-rosa/60">
               <div class="flex items-center justify-between gap-3 border-b border-rosa/50 bg-rosa/10 px-5 py-3">
                 <p class="text-sm text-granate">Vista previa de tus términos globales</p>
-                <button type="button" class="text-xs text-coral hover:text-rojizo transition" @click="verTerminosGlobal = !verTerminosGlobal">
-                  {{ verTerminosGlobal ? 'Ocultar' : 'Ver vista previa' }}
-                </button>
+                <div class="flex items-center gap-3">
+                  <button type="button" class="text-xs text-granate underline underline-offset-2 hover:text-coral transition" @click="abrirModalTerminosGlobal">
+                    Editar términos globales
+                  </button>
+                  <button type="button" class="text-xs text-coral hover:text-rojizo transition" @click="verTerminosGlobal = !verTerminosGlobal">
+                    {{ verTerminosGlobal ? 'Ocultar' : 'Ver vista previa' }}
+                  </button>
+                </div>
               </div>
               <div v-if="verTerminosGlobal" class="p-5 sm:p-6">
                 <VistaPreviaTerminos
@@ -1205,6 +1316,11 @@ onBeforeUnmount(() => {
               </div>
 
               <div class="mt-5">
+                <AvisoCompletitudTerminos
+                  v-if="modoTerminos === 'editar'"
+                  :terminos="configTerminos"
+                  class="mb-5"
+                />
                 <EditorTerminos
                   v-if="modoTerminos === 'editar'"
                   v-model="configTerminos"
@@ -1404,6 +1520,88 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </template>
+
+    <div v-if="modalTerminosGlobal" class="fixed inset-0 z-[70] flex items-center justify-center bg-granate/40 px-4 py-6" @click.self="cerrarModalTerminosGlobal">
+      <div class="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-blanco p-6 shadow-xl sm:p-8">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-xl text-granate">Editar términos globales</h2>
+            <p class="mt-1 text-sm text-cafe/70">Estos cambios se aplican a los servicios que usan tus términos globales.</p>
+          </div>
+          <button type="button" class="rounded-md px-2 py-1 text-cafe/50 transition hover:bg-rosa/20 hover:text-cafe" aria-label="Cerrar" @click="cerrarModalTerminosGlobal">
+            ✕
+          </button>
+        </div>
+
+        <div class="mt-5 inline-flex rounded-lg border border-rosa p-0.5 text-sm">
+          <button type="button" class="rounded-md px-3 py-1.5 transition" :class="modoTerminosGlobal === 'editar' ? 'bg-coral text-white' : 'text-cafe hover:bg-rosa/20'" @click="modoTerminosGlobal = 'editar'">
+            Editar
+          </button>
+          <button type="button" class="rounded-md px-3 py-1.5 transition" :class="modoTerminosGlobal === 'preview' ? 'bg-coral text-white' : 'text-cafe hover:bg-rosa/20'" @click="modoTerminosGlobal = 'preview'">
+            Vista previa
+          </button>
+        </div>
+
+        <div class="mt-5">
+          <template v-if="modoTerminosGlobal === 'editar'">
+            <AvisoCompletitudTerminos
+              :terminos="configTerminosGlobalEdicion"
+              class="mb-5"
+            />
+            <EditorTerminos v-model="configTerminosGlobalEdicion" :derechos-catalogo="derechosCatalogo" />
+          </template>
+          <VistaPreviaTerminos
+            v-else
+            :terminos="configTerminosGlobalEdicion"
+            :derechos-catalogo="derechosCatalogo"
+            :mostrar-aviso="false"
+          />
+        </div>
+
+        <p v-if="errorTerminosGlobal" class="mt-4 text-sm text-rojizo">{{ errorTerminosGlobal }}</p>
+
+        <div class="mt-6 flex flex-col-reverse gap-3 border-t border-rosa/60 pt-5 sm:flex-row sm:justify-end">
+          <button type="button" class="rounded-md border border-rosa px-4 py-2 text-sm text-cafe transition hover:bg-rosa/20" @click="cerrarModalTerminosGlobal">
+            Cancelar
+          </button>
+          <button
+            type="button"
+            :disabled="!hayCambiosTerminosGlobal || guardandoTerminosGlobal"
+            class="rounded-md bg-coral px-5 py-2.5 text-sm text-white shadow-sm transition hover:bg-rojizo disabled:cursor-not-allowed disabled:opacity-50"
+            @click="solicitarGuardarTerminosGlobal"
+          >
+            {{ guardandoTerminosGlobal ? 'Guardando...' : 'Guardar términos globales' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <ModalConfirmacion
+      :abierto="confirmandoCambioFormulario"
+      titulo="¿Usar el formulario global?"
+      mensaje="Al guardar se eliminará la personalización de este servicio y se usará tu formulario global."
+      texto-confirmar="Usar formulario global"
+      @confirmar="confirmarCambioFormulario"
+      @cerrar="confirmandoCambioFormulario = false"
+    />
+
+    <ModalConfirmacion
+      :abierto="confirmandoCambioTerminos"
+      titulo="¿Usar los términos globales?"
+      mensaje="Al guardar se eliminarán los términos propios de este servicio y se usarán tus términos globales."
+      texto-confirmar="Usar términos globales"
+      @confirmar="confirmarCambioTerminos"
+      @cerrar="confirmandoCambioTerminos = false"
+    />
+
+    <ModalConfirmacion
+      :abierto="confirmandoTerminosGlobal"
+      titulo="¿Guardar términos globales?"
+      mensaje="Se actualizarán tus términos globales y los servicios que los usan verán los cambios."
+      texto-confirmar="Guardar términos"
+      @confirmar="guardarTerminosGlobal"
+      @cerrar="confirmandoTerminosGlobal = false"
+    />
 
     <SelectorPortfolio
       v-if="selectorAbierto"

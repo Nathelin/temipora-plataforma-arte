@@ -228,6 +228,7 @@ public class ServicioService {
         servicio.setArtista(artista);
         servicio.setEstado(true);
         aplicar(servicio, request);
+        validarTerminos(idArtista, null, request);
 
         Servicio guardado = servicioRepository.save(servicio);
         guardarConfiguracion(guardado.getIdServicio(), idArtista, request);
@@ -240,6 +241,7 @@ public class ServicioService {
         verificarDuenio(servicio, idArtista);
         validarUnico(idArtista, request.getIdTipoServicio(), request.getNombre(), idServicio);
         aplicar(servicio, request);
+        validarTerminos(idArtista, idServicio, request);
         Servicio guardado = servicioRepository.save(servicio);
         guardarConfiguracion(idServicio, idArtista, request);
         return ServicioDTO.desdeServicio(guardado);
@@ -257,8 +259,25 @@ public class ServicioService {
     public ServicioDTO darDeAlta(Long idServicio, Long idArtista) {
         Servicio servicio = obtenerEntidad(idServicio);
         verificarDuenio(servicio, idArtista);
+        if (!terminosService.tieneTerminosValidos(idServicio, idArtista)) {
+            throw new IllegalArgumentException(
+                "Completá tus términos de uso y servicio antes de publicar el servicio.");
+        }
         servicio.setEstado(true);
         return ServicioDTO.desdeServicio(servicioRepository.save(servicio));
+    }
+
+    private void validarTerminos(Long idArtista, Long idServicio, ServicioRequest request) {
+        if (request.getTerminos() != null) {
+            return;
+        }
+        boolean valido = idServicio == null
+            ? terminosService.tieneGlobalValido(idArtista)
+            : terminosService.tieneTerminosValidos(idServicio, idArtista);
+        if (!valido) {
+            throw new IllegalArgumentException(
+                "Completá tus términos de uso y servicio antes de publicar el servicio.");
+        }
     }
 
     private void aplicar(Servicio servicio, ServicioRequest r) {

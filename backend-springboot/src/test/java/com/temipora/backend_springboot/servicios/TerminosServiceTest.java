@@ -20,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.DerechoTermino;
+import com.temipora.backend_springboot.modelo.TerminoDerecho;
 import com.temipora.backend_springboot.modelo.TerminoDerechoRequest;
 import com.temipora.backend_springboot.modelo.Terminos;
 import com.temipora.backend_springboot.modelo.TerminosDTO;
@@ -126,12 +127,70 @@ class TerminosServiceTest {
     void eliminarServicio_borraLosTerminosPropios() {
         Terminos propios = terminos(1L, 1, "Propios");
         propios.setIdServicio(7L);
+        Terminos globales = terminos(2L, 1, "Global");
         when(terminosRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
             .thenReturn(Optional.of(propios));
+        when(terminosRepository.findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(5L))
+            .thenReturn(Optional.of(globales));
 
         terminosService.eliminarServicio(7L, 5L);
 
         verify(terminosRepository).delete(propios);
+    }
+
+    @Test
+    void eliminarServicio_sinGlobalesValidos_lanzaError() {
+        when(terminosRepository.findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(5L))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> terminosService.eliminarServicio(7L, 5L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Antes de quitar los términos propios, completá tus términos globales.");
+
+        verify(terminosRepository, never()).delete(any(Terminos.class));
+    }
+
+    @Test
+    void tieneGlobalValido_conTexto_devuelveTrue() {
+        Terminos globales = terminos(1L, 1, "Global");
+        when(terminosRepository.findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(5L))
+            .thenReturn(Optional.of(globales));
+
+        assertThat(terminosService.tieneGlobalValido(5L)).isTrue();
+    }
+
+    @Test
+    void tieneGlobalValido_conDerechosSinTexto_devuelveFalse() {
+        Terminos globales = terminos(1L, 1, null);
+        TerminoDerecho comercial = new TerminoDerecho();
+        comercial.setDisponible(true);
+        comercial.setDerecho(derecho(1L, "CONTENIDO", "Uso comercial", 2));
+        globales.getTerminoDerechos().add(comercial);
+        when(terminosRepository.findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(5L))
+            .thenReturn(Optional.of(globales));
+
+        assertThat(terminosService.tieneGlobalValido(5L)).isFalse();
+    }
+
+    @Test
+    void tieneTerminosValidos_conPropiosVacios_devuelveFalse() {
+        Terminos propios = terminos(1L, 1, null);
+        propios.setIdServicio(7L);
+        when(terminosRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+            .thenReturn(Optional.of(propios));
+
+        assertThat(terminosService.tieneTerminosValidos(7L, 5L)).isFalse();
+    }
+
+    @Test
+    void tieneTerminosValidos_sinPropios_usaGlobales() {
+        Terminos globales = terminos(2L, 1, "Global");
+        when(terminosRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+            .thenReturn(Optional.empty());
+        when(terminosRepository.findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(5L))
+            .thenReturn(Optional.of(globales));
+
+        assertThat(terminosService.tieneTerminosValidos(7L, 5L)).isTrue();
     }
 
     // ---------------------------------------------------------------
@@ -219,6 +278,30 @@ class TerminosServiceTest {
     @Test
     void guardarGlobal_sinContenido_lanzaError() {
         TerminosRequest request = requestVacio();
+
+        assertThatThrownBy(() -> terminosService.guardarGlobal(5L, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Completá al menos una sección de tus términos.");
+
+        verify(terminosRepository, never()).save(any(Terminos.class));
+    }
+
+    @Test
+    void guardarGlobal_soloConDerechoPersonal_lanzaError() {
+        TerminosRequest request = requestVacio();
+        request.setDerechos(List.of(derechoReq(2L, true, null)));
+
+        assertThatThrownBy(() -> terminosService.guardarGlobal(5L, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Completá al menos una sección de tus términos.");
+
+        verify(terminosRepository, never()).save(any(Terminos.class));
+    }
+
+    @Test
+    void guardarGlobal_conDerechoOfrecidoSinTexto_lanzaError() {
+        TerminosRequest request = requestVacio();
+        request.setDerechos(List.of(derechoReq(1L, true, new BigDecimal("20"))));
 
         assertThatThrownBy(() -> terminosService.guardarGlobal(5L, request))
             .isInstanceOf(IllegalArgumentException.class)

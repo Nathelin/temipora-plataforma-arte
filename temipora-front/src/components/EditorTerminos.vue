@@ -15,7 +15,7 @@ const secciones = [
   { key: 'usoCliente', label: 'Uso del cliente' },
 ]
 
-const PLANTILLA = {
+const PLACEHOLDERS = {
   informacionGeneral: 'Antes de comisionar, contame tu idea con la mayor cantidad de detalles posible (personajes, estilo, colores, referencias). Te confirmo si puedo tomarlo y el presupuesto final.',
   politicaRevisiones: 'Incluyo hasta 2 rondas de revisiones (boceto y color). Cambios grandes fuera de esas etapas pueden tener un costo extra.',
   politicaCancelaciones: 'Si cancelás antes de empezar, devuelvo el 100%. Si el pedido ya está en boceto, devuelvo el 50%. Con el lineart o color avanzado no hay reembolso.',
@@ -28,28 +28,17 @@ const modal = ref({ abierto: false, titulo: '', descripcion: '' })
 function abrirDescripcion(titulo, descripcion) {
   modal.value = { abierto: true, titulo, descripcion }
 }
-
-function usarPlantilla() {
-  for (const [key, texto] of Object.entries(PLANTILLA)) {
-    if (!datos.value.form[key].trim()) datos.value.form[key] = texto
-  }
-}
 </script>
 
 <template>
   <div class="space-y-8">
-    <div class="flex justify-end">
-      <button type="button" class="text-sm text-coral hover:text-rojizo transition" @click="usarPlantilla">
-        Usar plantilla sugerida
-      </button>
-    </div>
-
     <div class="space-y-6">
       <div v-for="s in secciones" :key="s.key">
         <label class="block text-sm text-cafe mb-2">{{ s.label }}</label>
         <textarea
           v-model="datos.form[s.key]"
           rows="3"
+          :placeholder="PLACEHOLDERS[s.key]"
           class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"
         ></textarea>
       </div>
