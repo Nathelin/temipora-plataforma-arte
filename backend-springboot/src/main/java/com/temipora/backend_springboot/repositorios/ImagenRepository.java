@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.repositorios;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.domain.Page;
@@ -10,11 +11,15 @@ import com.temipora.backend_springboot.modelo.Imagen;
 import com.temipora.backend_springboot.modelo.Portfolio;
 import com.temipora.backend_springboot.modelo.TipoArte;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface ImagenRepository extends JpaRepository<Imagen,Long>{
 
 	List<Imagen> findByPortfolioAndEstadoTrueOrderByFechaSubidaDesc(Portfolio portfolio);
+
+	@EntityGraph(attributePaths = { "usuario", "tipoArte", "tipoArte.medio" })
+	List<Imagen> findByUsuarioIdUsuarioInAndEstadoTrue(Collection<Long> idsUsuario);
 
 	boolean existsByUrl(String url);
 

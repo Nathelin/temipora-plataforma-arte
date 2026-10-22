@@ -181,6 +181,22 @@ class ServicioServiceTest {
     }
 
     @Test
+    void crear_cuposCero_lanzaError() {
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+            .thenReturn(false);
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+
+        ServicioRequest request = request();
+        request.setCupos(0);
+
+        assertThatThrownBy(() -> servicioService.crear(5L, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("La cantidad de cupos debe ser mayor a cero.");
+
+        verify(servicioRepository, never()).save(any(Servicio.class));
+    }
+
+    @Test
     void obtener_servicioInactivoDeOtroUsuario_lanzaNoSuchElement() {
         Servicio servicio = servicio(1L, 5L);
         servicio.setEstado(false);

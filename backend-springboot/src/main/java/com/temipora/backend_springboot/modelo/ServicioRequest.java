@@ -53,7 +53,7 @@ public class ServicioRequest {
     private ETiempoEntregaUnidad tiempoEntregaUnidad;
 
     @NotNull(message = "La cantidad de cupos es obligatoria.")
-    @Min(value = 0, message = "Los cupos no pueden ser negativos")
+    @Min(value = 1, message = "La cantidad de cupos debe ser mayor a cero.")
     private Integer cupos;
 
     private boolean habilitarCuposTrasEntrega;

@@ -17,6 +17,7 @@ import AdminLayout from '../layouts/AdminLayout.vue'
 import ConfiguracionLayout from '../layouts/ConfiguracionLayout.vue'
 import Inicio from '../views/Inicio.vue'
 import Perfil from '../views/Perfil.vue'
+import Favoritos from '../views/Favoritos.vue'
 import Servicios from '../views/Servicios.vue'
 import ServicioDetalle from '../views/ServicioDetalle.vue'
 import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
@@ -61,6 +62,12 @@ const routes = [
           }
           return { name: 'inicio' }
         },
+      },
+      {
+        path: 'favoritos',
+        name: 'favoritos',
+        component: Favoritos,
+        meta: { title: 'Artistas favoritos', requiresAuth: true },
       },
       {
         path: 'portfolio/subir',
@@ -240,6 +247,11 @@ router.beforeEach((to, from, next) => {
     document.title = routeTitle;
   } else {
     document.title = 'Temipora';
+  }
+
+  if (to.matched.some((r) => r.meta.requiresAuth) && !token) {
+    next({ name: 'login' })
+    return
   }
 
   if (to.matched.some((r) => r.meta.requiresAdmin)) {

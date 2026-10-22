@@ -108,6 +108,13 @@ function irAPerfil() {
               Explorar
             </router-link>
             <router-link
+              v-if="estaLogueado"
+              to="/favoritos"
+              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+            >
+              Favoritos
+            </router-link>
+            <router-link
               v-if="estaLogueado && esArtista"
               to="/mis-servicios"
               class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
@@ -229,6 +236,13 @@ function irAPerfil() {
                   Perfil
                 </button>
                 <button
+                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  role="menuitem"
+                  @click="menuAbierto = false; router.push({ name: 'favoritos' })"
+                >
+                  Favoritos
+                </button>
+                <button
                   v-if="esAdmin"
                   class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
                   role="menuitem"
@@ -283,6 +297,14 @@ function irAPerfil() {
                 Explorar
               </router-link>
               <router-link
+                v-if="estaLogueado"
+                to="/favoritos"
+                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                @click="menuMovilAbierto = false"
+              >
+                Favoritos
+              </router-link>
+              <router-link
                 v-if="estaLogueado && esArtista"
                 to="/mis-servicios"
                 class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
@@ -330,6 +352,13 @@ function irAPerfil() {
                   @click="menuMovilAbierto = false; irAPerfil()"
                 >
                   Mi perfil
+                </button>
+                <button
+                  type="button"
+                  class="flex w-full items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  @click="menuMovilAbierto = false; router.push({ name: 'favoritos' })"
+                >
+                  Favoritos
                 </button>
                 <button
                   type="button"

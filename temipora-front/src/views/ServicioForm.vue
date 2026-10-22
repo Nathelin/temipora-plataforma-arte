@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { acceptImagenes, validarImagen, procesarImagen, LIMITES_IMAGEN } from '../servicios/archivos'
-import { formatearPrecio } from '../servicios/moneda'
+import { formatearPrecio, formatearMonto, formatearMontoEnEdicion, parsearMonto } from '../servicios/moneda'
 import { useMonedas } from '../composables/useMonedas'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
 import SelectorPortfolio from '../components/SelectorPortfolio.vue'
@@ -272,7 +272,7 @@ async function cargar() {
         idTipoServicio: d.idTipoServicio ? String(d.idTipoServicio) : '',
         idMedio: d.idMedio ? String(d.idMedio) : '',
         descripcion: d.descripcion || '',
-        precioBase: d.precioBase ?? '',
+        precioBase: formatearMonto(d.precioBase),
         idMoneda: d.idMoneda ? String(d.idMoneda) : '',
         contenidoSensible: !!d.contenidoSensible,
         contenidosSensibles: Array.isArray(d.contenidosSensibles) ? [...d.contenidosSensibles] : [],
@@ -429,13 +429,43 @@ function elegirTerminos(personalizado) {
   else verTerminosGlobal.value = true
 }
 
+function posicionSegunSignificativos(texto, cantidad) {
+  if (cantidad <= 0) return 0
+  let encontrados = 0
+  for (let i = 0; i < texto.length; i += 1) {
+    if (/[\d,]/.test(texto[i])) {
+      encontrados += 1
+      if (encontrados === cantidad) return i + 1
+    }
+  }
+  return texto.length
+}
+
+function alEscribirPrecioBase(event) {
+  const input = event.target
+  const posicion = input.selectionStart ?? input.value.length
+  const significativosAntes = input.value.slice(0, posicion).replace(/[^\d,]/g, '').length
+  const formateado = formatearMontoEnEdicion(input.value)
+
+  form.value.precioBase = formateado
+  input.value = formateado
+  const nuevaPosicion = posicionSegunSignificativos(formateado, significativosAntes)
+  input.setSelectionRange(nuevaPosicion, nuevaPosicion)
+}
+
+function alSalirPrecioBase() {
+  const numero = parsearMonto(form.value.precioBase)
+  form.value.precioBase = numero === null ? '' : formatearMonto(numero)
+}
+
 function validarDatosBasicos() {
   const errs = []
   if (!form.value.nombre.trim()) errs.push('El nombre es obligatorio.')
   if (!form.value.idTipoServicio) errs.push('Elegí un tipo de servicio.')
   if (!form.value.idMedio) errs.push('Elegí un medio.')
   if (!form.value.descripcion.trim()) errs.push('La descripción es obligatoria.')
-  if (form.value.precioBase === '' || Number(form.value.precioBase) <= 0) errs.push('Ingresá un precio base mayor a cero.')
+  const precioBase = parsearMonto(form.value.precioBase)
+  if (precioBase === null || precioBase <= 0) errs.push('Ingresá un precio base mayor a cero.')
   if (!form.value.idMoneda) errs.push('Elegí una moneda.')
   return errs
 }
@@ -445,8 +475,8 @@ function validarEntrega() {
   if (!form.value.tiempoEntregaValor || Number(form.value.tiempoEntregaValor) < 1) {
     errs.push('Ingresá el tiempo estimado de entrega.')
   }
-  if (form.value.cupos === '' || Number(form.value.cupos) < 0) {
-    errs.push('Ingresá la cantidad de cupos.')
+  if (form.value.cupos === '' || Number(form.value.cupos) <= 0) {
+    errs.push('Ingresá una cantidad de cupos mayor a cero.')
   }
   if (form.value.contenidoSensible && !form.value.contenidosSensibles.length) {
     errs.push('Marcá el servicio como sensible y elegí qué tipo de contenido puede aparecer.')
@@ -587,7 +617,7 @@ async function guardar() {
       idMedio: Number(form.value.idMedio),
       nombre: form.value.nombre.trim(),
       descripcion: form.value.descripcion.trim(),
-      precioBase: Number(form.value.precioBase),
+      precioBase: parsearMonto(form.value.precioBase),
       idMoneda: Number(form.value.idMoneda),
       contenidoSensible: form.value.contenidoSensible,
       contenidosSensibles: form.value.contenidoSensible ? form.value.contenidosSensibles : [],
@@ -786,8 +816,10 @@ onBeforeUnmount(() => {
             <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_13rem] gap-6">
               <div>
                 <label class="block text-sm text-cafe mb-2">Precio base <span class="text-rojizo">*</span></label>
-                <input v-model="form.precioBase" type="number" min="0" step="0.01"
-                  class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
+                <input :value="form.precioBase" type="text" inputmode="decimal" placeholder="1.000"
+                  class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+                  @input="alEscribirPrecioBase" @blur="alSalirPrecioBase" />
+                <p class="text-xs text-cafe/50 mt-1">Utiliza coma para indicar centavos.</p>
               </div>
               <div>
                 <label class="block text-sm text-cafe mb-2">Moneda <span class="text-rojizo">*</span></label>
@@ -844,7 +876,7 @@ onBeforeUnmount(() => {
                 </div>
                 <div>
                   <label class="block text-sm text-cafe mb-2">Cantidad de cupos <span class="text-rojizo">*</span></label>
-                  <input v-model="form.cupos" type="number" min="0"
+                  <input v-model="form.cupos" type="number" min="1" step="1"
                     class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
                 </div>
                 <label class="flex items-center gap-2 text-sm text-cafe">
@@ -1212,7 +1244,7 @@ onBeforeUnmount(() => {
                   </div>
                   <p class="mt-3 text-sm text-cafe whitespace-pre-wrap">{{ form.descripcion || '—' }}</p>
                   <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-cafe/70">
-                    <span>Precio: <span class="text-granate">{{ form.precioBase !== '' ? formatearPrecio(form.precioBase, monedaSeleccionada?.codigo || 'ARS') : '—' }}</span></span>
+                    <span>Precio: <span class="text-granate">{{ formatearPrecio(parsearMonto(form.precioBase), monedaSeleccionada?.codigo || 'ARS') }}</span></span>
                     <span>Entrega: {{ form.tiempoEntregaValor ? `${form.tiempoEntregaValor} ${UNIDADES.find(u => u.valor === form.tiempoEntregaUnidad)?.texto?.toLowerCase()}` : '—' }}</span>
                     <span>Cupos: {{ form.cupos !== '' ? form.cupos : '—' }}</span>
                     <span v-if="form.contenidoSensible" class="text-rojizo">Contenido sensible</span>

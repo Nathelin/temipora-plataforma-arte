@@ -266,6 +266,9 @@ public class ServicioService {
         if (r.getPrecioBase() == null || r.getPrecioBase().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("El precio base debe ser mayor a cero.");
         }
+        if (r.getCupos() == null || r.getCupos() <= 0) {
+            throw new IllegalArgumentException("La cantidad de cupos debe ser mayor a cero.");
+        }
 
         TipoServicio tipo = tipoServicioRepository.findByIdTipoServicio(r.getIdTipoServicio())
             .orElseThrow(() -> new IllegalArgumentException("Tipo de servicio no encontrado: " + r.getIdTipoServicio()));
