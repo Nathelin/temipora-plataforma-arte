@@ -178,7 +178,7 @@ const ctaFinal = computed(() => {
 
           <router-link
             to="/servicios"
-            class="mt-8 inline-flex min-h-12 items-center justify-center rounded-full bg-coral px-7 text-base font-bold text-white shadow-[0_10px_24px_rgba(194,24,91,0.22)] transition hover:-translate-y-0.5 hover:bg-rojizo"
+            class="mt-8 inline-flex min-h-12 items-center justify-center rounded-full bg-coral px-7 text-base font-bold text-white shadow-[0_10px_24px_var(--sombra-acento)] transition hover:-translate-y-0.5 hover:bg-rojizo"
           >
             Ver artistas y servicios
           </router-link>
