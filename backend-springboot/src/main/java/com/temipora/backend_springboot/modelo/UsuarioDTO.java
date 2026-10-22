@@ -3,6 +3,8 @@ package com.temipora.backend_springboot.modelo;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import com.temipora.backend_springboot.servicios.TelefonoService;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,7 +25,8 @@ public class UsuarioDTO {
     private String apellido;
     private String biografia;
     private String correo;
-    private String telefono;
+    private boolean tieneTelefono;
+    private String telefonoEnmascarado;
     private String sexo;
     private Long idPais;
     private String nombrePais;
@@ -35,6 +38,8 @@ public class UsuarioDTO {
     private String urlFotoPerfilMiniatura;
     private String urlBanner;
     private EPreferenciaContenidoSensible preferenciaSensible;
+    private Long idMonedaPreferida;
+    private String monedaPreferida;
     private String rol;
 
     public static UsuarioDTO desdeUsuario(Usuario usuario) {
@@ -48,7 +53,8 @@ public class UsuarioDTO {
             .apellido(usuario.getApellido())
             .biografia(usuario.getBiografia())
             .correo(usuario.getCorreo())
-            .telefono(usuario.getTelefono())
+            .tieneTelefono(usuario.getTelefono() != null && !usuario.getTelefono().isBlank())
+            .telefonoEnmascarado(TelefonoService.enmascarar(usuario.getTelefono()))
             .sexo(usuario.getSexo())
             .idPais(usuario.getPais() != null ? usuario.getPais().getIdPais() : null)
             .nombrePais(usuario.getPais() != null ? usuario.getPais().getNombre() : null)
@@ -60,6 +66,10 @@ public class UsuarioDTO {
             .urlFotoPerfilMiniatura(usuario.getUrlFotoPerfilMiniatura())
             .urlBanner(usuario.getUrlBanner())
             .preferenciaSensible(usuario.getPreferenciaSensible())
+            .idMonedaPreferida(usuario.getMonedaPreferida() != null
+                ? usuario.getMonedaPreferida().getIdMoneda() : null)
+            .monedaPreferida(usuario.getMonedaPreferida() != null
+                ? usuario.getMonedaPreferida().getCodigo() : null)
             .rol(usuario.getRol() != null ? usuario.getRol().getNombre().name() : null)
             .build();
     }

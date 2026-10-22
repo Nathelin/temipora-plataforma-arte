@@ -74,7 +74,7 @@ onMounted(() => {
 
 <template>
   <div class="bg-blanco rounded-3xl shadow-xl shadow-rosa/40 p-6 sm:p-8">
-    <h2 class="text-lg text-granate mb-6">Mis etiquetas</h2>
+    <h2 class="text-lg text-granate font-bold mb-6">Mis etiquetas</h2>
 
     <p v-if="!esArtista" class="text-cafe/60 text-center py-10">
       Esta sección es solo para artistas.

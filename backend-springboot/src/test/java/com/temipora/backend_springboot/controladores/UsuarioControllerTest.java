@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -35,7 +36,9 @@ import com.temipora.backend_springboot.config.JwtUtils;
 import com.temipora.backend_springboot.config.SecurityConfig;
 import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
+import com.temipora.backend_springboot.modelo.ActualizarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.QuitarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -266,6 +269,125 @@ class UsuarioControllerTest {
                 .andExpect(status().isForbidden());
 
         verify(usuarioService, never()).cambiarCorreo(any(), any());
+    }
+
+    // ---------------------------------------------------------------
+    // PUT /api/usuarios/{idUsuario}/telefono
+    // ---------------------------------------------------------------
+
+    @Test
+    void cambiarTelefono_sinToken_devuelve401YNoLlamaAlServicio() throws Exception {
+        mockMvc.perform(put("/api/usuarios/7/telefono")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"telefonoActual\":\"+16502530000\",\"telefonoNuevo\":\"+5491123456789\",\"contraseniaActual\":\"secreta123\"}"))
+                .andExpect(status().isUnauthorized());
+
+        verify(usuarioService, never()).cambiarTelefono(any(), any());
+    }
+
+    @Test
+    void cambiarTelefono_tokenValido_devuelve200ConTelefonoEnmascarado() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("cliente42", ERol.CLIENTE.name());
+        when(usuarioService.nombreUsuario(7L)).thenReturn("cliente42");
+        when(usuarioService.cambiarTelefono(eq(7L), any(ActualizarTelefonoDTO.class)))
+                .thenReturn(UsuarioDTO.builder()
+                        .idUsuario(7L)
+                        .tieneTelefono(true)
+                        .telefonoEnmascarado("+54 *******6789")
+                        .build());
+
+        mockMvc.perform(put("/api/usuarios/7/telefono")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"telefonoActual\":\"+16502530000\",\"telefonoNuevo\":\"+5491123456789\",\"contraseniaActual\":\"secreta123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tieneTelefono").value(true))
+                .andExpect(jsonPath("$.telefonoEnmascarado").value("+54 *******6789"))
+                .andExpect(jsonPath("$.telefono").doesNotExist());
+
+        verify(usuarioService).cambiarTelefono(eq(7L), any(ActualizarTelefonoDTO.class));
+    }
+
+    @Test
+    void cambiarTelefono_tokenDeOtroUsuario_devuelve403() throws Exception {
+        stubUsuarioConRol("intruso", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("intruso", ERol.CLIENTE.name());
+        when(usuarioService.nombreUsuario(7L)).thenReturn("CosmicCrap");
+
+        mockMvc.perform(put("/api/usuarios/7/telefono")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"telefonoNuevo\":\"+5491123456789\",\"contraseniaActual\":\"secreta123\"}"))
+                .andExpect(status().isForbidden());
+
+        verify(usuarioService, never()).cambiarTelefono(any(), any());
+    }
+
+    @Test
+    void cambiarTelefono_sinTelefonoNuevo_devuelve400SinLlamarAlServicio() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("cliente42", ERol.CLIENTE.name());
+
+        mockMvc.perform(put("/api/usuarios/7/telefono")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"contraseniaActual\":\"secreta123\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(usuarioService, never()).cambiarTelefono(any(), any());
+    }
+
+    // ---------------------------------------------------------------
+    // DELETE /api/usuarios/{idUsuario}/telefono
+    // ---------------------------------------------------------------
+
+    @Test
+    void quitarTelefono_sinToken_devuelve401YNoLlamaAlServicio() throws Exception {
+        mockMvc.perform(delete("/api/usuarios/7/telefono")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"contraseniaActual\":\"secreta123\"}"))
+                .andExpect(status().isUnauthorized());
+
+        verify(usuarioService, never()).quitarTelefono(any(), any());
+    }
+
+    @Test
+    void quitarTelefono_tokenValido_devuelve200SinTelefono() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("cliente42", ERol.CLIENTE.name());
+        when(usuarioService.nombreUsuario(7L)).thenReturn("cliente42");
+        when(usuarioService.quitarTelefono(eq(7L), any(QuitarTelefonoDTO.class)))
+                .thenReturn(UsuarioDTO.builder()
+                        .idUsuario(7L)
+                        .tieneTelefono(false)
+                        .telefonoEnmascarado(null)
+                        .build());
+
+        mockMvc.perform(delete("/api/usuarios/7/telefono")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"contraseniaActual\":\"secreta123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tieneTelefono").value(false))
+                .andExpect(jsonPath("$.telefonoEnmascarado").doesNotExist());
+
+        verify(usuarioService).quitarTelefono(eq(7L), any(QuitarTelefonoDTO.class));
+    }
+
+    @Test
+    void quitarTelefono_tokenDeOtroUsuario_devuelve403() throws Exception {
+        stubUsuarioConRol("intruso", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("intruso", ERol.CLIENTE.name());
+        when(usuarioService.nombreUsuario(7L)).thenReturn("CosmicCrap");
+
+        mockMvc.perform(delete("/api/usuarios/7/telefono")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"contraseniaActual\":\"secreta123\"}"))
+                .andExpect(status().isForbidden());
+
+        verify(usuarioService, never()).quitarTelefono(any(), any());
     }
 
     // ---------------------------------------------------------------

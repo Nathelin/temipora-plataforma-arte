@@ -267,8 +267,8 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="bg-blanco rounded-3xl shadow-xl shadow-rosa/40 p-6 sm:p-8">
-    <h2 class="text-lg text-granate mb-2">Formulario de pedidos</h2>
-    <p class="text-sm text-cafe/70 mb-6 pb-5">
+    <h2 class="text-lg text-granate font-bold">Formulario de pedidos</h2>
+    <p class="text-sm text-cafe/70 pb-5">
       Este es el formulario por defecto que usarán tus clientes para solicitar tus servicios.
     </p>
 
@@ -301,7 +301,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- Lista de preguntas -->
-      <div v-if="preguntas.length" class="space-y-3 pt-5 pb-5">
+      <div v-if="preguntas.length" class="space-y-3">
         <div
           v-for="(p, i) in preguntas"
           :key="p.uid"

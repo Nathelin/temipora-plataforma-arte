@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -21,11 +22,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.ETiempoEntregaUnidad;
 import com.temipora.backend_springboot.modelo.Medio;
+import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.ServicioRequest;
 import com.temipora.backend_springboot.modelo.TipoServicio;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.TipoServicioRepository;
@@ -46,6 +49,21 @@ class ServicioServiceTest {
     @Mock
     private MedioRepository medioRepository;
 
+    @Mock
+    private EtiquetaRepository etiquetaRepository;
+
+    @Mock
+    private FormularioService formularioService;
+
+    @Mock
+    private TerminosService terminosService;
+
+    @Mock
+    private ConversionMonedaService conversionMonedaService;
+
+    @Mock
+    private MonedaService monedaService;
+
     @InjectMocks
     private ServicioService servicioService;
 
@@ -61,12 +79,34 @@ class ServicioServiceTest {
     }
 
     @Test
+    void listarMios_conviertePrecioAMonedaPreferidaDelArtista() {
+        Servicio servicio = servicio(1L, 5L);
+        servicio.setPrecioBase(new BigDecimal("100.00"));
+        servicio.setMoneda(moneda(3L, "ARS"));
+
+        Usuario artista = usuario(5L);
+        artista.setMonedaPreferida(moneda(2L, "USD"));
+
+        when(servicioRepository.findByArtistaIdUsuarioOrderByNombreAsc(5L))
+            .thenReturn(List.of(servicio));
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(artista));
+        when(conversionMonedaService.factor(any(Moneda.class), any(Moneda.class), any(LocalDateTime.class)))
+            .thenReturn(new BigDecimal("0.5"));
+
+        List<ServicioDTO> resultado = servicioService.listarMios(5L);
+
+        assertThat(resultado.get(0).getPrecioBaseMostrado()).isEqualByComparingTo("50.00");
+        assertThat(resultado.get(0).getMonedaMostrada()).isEqualTo("USD");
+    }
+
+    @Test
     void crear_ok_calculaDiasYGuarda() {
         when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
             .thenReturn(false);
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
         when(medioRepository.findByIdMedio(2L)).thenReturn(Optional.of(medio(2L, "Digital")));
+        when(monedaService.obtener(3L)).thenReturn(moneda(3L, "ARS"));
         when(servicioRepository.save(any(Servicio.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ServicioRequest request = request();
@@ -77,6 +117,7 @@ class ServicioServiceTest {
         assertThat(dto.isEstado()).isTrue();
         assertThat(dto.getImagenes()).containsExactly("a.png", "b.png");
         assertThat(dto.getNombreTipoServicio()).isEqualTo("Ilustración digital");
+        assertThat(dto.getDescripcionTipoServicio()).isEqualTo("d");
     }
 
     @Test
@@ -89,6 +130,65 @@ class ServicioServiceTest {
             .hasMessage("Ya tenés un servicio con ese nombre y tipo.");
 
         verify(servicioRepository, never()).save(any(Servicio.class));
+    }
+
+    @Test
+    void crear_sinImagenDePortada_lanzaError() {
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+            .thenReturn(false);
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+
+        ServicioRequest request = request();
+        request.setImagenPortada(" ");
+
+        assertThatThrownBy(() -> servicioService.crear(5L, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("La imagen de portada es obligatoria.");
+
+        verify(servicioRepository, never()).save(any(Servicio.class));
+    }
+
+    @Test
+    void crear_sinImagenesDeEjemplo_lanzaError() {
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+            .thenReturn(false);
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+
+        ServicioRequest request = request();
+        request.setImagenes(List.of(" "));
+
+        assertThatThrownBy(() -> servicioService.crear(5L, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Debés agregar al menos una imagen de ejemplo.");
+
+        verify(servicioRepository, never()).save(any(Servicio.class));
+    }
+
+    @Test
+    void crear_precioCero_lanzaError() {
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+            .thenReturn(false);
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+
+        ServicioRequest request = request();
+        request.setPrecioBase(BigDecimal.ZERO);
+
+        assertThatThrownBy(() -> servicioService.crear(5L, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("El precio base debe ser mayor a cero.");
+
+        verify(servicioRepository, never()).save(any(Servicio.class));
+    }
+
+    @Test
+    void obtener_servicioInactivoDeOtroUsuario_lanzaNoSuchElement() {
+        Servicio servicio = servicio(1L, 5L);
+        servicio.setEstado(false);
+        when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio));
+
+        assertThatThrownBy(() -> servicioService.obtener(1L, 99L))
+            .isInstanceOf(NoSuchElementException.class)
+            .hasMessage("Servicio no encontrado: 1");
     }
 
     @Test
@@ -110,6 +210,7 @@ class ServicioServiceTest {
             .thenReturn(false);
         when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
         when(medioRepository.findByIdMedio(2L)).thenReturn(Optional.of(medio(2L, "Digital")));
+        when(monedaService.obtener(3L)).thenReturn(moneda(3L, "ARS"));
         when(servicioRepository.save(any(Servicio.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ServicioDTO dto = servicioService.modificar(1L, 5L, request());
@@ -161,14 +262,20 @@ class ServicioServiceTest {
         ServicioRequest r = new ServicioRequest();
         r.setIdTipoServicio(1L);
         r.setIdMedio(2L);
+        r.setIdMoneda(3L);
         r.setNombre("Ilustración");
         r.setDescripcion("desc");
         r.setPrecioBase(new BigDecimal("100.00"));
         r.setTiempoEntregaValor(2);
         r.setTiempoEntregaUnidad(ETiempoEntregaUnidad.SEMANAS);
         r.setCupos(5);
+        r.setImagenPortada("portada.png");
         r.setImagenes(List.of("a.png", "b.png"));
         return r;
+    }
+
+    private Moneda moneda(Long id, String codigo) {
+        return Moneda.builder().idMoneda(id).codigo(codigo).nombre(codigo).build();
     }
 
     private TipoServicio tipoServicio(Long id, String nombre) {

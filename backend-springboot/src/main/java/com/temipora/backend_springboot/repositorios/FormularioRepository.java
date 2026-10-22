@@ -12,5 +12,7 @@ public interface FormularioRepository extends JpaRepository<Formulario, Long> {
 
     Optional<Formulario> findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalse(Long idUsuario);
 
+    Optional<Formulario> findByArtistaIdUsuarioAndIdServicio(Long idUsuario, Long idServicio);
+
     Optional<Formulario> findFirstByEsSistemaTrue();
 }

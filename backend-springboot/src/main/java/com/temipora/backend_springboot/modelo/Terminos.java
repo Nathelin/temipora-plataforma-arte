@@ -61,8 +61,11 @@ public class Terminos {
     @Column(name = "pago_extra", length = 250)
     private String pagoExtra;
 
-    @Column(name = "tiempo_entrega", length = 120)
-    private String tiempoEntrega;
+    @Column(name = "que_dibuja", columnDefinition = "TEXT")
+    private String queDibuja;
+
+    @Column(name = "que_no_dibuja", columnDefinition = "TEXT")
+    private String queNoDibuja;
 
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion = LocalDateTime.now();
@@ -71,18 +74,7 @@ public class Terminos {
     private LocalDateTime fechaActualizacion;
 
     @OneToMany(mappedBy = "terminos", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<TerminoTema> terminoTemas = new ArrayList<>();
-
-    @OneToMany(mappedBy = "terminos", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TerminoDerecho> terminoDerechos = new ArrayList<>();
-
-    public void reemplazarTemas(List<TerminoTema> nuevos) {
-        this.terminoTemas.clear();
-        for (TerminoTema t : nuevos) {
-            t.setTerminos(this);
-            this.terminoTemas.add(t);
-        }
-    }
 
     public void reemplazarDerechos(List<TerminoDerecho> nuevos) {
         this.terminoDerechos.clear();

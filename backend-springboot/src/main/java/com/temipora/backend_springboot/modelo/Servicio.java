@@ -3,8 +3,10 @@ package com.temipora.backend_springboot.modelo;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
@@ -66,6 +68,10 @@ public class Servicio {
     @Column(name = "precio_base", nullable = false, precision = 12, scale = 2)
     private BigDecimal precioBase;
 
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "id_moneda", nullable = false)
+    private Moneda moneda;
+
     @Column(name = "contenido_sensible", nullable = false)
     private boolean contenidoSensible = false;
 
@@ -102,11 +108,35 @@ public class Servicio {
     @OrderBy("orden ASC")
     private List<ServicioImagen> imagenes = new ArrayList<>();
 
+    @OneToMany(mappedBy = "servicio", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<ServicioEtiqueta> etiquetas = new LinkedHashSet<>();
+
     public void reemplazarImagenes(List<ServicioImagen> nuevas) {
         this.imagenes.clear();
         for (ServicioImagen img : nuevas) {
             img.setServicio(this);
             this.imagenes.add(img);
+        }
+    }
+
+    public void reemplazarEtiquetas(Set<Etiqueta> nuevas) {
+        Set<Etiqueta> deseadas = nuevas != null ? nuevas : Set.of();
+        Set<Long> idsDeseados = deseadas.stream()
+            .map(Etiqueta::getIdEtiqueta)
+            .collect(Collectors.toSet());
+        this.etiquetas.removeIf(se -> !idsDeseados.contains(se.getEtiqueta().getIdEtiqueta()));
+
+        Set<Long> idsActuales = this.etiquetas.stream()
+            .map(se -> se.getEtiqueta().getIdEtiqueta())
+            .collect(Collectors.toSet());
+        for (Etiqueta etiqueta : deseadas) {
+            if (idsActuales.add(etiqueta.getIdEtiqueta())) {
+                ServicioEtiqueta asignacion = new ServicioEtiqueta();
+                asignacion.setId(new ServicioEtiquetaId());
+                asignacion.setServicio(this);
+                asignacion.setEtiqueta(etiqueta);
+                this.etiquetas.add(asignacion);
+            }
         }
     }
 

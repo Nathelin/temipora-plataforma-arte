@@ -8,6 +8,8 @@ import MediosAdmin from '../components/MediosAdmin.vue'
 import TiposArteAdmin from '../components/TiposArteAdmin.vue'
 import MaterialesAdmin from '../components/MaterialesAdmin.vue'
 import PaisesAdmin from '../components/PaisesAdmin.vue'
+import CotizacionAdmin from '../components/CotizacionAdmin.vue'
+import MonedasAdmin from '../components/MonedasAdmin.vue'
 import Registro from '../components/Registro.vue'
 import TOS from '../components/TOS.vue'
 import MainLayout from '../layouts/MainLayout.vue'
@@ -161,6 +163,18 @@ const routes = [
         name: 'paises-admin',
         component: PaisesAdmin,
         meta: { title: 'Países' },
+      },
+      {
+        path: 'ajustes/cotizacion',
+        name: 'cotizacion-admin',
+        component: CotizacionAdmin,
+        meta: { title: 'Cotización de monedas' },
+      },
+      {
+        path: 'ajustes/monedas',
+        name: 'monedas-admin',
+        component: MonedasAdmin,
+        meta: { title: 'Monedas' },
       },
     ],
   },

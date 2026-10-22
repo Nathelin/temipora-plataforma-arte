@@ -11,4 +11,6 @@ public interface TerminosRepository extends JpaRepository<Terminos, Long> {
     Optional<Terminos> findByIdTerminos(Long idTerminos);
 
     Optional<Terminos> findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(Long idUsuario);
+
+    Optional<Terminos> findByArtistaIdUsuarioAndIdServicio(Long idUsuario, Long idServicio);
 }

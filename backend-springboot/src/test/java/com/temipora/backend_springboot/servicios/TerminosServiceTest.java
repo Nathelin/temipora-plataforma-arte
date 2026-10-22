@@ -20,16 +20,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.DerechoTermino;
-import com.temipora.backend_springboot.modelo.EEstadoTema;
-import com.temipora.backend_springboot.modelo.TemaTermino;
 import com.temipora.backend_springboot.modelo.TerminoDerechoRequest;
-import com.temipora.backend_springboot.modelo.TerminoTemaRequest;
 import com.temipora.backend_springboot.modelo.Terminos;
 import com.temipora.backend_springboot.modelo.TerminosDTO;
 import com.temipora.backend_springboot.modelo.TerminosRequest;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
-import com.temipora.backend_springboot.repositorios.TemaTerminoRepository;
 import com.temipora.backend_springboot.repositorios.TerminosRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -38,9 +34,6 @@ class TerminosServiceTest {
 
     @Mock
     private TerminosRepository terminosRepository;
-
-    @Mock
-    private TemaTerminoRepository temaTerminoRepository;
 
     @Mock
     private DerechoTerminoRepository derechoTerminoRepository;
@@ -63,7 +56,8 @@ class TerminosServiceTest {
         TerminosDTO dto = terminosService.obtenerGlobal(5L);
 
         assertThat(dto.getVersion()).isZero();
-        assertThat(dto.getTemas()).isEmpty();
+        assertThat(dto.getQueDibuja()).isNull();
+        assertThat(dto.getQueNoDibuja()).isNull();
         assertThat(dto.getDerechos()).isEmpty();
     }
 
@@ -80,12 +74,72 @@ class TerminosServiceTest {
     }
 
     // ---------------------------------------------------------------
+    // términos por servicio
+    // ---------------------------------------------------------------
+
+    @Test
+    void obtenerServicio_conTerminosPropios_devuelvePropio() {
+        Terminos propios = terminos(1L, 2, "Solo para este servicio");
+        propios.setIdServicio(7L);
+        when(terminosRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+            .thenReturn(Optional.of(propios));
+
+        TerminosDTO dto = terminosService.obtenerServicio(7L, 5L);
+
+        assertThat(dto.isPropio()).isTrue();
+        assertThat(dto.getIdServicio()).isEqualTo(7L);
+        assertThat(dto.getInformacionGeneral()).isEqualTo("Solo para este servicio");
+    }
+
+    @Test
+    void obtenerServicio_sinTerminosPropios_devuelveLosGlobales() {
+        Terminos globales = terminos(1L, 2, "Global");
+        when(terminosRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+            .thenReturn(Optional.empty());
+        when(terminosRepository.findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(5L))
+            .thenReturn(Optional.of(globales));
+
+        TerminosDTO dto = terminosService.obtenerServicio(7L, 5L);
+
+        assertThat(dto.isPropio()).isFalse();
+        assertThat(dto.getInformacionGeneral()).isEqualTo("Global");
+    }
+
+    @Test
+    void guardarServicio_creaTerminosPropios() {
+        when(terminosRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+            .thenReturn(Optional.empty());
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+        when(terminosRepository.save(any(Terminos.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TerminosRequest request = requestVacio();
+        request.setInformacionGeneral("Propios");
+
+        TerminosDTO dto = terminosService.guardarServicio(7L, 5L, request);
+
+        assertThat(dto.isPropio()).isTrue();
+        assertThat(dto.getIdServicio()).isEqualTo(7L);
+        assertThat(dto.getVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void eliminarServicio_borraLosTerminosPropios() {
+        Terminos propios = terminos(1L, 1, "Propios");
+        propios.setIdServicio(7L);
+        when(terminosRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+            .thenReturn(Optional.of(propios));
+
+        terminosService.eliminarServicio(7L, 5L);
+
+        verify(terminosRepository).delete(propios);
+    }
+
+    // ---------------------------------------------------------------
     // guardarGlobal
     // ---------------------------------------------------------------
 
     @Test
-    void guardarGlobal_creaVersion1ConTemasYDerechos() {
-        when(temaTerminoRepository.findByIdTemaTermino(1L)).thenReturn(Optional.of(tema(1L, "NSFW", 1)));
+    void guardarGlobal_creaVersion1ConTextoYDerechos() {
         when(derechoTerminoRepository.findByIdDerechoTermino(1L))
             .thenReturn(Optional.of(derecho(1L, "CONTENIDO", "Uso comercial en producción de contenido", 2)));
         when(terminosRepository.findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(5L))
@@ -95,19 +149,35 @@ class TerminosServiceTest {
 
         TerminosRequest request = requestVacio();
         request.setInformacionGeneral("  Hola  ");
-        request.setTemas(List.of(terminoReq(1L, EEstadoTema.SI)));
+        request.setQueDibuja("  OCs, fanart, furries  ");
+        request.setQueNoDibuja("  Mecha, gore explícito  ");
         request.setDerechos(List.of(derechoReq(1L, true, new BigDecimal("50"))));
 
         TerminosDTO dto = terminosService.guardarGlobal(5L, request);
 
         assertThat(dto.getVersion()).isEqualTo(1);
         assertThat(dto.getInformacionGeneral()).isEqualTo("Hola");
-        assertThat(dto.getTemas()).hasSize(1);
-        assertThat(dto.getTemas().get(0).getEstado()).isEqualTo("SI");
-        assertThat(dto.getTemas().get(0).isPersonalizado()).isFalse();
+        assertThat(dto.getQueDibuja()).isEqualTo("OCs, fanart, furries");
+        assertThat(dto.getQueNoDibuja()).isEqualTo("Mecha, gore explícito");
         assertThat(dto.getDerechos()).hasSize(1);
         assertThat(dto.getDerechos().get(0).isDisponible()).isTrue();
         assertThat(dto.getDerechos().get(0).getPorcentajeExtra()).isEqualByComparingTo("50");
+    }
+
+    @Test
+    void guardarGlobal_soloConQueNoDibuja_esContenidoValido() {
+        when(terminosRepository.findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(5L))
+            .thenReturn(Optional.empty());
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+        when(terminosRepository.save(any(Terminos.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TerminosRequest request = requestVacio();
+        request.setQueNoDibuja("No dibujo mecha.");
+
+        TerminosDTO dto = terminosService.guardarGlobal(5L, request);
+
+        assertThat(dto.getQueDibuja()).isNull();
+        assertThat(dto.getQueNoDibuja()).isEqualTo("No dibujo mecha.");
     }
 
     @Test
@@ -127,39 +197,6 @@ class TerminosServiceTest {
 
         assertThat(dto.getDerechos().get(0).isDisponible()).isTrue();
         assertThat(dto.getDerechos().get(0).getPorcentajeExtra()).isNull();
-    }
-
-    @Test
-    void guardarGlobal_temaPersonalizado_seGuarda() {
-        when(terminosRepository.findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(5L))
-            .thenReturn(Optional.empty());
-        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
-        when(terminosRepository.save(any(Terminos.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        TerminosRequest request = requestVacio();
-        request.setInformacionGeneral("Hola");
-        request.setTemas(List.of(temaPersonalizadoReq("Mi tema", EEstadoTema.NO)));
-
-        TerminosDTO dto = terminosService.guardarGlobal(5L, request);
-
-        assertThat(dto.getTemas()).hasSize(1);
-        assertThat(dto.getTemas().get(0).isPersonalizado()).isTrue();
-        assertThat(dto.getTemas().get(0).getNombre()).isEqualTo("Mi tema");
-    }
-
-    @Test
-    void guardarGlobal_temaPersonalizadoSinNombre_lanzaError() {
-        when(terminosRepository.findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(5L))
-            .thenReturn(Optional.empty());
-        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
-
-        TerminosRequest request = requestVacio();
-        request.setInformacionGeneral("Hola");
-        request.setTemas(List.of(temaPersonalizadoReq("   ", EEstadoTema.NO)));
-
-        assertThatThrownBy(() -> terminosService.guardarGlobal(5L, request))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("El tema personalizado necesita un nombre.");
     }
 
     @Test
@@ -191,21 +228,6 @@ class TerminosServiceTest {
     }
 
     @Test
-    void guardarGlobal_temaInexistente_lanzaError() {
-        when(temaTerminoRepository.findByIdTemaTermino(99L)).thenReturn(Optional.empty());
-        when(terminosRepository.findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(5L))
-            .thenReturn(Optional.empty());
-        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
-
-        TerminosRequest request = requestVacio();
-        request.setTemas(List.of(terminoReq(99L, EEstadoTema.NO)));
-
-        assertThatThrownBy(() -> terminosService.guardarGlobal(5L, request))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Tema no encontrado: 99");
-    }
-
-    @Test
     void guardarGlobal_artistaInexistente_lanzaNoSuchElement() {
         when(terminosRepository.findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(5L))
             .thenReturn(Optional.empty());
@@ -228,17 +250,8 @@ class TerminosServiceTest {
         terminos.setIdTerminos(id);
         terminos.setVersion(version);
         terminos.setInformacionGeneral(info);
-        terminos.setTerminoTemas(new ArrayList<>());
         terminos.setTerminoDerechos(new ArrayList<>());
         return terminos;
-    }
-
-    private TemaTermino tema(Long id, String nombre, int orden) {
-        TemaTermino tema = new TemaTermino();
-        tema.setIdTemaTermino(id);
-        tema.setNombre(nombre);
-        tema.setOrden(orden);
-        return tema;
     }
 
     private DerechoTermino derecho(Long id, String codigo, String nombre, int orden) {
@@ -248,20 +261,6 @@ class TerminosServiceTest {
         derecho.setNombre(nombre);
         derecho.setOrden(orden);
         return derecho;
-    }
-
-    private TerminoTemaRequest terminoReq(Long id, EEstadoTema estado) {
-        TerminoTemaRequest request = new TerminoTemaRequest();
-        request.setIdTemaTermino(id);
-        request.setEstado(estado);
-        return request;
-    }
-
-    private TerminoTemaRequest temaPersonalizadoReq(String nombre, EEstadoTema estado) {
-        TerminoTemaRequest request = new TerminoTemaRequest();
-        request.setNombre(nombre);
-        request.setEstado(estado);
-        return request;
     }
 
     private TerminoDerechoRequest derechoReq(Long id, boolean disponible, BigDecimal porcentaje) {
@@ -274,7 +273,6 @@ class TerminosServiceTest {
 
     private TerminosRequest requestVacio() {
         TerminosRequest request = new TerminosRequest();
-        request.setTemas(new ArrayList<>());
         request.setDerechos(new ArrayList<>());
         return request;
     }

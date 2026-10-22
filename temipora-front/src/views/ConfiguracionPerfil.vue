@@ -1,8 +1,8 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { parsePhoneNumberFromString, getExampleNumber } from 'libphonenumber-js'
 import api from '../servicios/api'
+import { useMonedas } from '../composables/useMonedas'
 import { acceptImagenes, validarImagen, procesarImagen, LIMITES_IMAGEN } from '../servicios/archivos'
 import { useAvisoActualizacion } from '../composables/useAvisoActualizacion'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
@@ -31,53 +31,14 @@ const form = ref({
   nombreDisplay: '',
   biografia: '',
   sexo: '',
-  telefono: '',
   idPais: '',
   urlFotoPerfil: '',
   urlBanner: '',
+  idMonedaPreferida: '',
 })
 
 const paises = ref([])
-
-const paisSeleccionado = computed(() =>
-  paises.value.find((p) => String(p.idPais) === form.value.idPais) || null,
-)
-const prefijoActual = computed(() => paisSeleccionado.value?.prefijoTelefonico || '')
-const ejemploTelefono = computed(() => {
-  const iso = paisSeleccionado.value?.codigoIso
-  if (!iso) return ''
-  try {
-    const ejemplo = getExampleNumber(iso)
-    return ejemplo ? ejemplo.formatNational() : ''
-  } catch {
-    return ''
-  }
-})
-
-function parseTelefono(valor) {
-  try {
-    return parsePhoneNumberFromString(valor, paisSeleccionado.value?.codigoIso || undefined)
-  } catch {
-    return undefined
-  }
-}
-
-function formatearTelefonoParaInput(valor) {
-  if (!valor) return ''
-  try {
-    const parsed = parsePhoneNumberFromString(valor)
-    return parsed ? parsed.formatNational() : valor
-  } catch {
-    return valor
-  }
-}
-
-function telefonoNormalizado() {
-  const tel = form.value.telefono.trim()
-  if (!tel) return ''
-  const parsed = parseTelefono(tel)
-  return parsed ? parsed.number : tel
-}
+const { monedas, cargar: cargarMonedas } = useMonedas()
 
 const SEXOS_VALIDOS = ['Masculino', 'Femenino', 'Otro']
 
@@ -91,18 +52,6 @@ function normalizarSexo(valor) {
 function sexoParaFormulario(valor) {
   return normalizarSexo(valor) || ''
 }
-
-const telefonoError = computed(() => {
-  const tel = form.value.telefono.trim()
-  if (!tel) return ''
-  const parsed = parseTelefono(tel)
-  if (!parsed || !parsed.isValid()) {
-    return paisSeleccionado.value
-      ? 'El teléfono no es válido para el país seleccionado.'
-      : 'Seleccioná un país o ingresá el número con prefijo internacional (ej. +1...).'
-  }
-  return ''
-})
 
 const editFoto = ref(null)
 const editBanner = ref(null)
@@ -119,8 +68,8 @@ function datosComparables() {
     nombreDisplay: form.value.nombreDisplay,
     biografia: form.value.biografia,
     sexo: sexoParaFormulario(form.value.sexo),
-    telefono: form.value.telefono,
     idPais: form.value.idPais,
+    idMonedaPreferida: form.value.idMonedaPreferida,
   })
 }
 
@@ -152,6 +101,7 @@ async function cargar() {
   cargando.value = true
   error.value = ''
   try {
+    await cargarMonedas()
     const res = await api.get(`/perfil/${nombreUsuario}`)
     const d = res.data
     idUsuario.value = d.idUsuario
@@ -159,10 +109,12 @@ async function cargar() {
       nombreDisplay: d.nombreDisplay || '',
       biografia: d.biografia || '',
       sexo: sexoParaFormulario(d.sexo),
-      telefono: formatearTelefonoParaInput(d.telefono),
       idPais: d.idPais ? String(d.idPais) : '',
       urlFotoPerfil: d.urlFotoPerfil || '',
       urlBanner: d.urlBanner || '',
+      idMonedaPreferida: d.idMonedaPreferida != null
+        ? String(d.idMonedaPreferida)
+        : (monedas.value.find((m) => m.codigo === d.monedaPreferida)?.idMoneda ?? ''),
     }
     previewFoto.value = ''
     previewBanner.value = ''
@@ -255,10 +207,6 @@ async function subirArchivo(archivo, limite, faseSubida, etiqueta) {
 }
 
 async function guardar() {
-  if (telefonoError.value) {
-    errorEdicion.value = telefonoError.value
-    return
-  }
   guardando.value = true
   mensaje.value = ''
   errorEdicion.value = ''
@@ -282,8 +230,8 @@ async function guardar() {
       nombreDisplay: form.value.nombreDisplay,
       biografia: form.value.biografia,
       sexo: normalizarSexo(form.value.sexo),
-      telefono: telefonoNormalizado(),
       ...(form.value.idPais ? { idPais: Number(form.value.idPais) } : {}),
+      ...(form.value.idMonedaPreferida ? { idMonedaPreferida: Number(form.value.idMonedaPreferida) } : {}),
       ...(urlFoto ? { urlFotoPerfil: urlFoto } : {}),
       ...(urlBanner ? { urlBanner } : {}),
     }
@@ -293,10 +241,12 @@ async function guardar() {
     form.value.nombreDisplay = r.data.nombreDisplay
     form.value.biografia = r.data.biografia
     form.value.sexo = sexoParaFormulario(r.data.sexo)
-    form.value.telefono = formatearTelefonoParaInput(r.data.telefono)
     form.value.idPais = r.data.idPais ? String(r.data.idPais) : ''
     form.value.urlFotoPerfil = r.data.urlFotoPerfil || ''
     form.value.urlBanner = r.data.urlBanner || ''
+    form.value.idMonedaPreferida = r.data.idMonedaPreferida != null
+      ? String(r.data.idMonedaPreferida)
+      : (monedas.value.find((m) => m.codigo === r.data.monedaPreferida)?.idMoneda ?? '')
     localStorage.setItem('urlFotoPerfil', form.value.urlFotoPerfil)
     window.dispatchEvent(new CustomEvent('perfil-foto-actualizada', {
       detail: { url: form.value.urlFotoPerfil },
@@ -342,12 +292,12 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="bg-blanco rounded-3xl shadow-xl shadow-rosa/40 p-6 sm:p-8">
-    <h2 class="text-lg text-granate mb-6">Mi perfil</h2>
+    <h2 class="text-lg text-granate mb-6 font-bold">Mi perfil</h2>
 
     <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
 
-    <div v-else class="space-y-6">
+    <div v-else class="space-y-5">
       <!-- Foto de perfil -->
       <div class="flex items-center gap-5">
         <input id="foto-perfil" type="file" :accept="acceptImagenes" class="sr-only" @change="onFotoChange" />
@@ -396,7 +346,7 @@ onBeforeUnmount(() => {
 
       <!-- Banner -->
       <div>
-        <div class="mb-2 flex items-center justify-between gap-3">
+        <div class="flex items-center justify-between gap-3">
           <label class="block text-sm text-cafe">Banner</label>
           <span class="text-xs text-cafe/50">Hacé click o arrastrá (JPG, PNG o WEBP)</span>
         </div>
@@ -429,7 +379,7 @@ onBeforeUnmount(() => {
 
       <!-- Nombre de display -->
       <div>
-        <label class="block text-sm text-cafe mb-2">Nombre de display</label>
+        <label class="block text-sm text-cafe">Nombre de display</label>
         <input
           v-model="form.nombreDisplay"
           type="text"
@@ -440,20 +390,20 @@ onBeforeUnmount(() => {
 
       <!-- Biografía -->
       <div>
-        <label class="block text-sm text-cafe mb-2">Biografía</label>
+        <label class="block text-sm text-cafe">Biografía</label>
         <textarea
           v-model="form.biografia"
           rows="4"
           maxlength="500"
           class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"
         ></textarea>
-        <p class="text-right text-xs text-cafe/50 mt-1">{{ form.biografia.length }}/500</p>
+        <p class="text-right text-xs text-cafe/50">{{ form.biografia.length }}/500</p>
       </div>
 
       <!-- Datos personales -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label class="block text-sm text-cafe mb-2">Sexo</label>
+          <label class="block text-sm text-cafe">Sexo</label>
           <select
             v-model="form.sexo"
             class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
@@ -465,30 +415,7 @@ onBeforeUnmount(() => {
           </select>
         </div>
         <div>
-          <label class="block text-sm text-cafe mb-2">Teléfono</label>
-          <div class="flex">
-            <span
-              v-if="prefijoActual"
-              class="inline-flex items-center rounded-l-lg border border-r-0 border-rosa bg-rosa/20 px-3 text-base text-cafe"
-            >
-              {{ prefijoActual }}
-            </span>
-            <input
-              v-model="form.telefono"
-              type="tel"
-              :placeholder="ejemploTelefono || 'Número de teléfono'"
-              class="pl-4 pr-4 block w-full border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset focus:outline-none"
-              :class="[
-                prefijoActual ? 'rounded-r-lg rounded-l-none' : 'rounded-lg',
-                telefonoError ? 'ring-rojizo focus:ring-rojizo' : 'ring-rosa focus:ring-coral',
-              ]"
-            />
-          </div>
-          <p v-if="telefonoError" class="text-xs text-rojizo mt-1">{{ telefonoError }}</p>
-          <p v-else class="text-xs text-cafe/50 mt-1">Se guarda en formato internacional.</p>
-        </div>
-        <div>
-          <label class="block text-sm text-cafe mb-2">País</label>
+          <label class="block text-sm text-cafe">País</label>
           <select
             v-model="form.idPais"
             class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
@@ -501,10 +428,21 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
+      <!-- Moneda preferida -->
+      <div>
+        <label class="block text-sm text-cafe">Moneda preferida</label>
+        <select
+          v-model="form.idMonedaPreferida"
+          class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+        >
+          <option v-for="m in monedas" :key="m.idMoneda" :value="String(m.idMoneda)">{{ m.nombre }} ({{ m.codigo }})</option>
+        </select>
+        <p class="text-xs text-cafe/50 mt-1">Los precios de los servicios se mostrarán convertidos a esta moneda.</p>
+      </div>
+
       <BarraGuardado
         :hay-cambios="hayCambios"
         :guardando="guardando"
-        :bloqueado="!!telefonoError"
         :texto="etiquetaBoton"
         @guardar="guardar"
       >

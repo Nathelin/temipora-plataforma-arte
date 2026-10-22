@@ -218,7 +218,7 @@ const pasosRouter = [
     class="min-h-screen w-full flex items-stretch justify-end px-4 py-4 sm:px-8 sm:py-6 sm:pr-10 bg-cover bg-center"
     :style="{ backgroundImage: `url(${fondo})` }"
   >
-    <div class="w-full max-w-md rounded-3xl bg-white px-8 py-10 shadow-xl flex flex-col justify-start">
+    <div class="w-full max-w-md rounded-3xl bg-superficie px-8 py-10 shadow-xl flex flex-col justify-start">
       <button
         type="button"
         class="self-start flex items-center gap-1 text-sm text-cafe/60 hover:text-rojizo transition mb-2"
@@ -345,7 +345,7 @@ const pasosRouter = [
 
         <label
           class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition"
-          :class="rol === 'CLIENTE' ? 'border-coral bg-rosa/20' : 'border-rosa bg-white hover:border-coral/50'"
+          :class="rol === 'CLIENTE' ? 'border-coral bg-rosa/20' : 'border-rosa bg-superficie hover:border-coral/50'"
         >
           <input v-model="rol" type="radio" value="CLIENTE" class="mt-1 accent-coral" />
           <span>
@@ -355,7 +355,7 @@ const pasosRouter = [
 
         <label
           class="flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition"
-          :class="rol === 'ARTISTA' ? 'border-coral bg-rosa/20' : 'border-rosa bg-white hover:border-coral/50'"
+          :class="rol === 'ARTISTA' ? 'border-coral bg-rosa/20' : 'border-rosa bg-superficie hover:border-coral/50'"
         >
           <input v-model="rol" type="radio" value="ARTISTA" class="mt-1 accent-coral" />
           <span>

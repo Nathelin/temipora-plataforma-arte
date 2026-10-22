@@ -1,22 +1,161 @@
+@import '@fontsource-variable/bricolage-grotesque';
+@import '@fontsource-variable/dm-sans';
 @import "tailwindcss";
 
 @theme {
-  --color-crema: #fff8f2;
-  --color-rosa: #ffe3e3;
-  --color-durazno: #ffd7c2;
-  --color-coral: #ff8f8f;
-  --color-rojizo: #d95f6b;
-  --color-granate: #8c3d4e;
-  --color-cafe: #6b4a4a;
+  /* Colores semánticos (tema claro por defecto) */
+  --color-fondo: #fff6f1;
+  --color-superficie: #ffffff;
+  --color-superficie-alt: #fff0e9;
+  --color-texto: #4a1d2e;
+  --color-texto-suave: #6e3b4d;
+  --color-borde: #ffc2d1;
+  --color-acento: #c2185b;
+  --color-acento-suave: #c2185b;
+  --color-acento-hover: #9a1047;
+  --color-acento-contraste: #ffffff;
+  --color-accion: #4a1d2e;
+  --color-accion-hover: #c2185b;
+  --color-inverso: #4a1d2e;
+  --color-inverso-suave: #ffc2d1;
+  --color-inverso-contraste: #fff6f1;
+  --color-decorativo-1: #ff8a7a;
+  --color-decorativo-2: #ffd9c7;
+  --color-decorativo-3: #ffe8a3;
+  --color-tinta: #4a1d2e;
+
+  /* Alias de compatibilidad con la paleta anterior */
+  --color-crema: #fff6f1;
+  --color-rosa: #ffc2d1;
+  --color-durazno: #ffd9c7;
+  --color-coral: #c2185b;
+  --color-coral-vivo: #ff8a7a;
+  --color-rojizo: #9a1047;
+  --color-granate: #4a1d2e;
+  --color-cafe: #6e3b4d;
   --color-blanco: #ffffff;
+  --color-mantequilla: #ffe8a3;
+
+  --font-sans: 'DM Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+
   html {
     scroll-behavior: smooth;
   }
 
   body {
-    font-weight: 300;
+    font-weight: 400;
   }
+
+  ::selection {
+    background: var(--color-rosa);
+    color: var(--color-granate);
+  }
+
+  [data-theme='noche'] {
+    color-scheme: dark;
+
+    --color-fondo: #241018;
+    --color-superficie: #321923;
+    --color-superficie-alt: #3d1f2c;
+    --color-texto: #fff6f1;
+    --color-texto-suave: #e8c9d2;
+    --color-borde: #7a3a52;
+    --color-acento: #c2185b;
+    --color-acento-suave: #ff9fbc;
+    --color-acento-hover: #d81b60;
+    --color-acento-contraste: #ffffff;
+    --color-accion: #c2185b;
+    --color-accion-hover: #d81b60;
+    --color-inverso: #1a0b12;
+    --color-inverso-suave: #ffc2d1;
+    --color-inverso-contraste: #fff6f1;
+    --color-decorativo-1: #ff8a7a;
+    --color-decorativo-2: #ffd9c7;
+    --color-decorativo-3: #ffe8a3;
+    --color-tinta: #4a1d2e;
+
+    --color-crema: #241018;
+    --color-rosa: #7a3a52;
+    --color-durazno: #ffd9c7;
+    --color-coral: #c2185b;
+    --color-coral-vivo: #ff8a7a;
+    --color-rojizo: #d81b60;
+    --color-granate: #1a0b12;
+    --color-cafe: #e8c9d2;
+    --color-blanco: #321923;
+    --color-mantequilla: #ffe8a3;
+  }
+
+  /* Controles de formulario: fondo oscuro y texto claro en modo noche.
+     Las utilidades de fondo y texto de Tailwind siguen teniendo prioridad. */
+  [data-theme='noche'] select,
+  [data-theme='noche'] input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']):not([type='submit']):not([type='button']):not([type='reset']):not([type='image']),
+  [data-theme='noche'] textarea {
+    background-color: var(--color-superficie-alt);
+    color: var(--color-texto);
+  }
+
+  [data-theme='noche'] select option,
+  [data-theme='noche'] select optgroup {
+    background-color: var(--color-superficie-alt);
+    color: var(--color-texto);
+  }
+
+  [data-theme='noche'] select option:disabled {
+    color: var(--color-texto-suave);
+  }
+}
+
+/* Ajustes de contraste para clases de la paleta anterior en modo noche. */
+[data-theme='noche'] .text-granate {
+  color: var(--color-texto);
+}
+
+[data-theme='noche'] .hover\:text-granate:hover {
+  color: var(--color-texto);
+}
+
+[data-theme='noche'] .text-coral {
+  color: var(--color-acento-suave);
+}
+
+[data-theme='noche'] .hover\:text-coral:hover {
+  color: var(--color-acento-suave);
+}
+
+[data-theme='noche'] .text-rojizo {
+  color: #ff9fbc;
+}
+
+[data-theme='noche'] .hover\:text-rojizo:hover {
+  color: #ff9fbc;
+}
+
+[data-theme='noche'] .text-rosa {
+  color: var(--color-inverso-suave);
+}
+
+[data-theme='noche'] .text-rosa\/80 {
+  color: color-mix(in oklab, var(--color-inverso-suave) 80%, transparent);
+}
+
+[data-theme='noche'] .hover\:text-rosa:hover {
+  color: var(--color-inverso-suave);
+}
+
+[data-theme='noche'] .bg-durazno\/40,
+[data-theme='noche'] .bg-durazno\/50 {
+  background-color: color-mix(in oklab, var(--color-decorativo-2) 18%, transparent);
+}
+
+[data-theme='noche'] .text-green-700,
+[data-theme='noche'] .text-green-600 {
+  color: #86efac;
 }

@@ -18,6 +18,11 @@ const filtros = ref({
   tiempoMaxDias: '',
 })
 
+const descripcionTipoSeleccionado = computed(() => {
+  if (!filtros.value.idTipoServicio) return ''
+  return tipos.value.find((t) => String(t.idTipoServicio) === filtros.value.idTipoServicio)?.descripcion || ''
+})
+
 let secuencia = 0
 
 async function cargar() {
@@ -105,24 +110,38 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="mx-auto px-4 sm:px-8 py-8">
-    <h1 class="text-2xl text-granate">Servicios</h1>
-    <p class="mt-1 mb-6 text-sm text-cafe/60">Comisiones y servicios ofrecidos por los artistas de la plataforma.</p>
+  <div class="mx-auto max-w-screen-2xl px-4 py-10 sm:px-8 sm:py-14">
+    <div>
+      <div class="pb-2">
+        <span class="inline-block -rotate-2 rounded-full bg-mantequilla px-4 py-1.5 text-sm font-bold text-tinta shadow-sm">
+          Comisiones
+        </span>
+        <h1 class="mt-5 font-display text-4xl font-extrabold tracking-[-0.03em] text-granate sm:text-5xl">
+          Encontrá a tu próximo artista
+        </h1>
+        <p class="mt-3 text-lg leading-relaxed text-cafe/75">
+          Explorá servicios por estilo, precio y tiempo de entrega. Cada propuesta está creada por alguien de la comunidad.
+        </p>
+      </div>
+    </div>
 
-    <!-- Filtros (UC-08) -->
-    <div class="mb-6 bg-blanco border border-rosa rounded-xl p-3">
+    <div class="mt-8 rounded-[28px] border border-borde/60 bg-superficie p-4 shadow-[0_14px_36px_rgba(74,29,46,0.08)] sm:p-5">
       <div class="flex flex-wrap items-center gap-3">
-        <div class="flex-1 min-w-44 relative">
+        <div class="relative min-w-44 flex-1">
+          <svg class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cafe/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
           <input
             v-model="filtros.nombre"
             type="text"
             placeholder="Buscar por nombre del servicio..."
-            class="pl-4 pr-9 block w-full rounded-lg border-0 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+            class="block w-full rounded-full border-0 bg-crema py-2.5 pl-11 pr-10 text-sm text-texto shadow-none ring-1 ring-inset ring-borde/60 placeholder:text-cafe/40 focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
           />
           <button
             v-if="filtros.nombre"
             type="button"
-            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-cafe/50 hover:text-granate"
+            class="absolute right-3.5 top-1/2 -translate-y-1/2 text-cafe/40 transition hover:text-granate"
             aria-label="Limpiar búsqueda"
             @click="filtros.nombre = ''"
           >
@@ -132,23 +151,25 @@ onMounted(async () => {
 
         <button
           type="button"
-          class="px-3 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition"
+          class="inline-flex min-h-10 items-center rounded-full border border-borde/60 bg-crema px-4 text-sm font-semibold text-cafe transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
           :aria-expanded="filtrosAbiertos"
           @click="filtrosAbiertos = !filtrosAbiertos"
         >
           Filtros
           <span
             v-if="cantidadFiltrosActivos"
-            class="ml-1.5 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-coral text-white text-xs"
+            class="ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-coral px-1.5 text-xs font-bold text-white"
           >
             {{ cantidadFiltrosActivos }}
           </span>
-          <span class="ml-1" aria-hidden="true">{{ filtrosAbiertos ? '▴' : '▾' }}</span>
+          <svg class="ml-2 h-3.5 w-3.5 transition-transform" :class="filtrosAbiertos ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+          </svg>
         </button>
 
         <button
           type="button"
-          class="px-3 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition"
+          class="inline-flex min-h-10 items-center rounded-full border border-borde/60 bg-crema px-4 text-sm font-semibold text-cafe transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
           @click="limpiarFiltros"
         >
           Limpiar
@@ -157,34 +178,37 @@ onMounted(async () => {
 
       <div
         v-if="filtrosAbiertos"
-        class="mt-3 pt-3 border-t border-rosa/60 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
+        class="mt-4 grid grid-cols-1 gap-4 border-t border-borde/40 pt-4 sm:grid-cols-2 lg:grid-cols-4"
       >
         <div>
-          <label class="block text-xs text-cafe/60 mb-1">Artista</label>
+          <label class="mb-1.5 block text-xs font-semibold text-cafe/60">Artista</label>
           <input
             v-model="filtros.nombreArtista"
             type="text"
-            placeholder="Nombre de usuario del artista..."
-            class="pl-4 pr-4 block w-full rounded-lg border-0 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+            placeholder="Nombre de usuario..."
+            class="block w-full rounded-2xl border-0 bg-crema px-4 py-2.5 text-sm text-texto ring-1 ring-inset ring-borde/60 placeholder:text-cafe/40 focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
           />
         </div>
         <div>
-          <label class="block text-xs text-cafe/60 mb-1">Tipo</label>
+          <label class="mb-1.5 block text-xs font-semibold text-cafe/60">Tipo</label>
           <select
             v-model="filtros.idTipoServicio"
-            class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none bg-blanco"
+            class="block w-full rounded-2xl border-0 bg-crema py-2.5 pl-4 pr-8 text-sm text-texto ring-1 ring-inset ring-borde/60 focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
           >
             <option value="">Todos</option>
             <option v-for="t in tipos" :key="t.idTipoServicio" :value="String(t.idTipoServicio)">
               {{ t.nombre }}
             </option>
           </select>
+          <p v-if="descripcionTipoSeleccionado" class="mt-2 text-xs leading-relaxed text-cafe/60">
+            {{ descripcionTipoSeleccionado }}
+          </p>
         </div>
         <div>
-          <label class="block text-xs text-cafe/60 mb-1">Contenido sensible</label>
+          <label class="mb-1.5 block text-xs font-semibold text-cafe/60">Contenido sensible</label>
           <select
             v-model="filtros.sensible"
-            class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none bg-blanco"
+            class="block w-full rounded-2xl border-0 bg-crema py-2.5 pl-4 pr-8 text-sm text-texto ring-1 ring-inset ring-borde/60 focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
           >
             <option value="">Todos</option>
             <option value="true">Con contenido sensible</option>
@@ -192,57 +216,76 @@ onMounted(async () => {
           </select>
         </div>
         <div>
-          <label class="block text-xs text-cafe/60 mb-1">Tiempo máximo de entrega (días)</label>
+          <label class="mb-1.5 block text-xs font-semibold text-cafe/60">Tiempo máximo (días)</label>
           <input
             v-model="filtros.tiempoMaxDias"
             type="number"
             min="1"
             placeholder="Sin límite"
-            class="pl-4 pr-4 block w-full rounded-lg border-0 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+            class="block w-full rounded-2xl border-0 bg-crema px-4 py-2.5 text-sm text-texto ring-1 ring-inset ring-borde/60 placeholder:text-cafe/40 focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
           />
         </div>
         <div>
-          <label class="block text-xs text-cafe/60 mb-1">Precio mínimo</label>
+          <label class="mb-1.5 block text-xs font-semibold text-cafe/60">Precio mínimo</label>
           <input
             v-model="filtros.precioMin"
             type="number"
             min="0"
             step="0.01"
             placeholder="0"
-            class="pl-4 pr-4 block w-full rounded-lg border-0 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+            class="block w-full rounded-2xl border-0 bg-crema px-4 py-2.5 text-sm text-texto ring-1 ring-inset ring-borde/60 placeholder:text-cafe/40 focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
           />
         </div>
         <div>
-          <label class="block text-xs text-cafe/60 mb-1">Precio máximo</label>
+          <label class="mb-1.5 block text-xs font-semibold text-cafe/60">Precio máximo</label>
           <input
             v-model="filtros.precioMax"
             type="number"
             min="0"
             step="0.01"
             placeholder="Sin límite"
-            class="pl-4 pr-4 block w-full rounded-lg border-0 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+            class="block w-full rounded-2xl border-0 bg-crema px-4 py-2.5 text-sm text-texto ring-1 ring-inset ring-borde/60 placeholder:text-cafe/40 focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
           />
         </div>
       </div>
     </div>
 
-    <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando servicios...</p>
-    <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
-
-    <template v-else>
-      <p v-if="!servicios.length && hayFiltrosActivos" class="text-sm text-cafe/60 py-8 text-center">
-        No hay servicios que coincidan con los filtros.
-        <button type="button" class="ml-2 underline text-granate hover:text-coral transition" @click="limpiarFiltros">
-          Limpiar filtros
-        </button>
-      </p>
-      <p v-else-if="!servicios.length" class="rounded-xl border border-dashed border-rosa/60 px-4 py-12 text-center text-sm text-cafe/50">
-        No hay servicios registrados en el sistema.
-      </p>
-
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <TarjetaServicio v-for="s in servicios" :key="s.idServicio" :servicio="s" />
+    <div class="mt-8">
+      <div v-if="cargando" class="flex flex-col items-center justify-center py-20 text-cafe/60">
+        <span class="h-8 w-8 animate-spin rounded-full border-2 border-borde border-t-coral" aria-hidden="true"></span>
+        <p class="mt-4 text-sm">Cargando servicios...</p>
       </div>
-    </template>
+      <p v-else-if="error" class="rounded-3xl border border-rojizo/20 bg-rojizo/5 px-6 py-12 text-center text-rojizo">{{ error }}</p>
+
+      <template v-else>
+        <div v-if="servicios.length" class="mb-4 flex items-center justify-between gap-4">
+          <p class="text-sm text-cafe/60">
+            {{ servicios.length }} {{ servicios.length === 1 ? 'servicio' : 'servicios' }} para explorar
+          </p>
+          <button
+            v-if="hayFiltrosActivos"
+            type="button"
+            class="text-sm font-semibold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
+            @click="limpiarFiltros"
+          >
+            Limpiar filtros
+          </button>
+        </div>
+
+        <p v-if="!servicios.length && hayFiltrosActivos" class="rounded-3xl border border-dashed border-borde bg-superficie px-6 py-14 text-center text-sm text-cafe/60">
+          No hay servicios que coincidan con los filtros.
+          <button type="button" class="ml-2 font-semibold text-granate underline decoration-coral/40 underline-offset-4 transition hover:text-coral" @click="limpiarFiltros">
+            Limpiar filtros
+          </button>
+        </p>
+        <p v-else-if="!servicios.length" class="rounded-3xl border border-dashed border-borde bg-superficie px-6 py-14 text-center text-sm text-cafe/50">
+          No hay servicios registrados en el sistema.
+        </p>
+
+        <div v-else class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          <TarjetaServicio v-for="s in servicios" :key="s.idServicio" :servicio="s" />
+        </div>
+      </template>
+    </div>
   </div>
 </template>
