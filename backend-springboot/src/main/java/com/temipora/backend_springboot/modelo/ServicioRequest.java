@@ -6,6 +6,7 @@ import java.util.Set;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -53,8 +54,17 @@ public class ServicioRequest {
     private ETiempoEntregaUnidad tiempoEntregaUnidad;
 
     @NotNull(message = "La cantidad de cupos es obligatoria.")
-    @Min(value = 0, message = "Los cupos no pueden ser negativos")
+    @Min(value = 1, message = "La cantidad de cupos debe ser mayor a cero.")
+    @Max(value = 10, message = "La cantidad de cupos no puede superar 10.")
     private Integer cupos;
+
+    private ModoRecepcionSolicitud modoRecepcion;
+
+    @Min(value = 1, message = "La cantidad máxima de dibujos debe ser mayor a cero.")
+    @Max(value = 50, message = "La cantidad máxima de dibujos no puede superar 50.")
+    private Integer maxDibujosPorSolicitud;
+
+    private boolean permiteListaEspera;
 
     private boolean habilitarCuposTrasEntrega;
 

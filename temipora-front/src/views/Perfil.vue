@@ -3,6 +3,7 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { useSubirImagen } from '../composables/useSubirImagen'
+import { useNotificaciones } from '../composables/useNotificaciones'
 import TarjetaServicio from '../components/TarjetaServicio.vue'
 
 const route = useRoute()
@@ -27,9 +28,17 @@ const perfil = ref({
 const cargandoPerfil = ref(true)
 const errorCarga = ref('')
 
+const { exito, error: notificarError } = useNotificaciones()
+const esFavorito = ref(false)
+const cargandoEstadoFavorito = ref(false)
+const actualizandoFavorito = ref(false)
+
 async function cargarPerfil() {
   cargandoPerfil.value = true
   errorCarga.value = ''
+  esFavorito.value = false
+  cargandoEstadoFavorito.value = false
+  actualizandoFavorito.value = false
   try {
     const nombreUsuario = route.params.nombreUsuario
     const res = await api.get(`/perfil/${nombreUsuario}`)
@@ -45,6 +54,7 @@ async function cargarPerfil() {
 
     if (data.rol === 'ARTISTA') {
       await Promise.all([cargarPortfolio(true), cargarEtiquetasPortfolio(), cargarTiposArte(), cargarServicios()])
+      void cargarEstadoFavorito()
     } else {
       totalPortfolio.value = 0
       etiquetasPortfolio.value = []
@@ -194,6 +204,9 @@ watch(() => route.params.nombreUsuario, () => {
   errorListaPortfolio.value = ''
   perfil.value.servicios = []
   errorServicios.value = ''
+  esFavorito.value = false
+  cargandoEstadoFavorito.value = false
+  actualizandoFavorito.value = false
 })
 
 watch(() => route.params.nombreUsuario, cargarPerfil, { immediate: true })
@@ -207,6 +220,71 @@ const esDuenio = computed(() => {
   const actual = localStorage.getItem('nombreUsuario') || ''
   return actual.toLowerCase() === perfil.value.nombreUsuario.toLowerCase()
 })
+
+const haySesion = computed(() => !!localStorage.getItem('token'))
+const puedeMarcarFavorito = computed(() => esArtista.value && !esDuenio.value)
+
+async function cargarEstadoFavorito() {
+  const nombre = perfil.value.nombreUsuario
+  esFavorito.value = false
+  if (!nombre || !puedeMarcarFavorito.value || !haySesion.value) return
+
+  cargandoEstadoFavorito.value = true
+  try {
+    const res = await api.get(`/favoritos/${encodeURIComponent(nombre)}`)
+    if (perfil.value.nombreUsuario === nombre) {
+      esFavorito.value = !!res.data?.esFavorito
+    }
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+    }
+  } finally {
+    if (perfil.value.nombreUsuario === nombre) {
+      cargandoEstadoFavorito.value = false
+    }
+  }
+}
+
+async function alternarFavorito() {
+  if (!haySesion.value) {
+    router.push({ name: 'login' })
+    return
+  }
+  if (
+    !puedeMarcarFavorito.value ||
+    actualizandoFavorito.value ||
+    cargandoEstadoFavorito.value
+  ) {
+    return
+  }
+
+  const nombre = perfil.value.nombreUsuario
+  actualizandoFavorito.value = true
+  try {
+    if (esFavorito.value) {
+      await api.delete(`/favoritos/${encodeURIComponent(nombre)}`)
+      if (perfil.value.nombreUsuario === nombre) {
+        esFavorito.value = false
+        exito(`Quitaste a @${nombre} de tus favoritos.`)
+      }
+    } else {
+      await api.post(`/favoritos/${encodeURIComponent(nombre)}`)
+      if (perfil.value.nombreUsuario === nombre) {
+        esFavorito.value = true
+        exito(`Agregaste a @${nombre} a tus favoritos.`)
+      }
+    }
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    notificarError(e.response?.data?.message || 'No se pudieron actualizar tus favoritos.')
+  } finally {
+    actualizandoFavorito.value = false
+  }
+}
 
 function fotoInicial(nombre) {
   return (nombre || '?').charAt(0).toUpperCase()
@@ -348,7 +426,7 @@ function irASubirImagen(imagen = null) {
     </div>
     <template v-else>
     <!-- Banner -->
-    <div class="relative h-44 w-full overflow-hidden bg-gradient-to-br from-rosa via-durazno to-mantequilla sm:h-64">
+    <div class="relative h-44 w-full overflow-hidden bg-linear-to-br from-rosa via-durazno to-mantequilla sm:h-64">
       <div class="absolute -left-10 top-6 h-44 w-44 rounded-full bg-white/20 blur-2xl" aria-hidden="true"></div>
       <div class="absolute right-10 top-8 h-28 w-28 rounded-full bg-coral/20 blur-xl" aria-hidden="true"></div>
       <img
@@ -357,7 +435,7 @@ function irASubirImagen(imagen = null) {
         alt="Banner"
         class="h-full w-full object-cover"
       />
-      <div v-if="perfil.urlBanner" class="absolute inset-0 bg-gradient-to-t from-granate/35 via-transparent to-transparent" aria-hidden="true"></div>
+      <div v-if="perfil.urlBanner" class="absolute inset-0 bg-linear-to-t from-granate/35 via-transparent to-transparent" aria-hidden="true"></div>
     </div>
 
     <div class="mx-auto max-w-screen-2xl px-4 sm:px-8">
@@ -379,18 +457,41 @@ function irASubirImagen(imagen = null) {
           </div>
         </div>
 
-        <div class="mt-2 flex-1 sm:mt-0">
+        <div class="flex-1 sm:mt-0">
           <h1 class="font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">{{ nombreParaMostrar }}</h1>
-          <p class="mt-2 text-sm text-cafe/60">@{{ perfil.nombreUsuario }}</p>
+          <p class="text-sm text-cafe/60">@{{ perfil.nombreUsuario }}</p>
 
-          <div class="mt-3 flex max-w-2xl items-start gap-3">
+          <div class="mt-2 flex max-w-2xl items-start gap-3">
             <p class="line-clamp-3 text-sm leading-relaxed text-cafe/80">
               {{ perfil.biografia || 'Sin biografía.' }}
             </p>
           </div>
         </div>
 
-        <div class="mt-4 flex shrink-0 items-center gap-3 pb-1 sm:mt-0 sm:pb-3">
+        <div class="mt-4 flex shrink-0 flex-wrap items-center gap-3 pb-1 sm:mt-0 sm:pb-3">
+          <button
+            v-if="puedeMarcarFavorito"
+            type="button"
+            class="inline-flex min-h-10 items-center gap-2 rounded-full border px-5 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60"
+            :class="esFavorito
+              ? 'border-coral bg-coral text-white hover:bg-rojizo'
+              : 'border-coral/50 bg-superficie text-granate hover:bg-rosa/25'"
+            :disabled="actualizandoFavorito || cargandoEstadoFavorito"
+            :aria-pressed="esFavorito"
+            @click="alternarFavorito"
+          >
+            <svg
+              class="h-4 w-4"
+              viewBox="0 0 24 24"
+              :fill="esFavorito ? 'currentColor' : 'none'"
+              stroke="currentColor"
+              stroke-width="1.8"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z" />
+            </svg>
+            <span>{{ actualizandoFavorito ? 'Guardando...' : esFavorito ? 'En favoritos' : 'Favorito' }}</span>
+          </button>
           <button v-if="esDuenio"
             class="inline-flex min-h-10 items-center rounded-full border border-borde/60 bg-superficie px-5 text-sm font-semibold text-granate transition hover:bg-rosa/25"
             @click="irAConfiguracion('privacidad')"
@@ -410,7 +511,7 @@ function irASubirImagen(imagen = null) {
       <!-- Pestañas -->
       <div class="pb-6">
         <template v-if="esArtista">
-          <div class="flex flex-wrap items-center gap-2 border-b border-borde/50 pb-3">
+          <div class="flex flex-wrap items-center gap-2 border-b border-borde/50 pb-1.5 pt-1.5">
             <button
               class="rounded-full px-5 py-2.5 text-sm font-semibold transition"
               :class="tabActiva === 'portfolio' ? 'bg-coral text-white shadow-sm' : 'text-cafe/60 hover:bg-rosa/25 hover:text-granate'"
@@ -436,7 +537,7 @@ function irASubirImagen(imagen = null) {
 
             <div v-if="tabActiva === 'portfolio'" class="mt-6">
               <!-- Barra compacta de filtros (siempre inicia colapsada) -->
-              <div class="mb-6 rounded-[24px] border border-borde/60 bg-superficie p-4 shadow-[0_10px_28px_rgba(74,29,46,0.06)]">
+              <div class="mb-6 rounded-3xl border border-borde/60 bg-superficie p-4 shadow-[0_10px_28px_rgba(74,29,46,0.06)]">
                 <div class="flex flex-wrap items-center gap-3">
                   <div class="flex-1 min-w-44 relative">
                     <input
@@ -556,10 +657,10 @@ function irASubirImagen(imagen = null) {
                 <button
                   v-for="obra in perfil.portfolio"
                   :key="obra.idImagen"
-                  class="group aspect-square overflow-hidden rounded-[22px] border border-borde/60 bg-superficie p-2 text-left shadow-[0_10px_26px_rgba(74,29,46,0.07)] transition duration-300 hover:-translate-y-1 hover:border-coral/40 hover:shadow-[0_18px_38px_rgba(194,24,91,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+                  class="group aspect-square overflow-hidden rounded-[22px] border border-borde/60 bg-superficie p-2 text-left shadow-[0_10px_26px_rgba(74,29,46,0.07)] transition duration-300 hover:-translate-y-1 hover:border-coral/40 hover:shadow-[0_18px_38px_var(--sombra-acento)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
                   @click="abrirDetalleImagen(obra)"
                 >
-                  <div class="relative h-[calc(100%-2.25rem)] min-h-0 overflow-hidden rounded-[16px] bg-coral/20">
+                  <div class="relative h-[calc(100%-2.25rem)] min-h-0 overflow-hidden rounded-2xl bg-coral/20">
                     <img
                       v-if="obra.url"
                       :src="obra.url"
@@ -632,7 +733,7 @@ function irASubirImagen(imagen = null) {
         </template>
 
         <template v-else>
-          <div class="flex flex-wrap items-center gap-2 border-b border-borde/50 pb-3">
+          <div class="flex flex-wrap items-center gap-2 border-b border-borde/50 pb-1.5 pt-1.5">
             <button class="rounded-full bg-coral px-5 py-2.5 text-sm font-semibold text-white shadow-sm">
               Pedidos
             </button>

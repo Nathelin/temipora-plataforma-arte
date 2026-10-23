@@ -1,8 +1,11 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import api from '../servicios/api'
+import { hayContenidoTerminos } from '../servicios/terminos'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
 import BarraGuardado from '../components/BarraGuardado.vue'
+import AvisoCompletitudTerminos from '../components/AvisoCompletitudTerminos.vue'
+import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 
 const nombreUsuario = localStorage.getItem('nombreUsuario') || ''
 
@@ -25,7 +28,7 @@ const secciones = [
   { key: 'usoCliente', label: 'Uso del cliente' },
 ]
 
-const PLANTILLA = {
+const PLACEHOLDERS = {
   informacionGeneral: 'Antes de comisionar, contame tu idea con la mayor cantidad de detalles posible (personajes, estilo, colores, referencias). Te confirmo si puedo tomarlo y el presupuesto final.',
   politicaRevisiones: 'Incluyo hasta 2 rondas de revisiones (boceto y color). Cambios grandes fuera de esas etapas pueden tener un costo extra.',
   politicaCancelaciones: 'Si cancelás antes de empezar, devuelvo el 100%. Si el pedido ya está en boceto, devuelvo el 50%. Con el lineart o color avanzado no hay reembolso.',
@@ -48,6 +51,7 @@ const estadoDerechos = ref({})
 const estadoGuardado = ref(null)
 
 const modal = ref({ abierto: false, titulo: '', descripcion: '' })
+const confirmandoGuardado = ref(false)
 
 // ---------------------------------------------------------------
 // carga
@@ -117,12 +121,6 @@ function abrirDescripcion(titulo, descripcion) {
   modal.value = { abierto: true, titulo, descripcion }
 }
 
-function usarPlantilla() {
-  for (const [key, texto] of Object.entries(PLANTILLA)) {
-    if (!form.value[key].trim()) form.value[key] = texto
-  }
-}
-
 function porcentajeDe(derecho) {
   if (derecho.codigo === 'PERSONAL') return null
   const valor = estadoDerechos.value[derecho.idDerechoTermino]?.porcentajeExtra
@@ -136,20 +134,23 @@ function porcentajeDe(derecho) {
 // ---------------------------------------------------------------
 
 function hayContenido() {
-  const hayTexto = [...secciones.map((s) => s.key), 'queDibuja', 'queNoDibuja']
-    .some((k) => (form.value[k] || '').trim())
-  const hayDerechos = Object.values(estadoDerechos.value).some((d) => d.disponible)
-  return hayTexto || hayDerechos
+  return hayContenidoTerminos({ form: form.value })
 }
 
-async function guardar() {
+function solicitarGuardado() {
   mensaje.value = ''
   errorGuardado.value = ''
   if (!hayContenido()) {
     errorGuardado.value = 'Completá al menos una sección de tus términos.'
     return
   }
+  confirmandoGuardado.value = true
+}
 
+async function guardar() {
+  confirmandoGuardado.value = false
+  mensaje.value = ''
+  errorGuardado.value = ''
   guardando.value = true
   try {
     const payload = {
@@ -227,11 +228,7 @@ onBeforeUnmount(() => {
 
       <!-- ================= EDICIÓN ================= -->
       <template v-if="modo === 'editar'">
-        <div class="flex justify-end">
-          <button type="button" class="text-sm text-coral hover:text-rojizo transition" @click="usarPlantilla">
-            Usar plantilla sugerida
-          </button>
-        </div>
+        <AvisoCompletitudTerminos :terminos="{ form }" />
 
         <!-- Secciones de texto -->
         <div class="space-y-8">
@@ -240,6 +237,7 @@ onBeforeUnmount(() => {
             <textarea
               v-model="form[s.key]"
               rows="3"
+              :placeholder="PLACEHOLDERS[s.key]"
               class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"
             ></textarea>
           </div>
@@ -327,7 +325,7 @@ onBeforeUnmount(() => {
             class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
         </div>
 
-        <BarraGuardado :hay-cambios="hayCambios" :guardando="guardando" texto="Guardar términos" @guardar="guardar">
+        <BarraGuardado :hay-cambios="hayCambios" :guardando="guardando" texto="Guardar términos" @guardar="solicitarGuardado">
           <template #aviso>
             <p v-if="errorGuardado" class="text-rojizo text-sm">{{ errorGuardado }}</p>
             <p v-else-if="mensaje" class="text-green-700 text-sm">{{ mensaje }}</p>
@@ -388,5 +386,16 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+
+    <ModalConfirmacion
+      :abierto="confirmandoGuardado"
+      titulo="¿Guardar términos globales?"
+      :mensaje="version > 0
+        ? 'Se actualizarán tus términos globales. Los servicios que usan estos términos verán los cambios. Este cambio NO afecta a tus pedidos activos.'
+        : 'Se crearán tus términos globales. Se usarán por defecto en tus servicios.'"
+      texto-confirmar="Guardar términos"
+      @confirmar="guardar"
+      @cerrar="confirmandoGuardado = false"
+    />
   </div>
 </template>

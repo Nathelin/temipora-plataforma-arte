@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import BrandLogo from '../components/BrandLogo.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 
 const router = useRouter()
 const { abrir } = useSubirImagen()
@@ -108,6 +109,13 @@ function irAPerfil() {
               Explorar
             </router-link>
             <router-link
+              v-if="estaLogueado"
+              to="/favoritos"
+              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+            >
+              Favoritos
+            </router-link>
+            <router-link
               v-if="estaLogueado && esArtista"
               to="/mis-servicios"
               class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
@@ -128,6 +136,8 @@ function irAPerfil() {
         <div class="flex items-center gap-2.5 sm:gap-3">
           <ThemeToggle />
 
+          <PanelNotificaciones v-if="estaLogueado" />
+
           <template v-if="!estaLogueado">
             <router-link
               to="/login"
@@ -137,7 +147,7 @@ function irAPerfil() {
             </router-link>
             <router-link
               to="/registrarse"
-              class="hidden min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(194,24,91,0.22)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema sm:inline-flex"
+              class="hidden min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema sm:inline-flex"
             >
               Únete
             </router-link>
@@ -147,7 +157,7 @@ function irAPerfil() {
             <!-- Botón Subir (solo artistas) -->
             <div v-if="esArtista" ref="contenedorSubir" class="relative hidden md:block">
               <button
-                class="inline-flex min-h-10 items-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(194,24,91,0.22)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema"
+                class="inline-flex min-h-10 items-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema"
                 aria-haspopup="menu"
                 :aria-expanded="subirAbierto"
                 @click="subirAbierto = !subirAbierto"
@@ -229,6 +239,13 @@ function irAPerfil() {
                   Perfil
                 </button>
                 <button
+                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  role="menuitem"
+                  @click="menuAbierto = false; router.push({ name: 'favoritos' })"
+                >
+                  Favoritos
+                </button>
+                <button
                   v-if="esAdmin"
                   class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
                   role="menuitem"
@@ -283,6 +300,14 @@ function irAPerfil() {
                 Explorar
               </router-link>
               <router-link
+                v-if="estaLogueado"
+                to="/favoritos"
+                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                @click="menuMovilAbierto = false"
+              >
+                Favoritos
+              </router-link>
+              <router-link
                 v-if="estaLogueado && esArtista"
                 to="/mis-servicios"
                 class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
@@ -330,6 +355,13 @@ function irAPerfil() {
                   @click="menuMovilAbierto = false; irAPerfil()"
                 >
                   Mi perfil
+                </button>
+                <button
+                  type="button"
+                  class="flex w-full items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  @click="menuMovilAbierto = false; router.push({ name: 'favoritos' })"
+                >
+                  Favoritos
                 </button>
                 <button
                   type="button"

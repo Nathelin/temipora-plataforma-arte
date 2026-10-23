@@ -33,7 +33,9 @@ import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.TerminosDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.servicios.FormularioService;
+import com.temipora.backend_springboot.servicios.ListaEsperaService;
 import com.temipora.backend_springboot.servicios.ServicioService;
+import com.temipora.backend_springboot.servicios.SolicitudServicioService;
 import com.temipora.backend_springboot.servicios.TerminosService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -65,6 +67,12 @@ class ServicioConfiguracionControllerTest {
 
     @MockitoBean
     private UsuarioService usuarioService;
+
+    @MockitoBean
+    private SolicitudServicioService solicitudServicioService;
+
+    @MockitoBean
+    private ListaEsperaService listaEsperaService;
 
     @MockitoBean
     private UserDetailsService userDetailsService;

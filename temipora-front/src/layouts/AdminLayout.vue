@@ -3,6 +3,7 @@ import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BrandLogo from '../components/BrandLogo.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,7 +46,7 @@ const secciones = [
   },
   { nombre: 'Moderación', to: null, activa: false },
   { nombre: 'Sanciones', to: null, activa: false },
-  { nombre: 'Notificaciones', to: null, activa: false },
+  { nombre: 'Notificaciones', to: '/admin/notificaciones', activa: true },
   { nombre: 'Auditoría', to: null, activa: false },
 ]
 
@@ -156,6 +157,8 @@ function cerrarSesion() {
 
         <div class="flex items-center gap-2.5">
           <ThemeToggle />
+
+          <PanelNotificaciones />
 
           <div ref="contenedorMenu" class="relative">
             <button

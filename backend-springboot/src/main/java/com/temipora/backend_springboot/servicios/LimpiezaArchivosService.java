@@ -8,23 +8,28 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 
 import com.temipora.backend_springboot.repositorios.ImagenRepository;
+import com.temipora.backend_springboot.repositorios.RespuestaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 @Service
 public class LimpiezaArchivosService {
 
     static final Duration ANTIGUEDAD_HUERFANOS = Duration.ofHours(24);
+    private static final String TIPO_CAMPO_IMAGEN = "SUBIR_IMAGEN";
 
     private final StorageService storageService;
     private final ImagenRepository imagenRepository;
     private final UsuarioRepository usuarioRepository;
+    private final RespuestaRepository respuestaRepository;
 
     public LimpiezaArchivosService(StorageService storageService,
             ImagenRepository imagenRepository,
-            UsuarioRepository usuarioRepository) {
+            UsuarioRepository usuarioRepository,
+            RespuestaRepository respuestaRepository) {
         this.storageService = storageService;
         this.imagenRepository = imagenRepository;
         this.usuarioRepository = usuarioRepository;
+        this.respuestaRepository = respuestaRepository;
     }
 
     /**
@@ -61,10 +66,15 @@ public class LimpiezaArchivosService {
         usuarioRepository.findUrlsFotoPerfil().forEach(referenciadas::add);
         usuarioRepository.findUrlsFotoPerfilMiniatura().forEach(referenciadas::add);
         usuarioRepository.findUrlsBanner().forEach(referenciadas::add);
+        respuestaRepository.findRespuestasByTipoCampoCodigo(TIPO_CAMPO_IMAGEN).stream()
+            .filter(url -> url != null && !url.isBlank())
+            .forEach(referenciadas::add);
         return storageService.eliminarHuerfanos(referenciadas::contains, ANTIGUEDAD_HUERFANOS);
     }
 
     public boolean enUso(String url) {
-        return imagenRepository.existsByUrl(url) || usuarioRepository.existeUrlEnPerfil(url);
+        return imagenRepository.existsByUrl(url)
+            || usuarioRepository.existeUrlEnPerfil(url)
+            || respuestaRepository.existsByRespuestaAndTipoCampoCodigo(url, TIPO_CAMPO_IMAGEN);
     }
 }

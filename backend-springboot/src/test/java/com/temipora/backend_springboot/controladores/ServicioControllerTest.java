@@ -116,6 +116,19 @@ class ServicioControllerTest {
         verify(servicioService, never()).crear(any(), any());
     }
 
+    @Test
+    void crear_cuposCero_devuelve400() throws Exception {
+        stubUsuarioConRol("artista1", ERol.ARTISTA);
+
+        mockMvc.perform(post("/api/servicios")
+                .header("Authorization", "Bearer " + token("artista1", ERol.ARTISTA))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(JSON_VALIDO.replace("\"cupos\":5", "\"cupos\":0")))
+                .andExpect(status().isBadRequest());
+
+        verify(servicioService, never()).crear(any(), any());
+    }
+
     // ---------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------

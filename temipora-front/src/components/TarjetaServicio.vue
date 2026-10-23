@@ -49,7 +49,7 @@ function irAlArtista() {
 </script>
 
 <template>
-  <article class="group flex h-full flex-col overflow-hidden rounded-[26px] border border-borde/60 bg-superficie shadow-[0_12px_32px_rgba(74,29,46,0.08)] transition duration-300 hover:-translate-y-1.5 hover:border-coral/40 hover:shadow-[0_22px_48px_rgba(194,24,91,0.16)]">
+  <article class="group flex h-full flex-col overflow-hidden rounded-[26px] border border-borde/60 bg-superficie shadow-[0_12px_32px_rgba(74,29,46,0.08)] transition duration-300 hover:-translate-y-1.5 hover:border-coral/40 hover:shadow-[0_22px_48px_var(--sombra-acento)]">
     <button type="button" class="relative h-48 w-full overflow-hidden bg-rosa/20 text-left" @click="irAlServicio">
       <img
         v-if="servicio.imagenPortada"
@@ -140,7 +140,7 @@ function irAlArtista() {
         </div>
         <div class="flex flex-wrap justify-end gap-1.5 text-[11px] font-medium text-cafe/60">
           <span class="rounded-full bg-crema px-2.5 py-1">{{ textoEntrega(servicio) }}</span>
-          <span class="rounded-full bg-crema px-2.5 py-1">{{ servicio.cupos }} cupos</span>
+          <span class="rounded-full bg-crema px-2.5 py-1">{{ servicio.cuposDisponibles ?? servicio.cupos }} cupos libres</span>
         </div>
       </div>
 

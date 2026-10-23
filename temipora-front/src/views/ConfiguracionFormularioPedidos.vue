@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import api from '../servicios/api'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
 import BarraGuardado from '../components/BarraGuardado.vue'
+import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 
 const nombreUsuario = localStorage.getItem('nombreUsuario') || ''
 
@@ -17,6 +18,7 @@ const tipos = ref([])
 const esSistema = ref(false)
 const preguntas = ref([])
 const estadoGuardado = ref(null)
+const confirmandoGuardado = ref(false)
 
 let uid = 0
 const arrastrando = ref(null)
@@ -204,7 +206,7 @@ function onDragEnd() {
 // guardar
 // ---------------------------------------------------------------
 
-async function guardarFormulario() {
+function solicitarGuardado() {
   mensaje.value = ''
   errorGuardado.value = ''
   if (!preguntas.value.length) {
@@ -215,7 +217,14 @@ async function guardarFormulario() {
     errorGuardado.value = 'Agregá al menos una pregunta que el cliente pueda completar.'
     return
   }
+  if (!hayCambios.value) return
+  confirmandoGuardado.value = true
+}
 
+async function guardarFormulario() {
+  confirmandoGuardado.value = false
+  mensaje.value = ''
+  errorGuardado.value = ''
   guardando.value = true
   try {
     const payload = {
@@ -297,7 +306,7 @@ onBeforeUnmount(() => {
 
       <template v-if="modo === 'editar'">
       <div v-if="esSistema" class="rounded-xl border border-coral/40 bg-coral/10 px-4 py-3 text-sm text-granate">
-        Estás viendo el <strong>formulario por defecto del sistema</strong>. Guardá para crear tu propia versión.
+        Estás viendo el <strong>formulario por defecto del sistema</strong>. Te recomendamos editarlo y ajustarlo a tus necesidades.
       </div>
 
       <!-- Lista de preguntas -->
@@ -384,7 +393,7 @@ onBeforeUnmount(() => {
         :hay-cambios="hayCambios"
         :guardando="guardando"
         texto="Guardar formulario"
-        @guardar="guardarFormulario"
+        @guardar="solicitarGuardado"
       >
         <template #aviso>
           <p v-if="errorGuardado" class="text-rojizo text-sm">{{ errorGuardado }}</p>
@@ -565,5 +574,16 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+
+    <ModalConfirmacion
+      :abierto="confirmandoGuardado"
+      titulo="¿Guardar formulario global?"
+      :mensaje="esSistema
+        ? 'Se creará tu propia versión del formulario. El formulario del sistema no se modificará.'
+        : 'Se actualizará tu formulario global. Los servicios que lo usan verán los cambios. Este cambio NO afecta a tus pedidos activos.'"
+      texto-confirmar="Guardar formulario"
+      @confirmar="guardarFormulario"
+      @cerrar="confirmandoGuardado = false"
+    />
   </div>
 </template>

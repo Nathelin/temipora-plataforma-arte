@@ -1,0 +1,653 @@
+package com.temipora.backend_springboot.servicios;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Set;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.temipora.backend_springboot.modelo.DisponibilidadServicioDTO;
+import com.temipora.backend_springboot.modelo.EstadoSolicitud;
+import com.temipora.backend_springboot.modelo.Formulario;
+import com.temipora.backend_springboot.modelo.FormularioDTO;
+import com.temipora.backend_springboot.modelo.ItemSolicitud;
+import com.temipora.backend_springboot.modelo.ItemSolicitudRequest;
+import com.temipora.backend_springboot.modelo.ListaEspera;
+import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
+import com.temipora.backend_springboot.modelo.Pregunta;
+import com.temipora.backend_springboot.modelo.PreguntaDTO;
+import com.temipora.backend_springboot.modelo.Respuesta;
+import com.temipora.backend_springboot.modelo.RespuestaSolicitudRequest;
+import com.temipora.backend_springboot.modelo.Servicio;
+import com.temipora.backend_springboot.modelo.ServicioDTO;
+import com.temipora.backend_springboot.modelo.Solicitud;
+import com.temipora.backend_springboot.modelo.SolicitudDTO;
+import com.temipora.backend_springboot.modelo.SolicitudPublicaDTO;
+import com.temipora.backend_springboot.modelo.SolicitudServicioRequest;
+import com.temipora.backend_springboot.modelo.TerminoDerechoDTO;
+import com.temipora.backend_springboot.modelo.Terminos;
+import com.temipora.backend_springboot.modelo.TerminosDTO;
+import com.temipora.backend_springboot.modelo.TipoCampo;
+import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.FormularioRepository;
+import com.temipora.backend_springboot.repositorios.ServicioRepository;
+import com.temipora.backend_springboot.repositorios.SolicitudRepository;
+import com.temipora.backend_springboot.repositorios.TerminosRepository;
+import com.temipora.backend_springboot.repositorios.UsuarioRepository;
+
+@Service
+public class SolicitudServicioService {
+
+    private static final List<EstadoSolicitud> ESTADOS_ACTIVOS = List.of(
+        EstadoSolicitud.PENDIENTE,
+        EstadoSolicitud.EN_LISTA_ESPERA,
+        EstadoSolicitud.PRESUPUESTADA,
+        EstadoSolicitud.PAGADA);
+
+    private static final List<EstadoSolicitud> ESTADOS_QUE_OCUPAN_CUPO = List.of(
+        EstadoSolicitud.PRESUPUESTADA,
+        EstadoSolicitud.PAGADA);
+
+    private static final String NOTIFICACION_SOLICITUD = "SOLICITUD_RECIBIDA";
+    private static final String NOTIFICACION_ESPERA = "SOLICITUD_EN_LISTA_ESPERA";
+    private static final String TIPO_REFERENCIA_SOLICITUD = "SOLICITUD";
+
+    private static final String TEXTO = "TEXTO";
+    private static final String CASILLAS = "CASILLAS";
+    private static final String OPCIONES = "OPCIONES";
+    private static final String ENCABEZADO = "ENCABEZADO";
+    private static final String SUBIR_IMAGEN = "SUBIR_IMAGEN";
+
+    private final ServicioRepository servicioRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final FormularioRepository formularioRepository;
+    private final TerminosRepository terminosRepository;
+    private final SolicitudRepository solicitudRepository;
+    private final ServicioService servicioService;
+    private final FormularioService formularioService;
+    private final TerminosService terminosService;
+    private final ListaEsperaService listaEsperaService;
+    private final NotificacionService notificacionService;
+
+    public SolicitudServicioService(
+            ServicioRepository servicioRepository,
+            UsuarioRepository usuarioRepository,
+            FormularioRepository formularioRepository,
+            TerminosRepository terminosRepository,
+            SolicitudRepository solicitudRepository,
+            ServicioService servicioService,
+            FormularioService formularioService,
+            TerminosService terminosService,
+            ListaEsperaService listaEsperaService,
+            NotificacionService notificacionService) {
+        this.servicioRepository = servicioRepository;
+        this.usuarioRepository = usuarioRepository;
+        this.formularioRepository = formularioRepository;
+        this.terminosRepository = terminosRepository;
+        this.solicitudRepository = solicitudRepository;
+        this.servicioService = servicioService;
+        this.formularioService = formularioService;
+        this.terminosService = terminosService;
+        this.listaEsperaService = listaEsperaService;
+        this.notificacionService = notificacionService;
+    }
+
+    @Transactional(readOnly = true)
+    public DisponibilidadServicioDTO disponibilidad(Long idServicio, Long idCliente) {
+        servicioService.obtener(idServicio, idCliente);
+        Servicio servicio = servicioRepository.findByIdServicio(idServicio)
+            .orElseThrow(() -> new NoSuchElementException("Servicio no encontrado: " + idServicio));
+
+        int cuposTotales = servicio.getCupos() == null ? 0 : servicio.getCupos();
+        int cuposOcupados = calcularOcupados(idServicio);
+        int cuposDisponibles = Math.max(0, cuposTotales - cuposOcupados);
+        ModoRecepcionSolicitud modo = modoDe(servicio);
+
+        boolean tieneSolicitudActiva = idCliente != null
+            && solicitudRepository.existsByServicioIdServicioAndClienteIdUsuarioAndEstadoIn(
+                idServicio, idCliente, ESTADOS_ACTIVOS);
+        boolean tieneSolicitudEnEspera = idCliente != null
+            && solicitudRepository.existsByServicioIdServicioAndClienteIdUsuarioAndEstado(
+                idServicio, idCliente, EstadoSolicitud.EN_LISTA_ESPERA);
+
+        boolean permiteListaEspera = modo == ModoRecepcionSolicitud.SOLO_ESPERA;
+        boolean puedeSolicitarCupo = idCliente != null
+            && !tieneSolicitudActiva
+            && modo == ModoRecepcionSolicitud.ABIERTA;
+        boolean puedeListaEspera = idCliente != null
+            && !tieneSolicitudActiva
+            && modo == ModoRecepcionSolicitud.SOLO_ESPERA;
+        boolean puedeSolicitar = puedeSolicitarCupo || puedeListaEspera;
+
+        String mensaje;
+        if (idCliente == null) {
+            mensaje = "Iniciá sesión para solicitar este servicio.";
+        } else if (tieneSolicitudActiva) {
+            mensaje = "Ya tenés una solicitud activa para este servicio.";
+        } else if (modo == ModoRecepcionSolicitud.CERRADA) {
+            mensaje = "El artista no está recibiendo solicitudes para este servicio.";
+        } else if (modo == ModoRecepcionSolicitud.SOLO_ESPERA) {
+            mensaje = "El servicio recibe solicitudes solo en lista de espera.";
+        } else if (cuposDisponibles > 0) {
+            mensaje = null;
+        } else {
+            mensaje = "No hay cupos libres. Podés enviar la solicitud y el artista la "
+                + "presupuestará cuando se libere un cupo.";
+        }
+
+        return DisponibilidadServicioDTO.builder()
+            .idServicio(idServicio)
+            .cuposTotales(cuposTotales)
+            .cuposOcupados(cuposOcupados)
+            .cuposDisponibles(cuposDisponibles)
+            .modoRecepcion(modo.name())
+            .maxDibujosPorSolicitud(maxDibujosDe(servicio))
+            .permiteListaEspera(permiteListaEspera)
+            .tieneSolicitudActiva(tieneSolicitudActiva)
+            .tieneSolicitudEnEspera(tieneSolicitudEnEspera)
+            .puedeSolicitarCupo(puedeSolicitarCupo)
+            .puedeListaEspera(puedeListaEspera)
+            .puedeSolicitar(puedeSolicitar)
+            .mensaje(mensaje)
+            .build();
+    }
+
+    @Transactional(readOnly = true)
+    public SolicitudPublicaDTO solicitudPublica(Long idServicio, Long idCliente) {
+        ServicioDTO servicio = servicioService.obtener(idServicio, idCliente);
+        TerminosDTO terminos = terminosService.obtenerServicio(idServicio, servicio.getIdArtista());
+        FormularioDTO formulario = formularioService.obtenerServicio(idServicio, servicio.getIdArtista());
+        DisponibilidadServicioDTO disponibilidad = disponibilidad(idServicio, idCliente);
+        boolean terminosValidos = terminos.getIdTerminos() != null
+            && terminos.getVersion() != null
+            && terminos.getVersion() > 0;
+
+        return SolicitudPublicaDTO.builder()
+            .servicio(servicio)
+            .terminos(terminos)
+            .formulario(formulario)
+            .disponibilidad(disponibilidad)
+            .terminosValidos(terminosValidos)
+            .build();
+    }
+
+    @Transactional
+    public SolicitudDTO crear(Long idCliente, SolicitudServicioRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("La solicitud es obligatoria.");
+        }
+        if (request.getIdTerminos() == null || request.getTerminosVersion() == null) {
+            throw new IllegalArgumentException("Tenés que aceptar los términos del servicio.");
+        }
+        if (!request.isAceptaTerminos()) {
+            throw new IllegalArgumentException("Tenés que aceptar los términos del servicio.");
+        }
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new IllegalArgumentException("Debés agregar al menos un dibujo.");
+        }
+
+        Usuario cliente = usuarioRepository.findByIdUsuario(idCliente)
+            .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idCliente));
+        Servicio servicio = servicioRepository.findByIdServicioForUpdate(request.getIdServicio())
+            .orElseThrow(() -> new NoSuchElementException(
+                "Servicio no encontrado: " + request.getIdServicio()));
+        if (!servicio.isEstado()) {
+            throw new NoSuchElementException("Servicio no encontrado: " + request.getIdServicio());
+        }
+
+        Usuario artista = servicio.getArtista();
+        if (artista != null && artista.getIdUsuario().equals(idCliente)) {
+            throw new IllegalArgumentException("No podés solicitar tu propio servicio.");
+        }
+
+        TerminosDTO terminos = terminosService.obtenerServicio(
+            servicio.getIdServicio(), artista.getIdUsuario());
+        if (terminos.getIdTerminos() == null || terminos.getVersion() == null
+                || terminos.getVersion() <= 0) {
+            throw new IllegalArgumentException(
+                "El artista no tiene términos de uso y servicio configurados.");
+        }
+        if (!request.getIdTerminos().equals(terminos.getIdTerminos())
+                || !request.getTerminosVersion().equals(terminos.getVersion())) {
+            throw new ConflictoException(
+                "Los términos del servicio cambiaron. Revisalos y volvé a aceptarlos.");
+        }
+
+        Terminos terminosEntidad = terminosRepository.findByIdTerminos(terminos.getIdTerminos())
+            .orElseThrow(() -> new NoSuchElementException(
+                "Términos no encontrados: " + terminos.getIdTerminos()));
+        FormularioDTO formularioDTO = formularioService.obtenerServicio(
+            servicio.getIdServicio(), artista.getIdUsuario());
+        Formulario formulario = formularioRepository
+            .findByIdFormulario(formularioDTO.getIdFormulario())
+            .orElseThrow(() -> new NoSuchElementException(
+                "Formulario no encontrado: " + formularioDTO.getIdFormulario()));
+
+        List<ItemPreparado> preparados = validarYPrepararItems(
+            request, formularioDTO, formulario);
+        int totalDibujos = preparados.size();
+        int maxDibujos = maxDibujosDe(servicio);
+        if (totalDibujos > maxDibujos) {
+            throw new IllegalArgumentException(
+                "Este servicio admite hasta " + maxDibujos + " dibujo(s) por solicitud.");
+        }
+
+        ModoRecepcionSolicitud modo = modoDe(servicio);
+        if (modo == ModoRecepcionSolicitud.CERRADA) {
+            throw new IllegalArgumentException(
+                "El artista no está recibiendo solicitudes para este servicio.");
+        }
+        if (solicitudRepository.existsByServicioIdServicioAndClienteIdUsuarioAndEstadoIn(
+                servicio.getIdServicio(), idCliente, ESTADOS_ACTIVOS)) {
+            throw new IllegalArgumentException(
+                "Ya tenés una solicitud activa para este servicio.");
+        }
+        if (modo == ModoRecepcionSolicitud.SOLO_ESPERA && !request.isAceptaListaEspera()) {
+            throw new IllegalArgumentException(
+                "Aceptá la lista de espera para enviar la solicitud.");
+        }
+
+        List<ItemPreparado> ordenados = new ArrayList<>(preparados);
+        if (request.isPrioridadDefinida()) {
+            validarPrioridades(ordenados);
+            ordenados.sort(Comparator.comparing(ItemPreparado::prioridad));
+        }
+
+        LocalDateTime terminosAceptadosEn = LocalDateTime.now();
+        String terminosSnapshot = serializarTerminos(terminos);
+
+        EstadoSolicitud estado = modo == ModoRecepcionSolicitud.SOLO_ESPERA
+            ? EstadoSolicitud.EN_LISTA_ESPERA
+            : EstadoSolicitud.PENDIENTE;
+        Solicitud solicitud = crearSolicitud(
+            servicio,
+            cliente,
+            artista,
+            formulario,
+            terminosEntidad,
+            terminos.getVersion(),
+            terminosAceptadosEn,
+            terminosSnapshot,
+            request.isPrioridadDefinida(),
+            estado,
+            ordenados);
+        solicitudRepository.save(solicitud);
+
+        if (estado == EstadoSolicitud.EN_LISTA_ESPERA) {
+            ListaEspera lista = listaEsperaService.crear(
+                solicitud, servicio, cliente, totalDibujos);
+            solicitud.setListaEspera(lista);
+            notificacionService.crearParaUsuario(
+                artista.getIdUsuario(),
+                NOTIFICACION_ESPERA,
+                "Nueva solicitud en lista de espera",
+                "Recibiste una solicitud para la lista de espera de '" + servicio.getNombre()
+                    + "' con " + totalDibujos + " dibujo(s).",
+                solicitud.getIdSolicitud(),
+                TIPO_REFERENCIA_SOLICITUD);
+        } else {
+            notificacionService.crearParaUsuario(
+                artista.getIdUsuario(),
+                NOTIFICACION_SOLICITUD,
+                "Nueva solicitud de servicio",
+                "Recibiste una solicitud para '" + servicio.getNombre() + "' con "
+                    + totalDibujos + " dibujo(s).",
+                solicitud.getIdSolicitud(),
+                TIPO_REFERENCIA_SOLICITUD);
+        }
+
+        return SolicitudDTO.desdeSolicitud(solicitud);
+    }
+
+    @Transactional(readOnly = true)
+    public SolicitudDTO obtenerSolicitud(Long idSolicitud, Long idUsuario) {
+        Solicitud solicitud = solicitudRepository.findByIdSolicitud(idSolicitud)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Solicitud no encontrada: " + idSolicitud));
+        boolean esCliente = solicitud.getCliente() != null
+            && solicitud.getCliente().getIdUsuario().equals(idUsuario);
+        boolean esArtista = solicitud.getArtista() != null
+            && solicitud.getArtista().getIdUsuario().equals(idUsuario);
+        if (!esCliente && !esArtista) {
+            throw new IllegalArgumentException("No podés ver esta solicitud.");
+        }
+        return SolicitudDTO.desdeSolicitud(solicitud);
+    }
+
+    private int calcularOcupados(Long idServicio) {
+        long ocupados = solicitudRepository.countByServicioIdServicioAndEstadoIn(
+            idServicio, ESTADOS_QUE_OCUPAN_CUPO);
+        return (int) Math.min(ocupados, Integer.MAX_VALUE);
+    }
+
+    private ModoRecepcionSolicitud modoDe(Servicio servicio) {
+        return servicio.getModoRecepcion() != null
+            ? servicio.getModoRecepcion()
+            : ModoRecepcionSolicitud.ABIERTA;
+    }
+
+    private int maxDibujosDe(Servicio servicio) {
+        return servicio.getMaxDibujosPorSolicitud() != null
+            ? servicio.getMaxDibujosPorSolicitud()
+            : 3;
+    }
+
+    private List<ItemPreparado> validarYPrepararItems(
+            SolicitudServicioRequest request,
+            FormularioDTO formularioDTO,
+            Formulario formulario) {
+        if (request.getItems().size() > 50) {
+            throw new IllegalArgumentException(
+                "Una solicitud puede tener como máximo 50 dibujos.");
+        }
+
+        Map<Long, PreguntaDTO> preguntasDto = new LinkedHashMap<>();
+        for (PreguntaDTO pregunta : formularioDTO.getPreguntas()) {
+            preguntasDto.put(pregunta.getIdPregunta(), pregunta);
+        }
+        Map<Long, Pregunta> preguntasEntidad = new LinkedHashMap<>();
+        for (Pregunta pregunta : formulario.getPreguntas()) {
+            preguntasEntidad.put(pregunta.getIdPregunta(), pregunta);
+        }
+
+        List<ItemPreparado> preparados = new ArrayList<>();
+        for (ItemSolicitudRequest item : request.getItems()) {
+            if (item == null || item.getNombre() == null || item.getNombre().isBlank()) {
+                throw new IllegalArgumentException("El nombre de cada dibujo es obligatorio.");
+            }
+
+            Map<Long, RespuestaSolicitudRequest> respuestasPorPregunta = new LinkedHashMap<>();
+            List<RespuestaSolicitudRequest> respuestas = item.getRespuestas() != null
+                ? item.getRespuestas()
+                : List.of();
+            for (RespuestaSolicitudRequest respuesta : respuestas) {
+                if (respuesta == null || respuesta.getIdPregunta() == null) {
+                    throw new IllegalArgumentException("Cada respuesta debe indicar su pregunta.");
+                }
+                if (respuestasPorPregunta.putIfAbsent(
+                        respuesta.getIdPregunta(), respuesta) != null) {
+                    throw new IllegalArgumentException(
+                        "La pregunta " + respuesta.getIdPregunta() + " está respondida más de una vez.");
+                }
+                if (!preguntasDto.containsKey(respuesta.getIdPregunta())) {
+                    throw new IllegalArgumentException(
+                        "La pregunta " + respuesta.getIdPregunta() + " no pertenece al formulario.");
+                }
+            }
+
+            List<RespuestaPreparada> respuestasPreparadas = new ArrayList<>();
+            int orden = 0;
+            for (PreguntaDTO pregunta : formularioDTO.getPreguntas()) {
+                RespuestaSolicitudRequest respuesta = respuestasPorPregunta.get(pregunta.getIdPregunta());
+                List<String> valores = respuesta != null
+                    ? limpiarValores(respuesta.getValores())
+                    : List.of();
+
+                if (ENCABEZADO.equals(pregunta.getCodigoTipo())) {
+                    if (!valores.isEmpty()) {
+                        throw new IllegalArgumentException(
+                            "La pregunta '" + pregunta.getEnunciado() + "' es un encabezado y no admite respuestas.");
+                    }
+                    orden++;
+                    continue;
+                }
+                if (pregunta.isObligatoria() && valores.isEmpty()) {
+                    throw new IllegalArgumentException(
+                        "La pregunta '" + pregunta.getEnunciado() + "' es obligatoria.");
+                }
+                if (valores.isEmpty()) {
+                    orden++;
+                    continue;
+                }
+
+                validarValores(pregunta, valores);
+                Pregunta preguntaEntidad = preguntasEntidad.get(pregunta.getIdPregunta());
+                if (preguntaEntidad == null) {
+                    throw new IllegalStateException(
+                        "La pregunta " + pregunta.getIdPregunta() + " no existe en la entidad.");
+                }
+                TipoCampo tipoCampo = preguntaEntidad.getTipoCampo();
+
+                int suborden = 0;
+                for (String valor : valores) {
+                    respuestasPreparadas.add(new RespuestaPreparada(
+                        preguntaEntidad,
+                        tipoCampo,
+                        pregunta.getEnunciado(),
+                        valor,
+                        orden,
+                        suborden++));
+                }
+                orden++;
+            }
+
+            Integer prioridad = request.isPrioridadDefinida() ? item.getPrioridad() : null;
+            preparados.add(new ItemPreparado(
+                item.getNombre().trim(),
+                prioridad,
+                respuestasPreparadas));
+        }
+        return preparados;
+    }
+
+    private void validarValores(PreguntaDTO pregunta, List<String> valores) {
+        String tipo = pregunta.getCodigoTipo();
+        if (tipo == null) {
+            throw new IllegalArgumentException(
+                "La pregunta '" + pregunta.getEnunciado() + "' no tiene un tipo de campo válido.");
+        }
+        switch (tipo) {
+            case TEXTO -> {
+                if (valores.size() != 1) {
+                    throw new IllegalArgumentException(
+                        "La pregunta '" + pregunta.getEnunciado() + "' admite un solo valor.");
+                }
+            }
+            case OPCIONES -> {
+                if (valores.size() != 1) {
+                    throw new IllegalArgumentException(
+                        "La pregunta '" + pregunta.getEnunciado() + "' admite una sola opción.");
+                }
+                if (pregunta.getOpciones() == null
+                        || !pregunta.getOpciones().contains(valores.get(0))) {
+                    throw new IllegalArgumentException(
+                        "La opción elegida en '" + pregunta.getEnunciado() + "' no es válida.");
+                }
+            }
+            case CASILLAS -> {
+                Set<String> unicas = new HashSet<>();
+                for (String valor : valores) {
+                    if (!unicas.add(valor)) {
+                        throw new IllegalArgumentException(
+                            "La pregunta '" + pregunta.getEnunciado() + "' tiene opciones repetidas.");
+                    }
+                    if (pregunta.getOpciones() == null
+                            || !pregunta.getOpciones().contains(valor)) {
+                        throw new IllegalArgumentException(
+                            "La opción '" + valor + "' no es válida para '"
+                                + pregunta.getEnunciado() + "'.");
+                    }
+                }
+            }
+            case SUBIR_IMAGEN -> {
+                if (valores.size() > 10) {
+                    throw new IllegalArgumentException(
+                        "La pregunta '" + pregunta.getEnunciado()
+                            + "' admite como máximo 10 imágenes.");
+                }
+            }
+            case ENCABEZADO -> throw new IllegalArgumentException(
+                "La pregunta '" + pregunta.getEnunciado() + "' no admite respuestas.");
+            default -> throw new IllegalArgumentException(
+                "El tipo de campo '" + tipo + "' no está soportado.");
+        }
+    }
+
+    private List<String> limpiarValores(List<String> valores) {
+        if (valores == null) {
+            return List.of();
+        }
+        return valores.stream()
+            .filter(Objects::nonNull)
+            .map(String::trim)
+            .filter(valor -> !valor.isEmpty())
+            .toList();
+    }
+
+    private void validarPrioridades(List<ItemPreparado> items) {
+        int total = items.size();
+        Set<Integer> usadas = new HashSet<>();
+        for (ItemPreparado item : items) {
+            Integer prioridad = item.prioridad();
+            if (prioridad == null) {
+                throw new IllegalArgumentException(
+                    "Definí la prioridad de todos los dibujos o elegí 'sin preferencia'.");
+            }
+            if (prioridad < 1 || prioridad > total) {
+                throw new IllegalArgumentException(
+                    "La prioridad debe estar entre 1 y " + total + ".");
+            }
+            if (!usadas.add(prioridad)) {
+                throw new IllegalArgumentException(
+                    "No podés repetir la prioridad " + prioridad + ".");
+            }
+        }
+        if (usadas.size() != total) {
+            throw new IllegalArgumentException(
+                "Las prioridades deben ser únicas y estar entre 1 y " + total + ".");
+        }
+    }
+
+    private Solicitud crearSolicitud(
+            Servicio servicio,
+            Usuario cliente,
+            Usuario artista,
+            Formulario formulario,
+            Terminos terminos,
+            Integer terminosVersion,
+            LocalDateTime terminosAceptadosEn,
+            String terminosSnapshot,
+            boolean prioridadDefinida,
+            EstadoSolicitud estado,
+            List<ItemPreparado> items) {
+        Solicitud solicitud = new Solicitud();
+        solicitud.setServicio(servicio);
+        solicitud.setCliente(cliente);
+        solicitud.setArtista(artista);
+        solicitud.setFormulario(formulario);
+        solicitud.setTerminos(terminos);
+        solicitud.setTerminosVersion(terminosVersion);
+        solicitud.setTerminosAceptadosEn(terminosAceptadosEn);
+        solicitud.setTerminosSnapshot(terminosSnapshot);
+        solicitud.setPrioridadDefinidaPorCliente(prioridadDefinida);
+        solicitud.setEstado(estado);
+        solicitud.setCantidadDibujos(items.size());
+        solicitud.setPrecioBase(servicio.getPrecioBase());
+        solicitud.setMoneda(servicio.getMoneda());
+        solicitud.setFechaActualizacion(LocalDateTime.now());
+
+        int orden = 0;
+        for (ItemPreparado itemPreparado : items) {
+            ItemSolicitud item = new ItemSolicitud();
+            item.setNombre(itemPreparado.nombre());
+            item.setOrden(orden++);
+            item.setOrdenPrioridad(prioridadDefinida ? itemPreparado.prioridad() : null);
+            item.setEstado("PENDIENTE");
+
+            for (RespuestaPreparada respuestaPreparada : itemPreparado.respuestas()) {
+                Respuesta respuesta = new Respuesta();
+                respuesta.setPregunta(respuestaPreparada.pregunta());
+                respuesta.setTipoCampo(respuestaPreparada.tipoCampo());
+                respuesta.setEnunciado(respuestaPreparada.enunciado());
+                respuesta.setRespuesta(respuestaPreparada.valor());
+                respuesta.setOrden(respuestaPreparada.orden());
+                respuesta.setSuborden(respuestaPreparada.suborden());
+                item.agregarRespuesta(respuesta);
+            }
+            solicitud.agregarItem(item);
+        }
+        return solicitud;
+    }
+
+    private String serializarTerminos(TerminosDTO terminos) {
+        StringBuilder json = new StringBuilder("{");
+        json.append("\"idTerminos\":").append(terminos.getIdTerminos()).append(',');
+        json.append("\"idServicio\":").append(terminos.getIdServicio()).append(',');
+        json.append("\"version\":").append(terminos.getVersion()).append(',');
+        json.append("\"informacionGeneral\":").append(jsonTexto(terminos.getInformacionGeneral())).append(',');
+        json.append("\"politicaRevisiones\":").append(jsonTexto(terminos.getPoliticaRevisiones())).append(',');
+        json.append("\"politicaCancelaciones\":").append(jsonTexto(terminos.getPoliticaCancelaciones())).append(',');
+        json.append("\"usoArtista\":").append(jsonTexto(terminos.getUsoArtista())).append(',');
+        json.append("\"usoCliente\":").append(jsonTexto(terminos.getUsoCliente())).append(',');
+        json.append("\"pagoExtra\":").append(jsonTexto(terminos.getPagoExtra())).append(',');
+        json.append("\"queDibuja\":").append(jsonTexto(terminos.getQueDibuja())).append(',');
+        json.append("\"queNoDibuja\":").append(jsonTexto(terminos.getQueNoDibuja())).append(',');
+        json.append("\"derechos\":[");
+        if (terminos.getDerechos() != null) {
+            boolean primero = true;
+            for (TerminoDerechoDTO derecho : terminos.getDerechos()) {
+                if (!primero) {
+                    json.append(',');
+                }
+                primero = false;
+                json.append("{\"idDerechoTermino\":").append(derecho.getIdDerechoTermino());
+                json.append(",\"codigo\":").append(jsonTexto(derecho.getCodigo()));
+                json.append(",\"nombre\":").append(jsonTexto(derecho.getNombre()));
+                json.append(",\"descripcion\":").append(jsonTexto(derecho.getDescripcion()));
+                json.append(",\"requierePiezaUnica\":").append(derecho.isRequierePiezaUnica());
+                json.append(",\"disponible\":").append(derecho.isDisponible());
+                json.append(",\"porcentajeExtra\":").append(derecho.getPorcentajeExtra());
+                json.append('}');
+            }
+        }
+        json.append("]}");
+        return json.toString();
+    }
+
+    private String jsonTexto(String valor) {
+        if (valor == null) {
+            return "null";
+        }
+        StringBuilder texto = new StringBuilder("\"");
+        for (char c : valor.toCharArray()) {
+            switch (c) {
+                case '"' -> texto.append("\\\"");
+                case '\\' -> texto.append("\\\\");
+                case '\n' -> texto.append("\\n");
+                case '\r' -> texto.append("\\r");
+                case '\t' -> texto.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        texto.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        texto.append(c);
+                    }
+                }
+            }
+        }
+        return texto.append('"').toString();
+    }
+
+    private record ItemPreparado(
+            String nombre,
+            Integer prioridad,
+            List<RespuestaPreparada> respuestas) {
+    }
+
+    private record RespuestaPreparada(
+            Pregunta pregunta,
+            TipoCampo tipoCampo,
+            String enunciado,
+            String valor,
+            int orden,
+            int suborden) {
+    }
+}

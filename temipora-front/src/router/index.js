@@ -17,9 +17,14 @@ import AdminLayout from '../layouts/AdminLayout.vue'
 import ConfiguracionLayout from '../layouts/ConfiguracionLayout.vue'
 import Inicio from '../views/Inicio.vue'
 import Perfil from '../views/Perfil.vue'
+import Favoritos from '../views/Favoritos.vue'
 import Servicios from '../views/Servicios.vue'
 import ServicioDetalle from '../views/ServicioDetalle.vue'
+import SolicitudServicio from '../views/SolicitudServicio.vue'
+import SolicitudDetalle from '../views/SolicitudDetalle.vue'
+import Notificaciones from '../views/Notificaciones.vue'
 import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
+import ConfiguracionApariencia from '../views/ConfiguracionApariencia.vue'
 import ConfiguracionPrivacidad from '../views/ConfiguracionPrivacidad.vue'
 import ConfiguracionEtiquetas from '../views/ConfiguracionEtiquetas.vue'
 import ConfiguracionFormularioPedidos from '../views/ConfiguracionFormularioPedidos.vue'
@@ -49,6 +54,12 @@ const routes = [
         props: (route) => ({ id: Number(route.params.id) }),
         meta: { title: 'Detalle del servicio' }
       },
+      {
+        path: 'servicios/:id/solicitar',
+        name: 'solicitud-servicio',
+        component: SolicitudServicio,
+        meta: { title: 'Solicitar servicio', requiresAuth: true, requiresCliente: true },
+      },
       { path: 'perfil/:nombreUsuario', name: 'perfil', component: Perfil,
         meta: { title: (route) => `Perfil de @${route.params.nombreUsuario}` }
       },
@@ -60,6 +71,27 @@ const routes = [
             return { name: 'perfil', params: { nombreUsuario } }
           }
           return { name: 'inicio' }
+        },
+      },
+      {
+        path: 'favoritos',
+        name: 'favoritos',
+        component: Favoritos,
+        meta: { title: 'Artistas favoritos', requiresAuth: true },
+      },
+      {
+        path: 'notificaciones',
+        name: 'notificaciones',
+        component: Notificaciones,
+        meta: { title: 'Notificaciones', requiresAuth: true },
+      },
+      {
+        path: 'solicitudes/:idSolicitud',
+        name: 'solicitud-detalle',
+        component: SolicitudDetalle,
+        meta: {
+          title: (route) => `Solicitud #${route.params.idSolicitud}`,
+          requiresAuth: true,
         },
       },
       {
@@ -92,6 +124,7 @@ const routes = [
         children: [
           { path: '', redirect: '/configuracion/perfil' },
           { path: 'perfil', name: 'configuracion-perfil', component: ConfiguracionPerfil, meta: { title: 'Configuración - Perfil' } },
+          { path: 'apariencia', name: 'configuracion-apariencia', component: ConfiguracionApariencia, meta: { title: 'Configuración - Apariencia' } },
           { path: 'privacidad', name: 'configuracion-privacidad', component: ConfiguracionPrivacidad, meta: { title: 'Configuración - Privacidad' } },
           { path: 'etiquetas', name: 'configuracion-etiquetas', component: ConfiguracionEtiquetas, meta: { title: 'Configuración - Mis etiquetas' } },
           { path: 'formulario-pedidos', name: 'configuracion-formulario-pedidos', component: ConfiguracionFormularioPedidos, meta: { title: 'Configuración - Formulario de pedidos', requiresArtist: true } },
@@ -176,6 +209,12 @@ const routes = [
         component: MonedasAdmin,
         meta: { title: 'Monedas' },
       },
+      {
+        path: 'notificaciones',
+        name: 'admin-notificaciones',
+        component: Notificaciones,
+        meta: { title: 'Notificaciones' },
+      },
     ],
   },
   { path: '/login', name: 'login', component: Login, meta: { title: 'Iniciar sesión' } },
@@ -242,6 +281,11 @@ router.beforeEach((to, from, next) => {
     document.title = 'Temipora';
   }
 
+  if (to.matched.some((r) => r.meta.requiresAuth) && !token) {
+    next({ name: 'login' })
+    return
+  }
+
   if (to.matched.some((r) => r.meta.requiresAdmin)) {
     if (!token || rol !== 'ADMIN') {
       next({ name: 'login' })
@@ -251,6 +295,13 @@ router.beforeEach((to, from, next) => {
 
   if (to.matched.some((r) => r.meta.requiresArtist)) {
     if (!token || rol !== 'ARTISTA') {
+      next({ name: 'inicio' })
+      return
+    }
+  }
+
+  if (to.matched.some((r) => r.meta.requiresCliente)) {
+    if (!token || rol !== 'CLIENTE') {
       next({ name: 'inicio' })
       return
     }
