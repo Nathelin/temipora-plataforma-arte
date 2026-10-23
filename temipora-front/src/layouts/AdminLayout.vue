@@ -46,7 +46,7 @@ const secciones = [
   },
   { nombre: 'Moderación', to: null, activa: false },
   { nombre: 'Sanciones', to: null, activa: false },
-  { nombre: 'Notificaciones', to: null, activa: false },
+  { nombre: 'Notificaciones', to: '/admin/notificaciones', activa: true },
   { nombre: 'Auditoría', to: null, activa: false },
 ]
 

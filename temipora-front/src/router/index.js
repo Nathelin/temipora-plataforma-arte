@@ -21,6 +21,8 @@ import Favoritos from '../views/Favoritos.vue'
 import Servicios from '../views/Servicios.vue'
 import ServicioDetalle from '../views/ServicioDetalle.vue'
 import SolicitudServicio from '../views/SolicitudServicio.vue'
+import SolicitudDetalle from '../views/SolicitudDetalle.vue'
+import Notificaciones from '../views/Notificaciones.vue'
 import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
 import ConfiguracionApariencia from '../views/ConfiguracionApariencia.vue'
 import ConfiguracionPrivacidad from '../views/ConfiguracionPrivacidad.vue'
@@ -76,6 +78,21 @@ const routes = [
         name: 'favoritos',
         component: Favoritos,
         meta: { title: 'Artistas favoritos', requiresAuth: true },
+      },
+      {
+        path: 'notificaciones',
+        name: 'notificaciones',
+        component: Notificaciones,
+        meta: { title: 'Notificaciones', requiresAuth: true },
+      },
+      {
+        path: 'solicitudes/:idSolicitud',
+        name: 'solicitud-detalle',
+        component: SolicitudDetalle,
+        meta: {
+          title: (route) => `Solicitud #${route.params.idSolicitud}`,
+          requiresAuth: true,
+        },
       },
       {
         path: 'portfolio/subir',
@@ -191,6 +208,12 @@ const routes = [
         name: 'monedas-admin',
         component: MonedasAdmin,
         meta: { title: 'Monedas' },
+      },
+      {
+        path: 'notificaciones',
+        name: 'admin-notificaciones',
+        component: Notificaciones,
+        meta: { title: 'Notificaciones' },
       },
     ],
   },

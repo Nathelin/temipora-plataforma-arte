@@ -1,6 +1,12 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useNotificacionesSistema } from '../composables/useNotificacionesSistema'
+
+const router = useRouter()
+const rutaNotificaciones = localStorage.getItem('rol') === 'ADMIN'
+  ? { name: 'admin-notificaciones' }
+  : { name: 'notificaciones' }
 
 const {
   notificaciones,
@@ -45,9 +51,20 @@ function manejarTecla(event) {
   }
 }
 
+function destinoDe(notificacion) {
+  if (notificacion?.tipoReferencia !== 'SOLICITUD') return null
+  const rol = localStorage.getItem('rol')
+  if (rol !== 'ARTISTA' && rol !== 'CLIENTE') return null
+  const id = Number(notificacion.idReferencia)
+  if (!Number.isInteger(id) || id <= 0) return null
+  return { name: 'solicitud-detalle', params: { idSolicitud: id } }
+}
+
 async function seleccionar(notificacion) {
+  const destino = destinoDe(notificacion)
   await marcarLeida(notificacion)
   cerrar()
+  if (destino) router.push(destino)
 }
 
 async function marcarTodas() {
@@ -186,13 +203,26 @@ onBeforeUnmount(() => {
               <span class="mt-0.5 block text-xs leading-relaxed text-cafe/75">
                 {{ notificacion.descripcion }}
               </span>
-              <span class="mt-1 block text-[11px] text-cafe/50">
-                {{ formatearFecha(notificacion.fechaCreacion) }}
+              <span class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-cafe/50">
+                <span>{{ formatearFecha(notificacion.fechaCreacion) }}</span>
+                <span v-if="destinoDe(notificacion)" class="font-semibold text-coral">
+                  Ver solicitud →
+                </span>
               </span>
             </span>
           </button>
         </li>
       </ul>
+
+      <div class="border-t border-rosa/40 px-4 py-2.5 text-center">
+        <router-link
+          :to="rutaNotificaciones"
+          class="text-xs font-semibold text-coral transition hover:text-rojizo"
+          @click="cerrar"
+        >
+          Ver todas las notificaciones
+        </router-link>
+      </div>
     </div>
   </div>
 </template>

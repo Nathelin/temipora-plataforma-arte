@@ -18,6 +18,10 @@ import lombok.Setter;
 public class SolicitudDTO {
 
     private Long idSolicitud;
+    private Long idServicio;
+    private String nombreServicio;
+    private UsuarioResumenDTO cliente;
+    private UsuarioResumenDTO artista;
     private Long idTerminos;
     private Integer terminosVersion;
     private LocalDateTime terminosAceptadosEn;
@@ -33,6 +37,14 @@ public class SolicitudDTO {
     public static SolicitudDTO desdeSolicitud(Solicitud solicitud) {
         return SolicitudDTO.builder()
             .idSolicitud(solicitud.getIdSolicitud())
+            .idServicio(solicitud.getServicio() != null
+                ? solicitud.getServicio().getIdServicio()
+                : null)
+            .nombreServicio(solicitud.getServicio() != null
+                ? solicitud.getServicio().getNombre()
+                : null)
+            .cliente(UsuarioResumenDTO.desdeUsuario(solicitud.getCliente()))
+            .artista(UsuarioResumenDTO.desdeUsuario(solicitud.getArtista()))
             .idTerminos(solicitud.getTerminos() != null
                 ? solicitud.getTerminos().getIdTerminos()
                 : null)
