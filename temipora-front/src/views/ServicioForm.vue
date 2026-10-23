@@ -92,6 +92,15 @@ const UNIDADES = [
   { valor: 'MESES', texto: 'Meses' },
 ]
 
+const MAX_CUPOS = 10
+const MAX_DIBUJOS = 50
+
+const MODOS_RECEPCION = [
+  { valor: 'ABIERTA', texto: 'Abierta a solicitudes' },
+  { valor: 'SOLO_ESPERA', texto: 'Solo lista de espera' },
+  { valor: 'CERRADA', texto: 'Cerrada a nuevas solicitudes' },
+]
+
 const SENSIBLES = [
   { valor: 'VIOLENCIA', texto: 'Violencia' },
   { valor: 'DESNUDOS', texto: 'Desnudos' },
@@ -110,7 +119,8 @@ const form = ref({
   tiempoEntregaValor: '',
   tiempoEntregaUnidad: 'DIAS',
   cupos: '',
-  habilitarCuposTrasEntrega: false,
+  modoRecepcion: 'ABIERTA',
+  maxDibujosPorSolicitud: 3,
   imagenPortada: '',
   imagenes: [],
 })
@@ -298,7 +308,8 @@ async function cargar() {
         tiempoEntregaValor: d.tiempoEntregaValor ?? '',
         tiempoEntregaUnidad: d.tiempoEntregaUnidad || 'DIAS',
         cupos: d.cupos ?? '',
-        habilitarCuposTrasEntrega: !!d.habilitarCuposTrasEntrega,
+        modoRecepcion: d.modoRecepcion || 'ABIERTA',
+        maxDibujosPorSolicitud: d.maxDibujosPorSolicitud ?? 3,
         imagenPortada: d.imagenPortada || '',
         imagenes: Array.isArray(d.imagenes) ? [...d.imagenes] : [],
       }
@@ -522,6 +533,18 @@ function validarEntrega() {
   }
   if (form.value.cupos === '' || Number(form.value.cupos) <= 0) {
     errs.push('Ingresá una cantidad de cupos mayor a cero.')
+  } else if (Number(form.value.cupos) > MAX_CUPOS) {
+    errs.push(`La cantidad de cupos no puede superar ${MAX_CUPOS}.`)
+  }
+  if (
+    form.value.maxDibujosPorSolicitud === '' ||
+    Number(form.value.maxDibujosPorSolicitud) < 1 ||
+    Number(form.value.maxDibujosPorSolicitud) > MAX_DIBUJOS
+  ) {
+    errs.push(`El máximo de dibujos por solicitud debe estar entre 1 y ${MAX_DIBUJOS}.`)
+  }
+  if (!form.value.modoRecepcion) {
+    errs.push('Elegí cómo querés recibir solicitudes.')
   }
   if (form.value.contenidoSensible && !form.value.contenidosSensibles.length) {
     errs.push('Marcá el servicio como sensible y elegí qué tipo de contenido puede aparecer.')
@@ -712,7 +735,8 @@ async function guardar() {
       tiempoEntregaValor: Number(form.value.tiempoEntregaValor),
       tiempoEntregaUnidad: form.value.tiempoEntregaUnidad,
       cupos: Number(form.value.cupos),
-      habilitarCuposTrasEntrega: form.value.habilitarCuposTrasEntrega,
+      modoRecepcion: form.value.modoRecepcion,
+      maxDibujosPorSolicitud: Number(form.value.maxDibujosPorSolicitud),
       imagenPortada: form.value.imagenPortada,
       imagenes: form.value.imagenes,
       idsEtiquetas: etiquetas.value.map((e) => e.idEtiqueta),
@@ -964,13 +988,28 @@ onBeforeUnmount(() => {
                 </div>
                 <div>
                   <label class="block text-sm text-cafe mb-2">Cantidad de cupos <span class="text-rojizo">*</span></label>
-                  <input v-model="form.cupos" type="number" min="1" step="1"
+                  <input v-model="form.cupos" type="number" min="1" :max="MAX_CUPOS" step="1"
                     class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
+                  <p class="mt-1 text-xs text-cafe/50">Máximo {{ MAX_CUPOS }} cupos.</p>
                 </div>
-                <label class="flex items-center gap-2 text-sm text-cafe">
-                  <input v-model="form.habilitarCuposTrasEntrega" type="checkbox" class="accent-coral" />
-                  <span>Habilitar cupos nuevos tras la entrega de un pedido</span>
-                </label>
+                <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div>
+                    <label class="block text-sm text-cafe mb-2">Recepción de solicitudes <span class="text-rojizo">*</span></label>
+                    <select v-model="form.modoRecepcion"
+                      class="block w-full rounded-lg border-0 py-2.5 px-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
+                      <option v-for="m in MODOS_RECEPCION" :key="m.valor" :value="m.valor">{{ m.texto }}</option>
+                    </select>
+                    <p class="mt-1 text-xs text-cafe/50">
+                      Solo los servicios abiertos con cupos libres aparecen en Explorar.
+                    </p>
+                  </div>
+                  <div>
+                    <label class="block text-sm text-cafe mb-2">Máximo de dibujos por solicitud <span class="text-rojizo">*</span></label>
+                    <input v-model="form.maxDibujosPorSolicitud" type="number" min="1" :max="MAX_DIBUJOS" step="1"
+                      class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
+                    <p class="mt-1 text-xs text-cafe/50">Valor sugerido: 3. Una solicitud ocupa un solo cupo.</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1385,8 +1424,12 @@ onBeforeUnmount(() => {
                     <dd class="text-cafe">{{ form.cupos !== '' ? form.cupos : '—' }}</dd>
                   </div>
                   <div class="flex justify-between gap-3">
-                    <dt>Cupos tras entrega</dt>
-                    <dd class="text-cafe">{{ form.habilitarCuposTrasEntrega ? 'Sí' : 'No' }}</dd>
+                    <dt>Recepción</dt>
+                    <dd class="text-cafe">{{ MODOS_RECEPCION.find(m => m.valor === form.modoRecepcion)?.texto || form.modoRecepcion }}</dd>
+                  </div>
+                  <div class="flex justify-between gap-3">
+                    <dt>Máximo por solicitud</dt>
+                    <dd class="text-cafe">{{ form.maxDibujosPorSolicitud || '—' }} dibujo(s)</dd>
                   </div>
                   <div class="flex justify-between gap-3">
                     <dt>Contenido sensible</dt>

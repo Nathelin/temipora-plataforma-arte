@@ -42,6 +42,11 @@ public class ServicioDTO {
     private String tiempoEntregaUnidad;
     private Integer tiempoEntregaDias;
     private Integer cupos;
+    private Integer cuposOcupados;
+    private Integer cuposDisponibles;
+    private String modoRecepcion;
+    private Integer maxDibujosPorSolicitud;
+    private boolean permiteListaEspera;
     private boolean habilitarCuposTrasEntrega;
     private String imagenPortada;
     private List<String> imagenes;
@@ -97,6 +102,11 @@ public class ServicioDTO {
             .tiempoEntregaUnidad(s.getTiempoEntregaUnidad() != null ? s.getTiempoEntregaUnidad().name() : null)
             .tiempoEntregaDias(s.getTiempoEntregaDias())
             .cupos(s.getCupos())
+            .cuposOcupados(0)
+            .cuposDisponibles(s.getCupos())
+            .modoRecepcion(s.getModoRecepcion() != null ? s.getModoRecepcion().name() : null)
+            .maxDibujosPorSolicitud(s.getMaxDibujosPorSolicitud())
+            .permiteListaEspera(s.isPermiteListaEspera())
             .habilitarCuposTrasEntrega(s.isHabilitarCuposTrasEntrega())
             .imagenPortada(s.getImagenPortada())
             .imagenes(s.getImagenes().stream().map(ServicioImagen::getUrl).toList())

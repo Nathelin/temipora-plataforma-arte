@@ -95,6 +95,16 @@ public class Servicio {
     @Column(nullable = false)
     private Integer cupos = 0;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "modo_recepcion", nullable = false, length = 20)
+    private ModoRecepcionSolicitud modoRecepcion = ModoRecepcionSolicitud.ABIERTA;
+
+    @Column(name = "max_dibujos_por_solicitud", nullable = false)
+    private Integer maxDibujosPorSolicitud = 3;
+
+    @Column(name = "permite_lista_espera", nullable = false)
+    private boolean permiteListaEspera = false;
+
     @Column(name = "habilitar_cupos_tras_entrega", nullable = false)
     private boolean habilitarCuposTrasEntrega = false;
 

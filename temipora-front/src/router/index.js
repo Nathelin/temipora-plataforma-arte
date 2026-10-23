@@ -20,6 +20,7 @@ import Perfil from '../views/Perfil.vue'
 import Favoritos from '../views/Favoritos.vue'
 import Servicios from '../views/Servicios.vue'
 import ServicioDetalle from '../views/ServicioDetalle.vue'
+import SolicitudServicio from '../views/SolicitudServicio.vue'
 import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
 import ConfiguracionApariencia from '../views/ConfiguracionApariencia.vue'
 import ConfiguracionPrivacidad from '../views/ConfiguracionPrivacidad.vue'
@@ -50,6 +51,12 @@ const routes = [
       { path: 'servicios/:id', name: 'servicio-detalle', component: ServicioDetalle,
         props: (route) => ({ id: Number(route.params.id) }),
         meta: { title: 'Detalle del servicio' }
+      },
+      {
+        path: 'servicios/:id/solicitar',
+        name: 'solicitud-servicio',
+        component: SolicitudServicio,
+        meta: { title: 'Solicitar servicio', requiresAuth: true, requiresCliente: true },
       },
       { path: 'perfil/:nombreUsuario', name: 'perfil', component: Perfil,
         meta: { title: (route) => `Perfil de @${route.params.nombreUsuario}` }
@@ -265,6 +272,13 @@ router.beforeEach((to, from, next) => {
 
   if (to.matched.some((r) => r.meta.requiresArtist)) {
     if (!token || rol !== 'ARTISTA') {
+      next({ name: 'inicio' })
+      return
+    }
+  }
+
+  if (to.matched.some((r) => r.meta.requiresCliente)) {
+    if (!token || rol !== 'CLIENTE') {
       next({ name: 'inicio' })
       return
     }

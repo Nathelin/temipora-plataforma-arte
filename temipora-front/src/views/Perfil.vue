@@ -733,7 +733,7 @@ function irASubirImagen(imagen = null) {
         </template>
 
         <template v-else>
-          <div class="flex flex-wrap items-center gap-2 border-b border-borde/50 pb-3">
+          <div class="flex flex-wrap items-center gap-2 border-b border-borde/50 pb-1.5 pt-1.5">
             <button class="rounded-full bg-coral px-5 py-2.5 text-sm font-semibold text-white shadow-sm">
               Pedidos
             </button>

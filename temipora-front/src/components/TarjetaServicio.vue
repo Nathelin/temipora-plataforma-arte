@@ -140,7 +140,7 @@ function irAlArtista() {
         </div>
         <div class="flex flex-wrap justify-end gap-1.5 text-[11px] font-medium text-cafe/60">
           <span class="rounded-full bg-crema px-2.5 py-1">{{ textoEntrega(servicio) }}</span>
-          <span class="rounded-full bg-crema px-2.5 py-1">{{ servicio.cupos }} cupos</span>
+          <span class="rounded-full bg-crema px-2.5 py-1">{{ servicio.cuposDisponibles ?? servicio.cupos }} cupos libres</span>
         </div>
       </div>
 

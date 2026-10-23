@@ -16,10 +16,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
+import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 import com.temipora.backend_springboot.modelo.FiltroServicioRequest;
 import com.temipora.backend_springboot.modelo.Medio;
+import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
@@ -30,6 +32,7 @@ import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
+import com.temipora.backend_springboot.repositorios.SolicitudRepository;
 import com.temipora.backend_springboot.repositorios.TipoServicioRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -37,7 +40,12 @@ import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 @Validated
 public class ServicioService {
 
+    private static final List<EstadoSolicitud> ESTADOS_QUE_OCUPAN_CUPO = List.of(
+        EstadoSolicitud.PRESUPUESTADA,
+        EstadoSolicitud.PAGADA);
+
     private final ServicioRepository servicioRepository;
+    private final SolicitudRepository solicitudRepository;
     private final UsuarioRepository usuarioRepository;
     private final TipoServicioRepository tipoServicioRepository;
     private final MedioRepository medioRepository;
@@ -49,6 +57,7 @@ public class ServicioService {
 
     public ServicioService(
             ServicioRepository servicioRepository,
+            SolicitudRepository solicitudRepository,
             UsuarioRepository usuarioRepository,
             TipoServicioRepository tipoServicioRepository,
             MedioRepository medioRepository,
@@ -58,6 +67,7 @@ public class ServicioService {
             ConversionMonedaService conversionMonedaService,
             MonedaService monedaService) {
         this.servicioRepository = servicioRepository;
+        this.solicitudRepository = solicitudRepository;
         this.usuarioRepository = usuarioRepository;
         this.tipoServicioRepository = tipoServicioRepository;
         this.medioRepository = medioRepository;
@@ -85,6 +95,7 @@ public class ServicioService {
         Specification<Servicio> spec = activos(ocultarSensibles);
         spec = aplicarFiltros(spec, filtro);
         return servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre")).stream()
+            .filter(this::aceptaSolicitudesYPodriaPresupuestar)
             .map(s -> aDTO(s, requiereAdvertencia(s, pref, viewerId), moneda))
             .toList();
     }
@@ -141,7 +152,25 @@ public class ServicioService {
         BigDecimal factor = monedaDestino != null
             ? conversionMonedaService.factor(s.getMoneda(), monedaDestino, LocalDateTime.now())
             : null;
-        return ServicioDTO.desdeServicio(s, requiereAdvertencia, monedaDestino, factor);
+        ServicioDTO dto = ServicioDTO.desdeServicio(s, requiereAdvertencia, monedaDestino, factor);
+        int ocupados = calcularCuposOcupados(s.getIdServicio());
+        dto.setCuposOcupados(ocupados);
+        dto.setCuposDisponibles(Math.max(0, (s.getCupos() == null ? 0 : s.getCupos()) - ocupados));
+        return dto;
+    }
+
+    private boolean aceptaSolicitudesYPodriaPresupuestar(Servicio servicio) {
+        if (servicio.getModoRecepcion() != ModoRecepcionSolicitud.ABIERTA) {
+            return false;
+        }
+        int cupos = servicio.getCupos() == null ? 0 : servicio.getCupos();
+        return cupos - calcularCuposOcupados(servicio.getIdServicio()) > 0;
+    }
+
+    private int calcularCuposOcupados(Long idServicio) {
+        long ocupados = solicitudRepository.countByServicioIdServicioAndEstadoIn(
+            idServicio, ESTADOS_QUE_OCUPAN_CUPO);
+        return (int) Math.min(ocupados, Integer.MAX_VALUE);
     }
 
     private boolean requiereAdvertencia(
@@ -240,6 +269,12 @@ public class ServicioService {
         Servicio servicio = obtenerEntidad(idServicio);
         verificarDuenio(servicio, idArtista);
         validarUnico(idArtista, request.getIdTipoServicio(), request.getNombre(), idServicio);
+        int cuposOcupados = calcularCuposOcupados(idServicio);
+        if (request.getCupos() != null && request.getCupos() < cuposOcupados) {
+            throw new IllegalArgumentException(
+                "No podés reducir los cupos por debajo de los " + cuposOcupados
+                    + " ocupados o reservados.");
+        }
         aplicar(servicio, request);
         validarTerminos(idArtista, idServicio, request);
         Servicio guardado = servicioRepository.save(servicio);
@@ -288,6 +323,19 @@ public class ServicioService {
         if (r.getCupos() == null || r.getCupos() <= 0) {
             throw new IllegalArgumentException("La cantidad de cupos debe ser mayor a cero.");
         }
+        if (r.getCupos() > 10) {
+            throw new IllegalArgumentException("La cantidad de cupos no puede superar 10.");
+        }
+        ModoRecepcionSolicitud modo = r.getModoRecepcion() != null
+            ? r.getModoRecepcion()
+            : ModoRecepcionSolicitud.ABIERTA;
+        int maxDibujos = r.getMaxDibujosPorSolicitud() != null
+            ? r.getMaxDibujosPorSolicitud()
+            : 3;
+        if (maxDibujos < 1 || maxDibujos > 50) {
+            throw new IllegalArgumentException(
+                "La cantidad máxima de dibujos debe estar entre 1 y 50.");
+        }
 
         TipoServicio tipo = tipoServicioRepository.findByIdTipoServicio(r.getIdTipoServicio())
             .orElseThrow(() -> new IllegalArgumentException("Tipo de servicio no encontrado: " + r.getIdTipoServicio()));
@@ -310,7 +358,10 @@ public class ServicioService {
         servicio.setTiempoEntregaUnidad(r.getTiempoEntregaUnidad());
         servicio.setTiempoEntregaDias(r.getTiempoEntregaValor() * r.getTiempoEntregaUnidad().getFactorDias());
         servicio.setCupos(r.getCupos());
-        servicio.setHabilitarCuposTrasEntrega(r.isHabilitarCuposTrasEntrega());
+        servicio.setModoRecepcion(modo);
+        servicio.setMaxDibujosPorSolicitud(maxDibujos);
+        servicio.setPermiteListaEspera(modo == ModoRecepcionSolicitud.SOLO_ESPERA);
+        servicio.setHabilitarCuposTrasEntrega(false);
         servicio.setImagenPortada(limpiar(r.getImagenPortada()));
 
         List<ServicioImagen> imagenes = new ArrayList<>();

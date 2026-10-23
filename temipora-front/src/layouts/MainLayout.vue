@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import BrandLogo from '../components/BrandLogo.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 
 const router = useRouter()
 const { abrir } = useSubirImagen()
@@ -134,6 +135,8 @@ function irAPerfil() {
         <!-- Acciones -->
         <div class="flex items-center gap-2.5 sm:gap-3">
           <ThemeToggle />
+
+          <PanelNotificaciones v-if="estaLogueado" />
 
           <template v-if="!estaLogueado">
             <router-link

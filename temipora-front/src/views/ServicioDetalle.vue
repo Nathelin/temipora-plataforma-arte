@@ -10,8 +10,12 @@ const router = useRouter()
 
 const servicio = ref(null)
 const terminos = ref(null)
+const disponibilidad = ref(null)
+const terminosValidos = ref(false)
 const cargando = ref(true)
 const error = ref('')
+const autenticado = ref(!!localStorage.getItem('token'))
+const rol = ref(localStorage.getItem('rol') || '')
 
 const CAMPOS_TERMINOS = [
   'informacionGeneral',
@@ -68,6 +72,22 @@ const esDuenio = computed(() => {
   const actual = localStorage.getItem('nombreUsuario') || ''
   return actual.toLowerCase() === (servicio.value?.nombreArtista || '').toLowerCase()
 })
+const esCliente = computed(() => rol.value === 'CLIENTE')
+const puedeSolicitar = computed(
+  () =>
+    autenticado.value &&
+    esCliente.value &&
+    !esDuenio.value &&
+    terminosValidos.value &&
+    !!disponibilidad.value?.puedeSolicitar,
+)
+const mensajeSolicitud = computed(() => {
+  if (esDuenio.value) return ''
+  if (!autenticado.value) return 'Iniciá sesión como cliente para solicitar este servicio.'
+  if (!esCliente.value) return 'Solo las cuentas de cliente pueden solicitar servicios.'
+  if (!terminosValidos.value) return 'El artista todavía no configuró los términos y condiciones de este servicio.'
+  return disponibilidad.value?.mensaje || ''
+})
 
 const precioMostrado = computed(() =>
   formatearPrecio(
@@ -113,20 +133,43 @@ function irAServicios() {
   router.push({ name: 'servicios' })
 }
 
+function irASolicitar() {
+  if (!autenticado.value) {
+    router.push({ name: 'login' })
+    return
+  }
+  router.push({ name: 'solicitud-servicio', params: { id: servicio.value.idServicio } })
+}
+
+function aplicarSolicitudPublica(data) {
+  servicio.value = data.servicio
+  terminos.value = data.terminos
+  disponibilidad.value = data.disponibilidad
+  terminosValidos.value = !!data.terminosValidos
+}
+
 async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    const res = await api.get(`/servicios/${route.params.id}`)
-    servicio.value = res.data
-    try {
-      const terminosRes = await api.get(`/servicios/${route.params.id}/terminos-publicos`)
-      terminos.value = terminosRes.data
-    } catch {
-      terminos.value = null
-    }
+    const res = await api.get(`/servicios/${route.params.id}/solicitud-publica`)
+    aplicarSolicitudPublica(res.data)
   } catch (e) {
-    error.value = e.response?.data?.message || 'No se pudo cargar el servicio.'
+    try {
+      const servicioRes = await api.get(`/servicios/${route.params.id}`)
+      servicio.value = servicioRes.data
+      const [terminosRes, disponibilidadRes] = await Promise.all([
+        api.get(`/servicios/${route.params.id}/terminos-publicos`).catch(() => null),
+        api.get(`/servicios/${route.params.id}/disponibilidad`).catch(() => null),
+      ])
+      terminos.value = terminosRes?.data || null
+      disponibilidad.value = disponibilidadRes?.data || null
+      terminosValidos.value =
+        !!terminos.value?.idTerminos &&
+        Number(terminos.value?.version || 0) > 0
+    } catch (e2) {
+      error.value = e2.response?.data?.message || 'No se pudo cargar el servicio.'
+    }
   } finally {
     cargando.value = false
   }
@@ -231,7 +274,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
         <aside class="lg:sticky lg:top-16 h-fit rounded-2xl border border-rosa/50 bg-blanco p-6">
           <p class="text-2xl text-granate">{{ precioMostrado }}</p>
           <p class="mt-1 text-xs text-cafe/50">
-            Precio base
+            Precio base por dibujo
             <span v-if="precioConvertido"> · equivalente</span>
           </p>
           <p v-if="precioConvertido" class="mt-1 text-xs text-cafe/50">
@@ -258,7 +301,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
             </div>
             <div class="flex justify-between gap-3">
               <dt class="text-xs text-cafe/50">Cupos disponibles</dt>
-              <dd class="text-cafe">{{ servicio.cupos }}</dd>
+              <dd class="text-cafe">
+                {{ disponibilidad ? `${disponibilidad.cuposDisponibles} de ${disponibilidad.cuposTotales}` : servicio.cupos }}
+              </dd>
+            </div>
+            <div v-if="disponibilidad?.maxDibujosPorSolicitud" class="flex justify-between gap-3">
+              <dt class="text-xs text-cafe/50">Máximo por solicitud</dt>
+              <dd class="text-cafe">{{ disponibilidad.maxDibujosPorSolicitud }} dibujo(s)</dd>
+            </div>
+            <div v-if="disponibilidad?.modoRecepcion" class="flex justify-between gap-3">
+              <dt class="text-xs text-cafe/50">Recepción</dt>
+              <dd class="text-cafe">
+                {{ disponibilidad.modoRecepcion === 'SOLO_ESPERA'
+                  ? 'Solo lista de espera'
+                  : (disponibilidad.modoRecepcion === 'CERRADA' ? 'Cerrada' : 'Abierta') }}
+              </dd>
+            </div>
+            <div v-if="disponibilidad?.permiteListaEspera" class="flex justify-between gap-3">
+              <dt class="text-xs text-cafe/50">Lista de espera</dt>
+              <dd class="text-cafe">Disponible</dd>
             </div>
             <div v-if="esSensible" class="flex justify-between gap-3">
               <dt class="text-xs text-cafe/50">Contenido sensible</dt>
@@ -268,8 +329,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
 
           <div class="mt-6 space-y-3 border-t border-rosa/60 pt-6">
             <button
+              v-if="!esDuenio && !autenticado"
               type="button"
               class="w-full rounded-md bg-coral px-4 py-2 text-sm text-white hover:bg-rojizo transition shadow-sm"
+              @click="irASolicitar"
+            >
+              Iniciá sesión para solicitar
+            </button>
+            <button
+              v-else-if="!esDuenio"
+              type="button"
+              class="w-full rounded-md bg-coral px-4 py-2 text-sm text-white hover:bg-rojizo transition shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="!puedeSolicitar"
+              @click="irASolicitar"
+            >
+              Solicitar servicio
+            </button>
+            <button
+              type="button"
+              class="w-full rounded-md border border-rosa px-4 py-2 text-sm text-granate hover:bg-rosa/20 transition"
               @click="irAlArtista"
             >
               Ver perfil del artista
@@ -283,8 +361,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
             </router-link>
           </div>
 
-          <p class="mt-6 text-xs text-cafe/50 leading-relaxed border-t border-rosa/60 pt-4">
-            Para contratar este servicio, contactá al artista desde su perfil. Próximamente: pedidos y presupuestos desde la plataforma.
+          <p v-if="!esDuenio" class="mt-6 text-xs text-cafe/50 leading-relaxed border-t border-rosa/60 pt-4">
+            {{ mensajeSolicitud || 'Revisá los términos y condiciones antes de enviar tu solicitud.' }}
           </p>
         </aside>
       </div>

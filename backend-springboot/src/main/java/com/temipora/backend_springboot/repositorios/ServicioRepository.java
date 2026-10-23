@@ -7,12 +7,21 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.Servicio;
+
+import jakarta.persistence.LockModeType;
 
 public interface ServicioRepository extends JpaRepository<Servicio, Long>, JpaSpecificationExecutor<Servicio> {
 
     Optional<Servicio> findByIdServicio(Long idServicio);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM Servicio s WHERE s.idServicio = :idServicio")
+    Optional<Servicio> findByIdServicioForUpdate(@Param("idServicio") Long idServicio);
 
     List<Servicio> findByArtistaIdUsuarioOrderByNombreAsc(Long idUsuario);
 

@@ -62,7 +62,7 @@ const serviciosFiltradosPorCampos = computed(() => {
     if (precioMin !== null && precio < precioMin) return false
     if (precioMax !== null && precio > precioMax) return false
 
-    const cupos = Number(servicio.cupos ?? 0)
+    const cupos = Number(servicio.cuposDisponibles ?? servicio.cupos ?? 0)
     if (cuposMin !== null && cupos < cuposMin) return false
     if (cuposMax !== null && cupos > cuposMax) return false
 
@@ -551,7 +551,7 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
               <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-cafe/70">
                 <span>Precio: <span class="text-granate">{{ formatearPrecio(s.precioBaseMostrado ?? s.precioBase, s.monedaMostrada ?? s.moneda) }}</span></span>
                 <span>Entrega: {{ textoEntrega(s) }}</span>
-                <span>Cupos disponibles: {{ s.cupos }}</span>
+                <span>Cupos disponibles: {{ s.cuposDisponibles ?? s.cupos }}</span>
               </div>
 
               <div class="mt-auto pt-4 flex items-center justify-end gap-3 border-t border-rosa/40">
