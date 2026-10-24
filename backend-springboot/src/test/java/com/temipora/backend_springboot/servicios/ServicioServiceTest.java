@@ -3,9 +3,11 @@ package com.temipora.backend_springboot.servicios;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -17,11 +19,17 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Root;
 
 import com.temipora.backend_springboot.modelo.ETiempoEntregaUnidad;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
@@ -131,6 +139,33 @@ class ServicioServiceTest {
         assertThat(resultado.get(0).getIdServicio()).isEqualTo(1L);
         assertThat(resultado.get(0).getCuposDisponibles()).isEqualTo(2);
         assertThat(resultado.get(0).getModoRecepcion()).isEqualTo("ABIERTA");
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    @Test
+    void listarActivos_excluyeLosServiciosDelPropioArtista() {
+        when(servicioRepository.findAll(any(Specification.class), any(Sort.class)))
+            .thenReturn(List.of());
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.empty());
+        when(monedaService.predeterminada()).thenReturn(moneda(3L, "ARS"));
+
+        servicioService.listarActivos(new FiltroServicioRequest(), 5L);
+
+        ArgumentCaptor<Specification<Servicio>> captor = ArgumentCaptor.forClass(Specification.class);
+        verify(servicioRepository).findAll(captor.capture(), any(Sort.class));
+
+        Root<Servicio> root = mock(Root.class, withSettings().lenient());
+        CriteriaQuery<?> query = mock(CriteriaQuery.class);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        Path<Object> artista = mock(Path.class);
+        Path<Object> idArtista = mock(Path.class);
+
+        when(root.get("artista")).thenReturn((Path) artista);
+        when(artista.get("idUsuario")).thenReturn(idArtista);
+
+        captor.getValue().toPredicate(root, query, cb);
+
+        verify(cb).notEqual(idArtista, 5L);
     }
 
     @Test

@@ -279,7 +279,7 @@ onMounted(async () => {
           </button>
         </p>
         <p v-else-if="!servicios.length" class="rounded-3xl border border-dashed border-borde bg-superficie px-6 py-14 text-center text-sm text-cafe/50">
-          No hay servicios registrados en el sistema.
+          No hay servicios de otros artistas para explorar por ahora.
         </p>
 
         <div v-else class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">

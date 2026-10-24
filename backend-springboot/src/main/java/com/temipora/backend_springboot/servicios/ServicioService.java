@@ -113,6 +113,10 @@ public class ServicioService {
         Moneda moneda = monedaPreferidaDe(viewerId);
 
         Specification<Servicio> spec = activos(ocultarSensibles);
+        if (viewerId != null) {
+            spec = spec.and((root, query, cb) ->
+                cb.notEqual(root.get("artista").get("idUsuario"), viewerId));
+        }
         spec = aplicarFiltros(spec, filtro);
         return servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre")).stream()
             .filter(this::aceptaSolicitudesYPodriaPresupuestar)
