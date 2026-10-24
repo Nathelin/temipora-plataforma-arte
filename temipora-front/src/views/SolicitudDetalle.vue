@@ -3,6 +3,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
+import {
+  contraparteDe,
+  datosContraparte,
+  estadoDe,
+  formatearFechaSolicitud,
+} from '../servicios/solicitudes'
+import VisorImagenes from '../components/VisorImagenes.vue'
+import ModalRechazo from '../components/ModalRechazo.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -10,16 +18,6 @@ const router = useRouter()
 const solicitud = ref(null)
 const cargando = ref(true)
 const errorCarga = ref('')
-
-const ESTADOS = {
-  PENDIENTE: { texto: 'Pendiente', clase: 'border-mantequilla bg-mantequilla/40 text-granate' },
-  EN_LISTA_ESPERA: { texto: 'En lista de espera', clase: 'border-durazno bg-durazno/50 text-granate' },
-  PRESUPUESTADA: { texto: 'Presupuestada', clase: 'border-coral/30 bg-coral/10 text-coral' },
-  PAGADA: { texto: 'Pagada', clase: 'border-rosa bg-rosa/35 text-granate' },
-  FINALIZADA: { texto: 'Finalizada', clase: 'border-rosa bg-rosa/35 text-granate' },
-  RECHAZADA: { texto: 'Rechazada', clase: 'border-rojizo/25 bg-rojizo/10 text-rojizo' },
-  CANCELADA: { texto: 'Cancelada', clase: 'border-rojizo/25 bg-rojizo/10 text-rojizo' },
-}
 
 const idActual = Number(localStorage.getItem('idUsuario'))
 const rolActual = localStorage.getItem('rol')
@@ -31,32 +29,33 @@ const esArtistaDeLaSolicitud = computed(() => {
 })
 
 const contraparte = computed(() =>
-  esArtistaDeLaSolicitud.value ? solicitud.value?.cliente : solicitud.value?.artista,
+  contraparteDe(solicitud.value, esArtistaDeLaSolicitud.value),
 )
+const datosPersona = computed(() => datosContraparte(contraparte.value))
 const tituloContraparte = computed(() =>
   esArtistaDeLaSolicitud.value ? 'Cliente' : 'Artista',
 )
-const nombreContraparte = computed(
-  () => contraparte.value?.nombreDisplay || contraparte.value?.nombreUsuario || 'No disponible',
-)
-const usuarioContraparte = computed(() => contraparte.value?.nombreUsuario || '')
-const fotoContraparte = computed(
-  () => contraparte.value?.urlFotoPerfilMiniatura || contraparte.value?.urlFotoPerfil || '',
-)
-const inicialContraparte = computed(() => (nombreContraparte.value || '?').charAt(0).toUpperCase())
-const estadoInfo = computed(
-  () => ESTADOS[solicitud.value?.estado] || { texto: solicitud.value?.estado || 'Sin estado', clase: 'border-rosa bg-rosa/20 text-cafe' },
-)
+const nombreContraparte = computed(() => datosPersona.value?.nombre || 'No disponible')
+const usuarioContraparte = computed(() => datosPersona.value?.usuario || '')
+const fotoContraparte = computed(() => datosPersona.value?.foto || '')
+const inicialContraparte = computed(() => datosPersona.value?.inicial || '?')
+const estadoInfo = computed(() => estadoDe(solicitud.value?.estado))
 
-function formatearFecha(valor) {
-  if (!valor) return ''
-  const fecha = new Date(valor)
-  if (Number.isNaN(fecha.getTime())) return ''
-  return new Intl.DateTimeFormat('es', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-  }).format(fecha)
-}
+const modalRechazoAbierto = ref(false)
+const rechazando = ref(false)
+const errorRechazo = ref('')
+const avisoExito = ref('')
+
+const puedeRechazar = computed(
+  () => esArtistaDeLaSolicitud.value
+    && ['PENDIENTE', 'EN_LISTA_ESPERA'].includes(solicitud.value?.estado),
+)
+const textoMotivoRechazo = computed(() => {
+  if (solicitud.value?.motivoRechazo) return solicitud.value.motivoRechazo
+  return esArtistaDeLaSolicitud.value
+    ? 'No especificaste un motivo.'
+    : 'El artista decidió no mencionar el motivo.'
+})
 
 function gruposDeRespuestas(item) {
   const respuestas = [...(item?.respuestas || [])].sort((a, b) => {
@@ -86,8 +85,85 @@ function gruposDeRespuestas(item) {
   return [...grupos.values()]
 }
 
+const dibujosAbiertos = ref(new Set())
+const visor = ref({ abierto: false, imagenes: [], indice: 0, etiqueta: '', descripcion: '' })
+
+function resumenDeGrupos(grupos) {
+  if (!grupos.length) return 'Este dibujo no tiene respuestas registradas.'
+  const primero = grupos[0]
+  if (primero.codigoTipo === 'SUBIR_IMAGEN') {
+    const cantidad = primero.valores.length
+    return `${primero.enunciado}: ${cantidad} ${cantidad === 1 ? 'imagen adjunta' : 'imágenes adjuntas'}`
+  }
+  const texto = primero.valores.join(' ').replace(/\s+/g, ' ').trim()
+  return `${primero.enunciado}: ${texto}`
+}
+
+const dibujos = computed(() =>
+  (solicitud.value?.items || []).map((item, posicion) => {
+    const grupos = gruposDeRespuestas(item)
+    return { ...item, posicion, grupos, resumen: resumenDeGrupos(grupos) }
+  }),
+)
+
+function alternarDibujo(idItem) {
+  const siguiente = new Set(dibujosAbiertos.value)
+  if (siguiente.has(idItem)) {
+    siguiente.delete(idItem)
+  } else {
+    siguiente.add(idItem)
+  }
+  dibujosAbiertos.value = siguiente
+}
+
+function abrirVisor(dibujo, grupo, posicionImagen) {
+  visor.value = {
+    abierto: true,
+    imagenes: grupo.valores,
+    indice: posicionImagen,
+    etiqueta: `Dibujo ${dibujo.posicion + 1}`,
+    descripcion: grupo.enunciado,
+  }
+}
+
+function cerrarVisor() {
+  visor.value = { ...visor.value, abierto: false }
+}
+
+function abrirModalRechazo() {
+  errorRechazo.value = ''
+  modalRechazoAbierto.value = true
+}
+
+function cerrarModalRechazo() {
+  if (!rechazando.value) modalRechazoAbierto.value = false
+}
+
+async function confirmarRechazo(motivo) {
+  if (rechazando.value) return
+  rechazando.value = true
+  errorRechazo.value = ''
+  try {
+    const res = await api.post(
+      `/solicitudes-servicio/${solicitud.value.idSolicitud}/rechazar`,
+      { motivo: motivo || null },
+    )
+    solicitud.value = res.data
+    modalRechazoAbierto.value = false
+    avisoExito.value = 'La solicitud fue rechazada y el cliente recibió el aviso.'
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    errorRechazo.value = e.response?.data?.message || 'No se pudo rechazar la solicitud.'
+  } finally {
+    rechazando.value = false
+  }
+}
+
 function volver() {
-  router.push({ name: 'notificaciones' })
+  router.push({ name: 'solicitudes' })
 }
 
 async function cargar() {
@@ -121,7 +197,7 @@ onMounted(cargar)
       class="text-sm font-medium text-cafe/70 transition hover:text-coral"
       @click="volver"
     >
-      ← Volver a notificaciones
+      ← Volver a solicitudes
     </button>
 
     <div v-if="cargando" class="mt-8 rounded-2xl border border-rosa/50 bg-blanco px-6 py-16 text-center text-sm text-cafe/60">
@@ -143,7 +219,7 @@ onMounted(cargar)
           class="rounded-full bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-rojizo"
           @click="volver"
         >
-          Ir a notificaciones
+          Ir a mis solicitudes
         </button>
       </div>
     </div>
@@ -158,7 +234,7 @@ onMounted(cargar)
           <p class="mt-2 text-sm text-cafe/65">
             {{ solicitud.nombreServicio || 'Servicio' }}
             <span aria-hidden="true"> · </span>
-            {{ formatearFecha(solicitud.fechaCreacion) }}
+            {{ formatearFechaSolicitud(solicitud.fechaCreacion) }}
           </p>
         </div>
         <span
@@ -171,6 +247,19 @@ onMounted(cargar)
 
       <div class="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div class="space-y-6">
+          <section
+            v-if="solicitud.estado === 'RECHAZADA'"
+            class="rounded-2xl border border-rojizo/25 bg-rojizo/5 p-5 sm:p-6"
+          >
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-rojizo">
+              Solicitud rechazada
+            </p>
+            <p class="mt-2 text-sm leading-relaxed text-cafe/80">{{ textoMotivoRechazo }}</p>
+            <p v-if="solicitud.fechaRechazo" class="mt-2 text-xs text-cafe/50">
+              {{ formatearFechaSolicitud(solicitud.fechaRechazo) }}
+            </p>
+          </section>
+
           <section class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
             <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
               {{ tituloContraparte }}
@@ -223,81 +312,123 @@ onMounted(cargar)
               </span>
             </div>
 
-            <div class="mt-4 space-y-4">
+            <div class="mt-4 space-y-3">
               <article
-                v-for="(item, indice) in solicitud.items"
-                :key="item.idItemSolicitud"
-                class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6"
+                v-for="dibujo in dibujos"
+                :key="dibujo.idItemSolicitud"
+                class="overflow-hidden rounded-2xl border border-rosa/50 bg-blanco"
               >
-                <header class="flex flex-wrap items-start justify-between gap-3 border-b border-rosa/40 pb-4">
-                  <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
-                      Dibujo {{ indice + 1 }}
-                    </p>
-                    <h3 class="mt-1 text-lg font-semibold text-granate">{{ item.nombre }}</h3>
-                  </div>
-                  <span
-                    v-if="solicitud.prioridadDefinidaPorCliente && item.ordenPrioridad"
-                    class="rounded-full bg-coral/10 px-3 py-1 text-xs font-semibold text-coral"
+                <h3>
+                  <button
+                    type="button"
+                    class="flex w-full items-start justify-between gap-4 px-5 py-4 text-left transition hover:bg-rosa/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/50 sm:px-6"
+                    :aria-expanded="dibujosAbiertos.has(dibujo.idItemSolicitud)"
+                    :aria-controls="`panel-dibujo-${dibujo.idItemSolicitud}`"
+                    @click="alternarDibujo(dibujo.idItemSolicitud)"
                   >
-                    Prioridad {{ item.ordenPrioridad }}
-                  </span>
-                </header>
-
-                <div class="mt-4 space-y-5">
-                  <div
-                    v-for="grupo in gruposDeRespuestas(item)"
-                    :key="grupo.clave"
-                    class="border-b border-rosa/30 pb-5 last:border-b-0 last:pb-0"
-                  >
-                    <p class="text-sm font-semibold text-cafe">{{ grupo.enunciado }}</p>
-
-                    <div v-if="grupo.codigoTipo === 'SUBIR_IMAGEN'" class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      <a
-                        v-for="(url, urlIndice) in grupo.valores"
-                        :key="`${url}-${urlIndice}`"
-                        :href="url"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="group relative block aspect-square overflow-hidden rounded-xl bg-rosa/20 ring-1 ring-rosa/40"
-                      >
-                        <img
-                          :src="url"
-                          :alt="`Imagen de referencia ${urlIndice + 1} de ${item.nombre}`"
-                          class="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                          loading="lazy"
-                        />
-                      </a>
-                    </div>
-
-                    <p
-                      v-else-if="grupo.codigoTipo === 'TEXTO'"
-                      class="mt-2 whitespace-pre-line text-sm leading-relaxed text-cafe/75"
-                    >
-                      {{ grupo.valores.join('\n') }}
-                    </p>
-
-                    <div v-else class="mt-2 flex flex-wrap gap-2">
-                      <span
-                        v-for="(valor, valorIndice) in grupo.valores"
-                        :key="`${valor}-${valorIndice}`"
-                        class="rounded-full bg-rosa/20 px-3 py-1 text-sm text-cafe"
-                      >
-                        {{ valor }}
+                    <span class="min-w-0">
+                      <span class="flex flex-wrap items-center gap-2">
+                        <span class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                          Dibujo {{ dibujo.posicion + 1 }}
+                        </span>
+                        <span
+                          v-if="solicitud.prioridadDefinidaPorCliente && dibujo.ordenPrioridad"
+                          class="rounded-full bg-coral/10 px-2.5 py-0.5 text-[11px] font-semibold text-coral"
+                        >
+                          Prioridad {{ dibujo.ordenPrioridad }}
+                        </span>
                       </span>
+                      <span class="mt-1 block text-lg font-semibold text-granate">{{ dibujo.nombre }}</span>
+                      <span
+                        v-if="!dibujosAbiertos.has(dibujo.idItemSolicitud)"
+                        class="mt-1.5 line-clamp-2 block text-sm leading-relaxed text-cafe/60"
+                      >
+                        {{ dibujo.resumen }}
+                      </span>
+                    </span>
+
+                    <svg
+                      class="mt-1 h-5 w-5 shrink-0 text-cafe/50 transition-transform duration-300"
+                      :class="dibujosAbiertos.has(dibujo.idItemSolicitud) ? 'rotate-180' : ''"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                </h3>
+
+                <div
+                  :id="`panel-dibujo-${dibujo.idItemSolicitud}`"
+                  class="grid transition-[grid-template-rows] duration-300 ease-out"
+                  :class="dibujosAbiertos.has(dibujo.idItemSolicitud) ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+                  :inert="!dibujosAbiertos.has(dibujo.idItemSolicitud)"
+                >
+                  <div class="overflow-hidden">
+                    <div class="space-y-5 border-t border-rosa/40 px-5 py-5 sm:px-6">
+                      <div
+                        v-for="grupo in dibujo.grupos"
+                        :key="grupo.clave"
+                        class="border-b border-rosa/30 pb-5 last:border-b-0 last:pb-0"
+                      >
+                        <p class="text-sm font-semibold text-cafe">{{ grupo.enunciado }}</p>
+
+                        <div v-if="grupo.codigoTipo === 'SUBIR_IMAGEN'" class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <button
+                            v-for="(url, urlIndice) in grupo.valores"
+                            :key="`${url}-${urlIndice}`"
+                            type="button"
+                            class="group relative block aspect-square overflow-hidden rounded-xl bg-rosa/20 ring-1 ring-rosa/40 transition hover:ring-2 hover:ring-coral focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral"
+                            :aria-label="`Abrir ${dibujo.nombre}: imagen ${urlIndice + 1} de ${grupo.valores.length}`"
+                            @click="abrirVisor(dibujo, grupo, urlIndice)"
+                          >
+                            <img
+                              :src="url"
+                              :alt="`Imagen de referencia ${urlIndice + 1} de ${dibujo.nombre}`"
+                              class="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                              loading="lazy"
+                            />
+                            <span
+                              class="absolute bottom-2 right-2 rounded-full bg-granate/75 px-2 py-0.5 text-[11px] font-semibold text-white"
+                            >
+                              {{ urlIndice + 1 }}/{{ grupo.valores.length }}
+                            </span>
+                          </button>
+                        </div>
+
+                        <p
+                          v-else-if="grupo.codigoTipo === 'TEXTO'"
+                          class="mt-2 whitespace-pre-line text-sm leading-relaxed text-cafe/75"
+                        >
+                          {{ grupo.valores.join('\n') }}
+                        </p>
+
+                        <div v-else class="mt-2 flex flex-wrap gap-2">
+                          <span
+                            v-for="(valor, valorIndice) in grupo.valores"
+                            :key="`${valor}-${valorIndice}`"
+                            class="rounded-full bg-rosa/20 px-3 py-1 text-sm text-cafe"
+                          >
+                            {{ valor }}
+                          </span>
+                        </div>
+                      </div>
+
+                      <p v-if="!dibujo.grupos.length" class="text-sm text-cafe/55">
+                        Este dibujo no tiene respuestas registradas.
+                      </p>
                     </div>
                   </div>
-
-                  <p v-if="!gruposDeRespuestas(item).length" class="text-sm text-cafe/55">
-                    Este dibujo no tiene respuestas registradas.
-                  </p>
                 </div>
               </article>
             </div>
           </section>
         </div>
 
-        <aside class="space-y-4">
+        <aside class="space-y-4 lg:sticky lg:top-16 lg:h-fit lg:self-start">
           <section class="rounded-2xl border border-rosa/50 bg-blanco p-5">
             <h2 class="text-base font-semibold text-granate">Resumen</h2>
             <dl class="mt-4 space-y-3 text-sm">
@@ -328,14 +459,37 @@ onMounted(cargar)
 
           <section class="rounded-2xl border border-rosa/50 bg-blanco p-5">
             <h2 class="text-base font-semibold text-granate">Acciones</h2>
-            <p class="mt-2 text-xs leading-relaxed text-cafe/60">
-              Rechazar y presupuestar estarán disponibles próximamente.
+
+            <p
+              v-if="avisoExito"
+              role="status"
+              class="mt-3 rounded-xl border border-green-600/20 bg-green-500/10 px-3 py-2 text-xs leading-relaxed text-green-700"
+            >
+              {{ avisoExito }}
             </p>
-            <div class="mt-4 grid gap-2">
+
+            <p v-if="puedeRechazar" class="mt-2 text-xs leading-relaxed text-cafe/60">
+              Podés rechazar la solicitud y, si querés, explicarle el motivo al cliente.
+            </p>
+            <p
+              v-else-if="esArtistaDeLaSolicitud && solicitud.estado === 'RECHAZADA'"
+              class="mt-2 text-xs leading-relaxed text-cafe/60"
+            >
+              Rechazaste esta solicitud.
+            </p>
+            <p v-else-if="esArtistaDeLaSolicitud" class="mt-2 text-xs leading-relaxed text-cafe/60">
+              Esta solicitud ya no se puede rechazar.
+            </p>
+            <p v-else class="mt-2 text-xs leading-relaxed text-cafe/60">
+              Cuando el artista envíe el presupuesto, vas a poder pagarlo desde acá.
+            </p>
+
+            <div v-if="esArtistaDeLaSolicitud" class="mt-4 grid gap-2">
               <button
                 type="button"
-                disabled
-                class="inline-flex min-h-10 cursor-not-allowed items-center justify-center rounded-full border border-rosa bg-rosa/15 px-4 text-sm font-semibold text-cafe/40"
+                class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-4 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10 disabled:cursor-not-allowed disabled:border-rosa disabled:text-cafe/40 disabled:hover:bg-transparent"
+                :disabled="!puedeRechazar"
+                @click="abrirModalRechazo"
               >
                 Rechazar
               </button>
@@ -351,5 +505,22 @@ onMounted(cargar)
         </aside>
       </div>
     </template>
+
+    <VisorImagenes
+      :abierto="visor.abierto"
+      :imagenes="visor.imagenes"
+      :indice="visor.indice"
+      :etiqueta="visor.etiqueta"
+      :descripcion="visor.descripcion"
+      @cerrar="cerrarVisor"
+    />
+
+    <ModalRechazo
+      :abierto="modalRechazoAbierto"
+      :cargando="rechazando"
+      :error="errorRechazo"
+      @cerrar="cerrarModalRechazo"
+      @confirmar="confirmarRechazo"
+    />
   </div>
 </template>

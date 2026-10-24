@@ -22,6 +22,7 @@ import Servicios from '../views/Servicios.vue'
 import ServicioDetalle from '../views/ServicioDetalle.vue'
 import SolicitudServicio from '../views/SolicitudServicio.vue'
 import SolicitudDetalle from '../views/SolicitudDetalle.vue'
+import Solicitudes from '../views/Solicitudes.vue'
 import Notificaciones from '../views/Notificaciones.vue'
 import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
 import ConfiguracionApariencia from '../views/ConfiguracionApariencia.vue'
@@ -84,6 +85,12 @@ const routes = [
         name: 'notificaciones',
         component: Notificaciones,
         meta: { title: 'Notificaciones', requiresAuth: true },
+      },
+      {
+        path: 'solicitudes',
+        name: 'solicitudes',
+        component: Solicitudes,
+        meta: { title: 'Mis solicitudes', requiresAuth: true },
       },
       {
         path: 'solicitudes/:idSolicitud',

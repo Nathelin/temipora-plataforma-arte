@@ -49,4 +49,13 @@ public class ListaEsperaService {
             .map(ListaEsperaDTO::desdeListaEspera)
             .toList();
     }
+
+    @Transactional
+    public void marcarRechazada(Solicitud solicitud) {
+        listaEsperaRepository.findBySolicitudIdSolicitud(solicitud.getIdSolicitud())
+            .ifPresent(lista -> {
+                lista.setEstado("RECHAZADA");
+                lista.setFechaActualizacion(LocalDateTime.now());
+            });
+    }
 }

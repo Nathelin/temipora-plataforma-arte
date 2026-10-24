@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -14,6 +15,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +29,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.temipora.backend_springboot.modelo.AccionSolicitud;
 import com.temipora.backend_springboot.modelo.DisponibilidadServicioDTO;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.Formulario;
@@ -42,11 +45,14 @@ import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.SolicitudDTO;
+import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
 import com.temipora.backend_springboot.modelo.SolicitudServicioRequest;
 import com.temipora.backend_springboot.modelo.Terminos;
 import com.temipora.backend_springboot.modelo.TerminosDTO;
+import com.temipora.backend_springboot.modelo.TipoAccionSolicitud;
 import com.temipora.backend_springboot.modelo.TipoCampo;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.AccionSolicitudRepository;
 import com.temipora.backend_springboot.repositorios.FormularioRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
@@ -77,6 +83,9 @@ class SolicitudServicioServiceTest {
 
     @Mock
     private SolicitudRepository solicitudRepository;
+
+    @Mock
+    private AccionSolicitudRepository accionSolicitudRepository;
 
     @Mock
     private ServicioService servicioService;
@@ -356,6 +365,199 @@ class SolicitudServicioServiceTest {
             .hasMessageContaining("Ya tenés una solicitud activa");
     }
 
+    @Test
+    void listarRecibidas_sinEstado_devuelveLasDelArtista() {
+        Solicitud presupuestada = solicitudResumen(EstadoSolicitud.PRESUPUESTADA, 1);
+        Solicitud pendiente = solicitudResumen(EstadoSolicitud.PENDIENTE, 5);
+        when(solicitudRepository.findByArtistaIdUsuarioOrderByFechaCreacionDesc(ARTISTA))
+            .thenReturn(List.of(presupuestada, pendiente));
+
+        List<SolicitudResumenDTO> resultado = solicitudServicioService.listarRecibidas(ARTISTA, null);
+
+        assertThat(resultado).hasSize(2);
+        assertThat(resultado.get(0).getEstado()).isEqualTo(EstadoSolicitud.PRESUPUESTADA);
+        assertThat(resultado.get(1).getEstado()).isEqualTo(EstadoSolicitud.PENDIENTE);
+        assertThat(resultado.get(0).getNombreServicio()).isEqualTo("Ilustración");
+        assertThat(resultado.get(0).getCliente().getNombreUsuario()).isEqualTo("cliente");
+        assertThat(resultado.get(0).getArtista().getIdUsuario()).isEqualTo(ARTISTA);
+
+        verify(solicitudRepository, never())
+            .findByArtistaIdUsuarioAndEstadoOrderByFechaCreacionDesc(any(), any());
+    }
+
+    @Test
+    void listarRecibidas_conEstado_filtraPorEstado() {
+        Solicitud pendiente = solicitudResumen(EstadoSolicitud.PENDIENTE, 1);
+        when(solicitudRepository.findByArtistaIdUsuarioAndEstadoOrderByFechaCreacionDesc(
+            ARTISTA, EstadoSolicitud.PENDIENTE)).thenReturn(List.of(pendiente));
+
+        List<SolicitudResumenDTO> resultado = solicitudServicioService.listarRecibidas(
+            ARTISTA, EstadoSolicitud.PENDIENTE);
+
+        assertThat(resultado).hasSize(1);
+        assertThat(resultado.get(0).getEstado()).isEqualTo(EstadoSolicitud.PENDIENTE);
+
+        verify(solicitudRepository, never())
+            .findByArtistaIdUsuarioOrderByFechaCreacionDesc(any());
+    }
+
+    @Test
+    void listarEnviadas_sinEstado_devuelveLasDelCliente() {
+        Solicitud rechazada = solicitudResumen(EstadoSolicitud.RECHAZADA, 1);
+        when(solicitudRepository.findByClienteIdUsuarioOrderByFechaCreacionDesc(CLIENTE))
+            .thenReturn(List.of(rechazada));
+
+        List<SolicitudResumenDTO> resultado = solicitudServicioService.listarEnviadas(CLIENTE, null);
+
+        assertThat(resultado).hasSize(1);
+        assertThat(resultado.get(0).getEstado()).isEqualTo(EstadoSolicitud.RECHAZADA);
+        assertThat(resultado.get(0).getCantidadDibujos()).isEqualTo(2);
+
+        verify(solicitudRepository, never())
+            .findByClienteIdUsuarioAndEstadoOrderByFechaCreacionDesc(any(), any());
+    }
+
+    @Test
+    void rechazar_pendiente_registraAccionYNotificaAlCliente() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PENDIENTE, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+        when(accionSolicitudRepository.save(any(AccionSolicitud.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        SolicitudDTO resultado = solicitudServicioService.rechazar(
+            solicitud.getIdSolicitud(), ARTISTA, "  No llego con los tiempos  ");
+
+        assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.RECHAZADA);
+        assertThat(resultado.getEstado()).isEqualTo(EstadoSolicitud.RECHAZADA);
+        assertThat(resultado.getMotivoRechazo()).isEqualTo("No llego con los tiempos");
+        assertThat(resultado.getFechaRechazo()).isNotNull();
+
+        ArgumentCaptor<AccionSolicitud> captor = ArgumentCaptor.forClass(AccionSolicitud.class);
+        verify(accionSolicitudRepository).save(captor.capture());
+        AccionSolicitud accion = captor.getValue();
+        assertThat(accion.getTipoAccion()).isEqualTo(TipoAccionSolicitud.RECHAZO);
+        assertThat(accion.getSolicitud()).isSameAs(solicitud);
+        assertThat(accion.getUsuario()).isSameAs(artista);
+        assertThat(accion.getMotivo()).isEqualTo("No llego con los tiempos");
+
+        verify(notificacionService).crearParaUsuario(
+            eq(CLIENTE), eq("SOLICITUD_RECHAZADA"), eq("Solicitud rechazada"),
+            contains("No llego con los tiempos"), eq(solicitud.getIdSolicitud()), eq("SOLICITUD"));
+        verify(listaEsperaService, never()).marcarRechazada(any());
+    }
+
+    @Test
+    void rechazar_sinMotivo_usaMensajePorDefecto() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PENDIENTE, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+        when(accionSolicitudRepository.save(any(AccionSolicitud.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        SolicitudDTO resultado = solicitudServicioService.rechazar(
+            solicitud.getIdSolicitud(), ARTISTA, "   ");
+
+        assertThat(resultado.getMotivoRechazo()).isNull();
+
+        ArgumentCaptor<AccionSolicitud> captor = ArgumentCaptor.forClass(AccionSolicitud.class);
+        verify(accionSolicitudRepository).save(captor.capture());
+        assertThat(captor.getValue().getMotivo()).isNull();
+
+        verify(notificacionService).crearParaUsuario(
+            eq(CLIENTE), eq("SOLICITUD_RECHAZADA"), anyString(),
+            contains("no mencionar el motivo"), eq(solicitud.getIdSolicitud()), eq("SOLICITUD"));
+    }
+
+    @Test
+    void rechazar_otroUsuario_lanzaAccesoDenegado() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PENDIENTE, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+
+        assertThatThrownBy(() -> solicitudServicioService.rechazar(
+            solicitud.getIdSolicitud(), CLIENTE, null))
+            .isInstanceOf(AccesoDenegadoException.class)
+            .hasMessageContaining("No podés rechazar");
+
+        verify(accionSolicitudRepository, never()).save(any());
+        assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.PENDIENTE);
+    }
+
+    @Test
+    void rechazar_presupuestada_lanzaConflicto() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PRESUPUESTADA, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+
+        assertThatThrownBy(() -> solicitudServicioService.rechazar(
+            solicitud.getIdSolicitud(), ARTISTA, null))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("estado PRESUPUESTADA");
+
+        verify(accionSolicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void rechazar_yaRechazada_lanzaConflicto() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.RECHAZADA, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+
+        assertThatThrownBy(() -> solicitudServicioService.rechazar(
+            solicitud.getIdSolicitud(), ARTISTA, null))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("ya fue rechazada");
+
+        verify(accionSolicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void rechazar_enListaDeEspera_marcaLaLista() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.EN_LISTA_ESPERA, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+        when(accionSolicitudRepository.save(any(AccionSolicitud.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        solicitudServicioService.rechazar(solicitud.getIdSolicitud(), ARTISTA, null);
+
+        verify(listaEsperaService).marcarRechazada(solicitud);
+        assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.RECHAZADA);
+    }
+
+    @Test
+    void obtenerSolicitud_incluyeElMotivoDeRechazo() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.RECHAZADA, 1);
+        AccionSolicitud accion = new AccionSolicitud();
+        accion.setMotivo("No disponible");
+        accion.setFecha(LocalDateTime.now());
+        when(solicitudRepository.findByIdSolicitud(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+        when(accionSolicitudRepository
+            .findFirstBySolicitudIdSolicitudAndTipoAccionOrderByFechaDesc(
+                solicitud.getIdSolicitud(), TipoAccionSolicitud.RECHAZO))
+            .thenReturn(Optional.of(accion));
+
+        SolicitudDTO resultado = solicitudServicioService.obtenerSolicitud(
+            solicitud.getIdSolicitud(), CLIENTE);
+
+        assertThat(resultado.getMotivoRechazo()).isEqualTo("No disponible");
+        assertThat(resultado.getFechaRechazo()).isNotNull();
+    }
+
+    @Test
+    void obtenerSolicitud_deOtroUsuario_lanzaAccesoDenegado() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PENDIENTE, 1);
+        when(solicitudRepository.findByIdSolicitud(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+
+        assertThatThrownBy(() -> solicitudServicioService.obtenerSolicitud(
+            solicitud.getIdSolicitud(), 99L))
+            .isInstanceOf(AccesoDenegadoException.class)
+            .hasMessageContaining("No podés ver");
+    }
+
     private void prepararCreacion() {
         lenient().when(usuarioRepository.findByIdUsuario(CLIENTE)).thenReturn(Optional.of(cliente));
         lenient().when(servicioRepository.findByIdServicioForUpdate(SERVICIO))
@@ -373,6 +575,20 @@ class SolicitudServicioServiceTest {
             solicitud.setIdSolicitud(idsSolicitud.incrementAndGet());
             return solicitud;
         });
+    }
+
+    private Solicitud solicitudResumen(EstadoSolicitud estado, int horasAtras) {
+        Solicitud solicitud = new Solicitud();
+        solicitud.setIdSolicitud(idsSolicitud.incrementAndGet());
+        solicitud.setServicio(servicio);
+        solicitud.setCliente(cliente);
+        solicitud.setArtista(artista);
+        solicitud.setEstado(estado);
+        solicitud.setCantidadDibujos(2);
+        solicitud.setPrecioBase(new BigDecimal("100.00"));
+        solicitud.setMoneda(servicio.getMoneda());
+        solicitud.setFechaCreacion(LocalDateTime.now().minusHours(horasAtras));
+        return solicitud;
     }
 
     private SolicitudServicioRequest request(int cantidad, boolean prioridadDefinida) {

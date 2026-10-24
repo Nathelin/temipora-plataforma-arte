@@ -14,6 +14,7 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.AccionSolicitud;
 import com.temipora.backend_springboot.modelo.DisponibilidadServicioDTO;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.Formulario;
@@ -31,12 +32,15 @@ import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.SolicitudDTO;
 import com.temipora.backend_springboot.modelo.SolicitudPublicaDTO;
+import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
 import com.temipora.backend_springboot.modelo.SolicitudServicioRequest;
 import com.temipora.backend_springboot.modelo.TerminoDerechoDTO;
 import com.temipora.backend_springboot.modelo.Terminos;
 import com.temipora.backend_springboot.modelo.TerminosDTO;
+import com.temipora.backend_springboot.modelo.TipoAccionSolicitud;
 import com.temipora.backend_springboot.modelo.TipoCampo;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.AccionSolicitudRepository;
 import com.temipora.backend_springboot.repositorios.FormularioRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
@@ -56,8 +60,13 @@ public class SolicitudServicioService {
         EstadoSolicitud.PRESUPUESTADA,
         EstadoSolicitud.PAGADA);
 
+    private static final List<EstadoSolicitud> ESTADOS_RECHAZABLES = List.of(
+        EstadoSolicitud.PENDIENTE,
+        EstadoSolicitud.EN_LISTA_ESPERA);
+
     private static final String NOTIFICACION_SOLICITUD = "SOLICITUD_RECIBIDA";
     private static final String NOTIFICACION_ESPERA = "SOLICITUD_EN_LISTA_ESPERA";
+    private static final String NOTIFICACION_RECHAZO = "SOLICITUD_RECHAZADA";
     private static final String TIPO_REFERENCIA_SOLICITUD = "SOLICITUD";
 
     private static final String TEXTO = "TEXTO";
@@ -71,6 +80,7 @@ public class SolicitudServicioService {
     private final FormularioRepository formularioRepository;
     private final TerminosRepository terminosRepository;
     private final SolicitudRepository solicitudRepository;
+    private final AccionSolicitudRepository accionSolicitudRepository;
     private final ServicioService servicioService;
     private final FormularioService formularioService;
     private final TerminosService terminosService;
@@ -83,6 +93,7 @@ public class SolicitudServicioService {
             FormularioRepository formularioRepository,
             TerminosRepository terminosRepository,
             SolicitudRepository solicitudRepository,
+            AccionSolicitudRepository accionSolicitudRepository,
             ServicioService servicioService,
             FormularioService formularioService,
             TerminosService terminosService,
@@ -93,6 +104,7 @@ public class SolicitudServicioService {
         this.formularioRepository = formularioRepository;
         this.terminosRepository = terminosRepository;
         this.solicitudRepository = solicitudRepository;
+        this.accionSolicitudRepository = accionSolicitudRepository;
         this.servicioService = servicioService;
         this.formularioService = formularioService;
         this.terminosService = terminosService;
@@ -317,9 +329,95 @@ public class SolicitudServicioService {
         boolean esArtista = solicitud.getArtista() != null
             && solicitud.getArtista().getIdUsuario().equals(idUsuario);
         if (!esCliente && !esArtista) {
-            throw new IllegalArgumentException("No podés ver esta solicitud.");
+            throw new AccesoDenegadoException("No podés ver esta solicitud.");
         }
-        return SolicitudDTO.desdeSolicitud(solicitud);
+        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(solicitud);
+        accionSolicitudRepository
+            .findFirstBySolicitudIdSolicitudAndTipoAccionOrderByFechaDesc(
+                idSolicitud, TipoAccionSolicitud.RECHAZO)
+            .ifPresent(accion -> {
+                dto.setMotivoRechazo(accion.getMotivo());
+                dto.setFechaRechazo(accion.getFecha());
+            });
+        return dto;
+    }
+
+    @Transactional
+    public SolicitudDTO rechazar(Long idSolicitud, Long idArtista, String motivo) {
+        Solicitud solicitud = solicitudRepository.findByIdSolicitudForUpdate(idSolicitud)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Solicitud no encontrada: " + idSolicitud));
+        boolean esArtista = solicitud.getArtista() != null
+            && solicitud.getArtista().getIdUsuario().equals(idArtista);
+        if (!esArtista) {
+            throw new AccesoDenegadoException("No podés rechazar esta solicitud.");
+        }
+        if (solicitud.getEstado() == EstadoSolicitud.RECHAZADA) {
+            throw new ConflictoException("La solicitud ya fue rechazada.");
+        }
+        if (!ESTADOS_RECHAZABLES.contains(solicitud.getEstado())) {
+            throw new ConflictoException(
+                "No podés rechazar una solicitud en estado " + solicitud.getEstado() + ".");
+        }
+
+        String motivoLimpio = limpiarMotivo(motivo);
+        if (solicitud.getEstado() == EstadoSolicitud.EN_LISTA_ESPERA) {
+            listaEsperaService.marcarRechazada(solicitud);
+        }
+
+        LocalDateTime ahora = LocalDateTime.now();
+        solicitud.setEstado(EstadoSolicitud.RECHAZADA);
+        solicitud.setFechaActualizacion(ahora);
+
+        AccionSolicitud accion = new AccionSolicitud();
+        accion.setSolicitud(solicitud);
+        accion.setTipoAccion(TipoAccionSolicitud.RECHAZO);
+        accion.setUsuario(solicitud.getArtista());
+        accion.setFecha(ahora);
+        accion.setMotivo(motivoLimpio);
+        accionSolicitudRepository.save(accion);
+
+        String nombreServicio = solicitud.getServicio() != null
+            ? solicitud.getServicio().getNombre()
+            : "tu servicio";
+        String descripcion = motivoLimpio != null
+            ? "El artista rechazó tu solicitud de '" + nombreServicio + "'. Motivo: " + motivoLimpio
+            : "El artista rechazó tu solicitud de '" + nombreServicio
+                + "'. El artista decidió no mencionar el motivo.";
+        notificacionService.crearParaUsuario(
+            solicitud.getCliente().getIdUsuario(),
+            NOTIFICACION_RECHAZO,
+            "Solicitud rechazada",
+            descripcion,
+            solicitud.getIdSolicitud(),
+            TIPO_REFERENCIA_SOLICITUD);
+
+        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(solicitud);
+        dto.setMotivoRechazo(motivoLimpio);
+        dto.setFechaRechazo(ahora);
+        return dto;
+    }
+
+    @Transactional(readOnly = true)
+    public List<SolicitudResumenDTO> listarRecibidas(Long idArtista, EstadoSolicitud estado) {
+        List<Solicitud> solicitudes = estado == null
+            ? solicitudRepository.findByArtistaIdUsuarioOrderByFechaCreacionDesc(idArtista)
+            : solicitudRepository.findByArtistaIdUsuarioAndEstadoOrderByFechaCreacionDesc(
+                idArtista, estado);
+        return solicitudes.stream()
+            .map(SolicitudResumenDTO::desdeSolicitud)
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SolicitudResumenDTO> listarEnviadas(Long idCliente, EstadoSolicitud estado) {
+        List<Solicitud> solicitudes = estado == null
+            ? solicitudRepository.findByClienteIdUsuarioOrderByFechaCreacionDesc(idCliente)
+            : solicitudRepository.findByClienteIdUsuarioAndEstadoOrderByFechaCreacionDesc(
+                idCliente, estado);
+        return solicitudes.stream()
+            .map(SolicitudResumenDTO::desdeSolicitud)
+            .toList();
     }
 
     private int calcularOcupados(Long idServicio) {
@@ -489,6 +587,21 @@ public class SolicitudServicioService {
             default -> throw new IllegalArgumentException(
                 "El tipo de campo '" + tipo + "' no está soportado.");
         }
+    }
+
+    private String limpiarMotivo(String motivo) {
+        if (motivo == null) {
+            return null;
+        }
+        String limpio = motivo.trim();
+        if (limpio.isEmpty()) {
+            return null;
+        }
+        if (limpio.length() > 200) {
+            throw new IllegalArgumentException(
+                "El motivo no puede superar los 200 caracteres.");
+        }
+        return limpio;
     }
 
     private List<String> limpiarValores(List<String> valores) {
