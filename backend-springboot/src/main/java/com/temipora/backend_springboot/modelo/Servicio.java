@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -111,8 +112,19 @@ public class Servicio {
     @Column(name = "imagen_portada", length = 255)
     private String imagenPortada;
 
-    @Column(nullable = false)
-    private boolean estado = true;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private EstadoServicio estado = EstadoServicio.PUBLICADO;
+
+    @Column(name = "pausado_en")
+    private LocalDateTime pausadoEn;
+
+    @Column(name = "archivado_en")
+    private LocalDateTime archivadoEn;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_archivado_por")
+    private Usuario archivadoPor;
 
     @OneToMany(mappedBy = "servicio", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orden ASC")

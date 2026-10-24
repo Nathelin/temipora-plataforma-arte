@@ -84,6 +84,15 @@ public class SolicitudServicioController {
             idSolicitud, idAutenticado(authentication), motivo);
     }
 
+    @PostMapping("/{idSolicitud}/retirar-presupuesto")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public SolicitudDTO retirarPresupuesto(
+            @PathVariable Long idSolicitud,
+            Authentication authentication) {
+        return solicitudServicioService.retirarPresupuesto(
+            idSolicitud, idAutenticado(authentication));
+    }
+
     private Long idAutenticado(Authentication authentication) {
         return usuarioService.getByNombreUsuario(authentication.getName()).getIdUsuario();
     }

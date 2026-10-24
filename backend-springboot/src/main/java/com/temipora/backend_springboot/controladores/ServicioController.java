@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.temipora.backend_springboot.modelo.FiltroServicioRequest;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.ServicioRequest;
+import com.temipora.backend_springboot.modelo.ServicioResumenEstadoDTO;
+import com.temipora.backend_springboot.servicios.ServicioBajaService;
 import com.temipora.backend_springboot.servicios.ServicioService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -29,10 +31,15 @@ import jakarta.validation.Valid;
 public class ServicioController {
 
     private final ServicioService servicioService;
+    private final ServicioBajaService servicioBajaService;
     private final UsuarioService usuarioService;
 
-    public ServicioController(ServicioService servicioService, UsuarioService usuarioService) {
+    public ServicioController(
+            ServicioService servicioService,
+            ServicioBajaService servicioBajaService,
+            UsuarioService usuarioService) {
         this.servicioService = servicioService;
+        this.servicioBajaService = servicioBajaService;
         this.usuarioService = usuarioService;
     }
 
@@ -93,16 +100,28 @@ public class ServicioController {
         return servicioService.modificar(id, idAutenticado(authentication), request);
     }
 
-    @PostMapping("/servicios/{id}/baja")
+    @PostMapping("/servicios/{id}/pausar")
     @PreAuthorize("hasRole('ARTISTA')")
-    public ServicioDTO darDeBaja(@PathVariable Long id, Authentication authentication) {
-        return servicioService.darDeBaja(id, idAutenticado(authentication));
+    public ServicioDTO pausar(@PathVariable Long id, Authentication authentication) {
+        return servicioService.pausar(id, idAutenticado(authentication));
     }
 
-    @PostMapping("/servicios/{id}/activar")
+    @PostMapping("/servicios/{id}/reactivar")
     @PreAuthorize("hasRole('ARTISTA')")
-    public ServicioDTO darDeAlta(@PathVariable Long id, Authentication authentication) {
-        return servicioService.darDeAlta(id, idAutenticado(authentication));
+    public ServicioDTO reactivar(@PathVariable Long id, Authentication authentication) {
+        return servicioService.reactivar(id, idAutenticado(authentication));
+    }
+
+    @PostMapping("/servicios/{id}/archivar")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public ServicioDTO archivar(@PathVariable Long id, Authentication authentication) {
+        return servicioBajaService.archivar(id, idAutenticado(authentication));
+    }
+
+    @GetMapping("/servicios/{id}/resumen")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public ServicioResumenEstadoDTO resumen(@PathVariable Long id, Authentication authentication) {
+        return servicioBajaService.resumenEstado(id, idAutenticado(authentication));
     }
 
     private Long idAutenticado(Authentication authentication) {

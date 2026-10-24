@@ -9,6 +9,7 @@ import {
   estadoDe,
   formatearFechaSolicitud,
 } from '../servicios/solicitudes'
+import { estadoServicioDe } from '../servicios/servicios'
 import VisorImagenes from '../components/VisorImagenes.vue'
 import ModalRechazo from '../components/ModalRechazo.vue'
 
@@ -40,6 +41,20 @@ const usuarioContraparte = computed(() => datosPersona.value?.usuario || '')
 const fotoContraparte = computed(() => datosPersona.value?.foto || '')
 const inicialContraparte = computed(() => datosPersona.value?.inicial || '?')
 const estadoInfo = computed(() => estadoDe(solicitud.value?.estado))
+
+const avisoServicio = computed(() => {
+  const estado = solicitud.value?.estadoServicio
+  if (!estado || estado === 'PUBLICADO') return null
+  return estado === 'ARCHIVADO'
+    ? 'Este servicio fue dado de baja definitivamente. El historial de tu solicitud sigue disponible.'
+    : 'Este servicio está pausado: no recibe solicitudes nuevas, pero esta solicitud sigue vigente.'
+})
+const avisoServicioClase = computed(() => (
+  solicitud.value?.estadoServicio === 'ARCHIVADO'
+    ? 'border-rojizo/25 bg-rojizo/5 text-rojizo'
+    : 'border-durazno bg-durazno/30 text-granate'
+))
+const estadoServicioInfo = computed(() => estadoServicioDe(solicitud.value?.estadoServicio))
 
 const modalRechazoAbierto = ref(false)
 const rechazando = ref(false)
@@ -244,6 +259,22 @@ onMounted(cargar)
           {{ estadoInfo.texto }}
         </span>
       </header>
+
+      <p
+        v-if="avisoServicio"
+        class="mt-4 rounded-xl border px-4 py-3 text-sm leading-relaxed"
+        :class="avisoServicioClase"
+        role="status"
+      >
+        {{ avisoServicio }}
+        <span
+          v-if="solicitud.estadoServicio === 'ARCHIVADO'"
+          class="ml-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+          :class="estadoServicioInfo.clase"
+        >
+          {{ estadoServicioInfo.texto }}
+        </span>
+      </p>
 
       <div class="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div class="space-y-6">

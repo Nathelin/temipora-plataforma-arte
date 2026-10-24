@@ -34,6 +34,8 @@ import ConfiguracionCuenta from '../views/ConfiguracionCuenta.vue'
 import PortfolioSubir from '../views/PortfolioSubir.vue'
 import MisServicios from '../views/MisServicios.vue'
 import ServicioForm from '../views/ServicioForm.vue'
+import ServicioSolicitudes from '../views/ServicioSolicitudes.vue'
+import ServiciosArchivados from '../views/ServiciosArchivados.vue'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useConfirmacionSalida } from '../composables/useConfirmacionSalida'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
@@ -126,6 +128,12 @@ const routes = [
         meta: { title: 'Editar servicio', requiresArtist: true },
       },
       {
+        path: 'mis-servicios/:id/solicitudes',
+        name: 'servicio-solicitudes',
+        component: ServicioSolicitudes,
+        meta: { title: 'Solicitudes del servicio', requiresArtist: true },
+      },
+      {
         path: 'configuracion',
         component: ConfiguracionLayout,
         children: [
@@ -167,6 +175,12 @@ const routes = [
         component: TiposAdmin,
         props: { tipo: 'servicio' },
         meta: { title: 'Tipos de servicio' },
+      },
+      {
+        path: 'servicios/archivados',
+        name: 'servicios-archivados',
+        component: ServiciosArchivados,
+        meta: { title: 'Servicios archivados' },
       },
       {
         path: 'etiquetas',

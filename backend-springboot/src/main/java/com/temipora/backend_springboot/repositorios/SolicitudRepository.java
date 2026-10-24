@@ -37,6 +37,8 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
     List<Solicitud> findByClienteIdUsuarioAndEstadoOrderByFechaCreacionDesc(
             Long idCliente, EstadoSolicitud estado);
 
+    boolean existsByServicioIdServicioAndEstado(Long idServicio, EstadoSolicitud estado);
+
     boolean existsByServicioIdServicioAndClienteIdUsuarioAndEstadoIn(
             Long idServicio, Long idCliente, Collection<EstadoSolicitud> estados);
 
@@ -45,6 +47,32 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
 
     long countByServicioIdServicioAndEstadoIn(
             Long idServicio, Collection<EstadoSolicitud> estados);
+
+    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda" })
+    List<Solicitud> findByServicioIdServicioOrderByFechaCreacionDesc(Long idServicio);
+
+    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda" })
+    List<Solicitud> findByServicioIdServicioAndEstadoInOrderByFechaCreacionDesc(
+            Long idServicio, Collection<EstadoSolicitud> estados);
+
+    @Query("""
+        SELECT s.estado, COUNT(s)
+        FROM Solicitud s
+        WHERE s.servicio.idServicio = :idServicio
+        GROUP BY s.estado
+        """)
+    List<Object[]> contarPorServicioAgrupadoPorEstado(@Param("idServicio") Long idServicio);
+
+    @Query("""
+        SELECT s.servicio.idServicio, COUNT(s)
+        FROM Solicitud s
+        WHERE s.servicio.artista.idUsuario = :idArtista
+          AND s.estado IN :estados
+        GROUP BY s.servicio.idServicio
+        """)
+    List<Object[]> contarActivasPorServicioDelArtista(
+            @Param("idArtista") Long idArtista,
+            @Param("estados") Collection<EstadoSolicitud> estados);
 
     @Query("""
         SELECT COALESCE(SUM(s.cantidadDibujos), 0)

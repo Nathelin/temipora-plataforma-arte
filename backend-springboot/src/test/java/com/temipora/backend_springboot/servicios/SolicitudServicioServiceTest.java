@@ -31,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.AccionSolicitud;
 import com.temipora.backend_springboot.modelo.DisponibilidadServicioDTO;
+import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.Formulario;
 import com.temipora.backend_springboot.modelo.FormularioDTO;
@@ -128,7 +129,7 @@ class SolicitudServicioServiceTest {
         servicio = new Servicio();
         servicio.setIdServicio(SERVICIO);
         servicio.setNombre("Ilustración");
-        servicio.setEstado(true);
+        servicio.setEstado(EstadoServicio.PUBLICADO);
         servicio.setArtista(artista);
         servicio.setCupos(3);
         servicio.setModoRecepcion(ModoRecepcionSolicitud.ABIERTA);
@@ -556,6 +557,76 @@ class SolicitudServicioServiceTest {
             solicitud.getIdSolicitud(), 99L))
             .isInstanceOf(AccesoDenegadoException.class)
             .hasMessageContaining("No podés ver");
+    }
+
+    @Test
+    void retirarPresupuesto_presupuestadaLaRechazaYNotificaAlCliente() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PRESUPUESTADA, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+        when(accionSolicitudRepository.save(any(AccionSolicitud.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        SolicitudDTO resultado = solicitudServicioService.retirarPresupuesto(
+            solicitud.getIdSolicitud(), ARTISTA);
+
+        assertThat(resultado.getEstado()).isEqualTo(EstadoSolicitud.RECHAZADA);
+        assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.RECHAZADA);
+
+        ArgumentCaptor<AccionSolicitud> captor = ArgumentCaptor.forClass(AccionSolicitud.class);
+        verify(accionSolicitudRepository).save(captor.capture());
+        assertThat(captor.getValue().getTipoAccion())
+            .isEqualTo(TipoAccionSolicitud.RETIRO_PRESUPUESTO);
+        assertThat(captor.getValue().getOrigen()).isEqualTo("ARTISTA");
+
+        verify(notificacionService).crearParaUsuario(
+            eq(CLIENTE), eq("SOLICITUD_RECHAZADA"), eq("Presupuesto retirado"),
+            contains("retiró el presupuesto"), eq(solicitud.getIdSolicitud()), eq("SOLICITUD"));
+    }
+
+    @Test
+    void retirarPresupuesto_sinPresupuesto_lanzaConflicto() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PENDIENTE, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+
+        assertThatThrownBy(() -> solicitudServicioService.retirarPresupuesto(
+            solicitud.getIdSolicitud(), ARTISTA))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("presupuestada");
+
+        verify(accionSolicitudRepository, never()).save(any());
+        assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.PENDIENTE);
+    }
+
+    @Test
+    void cerrarPorBajaServicio_rechazaPendientesYEnEspera() {
+        Solicitud pendiente = solicitudResumen(EstadoSolicitud.PENDIENTE, 2);
+        Solicitud enEspera = solicitudResumen(EstadoSolicitud.EN_LISTA_ESPERA, 1);
+        when(solicitudRepository.findByServicioIdServicioAndEstadoInOrderByFechaCreacionDesc(
+            eq(SERVICIO), any())).thenReturn(List.of(pendiente, enEspera));
+        when(accionSolicitudRepository.save(any(AccionSolicitud.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        int cerradas = solicitudServicioService.cerrarPorBajaServicio(SERVICIO);
+
+        assertThat(cerradas).isEqualTo(2);
+        assertThat(pendiente.getEstado()).isEqualTo(EstadoSolicitud.RECHAZADA);
+        assertThat(enEspera.getEstado()).isEqualTo(EstadoSolicitud.RECHAZADA);
+        verify(listaEsperaService).marcarRechazada(enEspera);
+        verify(listaEsperaService, never()).marcarRechazada(pendiente);
+        verify(notificacionService, times(2)).crearParaUsuario(
+            eq(CLIENTE), eq("SOLICITUD_RECHAZADA"), eq("Solicitud rechazada"),
+            contains("no mencionar el motivo"), anyLong(), eq("SOLICITUD"));
+
+        ArgumentCaptor<AccionSolicitud> captor = ArgumentCaptor.forClass(AccionSolicitud.class);
+        verify(accionSolicitudRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues())
+            .allSatisfy(accion -> {
+                assertThat(accion.getOrigen()).isEqualTo("BAJA_SERVICIO");
+                assertThat(accion.getMotivo()).isNull();
+                assertThat(accion.getTipoAccion()).isEqualTo(TipoAccionSolicitud.RECHAZO);
+            });
     }
 
     private void prepararCreacion() {

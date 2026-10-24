@@ -11,6 +11,7 @@ import {
   formatearFechaSolicitud,
   solicitudesEnGrupo,
 } from '../servicios/solicitudes'
+import { estadoServicioDe } from '../servicios/servicios'
 
 const router = useRouter()
 
@@ -206,7 +207,16 @@ onMounted(cargar)
                     @{{ contraparte(solicitud).usuario }}
                   </span>
                 </p>
-                <p class="mt-1 truncate text-sm text-cafe/75">{{ solicitud.nombreServicio || 'Servicio' }}</p>
+                <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-cafe/75">
+                  <span class="truncate">{{ solicitud.nombreServicio || 'Servicio' }}</span>
+                  <span
+                    v-if="solicitud.estadoServicio && solicitud.estadoServicio !== 'PUBLICADO'"
+                    class="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                    :class="estadoServicioDe(solicitud.estadoServicio).clase"
+                  >
+                    Servicio {{ estadoServicioDe(solicitud.estadoServicio).texto.toLowerCase() }}
+                  </span>
+                </p>
                 <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-cafe/50">
                   <span>Solicitud #{{ solicitud.idSolicitud }}</span>
                   <span aria-hidden="true">·</span>

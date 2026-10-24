@@ -19,6 +19,7 @@ import com.temipora.backend_springboot.modelo.FormularioDTO;
 import com.temipora.backend_springboot.modelo.FormularioRequest;
 import com.temipora.backend_springboot.modelo.ListaEsperaDTO;
 import com.temipora.backend_springboot.modelo.SolicitudPublicaDTO;
+import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
 import com.temipora.backend_springboot.modelo.TerminosDTO;
 import com.temipora.backend_springboot.modelo.TerminosRequest;
 import com.temipora.backend_springboot.servicios.FormularioService;
@@ -70,6 +71,16 @@ public class ServicioConfiguracionController {
             Authentication authentication) {
         return solicitudServicioService.disponibilidad(
             idServicio, idAutenticadoOpcional(authentication));
+    }
+
+    @GetMapping("/solicitudes")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public List<SolicitudResumenDTO> obtenerSolicitudes(
+            @PathVariable Long idServicio,
+            Authentication authentication) {
+        Long idArtista = idAutenticado(authentication);
+        servicioService.verificarPropietario(idServicio, idArtista);
+        return solicitudServicioService.listarPorServicio(idServicio);
     }
 
     @GetMapping("/lista-espera")

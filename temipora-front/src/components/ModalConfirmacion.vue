@@ -5,6 +5,7 @@ defineProps({
   mensaje: { type: String, default: '' },
   textoConfirmar: { type: String, default: 'Confirmar' },
   textoCancelar: { type: String, default: 'Cancelar' },
+  destructivo: { type: Boolean, default: false },
 })
 
 defineEmits(['confirmar', 'cerrar'])
@@ -22,7 +23,8 @@ defineEmits(['confirmar', 'cerrar'])
 
     <div class="relative w-full max-w-md rounded-xl border border-rosa bg-blanco p-6 shadow-xl shadow-granate/20">
       <h2 id="titulo-modal-confirmacion" class="text-lg text-granate">{{ titulo }}</h2>
-      <p class="mt-2 text-sm leading-relaxed text-cafe/70">{{ mensaje }}</p>
+      <p v-if="mensaje" class="mt-2 text-sm leading-relaxed text-cafe/70">{{ mensaje }}</p>
+      <slot />
 
       <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button
@@ -34,7 +36,8 @@ defineEmits(['confirmar', 'cerrar'])
         </button>
         <button
           type="button"
-          class="rounded-md bg-coral px-5 py-2.5 text-sm text-white shadow-sm transition hover:bg-rojizo"
+          class="rounded-md px-5 py-2.5 text-sm text-white shadow-sm transition"
+          :class="destructivo ? 'bg-rojizo hover:bg-granate' : 'bg-coral hover:bg-rojizo'"
           @click="$emit('confirmar')"
         >
           {{ textoConfirmar }}

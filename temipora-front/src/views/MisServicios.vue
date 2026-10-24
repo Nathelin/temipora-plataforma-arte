@@ -1,14 +1,21 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
+import { estadoServicioDe } from '../servicios/servicios'
+import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+
+const router = useRouter()
 
 const servicios = ref([])
 const cargando = ref(true)
 const error = ref('')
-const filtro = ref('activos')
+const filtro = ref('publicados')
 const filtrosAbiertos = ref(false)
 const aviso = ref(null)
+const dialogo = ref(null)
+const procesandoDialogo = ref(false)
 const filtros = ref({
   texto: '',
   tipo: '',
@@ -70,17 +77,14 @@ const serviciosFiltradosPorCampos = computed(() => {
   })
 })
 
-const serviciosActivos = computed(() => serviciosFiltradosPorCampos.value.filter((s) => s.estado))
-const serviciosInactivos = computed(() => serviciosFiltradosPorCampos.value.filter((s) => !s.estado))
-const serviciosFiltrados = computed(() => {
-  if (filtro.value === 'inactivos') return serviciosInactivos.value
-  if (filtro.value === 'todos') return [...serviciosActivos.value, ...serviciosInactivos.value]
-  return serviciosActivos.value
-})
+const serviciosPublicados = computed(() => serviciosFiltradosPorCampos.value.filter((s) => s.estado === 'PUBLICADO'))
+const serviciosPausados = computed(() => serviciosFiltradosPorCampos.value.filter((s) => s.estado === 'PAUSADO'))
+const serviciosFiltrados = computed(() =>
+  filtro.value === 'pausados' ? serviciosPausados.value : serviciosPublicados.value,
+)
 const opcionesFiltro = computed(() => [
-  { valor: 'activos', texto: 'Activos', cantidad: serviciosActivos.value.length },
-  { valor: 'inactivos', texto: 'Inactivos', cantidad: serviciosInactivos.value.length },
-  { valor: 'todos', texto: 'Todos', cantidad: serviciosFiltradosPorCampos.value.length },
+  { valor: 'publicados', texto: 'Publicados', cantidad: serviciosPublicados.value.length },
+  { valor: 'pausados', texto: 'Pausados', cantidad: serviciosPausados.value.length },
 ])
 
 const hayFiltros = computed(() => Object.values(filtros.value).some((valor) => String(valor).trim() !== ''))
@@ -144,23 +148,23 @@ const estadoVacio = computed(() => {
       accion: { texto: 'Limpiar filtros', tipo: 'limpiar' },
     }
   }
-  if (filtro.value === 'activos') {
+  if (filtro.value === 'publicados') {
     return {
-      titulo: 'No tenés servicios activos.',
-      detalle: servicios.value.some((s) => !s.estado)
-        ? 'Revisá los que diste de baja o creá uno nuevo.'
+      titulo: 'No tenés servicios publicados.',
+      detalle: servicios.value.some((s) => s.estado === 'PAUSADO')
+        ? 'Revisá los que pausaste o creá uno nuevo.'
         : 'Creá tu primer servicio para empezar a ofrecerlo.',
-      accion: servicios.value.some((s) => !s.estado)
-        ? { texto: 'Ver inactivos', tipo: 'estado', valor: 'inactivos' }
+      accion: servicios.value.some((s) => s.estado === 'PAUSADO')
+        ? { texto: 'Ver pausados', tipo: 'estado', valor: 'pausados' }
         : null,
     }
   }
-  if (filtro.value === 'inactivos') {
+  if (filtro.value === 'pausados') {
     return {
-      titulo: 'No tenés servicios inactivos.',
-      detalle: 'Todos tus servicios están activos.',
-      accion: servicios.value.some((s) => s.estado)
-        ? { texto: 'Ver activos', tipo: 'estado', valor: 'activos' }
+      titulo: 'No tenés servicios pausados.',
+      detalle: 'Todos tus servicios están publicados.',
+      accion: servicios.value.some((s) => s.estado === 'PUBLICADO')
+        ? { texto: 'Ver publicados', tipo: 'estado', valor: 'publicados' }
         : null,
     }
   }
@@ -223,23 +227,118 @@ function textoEntrega(s) {
   return `${s.tiempoEntregaValor} ${(s.tiempoEntregaUnidad || '').toLowerCase()}`
 }
 
-async function alternarEstado(s) {
-  const baja = s.estado
-  const mensaje = baja
-    ? `¿Dar de baja el servicio "${s.nombre}"? Dejará de aparecer en tus búsquedas y perfil.`
-    : `¿Reactivar el servicio "${s.nombre}"?`
-  if (!window.confirm(mensaje)) return
+const tituloDialogo = computed(() => {
+  const d = dialogo.value
+  if (!d) return ''
+  if (d.bloqueo) return 'No podés dar de baja definitiva el servicio'
+  if (d.tipo === 'pausar') return `¿Pausar “${d.servicio.nombre}”?`
+  if (d.tipo === 'reactivar') return `¿Reactivar “${d.servicio.nombre}”?`
+  return `¿Dar de baja definitiva “${d.servicio.nombre}”?`
+})
+
+const mensajeDialogo = computed(() => {
+  const d = dialogo.value
+  if (!d) return ''
+  if (d.bloqueo) return d.bloqueo
+  if (d.tipo === 'pausar') {
+    return 'Dejará de aparecer en búsquedas y en tu perfil, y no recibirá solicitudes nuevas.'
+  }
+  if (d.tipo === 'reactivar') {
+    return 'Volverá a aparecer en búsquedas y en tu perfil, y podrá recibir solicitudes.'
+  }
+  return 'El servicio dejará de estar visible para vos y para los clientes, y solo un administrador podrá restaurarlo.'
+})
+
+const encabezadoDetalle = computed(() => {
+  const d = dialogo.value
+  if (!d || d.bloqueo || d.tipo === 'reactivar') return ''
+  return d.tipo === 'pausar' ? 'Vas a conservar' : 'Consecuencias'
+})
+
+const detallesDialogo = computed(() => {
+  const d = dialogo.value
+  if (!d || d.bloqueo || !d.resumen) return []
+  const r = d.resumen
+
+  if (d.tipo === 'pausar') {
+    const conserva = []
+    if (r.pendientes) conserva.push(`${r.pendientes} solicitud(es) pendiente(s)`)
+    if (r.enEspera) conserva.push(`${r.enEspera} en lista de espera`)
+    if (r.presupuestadas) conserva.push(`${r.presupuestadas} presupuestada(s)`)
+    if (r.pagadas) conserva.push(`${r.pagadas} pagada(s)`)
+    if (r.listaEspera) conserva.push(`${r.listaEspera} en la lista de espera`)
+    return conserva.length
+      ? conserva.map((texto) => `${texto}: podés seguir atendiéndolas aunque el servicio esté pausado.`)
+      : ['No tenés solicitudes ni pedidos en curso.']
+  }
+
+  const seCierran = []
+  if (r.pendientes) seCierran.push(`${r.pendientes} solicitud(es) pendiente(s) se van a rechazar`)
+  if (r.enEspera) seCierran.push(`${r.enEspera} en lista de espera se van a rechazar`)
+  if (r.listaEspera) seCierran.push(`${r.listaEspera} en la lista de espera se van a cancelar`)
+  return seCierran.length ? seCierran : ['No tenés solicitudes en curso.']
+})
+
+const textoConfirmarDialogo = computed(() => {
+  const d = dialogo.value
+  if (!d) return 'Confirmar'
+  if (d.bloqueo) return 'Ver solicitudes'
+  if (d.tipo === 'pausar') return 'Pausar servicio'
+  if (d.tipo === 'reactivar') return 'Reactivar servicio'
+  return 'Dar de baja definitiva'
+})
+
+async function abrirDialogo(tipo, servicio) {
+  if (tipo === 'reactivar') {
+    dialogo.value = { tipo, servicio }
+    return
+  }
   try {
-    const res = await api.post(`/servicios/${s.idServicio}/${baja ? 'baja' : 'activar'}`)
-    s.estado = res.data.estado
-    mostrarAviso(
-      'exito',
-      s.estado
-        ? `“${s.nombre}” se reactivó y vuelve a estar visible.`
-        : `“${s.nombre}” se dio de baja y ya no aparece en tus búsquedas ni perfil.`,
-    )
+    const res = await api.get(`/servicios/${servicio.idServicio}/resumen`)
+    dialogo.value = { tipo, servicio, resumen: res.data }
   } catch (e) {
-    mostrarAviso('error', e.response?.data?.message || 'No se pudo actualizar el estado.')
+    mostrarAviso('error', e.response?.data?.message || 'No se pudo consultar el estado del servicio.')
+  }
+}
+
+function cerrarDialogo() {
+  if (procesandoDialogo.value) return
+  dialogo.value = null
+}
+
+async function confirmarDialogo() {
+  const d = dialogo.value
+  if (!d || procesandoDialogo.value) return
+  if (d.bloqueo) {
+    dialogo.value = null
+    router.push(`/mis-servicios/${d.servicio.idServicio}/solicitudes`)
+    return
+  }
+  procesandoDialogo.value = true
+  try {
+    const res = await api.post(`/servicios/${d.servicio.idServicio}/${d.tipo === 'reactivar' ? 'reactivar' : d.tipo}`)
+    if (d.tipo === 'archivar') {
+      servicios.value = servicios.value.filter((s) => s.idServicio !== d.servicio.idServicio)
+      mostrarAviso('exito', `“${d.servicio.nombre}” se dio de baja definitiva.`)
+    } else {
+      d.servicio.estado = res.data.estado
+      mostrarAviso(
+        'exito',
+        d.tipo === 'pausar'
+          ? `“${d.servicio.nombre}” quedó pausado. Tus solicitudes y pedidos siguen activos.`
+          : `“${d.servicio.nombre}” se reactivó y vuelve a estar visible.`,
+      )
+    }
+    dialogo.value = null
+  } catch (e) {
+    const mensaje = e.response?.data?.message || 'No se pudo actualizar el estado.'
+    if (d.tipo === 'archivar' && e.response?.status === 409) {
+      dialogo.value = { ...d, bloqueo: mensaje }
+    } else {
+      mostrarAviso('error', mensaje)
+    }
+  } finally {
+    procesandoDialogo.value = false
   }
 }
 
@@ -536,10 +635,10 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
               <div class="flex items-start justify-between gap-2">
                 <h2 class="text-granate">{{ s.nombre }}</h2>
                 <span
-                  class="shrink-0 rounded-full px-2.5 py-0.5 text-xs"
-                  :class="s.estado ? 'bg-green-500/10 text-green-700' : 'bg-rojizo/10 text-rojizo'"
+                  class="shrink-0 rounded-full border px-2.5 py-0.5 text-xs"
+                  :class="estadoServicioDe(s.estado).clase"
                 >
-                  {{ s.estado ? 'Activo' : 'Inactivo' }}
+                  {{ estadoServicioDe(s.estado).texto }}
                 </span>
               </div>
               <p class="mt-1 text-xs text-cafe/60">{{ s.nombreTipoServicio }} · {{ s.nombreMedio }}</p>
@@ -554,12 +653,29 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
                 <span>Cupos disponibles: {{ s.cuposDisponibles ?? s.cupos }}</span>
               </div>
 
-              <div class="mt-auto pt-4 flex items-center justify-end gap-3 border-t border-rosa/40">
+              <div class="mt-auto pt-4 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 border-t border-rosa/40">
+                <router-link
+                  :to="`/mis-servicios/${s.idServicio}/solicitudes`"
+                  class="text-sm text-coral hover:text-rojizo transition"
+                >
+                  Solicitudes <span class="text-cafe/50">({{ s.solicitudesActivas || 0 }})</span>
+                </router-link>
                 <router-link :to="`/mis-servicios/${s.idServicio}/editar`" class="text-sm text-coral hover:text-rojizo transition">
                   Editar
                 </router-link>
-                <button type="button" class="text-sm text-cafe/60 hover:text-rojizo transition" @click="alternarEstado(s)">
-                  {{ s.estado ? 'Dar de baja' : 'Reactivar' }}
+                <button
+                  type="button"
+                  class="text-sm text-cafe/60 hover:text-rojizo transition"
+                  @click="abrirDialogo(s.estado === 'PUBLICADO' ? 'pausar' : 'reactivar', s)"
+                >
+                  {{ s.estado === 'PUBLICADO' ? 'Pausar' : 'Reactivar' }}
+                </button>
+                <button
+                  type="button"
+                  class="text-sm text-rojizo/80 hover:text-rojizo transition"
+                  @click="abrirDialogo('archivar', s)"
+                >
+                  Dar de baja definitiva
                 </button>
               </div>
             </div>
@@ -567,5 +683,34 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
         </div>
       </template>
     </template>
+
+    <ModalConfirmacion
+      :abierto="!!dialogo"
+      :titulo="tituloDialogo"
+      :mensaje="mensajeDialogo"
+      :texto-confirmar="textoConfirmarDialogo"
+      :texto-cancelar="dialogo?.bloqueo ? 'Cerrar' : 'Cancelar'"
+      :destructivo="dialogo?.tipo === 'archivar' && !dialogo?.bloqueo"
+      @confirmar="confirmarDialogo"
+      @cerrar="cerrarDialogo"
+    >
+      <div
+        v-if="encabezadoDetalle"
+        class="mt-4 rounded-xl border border-rosa/50 bg-crema/60 p-3"
+      >
+        <p class="text-xs font-semibold uppercase tracking-[0.12em] text-cafe/55">
+          {{ encabezadoDetalle }}
+        </p>
+        <ul class="mt-2 space-y-1 text-sm leading-relaxed text-cafe/75">
+          <li v-for="detalle in detallesDialogo" :key="detalle" class="flex gap-2">
+            <span aria-hidden="true">•</span>
+            <span>{{ detalle }}</span>
+          </li>
+        </ul>
+      </div>
+      <p v-if="dialogo?.bloqueo" class="mt-3 text-sm leading-relaxed text-cafe/70">
+        Podés ver y resolver las solicitudes del servicio antes de volver a intentarlo.
+      </p>
+    </ModalConfirmacion>
   </div>
 </template>

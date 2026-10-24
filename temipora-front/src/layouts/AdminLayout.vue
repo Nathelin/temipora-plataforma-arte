@@ -18,6 +18,7 @@ const secciones = [
   { nombre: 'Usuarios', to: '/admin/usuarios', activa: true },
   { nombre: 'Productos', to: '/admin/tipos/producto', activa: true },
   { nombre: 'Servicios', to: '/admin/tipos/servicio', activa: true },
+  { nombre: 'Servicios archivados', to: '/admin/servicios/archivados', activa: true },
   {
     nombre: 'Etiquetas y categorías',
     base: '/admin/etiquetas',

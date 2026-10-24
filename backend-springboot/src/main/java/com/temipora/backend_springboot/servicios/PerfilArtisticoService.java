@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.Imagen;
 import com.temipora.backend_springboot.modelo.ImagenEtiqueta;
 import com.temipora.backend_springboot.modelo.PerfilArtisticoDTO;
@@ -62,7 +63,8 @@ public class PerfilArtisticoService {
         }
 
         List<Imagen> imagenes = imagenRepository.findByUsuarioIdUsuarioInAndEstadoTrue(ids);
-        List<Servicio> servicios = servicioRepository.findByArtistaIdUsuarioInAndEstadoTrue(ids);
+        List<Servicio> servicios = servicioRepository.findByArtistaIdUsuarioInAndEstado(
+            ids, EstadoServicio.PUBLICADO);
 
         List<Long> idsImagenes = imagenes.stream()
             .map(Imagen::getIdImagen)

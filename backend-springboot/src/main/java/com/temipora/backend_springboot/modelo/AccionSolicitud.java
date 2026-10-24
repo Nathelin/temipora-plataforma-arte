@@ -45,4 +45,7 @@ public class AccionSolicitud {
 
     @Column(length = 200)
     private String motivo;
+
+    @Column(nullable = false, length = 20)
+    private String origen = "ARTISTA";
 }

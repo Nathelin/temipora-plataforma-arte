@@ -3,9 +3,11 @@ package com.temipora.backend_springboot.servicios;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
+import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
@@ -41,6 +44,12 @@ import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 public class ServicioService {
 
     private static final List<EstadoSolicitud> ESTADOS_QUE_OCUPAN_CUPO = List.of(
+        EstadoSolicitud.PRESUPUESTADA,
+        EstadoSolicitud.PAGADA);
+
+    private static final List<EstadoSolicitud> ESTADOS_ACTIVOS = List.of(
+        EstadoSolicitud.PENDIENTE,
+        EstadoSolicitud.EN_LISTA_ESPERA,
         EstadoSolicitud.PRESUPUESTADA,
         EstadoSolicitud.PAGADA);
 
@@ -81,8 +90,19 @@ public class ServicioService {
     @Transactional(readOnly = true)
     public List<ServicioDTO> listarMios(Long idArtista) {
         Moneda moneda = monedaPreferidaDe(idArtista);
-        return servicioRepository.findByArtistaIdUsuarioOrderByNombreAsc(idArtista).stream()
-            .map(s -> aDTO(s, false, moneda))
+        Map<Long, Long> activas = new HashMap<>();
+        for (Object[] fila : solicitudRepository.contarActivasPorServicioDelArtista(
+                idArtista, ESTADOS_ACTIVOS)) {
+            activas.put((Long) fila[0], (Long) fila[1]);
+        }
+        return servicioRepository
+            .findByArtistaIdUsuarioAndEstadoNotOrderByNombreAsc(idArtista, EstadoServicio.ARCHIVADO)
+            .stream()
+            .map(s -> {
+                ServicioDTO dto = aDTO(s, false, moneda);
+                dto.setSolicitudesActivas(activas.getOrDefault(s.getIdServicio(), 0L));
+                return dto;
+            })
             .toList();
     }
 
@@ -120,10 +140,10 @@ public class ServicioService {
             root.fetch("artista");
             if (ocultarSensibles) {
                 return cb.and(
-                    cb.isTrue(root.get("estado")),
+                    cb.equal(root.get("estado"), EstadoServicio.PUBLICADO),
                     cb.isFalse(root.get("contenidoSensible")));
             }
-            return cb.isTrue(root.get("estado"));
+            return cb.equal(root.get("estado"), EstadoServicio.PUBLICADO);
         };
     }
 
@@ -237,7 +257,8 @@ public class ServicioService {
         boolean esDuenio = viewerId != null
             && servicio.getArtista() != null
             && servicio.getArtista().getIdUsuario().equals(viewerId);
-        if (!esDuenio && !servicio.isEstado()) {
+        if (servicio.getEstado() == EstadoServicio.ARCHIVADO
+                || (!esDuenio && servicio.getEstado() != EstadoServicio.PUBLICADO)) {
             throw new NoSuchElementException("Servicio no encontrado: " + idServicio);
         }
         if (!esDuenio && pref == EPreferenciaContenidoSensible.OCULTAR && servicio.isContenidoSensible()) {
@@ -255,7 +276,7 @@ public class ServicioService {
 
         Servicio servicio = new Servicio();
         servicio.setArtista(artista);
-        servicio.setEstado(true);
+        servicio.setEstado(EstadoServicio.PUBLICADO);
         aplicar(servicio, request);
         validarTerminos(idArtista, null, request);
 
@@ -283,23 +304,44 @@ public class ServicioService {
     }
 
     @Transactional
-    public ServicioDTO darDeBaja(Long idServicio, Long idArtista) {
-        Servicio servicio = obtenerEntidad(idServicio);
-        verificarDuenio(servicio, idArtista);
-        servicio.setEstado(false);
-        return ServicioDTO.desdeServicio(servicioRepository.save(servicio));
+    public ServicioDTO pausar(Long idServicio, Long idArtista) {
+        Servicio servicio = bloquearPropio(idServicio, idArtista);
+        if (servicio.getEstado() == EstadoServicio.ARCHIVADO) {
+            throw new ConflictoException("El servicio está archivado y no se puede pausar.");
+        }
+        if (servicio.getEstado() != EstadoServicio.PAUSADO) {
+            servicio.setEstado(EstadoServicio.PAUSADO);
+            servicio.setPausadoEn(LocalDateTime.now());
+            servicioRepository.save(servicio);
+        }
+        return ServicioDTO.desdeServicio(servicio);
     }
 
     @Transactional
-    public ServicioDTO darDeAlta(Long idServicio, Long idArtista) {
-        Servicio servicio = obtenerEntidad(idServicio);
-        verificarDuenio(servicio, idArtista);
+    public ServicioDTO reactivar(Long idServicio, Long idArtista) {
+        Servicio servicio = bloquearPropio(idServicio, idArtista);
+        if (servicio.getEstado() == EstadoServicio.ARCHIVADO) {
+            throw new ConflictoException(
+                "El servicio está archivado: solo un administrador puede restaurarlo.");
+        }
+        if (servicio.getEstado() == EstadoServicio.PUBLICADO) {
+            return ServicioDTO.desdeServicio(servicio);
+        }
         if (!terminosService.tieneTerminosValidos(idServicio, idArtista)) {
             throw new IllegalArgumentException(
                 "Completá tus términos de uso y servicio antes de publicar el servicio.");
         }
-        servicio.setEstado(true);
-        return ServicioDTO.desdeServicio(servicioRepository.save(servicio));
+        servicio.setEstado(EstadoServicio.PUBLICADO);
+        servicio.setPausadoEn(null);
+        servicioRepository.save(servicio);
+        return ServicioDTO.desdeServicio(servicio);
+    }
+
+    private Servicio bloquearPropio(Long idServicio, Long idArtista) {
+        Servicio servicio = servicioRepository.findByIdServicioForUpdate(idServicio)
+            .orElseThrow(() -> new NoSuchElementException("Servicio no encontrado: " + idServicio));
+        verificarDuenio(servicio, idArtista);
+        return servicio;
     }
 
     private void validarTerminos(Long idArtista, Long idServicio, ServicioRequest request) {
@@ -453,10 +495,12 @@ public class ServicioService {
     private void validarUnico(Long idArtista, Long idTipoServicio, String nombre, Long idExcluido) {
         String limpio = nombre.trim();
         boolean existe = (idExcluido == null)
-            ? servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(
-                idArtista, idTipoServicio, limpio)
-            : servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndIdServicioNot(
-                idArtista, idTipoServicio, limpio, idExcluido);
+            ? servicioRepository
+                .existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndEstadoNot(
+                    idArtista, idTipoServicio, limpio, EstadoServicio.ARCHIVADO)
+            : servicioRepository
+                .existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndIdServicioNotAndEstadoNot(
+                    idArtista, idTipoServicio, limpio, idExcluido, EstadoServicio.ARCHIVADO);
 
         if (existe) {
             throw new IllegalArgumentException("Ya tenés un servicio con ese nombre y tipo.");
@@ -468,7 +512,7 @@ public class ServicioService {
         verificarDuenio(obtenerEntidad(idServicio), idArtista);
     }
 
-    private void verificarDuenio(Servicio servicio, Long idArtista) {
+    public void verificarDuenio(Servicio servicio, Long idArtista) {
         if (servicio.getArtista() == null || !servicio.getArtista().getIdUsuario().equals(idArtista)) {
             throw new IllegalArgumentException("No podés modificar un servicio que no es tuyo.");
         }

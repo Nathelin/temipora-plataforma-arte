@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.AccionSolicitud;
 import com.temipora.backend_springboot.modelo.DisponibilidadServicioDTO;
+import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.Formulario;
 import com.temipora.backend_springboot.modelo.FormularioDTO;
@@ -63,6 +64,13 @@ public class SolicitudServicioService {
     private static final List<EstadoSolicitud> ESTADOS_RECHAZABLES = List.of(
         EstadoSolicitud.PENDIENTE,
         EstadoSolicitud.EN_LISTA_ESPERA);
+
+    private static final List<EstadoSolicitud> ESTADOS_QUE_SE_CIERRAN_AL_ARCHIVAR = List.of(
+        EstadoSolicitud.PENDIENTE,
+        EstadoSolicitud.EN_LISTA_ESPERA);
+
+    private static final String ORIGEN_ARTISTA = "ARTISTA";
+    private static final String ORIGEN_BAJA_SERVICIO = "BAJA_SERVICIO";
 
     private static final String NOTIFICACION_SOLICITUD = "SOLICITUD_RECIBIDA";
     private static final String NOTIFICACION_ESPERA = "SOLICITUD_EN_LISTA_ESPERA";
@@ -211,8 +219,12 @@ public class SolicitudServicioService {
         Servicio servicio = servicioRepository.findByIdServicioForUpdate(request.getIdServicio())
             .orElseThrow(() -> new NoSuchElementException(
                 "Servicio no encontrado: " + request.getIdServicio()));
-        if (!servicio.isEstado()) {
-            throw new NoSuchElementException("Servicio no encontrado: " + request.getIdServicio());
+        if (servicio.getEstado() == EstadoServicio.ARCHIVADO) {
+            throw new ServicioNoDisponibleException("El servicio ya no está disponible.");
+        }
+        if (servicio.getEstado() != EstadoServicio.PUBLICADO) {
+            throw new ConflictoException(
+                "El servicio está pausado y no recibe solicitudes nuevas.");
         }
 
         Usuario artista = servicio.getArtista();
@@ -361,6 +373,68 @@ public class SolicitudServicioService {
         }
 
         String motivoLimpio = limpiarMotivo(motivo);
+        LocalDateTime ahora = registrarRechazo(solicitud, motivoLimpio, ORIGEN_ARTISTA);
+
+        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(solicitud);
+        dto.setMotivoRechazo(motivoLimpio);
+        dto.setFechaRechazo(ahora);
+        return dto;
+    }
+
+    @Transactional
+    public SolicitudDTO retirarPresupuesto(Long idSolicitud, Long idArtista) {
+        Solicitud solicitud = solicitudRepository.findByIdSolicitudForUpdate(idSolicitud)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Solicitud no encontrada: " + idSolicitud));
+        boolean esArtista = solicitud.getArtista() != null
+            && solicitud.getArtista().getIdUsuario().equals(idArtista);
+        if (!esArtista) {
+            throw new AccesoDenegadoException(
+                "No podés retirar el presupuesto de esta solicitud.");
+        }
+        if (solicitud.getEstado() != EstadoSolicitud.PRESUPUESTADA) {
+            throw new ConflictoException(
+                "Solo podés retirar el presupuesto de una solicitud presupuestada.");
+        }
+
+        LocalDateTime ahora = LocalDateTime.now();
+        solicitud.setEstado(EstadoSolicitud.RECHAZADA);
+        solicitud.setFechaActualizacion(ahora);
+
+        AccionSolicitud accion = new AccionSolicitud();
+        accion.setSolicitud(solicitud);
+        accion.setTipoAccion(TipoAccionSolicitud.RETIRO_PRESUPUESTO);
+        accion.setUsuario(solicitud.getArtista());
+        accion.setFecha(ahora);
+        accion.setOrigen(ORIGEN_ARTISTA);
+        accionSolicitudRepository.save(accion);
+
+        notificacionService.crearParaUsuario(
+            solicitud.getCliente().getIdUsuario(),
+            NOTIFICACION_RECHAZO,
+            "Presupuesto retirado",
+            "El artista retiró el presupuesto de '" + nombreServicioDe(solicitud)
+                + "'. Podés volver a enviar tu solicitud.",
+            solicitud.getIdSolicitud(),
+            TIPO_REFERENCIA_SOLICITUD);
+
+        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(solicitud);
+        dto.setFechaRechazo(ahora);
+        return dto;
+    }
+
+    @Transactional
+    public int cerrarPorBajaServicio(Long idServicio) {
+        List<Solicitud> abiertas = solicitudRepository
+            .findByServicioIdServicioAndEstadoInOrderByFechaCreacionDesc(
+                idServicio, ESTADOS_QUE_SE_CIERRAN_AL_ARCHIVAR);
+        for (Solicitud solicitud : abiertas) {
+            registrarRechazo(solicitud, null, ORIGEN_BAJA_SERVICIO);
+        }
+        return abiertas.size();
+    }
+
+    private LocalDateTime registrarRechazo(Solicitud solicitud, String motivo, String origen) {
         if (solicitud.getEstado() == EstadoSolicitud.EN_LISTA_ESPERA) {
             listaEsperaService.marcarRechazada(solicitud);
         }
@@ -374,14 +448,13 @@ public class SolicitudServicioService {
         accion.setTipoAccion(TipoAccionSolicitud.RECHAZO);
         accion.setUsuario(solicitud.getArtista());
         accion.setFecha(ahora);
-        accion.setMotivo(motivoLimpio);
+        accion.setMotivo(motivo);
+        accion.setOrigen(origen);
         accionSolicitudRepository.save(accion);
 
-        String nombreServicio = solicitud.getServicio() != null
-            ? solicitud.getServicio().getNombre()
-            : "tu servicio";
-        String descripcion = motivoLimpio != null
-            ? "El artista rechazó tu solicitud de '" + nombreServicio + "'. Motivo: " + motivoLimpio
+        String nombreServicio = nombreServicioDe(solicitud);
+        String descripcion = motivo != null
+            ? "El artista rechazó tu solicitud de '" + nombreServicio + "'. Motivo: " + motivo
             : "El artista rechazó tu solicitud de '" + nombreServicio
                 + "'. El artista decidió no mencionar el motivo.";
         notificacionService.crearParaUsuario(
@@ -392,10 +465,13 @@ public class SolicitudServicioService {
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
 
-        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(solicitud);
-        dto.setMotivoRechazo(motivoLimpio);
-        dto.setFechaRechazo(ahora);
-        return dto;
+        return ahora;
+    }
+
+    private String nombreServicioDe(Solicitud solicitud) {
+        return solicitud.getServicio() != null
+            ? solicitud.getServicio().getNombre()
+            : "tu servicio";
     }
 
     @Transactional(readOnly = true)
@@ -416,6 +492,14 @@ public class SolicitudServicioService {
             : solicitudRepository.findByClienteIdUsuarioAndEstadoOrderByFechaCreacionDesc(
                 idCliente, estado);
         return solicitudes.stream()
+            .map(SolicitudResumenDTO::desdeSolicitud)
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SolicitudResumenDTO> listarPorServicio(Long idServicio) {
+        return solicitudRepository.findByServicioIdServicioOrderByFechaCreacionDesc(idServicio)
+            .stream()
             .map(SolicitudResumenDTO::desdeSolicitud)
             .toList();
     }
