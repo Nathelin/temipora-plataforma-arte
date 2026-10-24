@@ -1,5 +1,7 @@
 package com.temipora.backend_springboot.controladores;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -9,9 +11,13 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.SolicitudDTO;
+import com.temipora.backend_springboot.modelo.SolicitudRechazoRequest;
+import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
 import com.temipora.backend_springboot.modelo.SolicitudServicioRequest;
 import com.temipora.backend_springboot.servicios.SolicitudServicioService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
@@ -42,6 +48,22 @@ public class SolicitudServicioController {
             .body(solicitudServicioService.crear(idCliente, request));
     }
 
+    @GetMapping("/recibidas")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public List<SolicitudResumenDTO> listarRecibidas(
+            @RequestParam(required = false) EstadoSolicitud estado,
+            Authentication authentication) {
+        return solicitudServicioService.listarRecibidas(idAutenticado(authentication), estado);
+    }
+
+    @GetMapping("/enviadas")
+    @PreAuthorize("hasRole('CLIENTE')")
+    public List<SolicitudResumenDTO> listarEnviadas(
+            @RequestParam(required = false) EstadoSolicitud estado,
+            Authentication authentication) {
+        return solicitudServicioService.listarEnviadas(idAutenticado(authentication), estado);
+    }
+
     @GetMapping("/{idSolicitud}")
     @PreAuthorize("isAuthenticated()")
     public SolicitudDTO obtenerSolicitud(
@@ -49,6 +71,17 @@ public class SolicitudServicioController {
             Authentication authentication) {
         return solicitudServicioService.obtenerSolicitud(
             idSolicitud, idAutenticado(authentication));
+    }
+
+    @PostMapping("/{idSolicitud}/rechazar")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public SolicitudDTO rechazar(
+            @PathVariable Long idSolicitud,
+            @Valid @RequestBody(required = false) SolicitudRechazoRequest request,
+            Authentication authentication) {
+        String motivo = request != null ? request.getMotivo() : null;
+        return solicitudServicioService.rechazar(
+            idSolicitud, idAutenticado(authentication), motivo);
     }
 
     private Long idAutenticado(Authentication authentication) {

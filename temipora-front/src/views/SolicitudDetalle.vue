@@ -3,7 +3,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
+import {
+  contraparteDe,
+  datosContraparte,
+  estadoDe,
+  formatearFechaSolicitud,
+} from '../servicios/solicitudes'
 import VisorImagenes from '../components/VisorImagenes.vue'
+import ModalRechazo from '../components/ModalRechazo.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,16 +18,6 @@ const router = useRouter()
 const solicitud = ref(null)
 const cargando = ref(true)
 const errorCarga = ref('')
-
-const ESTADOS = {
-  PENDIENTE: { texto: 'Pendiente', clase: 'border-mantequilla bg-mantequilla/40 text-granate' },
-  EN_LISTA_ESPERA: { texto: 'En lista de espera', clase: 'border-durazno bg-durazno/50 text-granate' },
-  PRESUPUESTADA: { texto: 'Presupuestada', clase: 'border-coral/30 bg-coral/10 text-coral' },
-  PAGADA: { texto: 'Pagada', clase: 'border-rosa bg-rosa/35 text-granate' },
-  FINALIZADA: { texto: 'Finalizada', clase: 'border-rosa bg-rosa/35 text-granate' },
-  RECHAZADA: { texto: 'Rechazada', clase: 'border-rojizo/25 bg-rojizo/10 text-rojizo' },
-  CANCELADA: { texto: 'Cancelada', clase: 'border-rojizo/25 bg-rojizo/10 text-rojizo' },
-}
 
 const idActual = Number(localStorage.getItem('idUsuario'))
 const rolActual = localStorage.getItem('rol')
@@ -32,32 +29,33 @@ const esArtistaDeLaSolicitud = computed(() => {
 })
 
 const contraparte = computed(() =>
-  esArtistaDeLaSolicitud.value ? solicitud.value?.cliente : solicitud.value?.artista,
+  contraparteDe(solicitud.value, esArtistaDeLaSolicitud.value),
 )
+const datosPersona = computed(() => datosContraparte(contraparte.value))
 const tituloContraparte = computed(() =>
   esArtistaDeLaSolicitud.value ? 'Cliente' : 'Artista',
 )
-const nombreContraparte = computed(
-  () => contraparte.value?.nombreDisplay || contraparte.value?.nombreUsuario || 'No disponible',
-)
-const usuarioContraparte = computed(() => contraparte.value?.nombreUsuario || '')
-const fotoContraparte = computed(
-  () => contraparte.value?.urlFotoPerfilMiniatura || contraparte.value?.urlFotoPerfil || '',
-)
-const inicialContraparte = computed(() => (nombreContraparte.value || '?').charAt(0).toUpperCase())
-const estadoInfo = computed(
-  () => ESTADOS[solicitud.value?.estado] || { texto: solicitud.value?.estado || 'Sin estado', clase: 'border-rosa bg-rosa/20 text-cafe' },
-)
+const nombreContraparte = computed(() => datosPersona.value?.nombre || 'No disponible')
+const usuarioContraparte = computed(() => datosPersona.value?.usuario || '')
+const fotoContraparte = computed(() => datosPersona.value?.foto || '')
+const inicialContraparte = computed(() => datosPersona.value?.inicial || '?')
+const estadoInfo = computed(() => estadoDe(solicitud.value?.estado))
 
-function formatearFecha(valor) {
-  if (!valor) return ''
-  const fecha = new Date(valor)
-  if (Number.isNaN(fecha.getTime())) return ''
-  return new Intl.DateTimeFormat('es', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-  }).format(fecha)
-}
+const modalRechazoAbierto = ref(false)
+const rechazando = ref(false)
+const errorRechazo = ref('')
+const avisoExito = ref('')
+
+const puedeRechazar = computed(
+  () => esArtistaDeLaSolicitud.value
+    && ['PENDIENTE', 'EN_LISTA_ESPERA'].includes(solicitud.value?.estado),
+)
+const textoMotivoRechazo = computed(() => {
+  if (solicitud.value?.motivoRechazo) return solicitud.value.motivoRechazo
+  return esArtistaDeLaSolicitud.value
+    ? 'No especificaste un motivo.'
+    : 'El artista decidió no mencionar el motivo.'
+})
 
 function gruposDeRespuestas(item) {
   const respuestas = [...(item?.respuestas || [])].sort((a, b) => {
@@ -132,8 +130,40 @@ function cerrarVisor() {
   visor.value = { ...visor.value, abierto: false }
 }
 
+function abrirModalRechazo() {
+  errorRechazo.value = ''
+  modalRechazoAbierto.value = true
+}
+
+function cerrarModalRechazo() {
+  if (!rechazando.value) modalRechazoAbierto.value = false
+}
+
+async function confirmarRechazo(motivo) {
+  if (rechazando.value) return
+  rechazando.value = true
+  errorRechazo.value = ''
+  try {
+    const res = await api.post(
+      `/solicitudes-servicio/${solicitud.value.idSolicitud}/rechazar`,
+      { motivo: motivo || null },
+    )
+    solicitud.value = res.data
+    modalRechazoAbierto.value = false
+    avisoExito.value = 'La solicitud fue rechazada y el cliente recibió el aviso.'
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    errorRechazo.value = e.response?.data?.message || 'No se pudo rechazar la solicitud.'
+  } finally {
+    rechazando.value = false
+  }
+}
+
 function volver() {
-  router.push({ name: 'notificaciones' })
+  router.push({ name: 'solicitudes' })
 }
 
 async function cargar() {
@@ -167,7 +197,7 @@ onMounted(cargar)
       class="text-sm font-medium text-cafe/70 transition hover:text-coral"
       @click="volver"
     >
-      ← Volver a notificaciones
+      ← Volver a solicitudes
     </button>
 
     <div v-if="cargando" class="mt-8 rounded-2xl border border-rosa/50 bg-blanco px-6 py-16 text-center text-sm text-cafe/60">
@@ -189,7 +219,7 @@ onMounted(cargar)
           class="rounded-full bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-rojizo"
           @click="volver"
         >
-          Ir a notificaciones
+          Ir a mis solicitudes
         </button>
       </div>
     </div>
@@ -204,7 +234,7 @@ onMounted(cargar)
           <p class="mt-2 text-sm text-cafe/65">
             {{ solicitud.nombreServicio || 'Servicio' }}
             <span aria-hidden="true"> · </span>
-            {{ formatearFecha(solicitud.fechaCreacion) }}
+            {{ formatearFechaSolicitud(solicitud.fechaCreacion) }}
           </p>
         </div>
         <span
@@ -217,6 +247,19 @@ onMounted(cargar)
 
       <div class="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div class="space-y-6">
+          <section
+            v-if="solicitud.estado === 'RECHAZADA'"
+            class="rounded-2xl border border-rojizo/25 bg-rojizo/5 p-5 sm:p-6"
+          >
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-rojizo">
+              Solicitud rechazada
+            </p>
+            <p class="mt-2 text-sm leading-relaxed text-cafe/80">{{ textoMotivoRechazo }}</p>
+            <p v-if="solicitud.fechaRechazo" class="mt-2 text-xs text-cafe/50">
+              {{ formatearFechaSolicitud(solicitud.fechaRechazo) }}
+            </p>
+          </section>
+
           <section class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
             <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
               {{ tituloContraparte }}
@@ -416,14 +459,37 @@ onMounted(cargar)
 
           <section class="rounded-2xl border border-rosa/50 bg-blanco p-5">
             <h2 class="text-base font-semibold text-granate">Acciones</h2>
-            <p class="mt-2 text-xs leading-relaxed text-cafe/60">
-              Rechazar y presupuestar estarán disponibles próximamente.
+
+            <p
+              v-if="avisoExito"
+              role="status"
+              class="mt-3 rounded-xl border border-green-600/20 bg-green-500/10 px-3 py-2 text-xs leading-relaxed text-green-700"
+            >
+              {{ avisoExito }}
             </p>
-            <div class="mt-4 grid gap-2">
+
+            <p v-if="puedeRechazar" class="mt-2 text-xs leading-relaxed text-cafe/60">
+              Podés rechazar la solicitud y, si querés, explicarle el motivo al cliente.
+            </p>
+            <p
+              v-else-if="esArtistaDeLaSolicitud && solicitud.estado === 'RECHAZADA'"
+              class="mt-2 text-xs leading-relaxed text-cafe/60"
+            >
+              Rechazaste esta solicitud.
+            </p>
+            <p v-else-if="esArtistaDeLaSolicitud" class="mt-2 text-xs leading-relaxed text-cafe/60">
+              Esta solicitud ya no se puede rechazar.
+            </p>
+            <p v-else class="mt-2 text-xs leading-relaxed text-cafe/60">
+              Cuando el artista envíe el presupuesto, vas a poder pagarlo desde acá.
+            </p>
+
+            <div v-if="esArtistaDeLaSolicitud" class="mt-4 grid gap-2">
               <button
                 type="button"
-                disabled
-                class="inline-flex min-h-10 cursor-not-allowed items-center justify-center rounded-full border border-rosa bg-rosa/15 px-4 text-sm font-semibold text-cafe/40"
+                class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-4 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10 disabled:cursor-not-allowed disabled:border-rosa disabled:text-cafe/40 disabled:hover:bg-transparent"
+                :disabled="!puedeRechazar"
+                @click="abrirModalRechazo"
               >
                 Rechazar
               </button>
@@ -447,6 +513,14 @@ onMounted(cargar)
       :etiqueta="visor.etiqueta"
       :descripcion="visor.descripcion"
       @cerrar="cerrarVisor"
+    />
+
+    <ModalRechazo
+      :abierto="modalRechazoAbierto"
+      :cargando="rechazando"
+      :error="errorRechazo"
+      @cerrar="cerrarModalRechazo"
+      @confirmar="confirmarRechazo"
     />
   </div>
 </template>

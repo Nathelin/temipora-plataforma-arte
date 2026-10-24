@@ -32,6 +32,8 @@ public class SolicitudDTO {
     private String moneda;
     private LocalDateTime fechaCreacion;
     private Integer posicionListaEspera;
+    private String motivoRechazo;
+    private LocalDateTime fechaRechazo;
     private List<ItemSolicitudDTO> items;
 
     public static SolicitudDTO desdeSolicitud(Solicitud solicitud) {
@@ -57,6 +59,7 @@ public class SolicitudDTO {
             .moneda(solicitud.getMoneda() != null ? solicitud.getMoneda().getCodigo() : null)
             .fechaCreacion(solicitud.getFechaCreacion())
             .posicionListaEspera(solicitud.getListaEspera() != null
+                && "ESPERANDO".equals(solicitud.getListaEspera().getEstado())
                 ? solicitud.getListaEspera().getPosicion()
                 : null)
             .items(solicitud.getItems().stream()

@@ -24,6 +24,7 @@ const contenedorNav = ref(null)
 const estaLogueado = computed(() => !!token.value)
 const esAdmin = computed(() => rol.value === 'ADMIN')
 const esArtista = computed(() => rol.value === 'ARTISTA')
+const puedeVerSolicitudes = computed(() => estaLogueado.value && !esAdmin.value)
 
 function alternarMenu() {
   menuAbierto.value = !menuAbierto.value
@@ -101,12 +102,19 @@ function irAPerfil() {
             <BrandLogo />
           </router-link>
 
-          <nav class="hidden items-center gap-6 md:flex" aria-label="Navegación principal">
+          <nav class="hidden items-center gap-6 lg:flex" aria-label="Navegación principal">
             <router-link
               to="/servicios"
               class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
             >
               Explorar
+            </router-link>
+            <router-link
+              v-if="puedeVerSolicitudes"
+              to="/solicitudes"
+              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+            >
+              Solicitudes
             </router-link>
             <router-link
               v-if="estaLogueado"
@@ -246,6 +254,14 @@ function irAPerfil() {
                   Favoritos
                 </button>
                 <button
+                  v-if="puedeVerSolicitudes"
+                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  role="menuitem"
+                  @click="menuAbierto = false; router.push({ name: 'solicitudes' })"
+                >
+                  Mis solicitudes
+                </button>
+                <button
                   v-if="esAdmin"
                   class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
                   role="menuitem"
@@ -272,7 +288,7 @@ function irAPerfil() {
           </template>
 
           <!-- Menú móvil -->
-          <div ref="contenedorNav" class="relative md:hidden">
+          <div ref="contenedorNav" class="relative lg:hidden">
             <button
               type="button"
               class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rosa/60 bg-blanco/70 text-granate transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
@@ -306,6 +322,14 @@ function irAPerfil() {
                 @click="menuMovilAbierto = false"
               >
                 Favoritos
+              </router-link>
+              <router-link
+                v-if="puedeVerSolicitudes"
+                to="/solicitudes"
+                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                @click="menuMovilAbierto = false"
+              >
+                Solicitudes
               </router-link>
               <router-link
                 v-if="estaLogueado && esArtista"

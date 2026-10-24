@@ -15,6 +15,7 @@ const {
 } = useNotificacionesSistema()
 
 const marcandoTodas = ref(false)
+const esAdmin = localStorage.getItem('rol') === 'ADMIN'
 const hayNotificaciones = computed(() => notificaciones.value.length > 0)
 const hayNoLeidas = computed(() => noLeidas.value > 0)
 
@@ -79,15 +80,25 @@ onMounted(() => {
         </p>
       </div>
 
-      <button
-        v-if="hayNoLeidas"
-        type="button"
-        class="inline-flex min-h-10 items-center justify-center self-start rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition hover:border-coral/50 hover:bg-rosa/20 disabled:cursor-not-allowed disabled:opacity-50 sm:self-auto"
-        :disabled="marcandoTodas"
-        @click="marcarTodas"
-      >
-        {{ marcandoTodas ? 'Marcando...' : 'Marcar todas como leídas' }}
-      </button>
+      <div class="flex flex-wrap items-center gap-3 self-start sm:self-auto">
+        <router-link
+          v-if="!esAdmin"
+          to="/solicitudes"
+          class="text-sm font-semibold text-coral transition hover:text-rojizo"
+        >
+          Mis solicitudes
+        </router-link>
+
+        <button
+          v-if="hayNoLeidas"
+          type="button"
+          class="inline-flex min-h-10 items-center justify-center rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition hover:border-coral/50 hover:bg-rosa/20 disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="marcandoTodas"
+          @click="marcarTodas"
+        >
+          {{ marcandoTodas ? 'Marcando...' : 'Marcar todas como leídas' }}
+        </button>
+      </div>
     </header>
 
     <div v-if="cargando && !hayNotificaciones" class="mt-8 rounded-2xl border border-rosa/50 bg-blanco px-6 py-12 text-center text-sm text-cafe/60">
