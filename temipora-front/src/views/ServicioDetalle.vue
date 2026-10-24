@@ -354,7 +354,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
             </button>
             <router-link
               v-if="esDuenio"
-              :to="`/mis-servicios/${servicio.idServicio}/editar`"
+              :to="`/panel/servicios/${servicio.idServicio}/editar`"
               class="block w-full rounded-md border border-rosa px-4 py-2 text-sm text-granate text-center hover:bg-rosa/20 transition"
             >
               Editar servicio

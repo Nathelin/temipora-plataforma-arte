@@ -708,7 +708,7 @@ function irASubirImagen(imagen = null) {
                   v-if="esDuenio"
                   type="button"
                   class="ml-2 underline text-granate hover:text-coral transition"
-                  @click="router.push('/mis-servicios/crear')"
+                  @click="router.push('/panel/servicios/crear')"
                 >
                   Creá tu primer servicio
                 </button>

@@ -784,7 +784,7 @@ async function guardar() {
 }
 
 function irAlListado() {
-  router.push('/mis-servicios')
+  router.push('/panel/servicios')
 }
 
 // ---------------------------------------------------------------

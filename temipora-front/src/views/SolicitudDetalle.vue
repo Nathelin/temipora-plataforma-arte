@@ -177,7 +177,8 @@ async function confirmarRechazo(motivo) {
 }
 
 function volver() {
-  router.push({ name: 'solicitudes' })
+  const destino = localStorage.getItem('rol') === 'ARTISTA' ? 'panel-solicitudes' : 'solicitudes'
+  router.push({ name: destino })
 }
 
 async function cargar() {

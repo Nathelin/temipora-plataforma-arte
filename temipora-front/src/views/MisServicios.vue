@@ -311,7 +311,7 @@ async function confirmarDialogo() {
   if (!d || procesandoDialogo.value) return
   if (d.bloqueo) {
     dialogo.value = null
-    router.push(`/mis-servicios/${d.servicio.idServicio}/solicitudes`)
+    router.push(`/panel/servicios/${d.servicio.idServicio}/solicitudes`)
     return
   }
   procesandoDialogo.value = true
@@ -354,7 +354,7 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
         <p class="mt-1 text-sm text-cafe/60">Los servicios que ofrecés a tus clientes.</p>
       </div>
       <router-link
-        to="/mis-servicios/crear"
+        to="/panel/servicios/crear"
         class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
       >
         Crear servicio
@@ -655,12 +655,12 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
 
               <div class="mt-auto pt-4 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 border-t border-rosa/40">
                 <router-link
-                  :to="`/mis-servicios/${s.idServicio}/solicitudes`"
+                  :to="`/panel/servicios/${s.idServicio}/solicitudes`"
                   class="text-sm text-coral hover:text-rojizo transition"
                 >
                   Solicitudes <span class="text-cafe/50">({{ s.solicitudesActivas || 0 }})</span>
                 </router-link>
-                <router-link :to="`/mis-servicios/${s.idServicio}/editar`" class="text-sm text-coral hover:text-rojizo transition">
+                <router-link :to="`/panel/servicios/${s.idServicio}/editar`" class="text-sm text-coral hover:text-rojizo transition">
                   Editar
                 </router-link>
                 <button
