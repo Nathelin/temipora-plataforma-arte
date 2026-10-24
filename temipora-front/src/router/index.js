@@ -61,7 +61,7 @@ const routes = [
         path: 'servicios/:id/solicitar',
         name: 'solicitud-servicio',
         component: SolicitudServicio,
-        meta: { title: 'Solicitar servicio', requiresAuth: true, requiresCliente: true },
+        meta: { title: 'Solicitar servicio', requiresAuth: true, requiresComprador: true },
       },
       { path: 'perfil/:nombreUsuario', name: 'perfil', component: Perfil,
         meta: { title: (route) => `Perfil de @${route.params.nombreUsuario}` }
@@ -321,8 +321,8 @@ router.beforeEach((to, from, next) => {
     }
   }
 
-  if (to.matched.some((r) => r.meta.requiresCliente)) {
-    if (!token || rol !== 'CLIENTE') {
+  if (to.matched.some((r) => r.meta.requiresComprador)) {
+    if (!token || (rol !== 'CLIENTE' && rol !== 'ARTISTA')) {
       next({ name: 'inicio' })
       return
     }

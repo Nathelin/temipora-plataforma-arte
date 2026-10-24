@@ -21,12 +21,11 @@ const cargando = ref(true)
 const errorCarga = ref('')
 
 const idActual = Number(localStorage.getItem('idUsuario'))
-const rolActual = localStorage.getItem('rol')
 
 const esArtistaDeLaSolicitud = computed(() => {
   const idArtista = solicitud.value?.artista?.idUsuario
-  if (idArtista && idActual) return idArtista === idActual
-  return rolActual === 'ARTISTA'
+  if (!idArtista || !idActual) return false
+  return idArtista === idActual
 })
 
 const contraparte = computed(() =>

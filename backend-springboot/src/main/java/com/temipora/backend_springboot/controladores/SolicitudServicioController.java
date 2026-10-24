@@ -39,7 +39,7 @@ public class SolicitudServicioController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('CLIENTE')")
+    @PreAuthorize("hasAnyRole('CLIENTE', 'ARTISTA')")
     public ResponseEntity<SolicitudDTO> crear(
             @Valid @RequestBody SolicitudServicioRequest request,
             Authentication authentication) {
@@ -57,7 +57,7 @@ public class SolicitudServicioController {
     }
 
     @GetMapping("/enviadas")
-    @PreAuthorize("hasRole('CLIENTE')")
+    @PreAuthorize("hasAnyRole('CLIENTE', 'ARTISTA')")
     public List<SolicitudResumenDTO> listarEnviadas(
             @RequestParam(required = false) EstadoSolicitud estado,
             Authentication authentication) {

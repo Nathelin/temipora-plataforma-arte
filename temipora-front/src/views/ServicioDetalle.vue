@@ -72,19 +72,19 @@ const esDuenio = computed(() => {
   const actual = localStorage.getItem('nombreUsuario') || ''
   return actual.toLowerCase() === (servicio.value?.nombreArtista || '').toLowerCase()
 })
-const esCliente = computed(() => rol.value === 'CLIENTE')
+const puedeContratar = computed(() => rol.value === 'CLIENTE' || rol.value === 'ARTISTA')
 const puedeSolicitar = computed(
   () =>
     autenticado.value &&
-    esCliente.value &&
+    puedeContratar.value &&
     !esDuenio.value &&
     terminosValidos.value &&
     !!disponibilidad.value?.puedeSolicitar,
 )
 const mensajeSolicitud = computed(() => {
   if (esDuenio.value) return ''
-  if (!autenticado.value) return 'Iniciá sesión como cliente para solicitar este servicio.'
-  if (!esCliente.value) return 'Solo las cuentas de cliente pueden solicitar servicios.'
+  if (!autenticado.value) return 'Iniciá sesión para solicitar este servicio.'
+  if (!puedeContratar.value) return 'Solo las cuentas de cliente o artista pueden solicitar servicios.'
   if (!terminosValidos.value) return 'El artista todavía no configuró los términos y condiciones de este servicio.'
   return disponibilidad.value?.mensaje || ''
 })
