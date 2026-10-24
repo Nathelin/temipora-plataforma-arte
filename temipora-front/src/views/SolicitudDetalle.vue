@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
+import VisorImagenes from '../components/VisorImagenes.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -84,6 +85,51 @@ function gruposDeRespuestas(item) {
   }
 
   return [...grupos.values()]
+}
+
+const dibujosAbiertos = ref(new Set())
+const visor = ref({ abierto: false, imagenes: [], indice: 0, etiqueta: '', descripcion: '' })
+
+function resumenDeGrupos(grupos) {
+  if (!grupos.length) return 'Este dibujo no tiene respuestas registradas.'
+  const primero = grupos[0]
+  if (primero.codigoTipo === 'SUBIR_IMAGEN') {
+    const cantidad = primero.valores.length
+    return `${primero.enunciado}: ${cantidad} ${cantidad === 1 ? 'imagen adjunta' : 'imágenes adjuntas'}`
+  }
+  const texto = primero.valores.join(' ').replace(/\s+/g, ' ').trim()
+  return `${primero.enunciado}: ${texto}`
+}
+
+const dibujos = computed(() =>
+  (solicitud.value?.items || []).map((item, posicion) => {
+    const grupos = gruposDeRespuestas(item)
+    return { ...item, posicion, grupos, resumen: resumenDeGrupos(grupos) }
+  }),
+)
+
+function alternarDibujo(idItem) {
+  const siguiente = new Set(dibujosAbiertos.value)
+  if (siguiente.has(idItem)) {
+    siguiente.delete(idItem)
+  } else {
+    siguiente.add(idItem)
+  }
+  dibujosAbiertos.value = siguiente
+}
+
+function abrirVisor(dibujo, grupo, posicionImagen) {
+  visor.value = {
+    abierto: true,
+    imagenes: grupo.valores,
+    indice: posicionImagen,
+    etiqueta: `Dibujo ${dibujo.posicion + 1}`,
+    descripcion: grupo.enunciado,
+  }
+}
+
+function cerrarVisor() {
+  visor.value = { ...visor.value, abierto: false }
 }
 
 function volver() {
@@ -223,81 +269,123 @@ onMounted(cargar)
               </span>
             </div>
 
-            <div class="mt-4 space-y-4">
+            <div class="mt-4 space-y-3">
               <article
-                v-for="(item, indice) in solicitud.items"
-                :key="item.idItemSolicitud"
-                class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6"
+                v-for="dibujo in dibujos"
+                :key="dibujo.idItemSolicitud"
+                class="overflow-hidden rounded-2xl border border-rosa/50 bg-blanco"
               >
-                <header class="flex flex-wrap items-start justify-between gap-3 border-b border-rosa/40 pb-4">
-                  <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
-                      Dibujo {{ indice + 1 }}
-                    </p>
-                    <h3 class="mt-1 text-lg font-semibold text-granate">{{ item.nombre }}</h3>
-                  </div>
-                  <span
-                    v-if="solicitud.prioridadDefinidaPorCliente && item.ordenPrioridad"
-                    class="rounded-full bg-coral/10 px-3 py-1 text-xs font-semibold text-coral"
+                <h3>
+                  <button
+                    type="button"
+                    class="flex w-full items-start justify-between gap-4 px-5 py-4 text-left transition hover:bg-rosa/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/50 sm:px-6"
+                    :aria-expanded="dibujosAbiertos.has(dibujo.idItemSolicitud)"
+                    :aria-controls="`panel-dibujo-${dibujo.idItemSolicitud}`"
+                    @click="alternarDibujo(dibujo.idItemSolicitud)"
                   >
-                    Prioridad {{ item.ordenPrioridad }}
-                  </span>
-                </header>
-
-                <div class="mt-4 space-y-5">
-                  <div
-                    v-for="grupo in gruposDeRespuestas(item)"
-                    :key="grupo.clave"
-                    class="border-b border-rosa/30 pb-5 last:border-b-0 last:pb-0"
-                  >
-                    <p class="text-sm font-semibold text-cafe">{{ grupo.enunciado }}</p>
-
-                    <div v-if="grupo.codigoTipo === 'SUBIR_IMAGEN'" class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      <a
-                        v-for="(url, urlIndice) in grupo.valores"
-                        :key="`${url}-${urlIndice}`"
-                        :href="url"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="group relative block aspect-square overflow-hidden rounded-xl bg-rosa/20 ring-1 ring-rosa/40"
-                      >
-                        <img
-                          :src="url"
-                          :alt="`Imagen de referencia ${urlIndice + 1} de ${item.nombre}`"
-                          class="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                          loading="lazy"
-                        />
-                      </a>
-                    </div>
-
-                    <p
-                      v-else-if="grupo.codigoTipo === 'TEXTO'"
-                      class="mt-2 whitespace-pre-line text-sm leading-relaxed text-cafe/75"
-                    >
-                      {{ grupo.valores.join('\n') }}
-                    </p>
-
-                    <div v-else class="mt-2 flex flex-wrap gap-2">
-                      <span
-                        v-for="(valor, valorIndice) in grupo.valores"
-                        :key="`${valor}-${valorIndice}`"
-                        class="rounded-full bg-rosa/20 px-3 py-1 text-sm text-cafe"
-                      >
-                        {{ valor }}
+                    <span class="min-w-0">
+                      <span class="flex flex-wrap items-center gap-2">
+                        <span class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                          Dibujo {{ dibujo.posicion + 1 }}
+                        </span>
+                        <span
+                          v-if="solicitud.prioridadDefinidaPorCliente && dibujo.ordenPrioridad"
+                          class="rounded-full bg-coral/10 px-2.5 py-0.5 text-[11px] font-semibold text-coral"
+                        >
+                          Prioridad {{ dibujo.ordenPrioridad }}
+                        </span>
                       </span>
+                      <span class="mt-1 block text-lg font-semibold text-granate">{{ dibujo.nombre }}</span>
+                      <span
+                        v-if="!dibujosAbiertos.has(dibujo.idItemSolicitud)"
+                        class="mt-1.5 line-clamp-2 block text-sm leading-relaxed text-cafe/60"
+                      >
+                        {{ dibujo.resumen }}
+                      </span>
+                    </span>
+
+                    <svg
+                      class="mt-1 h-5 w-5 shrink-0 text-cafe/50 transition-transform duration-300"
+                      :class="dibujosAbiertos.has(dibujo.idItemSolicitud) ? 'rotate-180' : ''"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                </h3>
+
+                <div
+                  :id="`panel-dibujo-${dibujo.idItemSolicitud}`"
+                  class="grid transition-[grid-template-rows] duration-300 ease-out"
+                  :class="dibujosAbiertos.has(dibujo.idItemSolicitud) ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+                  :inert="!dibujosAbiertos.has(dibujo.idItemSolicitud)"
+                >
+                  <div class="overflow-hidden">
+                    <div class="space-y-5 border-t border-rosa/40 px-5 py-5 sm:px-6">
+                      <div
+                        v-for="grupo in dibujo.grupos"
+                        :key="grupo.clave"
+                        class="border-b border-rosa/30 pb-5 last:border-b-0 last:pb-0"
+                      >
+                        <p class="text-sm font-semibold text-cafe">{{ grupo.enunciado }}</p>
+
+                        <div v-if="grupo.codigoTipo === 'SUBIR_IMAGEN'" class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <button
+                            v-for="(url, urlIndice) in grupo.valores"
+                            :key="`${url}-${urlIndice}`"
+                            type="button"
+                            class="group relative block aspect-square overflow-hidden rounded-xl bg-rosa/20 ring-1 ring-rosa/40 transition hover:ring-2 hover:ring-coral focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral"
+                            :aria-label="`Abrir ${dibujo.nombre}: imagen ${urlIndice + 1} de ${grupo.valores.length}`"
+                            @click="abrirVisor(dibujo, grupo, urlIndice)"
+                          >
+                            <img
+                              :src="url"
+                              :alt="`Imagen de referencia ${urlIndice + 1} de ${dibujo.nombre}`"
+                              class="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                              loading="lazy"
+                            />
+                            <span
+                              class="absolute bottom-2 right-2 rounded-full bg-granate/75 px-2 py-0.5 text-[11px] font-semibold text-white"
+                            >
+                              {{ urlIndice + 1 }}/{{ grupo.valores.length }}
+                            </span>
+                          </button>
+                        </div>
+
+                        <p
+                          v-else-if="grupo.codigoTipo === 'TEXTO'"
+                          class="mt-2 whitespace-pre-line text-sm leading-relaxed text-cafe/75"
+                        >
+                          {{ grupo.valores.join('\n') }}
+                        </p>
+
+                        <div v-else class="mt-2 flex flex-wrap gap-2">
+                          <span
+                            v-for="(valor, valorIndice) in grupo.valores"
+                            :key="`${valor}-${valorIndice}`"
+                            class="rounded-full bg-rosa/20 px-3 py-1 text-sm text-cafe"
+                          >
+                            {{ valor }}
+                          </span>
+                        </div>
+                      </div>
+
+                      <p v-if="!dibujo.grupos.length" class="text-sm text-cafe/55">
+                        Este dibujo no tiene respuestas registradas.
+                      </p>
                     </div>
                   </div>
-
-                  <p v-if="!gruposDeRespuestas(item).length" class="text-sm text-cafe/55">
-                    Este dibujo no tiene respuestas registradas.
-                  </p>
                 </div>
               </article>
             </div>
           </section>
         </div>
 
-        <aside class="space-y-4">
+        <aside class="space-y-4 lg:sticky lg:top-16 lg:h-fit lg:self-start">
           <section class="rounded-2xl border border-rosa/50 bg-blanco p-5">
             <h2 class="text-base font-semibold text-granate">Resumen</h2>
             <dl class="mt-4 space-y-3 text-sm">
@@ -351,5 +439,14 @@ onMounted(cargar)
         </aside>
       </div>
     </template>
+
+    <VisorImagenes
+      :abierto="visor.abierto"
+      :imagenes="visor.imagenes"
+      :indice="visor.indice"
+      :etiqueta="visor.etiqueta"
+      :descripcion="visor.descripcion"
+      @cerrar="cerrarVisor"
+    />
   </div>
 </template>
