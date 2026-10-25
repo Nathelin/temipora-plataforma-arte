@@ -4,9 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
 import VistaPreviaTerminos from '../components/VistaPreviaTerminos.vue'
+import { useNotificaciones } from '../composables/useNotificaciones'
 
 const route = useRoute()
 const router = useRouter()
+const { exito, error: notificarError } = useNotificaciones()
 
 const servicio = ref(null)
 const terminos = ref(null)
@@ -16,6 +18,9 @@ const cargando = ref(true)
 const error = ref('')
 const autenticado = ref(!!localStorage.getItem('token'))
 const rol = ref(localStorage.getItem('rol') || '')
+const esFavorito = ref(false)
+const cargandoEstadoFavorito = ref(false)
+const actualizandoFavorito = ref(false)
 
 const CAMPOS_TERMINOS = [
   'informacionGeneral',
@@ -72,19 +77,26 @@ const esDuenio = computed(() => {
   const actual = localStorage.getItem('nombreUsuario') || ''
   return actual.toLowerCase() === (servicio.value?.nombreArtista || '').toLowerCase()
 })
-const esCliente = computed(() => rol.value === 'CLIENTE')
+const puedeContratar = computed(() => rol.value === 'CLIENTE' || rol.value === 'ARTISTA')
+const puedeMarcarFavorito = computed(
+  () =>
+    autenticado.value &&
+    puedeContratar.value &&
+    !esDuenio.value &&
+    servicio.value?.estado === 'PUBLICADO',
+)
 const puedeSolicitar = computed(
   () =>
     autenticado.value &&
-    esCliente.value &&
+    puedeContratar.value &&
     !esDuenio.value &&
     terminosValidos.value &&
     !!disponibilidad.value?.puedeSolicitar,
 )
 const mensajeSolicitud = computed(() => {
   if (esDuenio.value) return ''
-  if (!autenticado.value) return 'Iniciá sesión como cliente para solicitar este servicio.'
-  if (!esCliente.value) return 'Solo las cuentas de cliente pueden solicitar servicios.'
+  if (!autenticado.value) return 'Iniciá sesión para solicitar este servicio.'
+  if (!puedeContratar.value) return 'Solo las cuentas de cliente o artista pueden solicitar servicios.'
   if (!terminosValidos.value) return 'El artista todavía no configuró los términos y condiciones de este servicio.'
   return disponibilidad.value?.mensaje || ''
 })
@@ -148,6 +160,58 @@ function aplicarSolicitudPublica(data) {
   terminosValidos.value = !!data.terminosValidos
 }
 
+async function cargarEstadoFavorito() {
+  esFavorito.value = false
+  if (!puedeMarcarFavorito.value) return
+
+  cargandoEstadoFavorito.value = true
+  try {
+    const res = await api.get(`/favoritos/servicios/${servicio.value.idServicio}`)
+    esFavorito.value = !!res.data?.esFavorito
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+    }
+  } finally {
+    cargandoEstadoFavorito.value = false
+  }
+}
+
+async function alternarFavoritoServicio() {
+  if (!autenticado.value) {
+    router.push({ name: 'login' })
+    return
+  }
+  if (
+    !puedeMarcarFavorito.value ||
+    actualizandoFavorito.value ||
+    cargandoEstadoFavorito.value
+  ) {
+    return
+  }
+
+  actualizandoFavorito.value = true
+  try {
+    if (esFavorito.value) {
+      await api.delete(`/favoritos/servicios/${servicio.value.idServicio}`)
+      esFavorito.value = false
+      exito(`Quitaste "${servicio.value.nombre}" de tus favoritos.`)
+    } else {
+      await api.post(`/favoritos/servicios/${servicio.value.idServicio}`)
+      esFavorito.value = true
+      exito(`Agregaste "${servicio.value.nombre}" a tus favoritos.`)
+    }
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    notificarError(e.response?.data?.message || 'No se pudieron actualizar tus favoritos.')
+  } finally {
+    actualizandoFavorito.value = false
+  }
+}
+
 async function cargar() {
   cargando.value = true
   error.value = ''
@@ -180,8 +244,9 @@ function manejarTecla(event) {
   if (mostrarSensible.value) mostrarSensible.value = false
 }
 
-onMounted(() => {
-  cargar()
+onMounted(async () => {
+  await cargar()
+  void cargarEstadoFavorito()
   window.addEventListener('keydown', manejarTecla)
 })
 
@@ -346,6 +411,29 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
               Solicitar servicio
             </button>
             <button
+              v-if="puedeMarcarFavorito"
+              type="button"
+              class="flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60"
+              :class="esFavorito
+                ? 'border-coral bg-coral text-white hover:bg-rojizo'
+                : 'border-coral/50 bg-superficie text-granate hover:bg-rosa/25'"
+              :disabled="actualizandoFavorito || cargandoEstadoFavorito"
+              :aria-pressed="esFavorito"
+              @click="alternarFavoritoServicio"
+            >
+              <svg
+                class="h-4 w-4"
+                viewBox="0 0 24 24"
+                :fill="esFavorito ? 'currentColor' : 'none'"
+                stroke="currentColor"
+                stroke-width="1.8"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z" />
+              </svg>
+              {{ actualizandoFavorito ? 'Guardando...' : esFavorito ? 'En favoritos' : 'Guardar en favoritos' }}
+            </button>
+            <button
               type="button"
               class="w-full rounded-md border border-rosa px-4 py-2 text-sm text-granate hover:bg-rosa/20 transition"
               @click="irAlArtista"
@@ -354,7 +442,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
             </button>
             <router-link
               v-if="esDuenio"
-              :to="`/mis-servicios/${servicio.idServicio}/editar`"
+              :to="`/panel/servicios/${servicio.idServicio}/editar`"
               class="block w-full rounded-md border border-rosa px-4 py-2 text-sm text-granate text-center hover:bg-rosa/20 transition"
             >
               Editar servicio

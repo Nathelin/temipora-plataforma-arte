@@ -1,13 +1,11 @@
 ﻿<script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { useSubirImagen } from '../composables/useSubirImagen'
 import BrandLogo from '../components/BrandLogo.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 
 const router = useRouter()
-const { abrir } = useSubirImagen()
 
 const token = ref(localStorage.getItem('token') || '')
 const rol = ref(localStorage.getItem('rol') || '')
@@ -15,34 +13,23 @@ const nombreUsuario = ref(localStorage.getItem('nombreUsuario') || '')
 const urlFotoPerfil = ref(localStorage.getItem('urlFotoPerfil') || '')
 
 const menuAbierto = ref(false)
-const subirAbierto = ref(false)
 const menuMovilAbierto = ref(false)
 const contenedorMenu = ref(null)
-const contenedorSubir = ref(null)
 const contenedorNav = ref(null)
 
 const estaLogueado = computed(() => !!token.value)
 const esAdmin = computed(() => rol.value === 'ADMIN')
 const esArtista = computed(() => rol.value === 'ARTISTA')
-const puedeVerSolicitudes = computed(() => estaLogueado.value && !esAdmin.value)
+const esCliente = computed(() => rol.value === 'CLIENTE')
+const puedeVerSolicitudes = computed(() => estaLogueado.value && esCliente.value)
 
 function alternarMenu() {
   menuAbierto.value = !menuAbierto.value
 }
 
-function subirImagen() {
-  subirAbierto.value = false
-  menuMovilAbierto.value = false
-  abrir('crear')
-  router.push({ name: 'portfolio-subir' })
-}
-
 function manejarClickExterior(event) {
   if (contenedorMenu.value && !contenedorMenu.value.contains(event.target)) {
     menuAbierto.value = false
-  }
-  if (contenedorSubir.value && !contenedorSubir.value.contains(event.target)) {
-    subirAbierto.value = false
   }
   if (contenedorNav.value && !contenedorNav.value.contains(event.target)) {
     menuMovilAbierto.value = false
@@ -52,7 +39,6 @@ function manejarClickExterior(event) {
 function manejarTecla(event) {
   if (event.key === 'Escape') {
     menuAbierto.value = false
-    subirAbierto.value = false
     menuMovilAbierto.value = false
   }
 }
@@ -125,10 +111,10 @@ function irAPerfil() {
             </router-link>
             <router-link
               v-if="estaLogueado && esArtista"
-              to="/mis-servicios"
+              to="/panel"
               class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
             >
-              Mis servicios
+              Mi panel
             </router-link>
             <router-link
               v-if="estaLogueado && esAdmin"
@@ -162,52 +148,6 @@ function irAPerfil() {
           </template>
 
           <template v-else>
-            <!-- Botón Subir (solo artistas) -->
-            <div v-if="esArtista" ref="contenedorSubir" class="relative hidden md:block">
-              <button
-                class="inline-flex min-h-10 items-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema"
-                aria-haspopup="menu"
-                :aria-expanded="subirAbierto"
-                @click="subirAbierto = !subirAbierto"
-              >
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M12 19V5M5 12l7-7 7 7" />
-                </svg>
-                Subir
-                <svg class="h-3.5 w-3.5 transition-transform" :class="subirAbierto ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
-                </svg>
-              </button>
-
-              <div
-                v-if="subirAbierto"
-                class="absolute right-0 z-40 mt-2 w-56 overflow-hidden rounded-2xl border border-rosa/50 bg-blanco p-1.5 shadow-[0_18px_40px_rgba(74,29,46,0.16)]"
-                role="menu"
-              >
-                <button
-                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                  role="menuitem"
-                  @click="subirImagen"
-                >
-                  Imagen
-                </button>
-                <button
-                  disabled
-                  class="w-full cursor-not-allowed rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe/40"
-                  aria-disabled="true"
-                >
-                  Producto <span class="text-xs">· Próximamente</span>
-                </button>
-                <button
-                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                  role="menuitem"
-                  @click="subirAbierto = false; router.push('/mis-servicios/crear')"
-                >
-                  Servicio
-                </button>
-              </div>
-            </div>
-
             <div ref="contenedorMenu" class="relative">
               <button
                 class="group flex min-h-10 items-center gap-2 rounded-full p-0.5 pr-1.5 transition hover:bg-rosa/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
@@ -260,6 +200,14 @@ function irAPerfil() {
                   @click="menuAbierto = false; router.push({ name: 'solicitudes' })"
                 >
                   Mis solicitudes
+                </button>
+                <button
+                  v-if="esArtista"
+                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  role="menuitem"
+                  @click="menuAbierto = false; router.push({ name: 'panel-resumen' })"
+                >
+                  Mi panel
                 </button>
                 <button
                   v-if="esAdmin"
@@ -333,11 +281,11 @@ function irAPerfil() {
               </router-link>
               <router-link
                 v-if="estaLogueado && esArtista"
-                to="/mis-servicios"
+                to="/panel"
                 class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
                 @click="menuMovilAbierto = false"
               >
-                Mis servicios
+                Mi panel
               </router-link>
               <router-link
                 v-if="estaLogueado && esAdmin"
@@ -366,13 +314,6 @@ function irAPerfil() {
               </div>
 
               <div v-else class="mt-1 border-t border-rosa/40 pt-1">
-                <button
-                  type="button"
-                  class="flex w-full items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                  @click="subirImagen"
-                >
-                  Subir imagen
-                </button>
                 <button
                   type="button"
                   class="flex w-full items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"

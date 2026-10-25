@@ -16,6 +16,7 @@ const {
 
 const marcandoTodas = ref(false)
 const esAdmin = localStorage.getItem('rol') === 'ADMIN'
+const esArtista = localStorage.getItem('rol') === 'ARTISTA'
 const hayNotificaciones = computed(() => notificaciones.value.length > 0)
 const hayNoLeidas = computed(() => noLeidas.value > 0)
 
@@ -83,7 +84,7 @@ onMounted(() => {
       <div class="flex flex-wrap items-center gap-3 self-start sm:self-auto">
         <router-link
           v-if="!esAdmin"
-          to="/solicitudes"
+          :to="esArtista ? '/panel/solicitudes' : '/solicitudes'"
           class="text-sm font-semibold text-coral transition hover:text-rojizo"
         >
           Mis solicitudes

@@ -9,9 +9,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.temipora.backend_springboot.modelo.ArtistaFavoritoDTO;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
+import com.temipora.backend_springboot.modelo.ServicioFavoritoDTO;
 import com.temipora.backend_springboot.servicios.FavoritoService;
 
 @RestController
@@ -24,34 +27,91 @@ public class FavoritoController {
         this.favoritoService = favoritoService;
     }
 
-    @GetMapping
-    public List<ArtistaFavoritoDTO> listar(Authentication authentication) {
-        return favoritoService.listar(authentication.getName());
+    // ------------------------------------------------------------------
+    // Artistas
+    // ------------------------------------------------------------------
+
+    @GetMapping("/artistas")
+    public PaginaDTO<ArtistaFavoritoDTO> listarArtistas(
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "12") int tamanio,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "recientes") String orden,
+            Authentication authentication) {
+        return favoritoService.listarArtistas(
+            authentication.getName(), pagina, tamanio, q, orden);
     }
 
-    @GetMapping("/{nombreUsuario}")
-    public Map<String, Boolean> estado(
+    @GetMapping("/artistas/{nombreUsuario}")
+    public Map<String, Boolean> estadoArtista(
             @PathVariable String nombreUsuario,
             Authentication authentication) {
         return Map.of(
             "esFavorito",
-            favoritoService.esFavorito(authentication.getName(), nombreUsuario));
+            favoritoService.esFavoritoArtista(authentication.getName(), nombreUsuario));
     }
 
-    @PostMapping("/{nombreUsuario}")
-    public ArtistaFavoritoDTO agregar(
+    @PostMapping("/artistas/{nombreUsuario}")
+    public ArtistaFavoritoDTO agregarArtista(
             @PathVariable String nombreUsuario,
             Authentication authentication) {
-        return favoritoService.agregar(authentication.getName(), nombreUsuario);
+        return favoritoService.agregarArtista(authentication.getName(), nombreUsuario);
     }
 
-    @DeleteMapping("/{nombreUsuario}")
-    public Map<String, Object> eliminar(
+    @DeleteMapping("/artistas/{nombreUsuario}")
+    public Map<String, Object> eliminarArtista(
             @PathVariable String nombreUsuario,
             Authentication authentication) {
-        favoritoService.eliminar(authentication.getName(), nombreUsuario);
+        favoritoService.eliminarArtista(authentication.getName(), nombreUsuario);
         return Map.of(
             "esFavorito", false,
             "message", "El artista se eliminó de tus favoritos.");
+    }
+
+    // ------------------------------------------------------------------
+    // Servicios
+    // ------------------------------------------------------------------
+
+    @GetMapping("/servicios")
+    public PaginaDTO<ServicioFavoritoDTO> listarServicios(
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "12") int tamanio,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "recientes") String orden,
+            @RequestParam(defaultValue = "todos") String estado,
+            Authentication authentication) {
+        return favoritoService.listarServicios(
+            authentication.getName(), pagina, tamanio, q, orden, estado);
+    }
+
+    @GetMapping("/servicios/ids")
+    public List<Long> listarIdsServicios(Authentication authentication) {
+        return favoritoService.listarIdsServicios(authentication.getName());
+    }
+
+    @GetMapping("/servicios/{idServicio}")
+    public Map<String, Boolean> estadoServicio(
+            @PathVariable Long idServicio,
+            Authentication authentication) {
+        return Map.of(
+            "esFavorito",
+            favoritoService.esFavoritoServicio(authentication.getName(), idServicio));
+    }
+
+    @PostMapping("/servicios/{idServicio}")
+    public ServicioFavoritoDTO agregarServicio(
+            @PathVariable Long idServicio,
+            Authentication authentication) {
+        return favoritoService.agregarServicio(authentication.getName(), idServicio);
+    }
+
+    @DeleteMapping("/servicios/{idServicio}")
+    public Map<String, Object> eliminarServicio(
+            @PathVariable Long idServicio,
+            Authentication authentication) {
+        favoritoService.eliminarServicio(authentication.getName(), idServicio);
+        return Map.of(
+            "esFavorito", false,
+            "message", "El servicio se eliminó de tus favoritos.");
     }
 }

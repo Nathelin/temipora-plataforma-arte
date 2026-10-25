@@ -1,12 +1,19 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '../servicios/api'
 import TarjetaServicio from '../components/TarjetaServicio.vue'
+import { useNotificaciones } from '../composables/useNotificaciones'
+
+const router = useRouter()
+const { exito, error: notificarError } = useNotificaciones()
 
 const servicios = ref([])
 const tipos = ref([])
 const cargando = ref(true)
 const error = ref('')
+const favoritos = ref(new Set())
+const actualizandoFavorito = ref(new Set())
 
 const filtros = ref({
   nombre: '',
@@ -98,7 +105,53 @@ watch(filtros, () => {
   temporizador = setTimeout(cargar, 350)
 }, { deep: true })
 
+async function cargarFavoritos() {
+  if (!localStorage.getItem('token')) return
+  try {
+    const res = await api.get('/favoritos/servicios/ids')
+    favoritos.value = new Set(res.data || [])
+  } catch {
+    favoritos.value = new Set()
+  }
+}
+
+async function alternarFavorito(servicio) {
+  if (!localStorage.getItem('token')) {
+    router.push({ name: 'login' })
+    return
+  }
+
+  const id = servicio.idServicio
+  if (actualizandoFavorito.value.has(id)) return
+
+  actualizandoFavorito.value = new Set(actualizandoFavorito.value).add(id)
+  try {
+    if (favoritos.value.has(id)) {
+      await api.delete(`/favoritos/servicios/${id}`)
+      const siguientes = new Set(favoritos.value)
+      siguientes.delete(id)
+      favoritos.value = siguientes
+      exito(`Quitaste "${servicio.nombre}" de tus favoritos.`)
+    } else {
+      await api.post(`/favoritos/servicios/${id}`)
+      favoritos.value = new Set(favoritos.value).add(id)
+      exito(`Agregaste "${servicio.nombre}" a tus favoritos.`)
+    }
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    notificarError(e.response?.data?.message || 'No se pudieron actualizar tus favoritos.')
+  } finally {
+    const siguientes = new Set(actualizandoFavorito.value)
+    siguientes.delete(id)
+    actualizandoFavorito.value = siguientes
+  }
+}
+
 onMounted(async () => {
+  void cargarFavoritos()
   try {
     const res = await api.get('/tipos-servicio')
     tipos.value = res.data
@@ -279,11 +332,19 @@ onMounted(async () => {
           </button>
         </p>
         <p v-else-if="!servicios.length" class="rounded-3xl border border-dashed border-borde bg-superficie px-6 py-14 text-center text-sm text-cafe/50">
-          No hay servicios registrados en el sistema.
+          No hay servicios de otros artistas para explorar por ahora.
         </p>
 
         <div v-else class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-          <TarjetaServicio v-for="s in servicios" :key="s.idServicio" :servicio="s" />
+          <TarjetaServicio
+            v-for="s in servicios"
+            :key="s.idServicio"
+            :servicio="s"
+            mostrar-favorito
+            :es-favorito="favoritos.has(s.idServicio)"
+            :actualizando-favorito="actualizandoFavorito.has(s.idServicio)"
+            @alternar-favorito="alternarFavorito"
+          />
         </div>
       </template>
     </div>

@@ -3,9 +3,11 @@ package com.temipora.backend_springboot.servicios;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -17,13 +19,20 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Root;
+
 import com.temipora.backend_springboot.modelo.ETiempoEntregaUnidad;
+import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.FiltroServicioRequest;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
@@ -78,7 +87,8 @@ class ServicioServiceTest {
 
     @Test
     void listarMios_mapeaEntidadesADtos() {
-        when(servicioRepository.findByArtistaIdUsuarioOrderByNombreAsc(5L))
+        when(servicioRepository.findByArtistaIdUsuarioAndEstadoNotOrderByNombreAsc(
+            5L, EstadoServicio.ARCHIVADO))
             .thenReturn(List.of(servicio(1L, 5L)));
 
         List<ServicioDTO> resultado = servicioService.listarMios(5L);
@@ -96,7 +106,8 @@ class ServicioServiceTest {
         Usuario artista = usuario(5L);
         artista.setMonedaPreferida(moneda(2L, "USD"));
 
-        when(servicioRepository.findByArtistaIdUsuarioOrderByNombreAsc(5L))
+        when(servicioRepository.findByArtistaIdUsuarioAndEstadoNotOrderByNombreAsc(
+            5L, EstadoServicio.ARCHIVADO))
             .thenReturn(List.of(servicio));
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(artista));
         when(conversionMonedaService.factor(any(Moneda.class), any(Moneda.class), any(LocalDateTime.class)))
@@ -130,12 +141,39 @@ class ServicioServiceTest {
         assertThat(resultado.get(0).getModoRecepcion()).isEqualTo("ABIERTA");
     }
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    @Test
+    void listarActivos_excluyeLosServiciosDelPropioArtista() {
+        when(servicioRepository.findAll(any(Specification.class), any(Sort.class)))
+            .thenReturn(List.of());
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.empty());
+        when(monedaService.predeterminada()).thenReturn(moneda(3L, "ARS"));
+
+        servicioService.listarActivos(new FiltroServicioRequest(), 5L);
+
+        ArgumentCaptor<Specification<Servicio>> captor = ArgumentCaptor.forClass(Specification.class);
+        verify(servicioRepository).findAll(captor.capture(), any(Sort.class));
+
+        Root<Servicio> root = mock(Root.class, withSettings().lenient());
+        CriteriaQuery<?> query = mock(CriteriaQuery.class);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        Path<Object> artista = mock(Path.class);
+        Path<Object> idArtista = mock(Path.class);
+
+        when(root.get("artista")).thenReturn((Path) artista);
+        when(artista.get("idUsuario")).thenReturn(idArtista);
+
+        captor.getValue().toPredicate(root, query, cb);
+
+        verify(cb).notEqual(idArtista, 5L);
+    }
+
     @Test
     void modificar_noPermiteBajarCuposPorDebajoDeOcupados() {
         Servicio servicio = servicioLista(1L, ModoRecepcionSolicitud.ABIERTA, 5);
         when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio));
-        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndIdServicioNot(
-            5L, 1L, "Ilustración", 1L)).thenReturn(false);
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndIdServicioNotAndEstadoNot(
+            5L, 1L, "Ilustración", 1L, EstadoServicio.ARCHIVADO)).thenReturn(false);
         when(solicitudRepository.countByServicioIdServicioAndEstadoIn(any(Long.class), any()))
             .thenReturn(3L);
 
@@ -151,7 +189,7 @@ class ServicioServiceTest {
 
     @Test
     void crear_ok_calculaDiasYGuarda() {
-        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndEstadoNot(5L, 1L, "Ilustración", EstadoServicio.ARCHIVADO))
             .thenReturn(false);
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
@@ -165,7 +203,7 @@ class ServicioServiceTest {
 
         assertThat(dto.getTiempoEntregaDias()).isEqualTo(14);
         assertThat(dto.getTiempoEntregaUnidad()).isEqualTo("SEMANAS");
-        assertThat(dto.isEstado()).isTrue();
+        assertThat(dto.getEstado()).isEqualTo(EstadoServicio.PUBLICADO);
         assertThat(dto.getImagenes()).containsExactly("a.png", "b.png");
         assertThat(dto.getNombreTipoServicio()).isEqualTo("Ilustración digital");
         assertThat(dto.getDescripcionTipoServicio()).isEqualTo("d");
@@ -173,7 +211,7 @@ class ServicioServiceTest {
 
     @Test
     void crear_sinTerminosGlobales_lanzaError() {
-        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndEstadoNot(5L, 1L, "Ilustración", EstadoServicio.ARCHIVADO))
             .thenReturn(false);
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
@@ -190,7 +228,7 @@ class ServicioServiceTest {
 
     @Test
     void crear_nombreTipoRepetido_lanzaError() {
-        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndEstadoNot(5L, 1L, "Ilustración", EstadoServicio.ARCHIVADO))
             .thenReturn(true);
 
         assertThatThrownBy(() -> servicioService.crear(5L, request()))
@@ -202,7 +240,7 @@ class ServicioServiceTest {
 
     @Test
     void crear_sinImagenDePortada_lanzaError() {
-        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndEstadoNot(5L, 1L, "Ilustración", EstadoServicio.ARCHIVADO))
             .thenReturn(false);
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
 
@@ -218,7 +256,7 @@ class ServicioServiceTest {
 
     @Test
     void crear_sinImagenesDeEjemplo_lanzaError() {
-        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndEstadoNot(5L, 1L, "Ilustración", EstadoServicio.ARCHIVADO))
             .thenReturn(false);
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
 
@@ -234,7 +272,7 @@ class ServicioServiceTest {
 
     @Test
     void crear_precioCero_lanzaError() {
-        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndEstadoNot(5L, 1L, "Ilustración", EstadoServicio.ARCHIVADO))
             .thenReturn(false);
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
 
@@ -250,7 +288,7 @@ class ServicioServiceTest {
 
     @Test
     void crear_cuposCero_lanzaError() {
-        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndEstadoNot(5L, 1L, "Ilustración", EstadoServicio.ARCHIVADO))
             .thenReturn(false);
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
 
@@ -266,7 +304,7 @@ class ServicioServiceTest {
 
     @Test
     void crear_cuposMayorAlMaximo_lanzaError() {
-        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndEstadoNot(5L, 1L, "Ilustración", EstadoServicio.ARCHIVADO))
             .thenReturn(false);
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
 
@@ -281,9 +319,9 @@ class ServicioServiceTest {
     }
 
     @Test
-    void obtener_servicioInactivoDeOtroUsuario_lanzaNoSuchElement() {
+    void obtener_servicioPausadoDeOtroUsuario_lanzaNoSuchElement() {
         Servicio servicio = servicio(1L, 5L);
-        servicio.setEstado(false);
+        servicio.setEstado(EstadoServicio.PAUSADO);
         when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio));
 
         assertThatThrownBy(() -> servicioService.obtener(1L, 99L))
@@ -292,8 +330,19 @@ class ServicioServiceTest {
     }
 
     @Test
+    void obtener_servicioArchivadoDelDuenio_lanzaNoSuchElement() {
+        Servicio servicio = servicio(1L, 5L);
+        servicio.setEstado(EstadoServicio.ARCHIVADO);
+        when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio));
+
+        assertThatThrownBy(() -> servicioService.obtener(1L, 5L))
+            .isInstanceOf(NoSuchElementException.class)
+            .hasMessage("Servicio no encontrado: 1");
+    }
+
+    @Test
     void crear_tipoInexistente_lanzaError() {
-        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCase(5L, 1L, "Ilustración"))
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndEstadoNot(5L, 1L, "Ilustración", EstadoServicio.ARCHIVADO))
             .thenReturn(false);
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.empty());
@@ -306,7 +355,7 @@ class ServicioServiceTest {
     @Test
     void modificar_ok() {
         when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio(1L, 5L)));
-        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndIdServicioNot(5L, 1L, "Ilustración", 1L))
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndIdServicioNotAndEstadoNot(5L, 1L, "Ilustración", 1L, EstadoServicio.ARCHIVADO))
             .thenReturn(false);
         when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
         when(medioRepository.findByIdMedio(2L)).thenReturn(Optional.of(medio(2L, "Digital")));
@@ -322,7 +371,7 @@ class ServicioServiceTest {
     @Test
     void modificar_sinTerminosValidos_lanzaError() {
         when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio(1L, 5L)));
-        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndIdServicioNot(5L, 1L, "Ilustración", 1L))
+        when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndIdServicioNotAndEstadoNot(5L, 1L, "Ilustración", 1L, EstadoServicio.ARCHIVADO))
             .thenReturn(false);
         when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
         when(medioRepository.findByIdMedio(2L)).thenReturn(Optional.of(medio(2L, "Digital")));
@@ -355,25 +404,50 @@ class ServicioServiceTest {
     }
 
     @Test
-    void darDeBaja_desactivaElServicio() {
-        when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio(1L, 5L)));
+    void pausar_marcaElServicioComoPausado() {
+        when(servicioRepository.findByIdServicioForUpdate(1L))
+            .thenReturn(Optional.of(servicio(1L, 5L)));
         when(servicioRepository.save(any(Servicio.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        ServicioDTO dto = servicioService.darDeBaja(1L, 5L);
+        ServicioDTO dto = servicioService.pausar(1L, 5L);
 
-        assertThat(dto.isEstado()).isFalse();
+        assertThat(dto.getEstado()).isEqualTo(EstadoServicio.PAUSADO);
     }
 
     @Test
-    void darDeAlta_sinTerminosValidos_lanzaError() {
-        when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio(1L, 5L)));
+    void pausar_conSolicitudesPendientesYCompromisos_igualPausa() {
+        Servicio servicio = servicio(1L, 5L);
+        when(servicioRepository.findByIdServicioForUpdate(1L)).thenReturn(Optional.of(servicio));
+        when(servicioRepository.save(any(Servicio.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ServicioDTO dto = servicioService.pausar(1L, 5L);
+
+        assertThat(dto.getEstado()).isEqualTo(EstadoServicio.PAUSADO);
+        verify(solicitudRepository, never()).countByServicioIdServicioAndEstadoIn(any(), any());
+    }
+
+    @Test
+    void reactivar_sinTerminosValidos_lanzaError() {
+        Servicio servicio = servicio(1L, 5L);
+        servicio.setEstado(EstadoServicio.PAUSADO);
+        when(servicioRepository.findByIdServicioForUpdate(1L)).thenReturn(Optional.of(servicio));
         when(terminosService.tieneTerminosValidos(1L, 5L)).thenReturn(false);
 
-        assertThatThrownBy(() -> servicioService.darDeAlta(1L, 5L))
+        assertThatThrownBy(() -> servicioService.reactivar(1L, 5L))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Completá tus términos de uso y servicio antes de publicar el servicio.");
 
         verify(servicioRepository, never()).save(any(Servicio.class));
+    }
+
+    @Test
+    void reactivar_archivado_lanzaConflicto() {
+        Servicio servicio = servicio(1L, 5L);
+        servicio.setEstado(EstadoServicio.ARCHIVADO);
+        when(servicioRepository.findByIdServicioForUpdate(1L)).thenReturn(Optional.of(servicio));
+
+        assertThatThrownBy(() -> servicioService.reactivar(1L, 5L))
+            .isInstanceOf(ConflictoException.class);
     }
 
     // ---------------------------------------------------------------
@@ -393,7 +467,7 @@ class ServicioServiceTest {
         s.setNombre("Servicio " + id);
         s.setPrecioBase(new BigDecimal("100.00"));
         s.setMoneda(moneda(3L, "ARS"));
-        s.setEstado(true);
+        s.setEstado(EstadoServicio.PUBLICADO);
         s.setCupos(cupos);
         s.setModoRecepcion(modo);
         s.setMaxDibujosPorSolicitud(3);

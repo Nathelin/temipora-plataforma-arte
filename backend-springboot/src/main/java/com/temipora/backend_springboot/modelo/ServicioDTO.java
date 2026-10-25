@@ -2,6 +2,7 @@ package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
@@ -51,7 +52,10 @@ public class ServicioDTO {
     private String imagenPortada;
     private List<String> imagenes;
     private List<EtiquetaDTO> etiquetas;
-    private boolean estado;
+    private EstadoServicio estado;
+    private Long solicitudesActivas;
+    private LocalDateTime pausadoEn;
+    private LocalDateTime archivadoEn;
 
     public static ServicioDTO desdeServicio(Servicio s) {
         return desdeServicio(s, false, null, null);
@@ -115,7 +119,9 @@ public class ServicioDTO {
                 .sorted(Comparator.comparing(Etiqueta::getNombre, String.CASE_INSENSITIVE_ORDER))
                 .map(EtiquetaDTO::desdeEtiqueta)
                 .toList())
-            .estado(s.isEstado())
+            .estado(s.getEstado())
+            .pausadoEn(s.getPausadoEn())
+            .archivadoEn(s.getArchivadoEn())
             .build();
     }
 }

@@ -15,9 +15,13 @@ import TOS from '../components/TOS.vue'
 import MainLayout from '../layouts/MainLayout.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
 import ConfiguracionLayout from '../layouts/ConfiguracionLayout.vue'
+import ArtistLayout from '../layouts/ArtistLayout.vue'
 import Inicio from '../views/Inicio.vue'
+import PanelResumen from '../views/PanelResumen.vue'
 import Perfil from '../views/Perfil.vue'
 import Favoritos from '../views/Favoritos.vue'
+import FavoritosArtistas from '../views/FavoritosArtistas.vue'
+import FavoritosServicios from '../views/FavoritosServicios.vue'
 import Servicios from '../views/Servicios.vue'
 import ServicioDetalle from '../views/ServicioDetalle.vue'
 import SolicitudServicio from '../views/SolicitudServicio.vue'
@@ -34,6 +38,8 @@ import ConfiguracionCuenta from '../views/ConfiguracionCuenta.vue'
 import PortfolioSubir from '../views/PortfolioSubir.vue'
 import MisServicios from '../views/MisServicios.vue'
 import ServicioForm from '../views/ServicioForm.vue'
+import ServicioSolicitudes from '../views/ServicioSolicitudes.vue'
+import ServiciosArchivados from '../views/ServiciosArchivados.vue'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useConfirmacionSalida } from '../composables/useConfirmacionSalida'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
@@ -59,7 +65,7 @@ const routes = [
         path: 'servicios/:id/solicitar',
         name: 'solicitud-servicio',
         component: SolicitudServicio,
-        meta: { title: 'Solicitar servicio', requiresAuth: true, requiresCliente: true },
+        meta: { title: 'Solicitar servicio', requiresAuth: true, requiresComprador: true },
       },
       { path: 'perfil/:nombreUsuario', name: 'perfil', component: Perfil,
         meta: { title: (route) => `Perfil de @${route.params.nombreUsuario}` }
@@ -78,7 +84,19 @@ const routes = [
         path: 'favoritos',
         name: 'favoritos',
         component: Favoritos,
+        meta: { title: 'Favoritos', requiresAuth: true },
+      },
+      {
+        path: 'favoritos/artistas',
+        name: 'favoritos-artistas',
+        component: FavoritosArtistas,
         meta: { title: 'Artistas favoritos', requiresAuth: true },
+      },
+      {
+        path: 'favoritos/servicios',
+        name: 'favoritos-servicios',
+        component: FavoritosServicios,
+        meta: { title: 'Servicios favoritos', requiresAuth: true },
       },
       {
         path: 'notificaciones',
@@ -102,29 +120,36 @@ const routes = [
         },
       },
       {
-        path: 'portfolio/subir',
-        name: 'portfolio-subir',
-        component: PortfolioSubir,
-        meta: { title: 'Subir imagen al portfolio', requiresArtist: true },
+        path: 'panel',
+        component: ArtistLayout,
+        meta: { requiresAuth: true, requiresArtist: true },
+        children: [
+          { path: '', name: 'panel-resumen', component: PanelResumen, meta: { title: 'Mi panel' } },
+          { path: 'servicios', name: 'mis-servicios', component: MisServicios, meta: { title: 'Mis servicios' } },
+          { path: 'servicios/crear', name: 'servicio-crear', component: ServicioForm, meta: { title: 'Crear servicio' } },
+          { path: 'servicios/:id/editar', name: 'servicio-editar', component: ServicioForm, meta: { title: 'Editar servicio' } },
+          { path: 'servicios/:id/solicitudes', name: 'servicio-solicitudes', component: ServicioSolicitudes, meta: { title: 'Solicitudes del servicio' } },
+          { path: 'solicitudes', name: 'panel-solicitudes', component: Solicitudes, meta: { title: 'Solicitudes' } },
+          { path: 'formulario-pedidos', name: 'panel-formulario-pedidos', component: ConfiguracionFormularioPedidos, meta: { title: 'Formulario de pedidos' } },
+          { path: 'terminos', name: 'panel-terminos', component: ConfiguracionTerminosArtista, meta: { title: 'Términos y condiciones' } },
+          { path: 'etiquetas', name: 'panel-etiquetas', component: ConfiguracionEtiquetas, meta: { title: 'Mis etiquetas' } },
+          { path: 'portfolio', name: 'portfolio-subir', component: PortfolioSubir, meta: { title: 'Mi portfolio' } },
+        ],
       },
-      {
-        path: 'mis-servicios',
-        name: 'mis-servicios',
-        component: MisServicios,
-        meta: { title: 'Mis servicios', requiresArtist: true },
-      },
-      {
-        path: 'mis-servicios/crear',
-        name: 'servicio-crear',
-        component: ServicioForm,
-        meta: { title: 'Crear servicio', requiresArtist: true },
-      },
+      { path: 'portfolio/subir', redirect: { name: 'portfolio-subir' } },
+      { path: 'mis-servicios', redirect: { name: 'mis-servicios' } },
+      { path: 'mis-servicios/crear', redirect: { name: 'servicio-crear' } },
       {
         path: 'mis-servicios/:id/editar',
-        name: 'servicio-editar',
-        component: ServicioForm,
-        meta: { title: 'Editar servicio', requiresArtist: true },
+        redirect: (to) => ({ name: 'servicio-editar', params: { id: to.params.id } }),
       },
+      {
+        path: 'mis-servicios/:id/solicitudes',
+        redirect: (to) => ({ name: 'servicio-solicitudes', params: { id: to.params.id } }),
+      },
+      { path: 'configuracion/etiquetas', redirect: { name: 'panel-etiquetas' } },
+      { path: 'configuracion/formulario-pedidos', redirect: { name: 'panel-formulario-pedidos' } },
+      { path: 'configuracion/terminos-artista', redirect: { name: 'panel-terminos' } },
       {
         path: 'configuracion',
         component: ConfiguracionLayout,
@@ -133,9 +158,6 @@ const routes = [
           { path: 'perfil', name: 'configuracion-perfil', component: ConfiguracionPerfil, meta: { title: 'Configuración - Perfil' } },
           { path: 'apariencia', name: 'configuracion-apariencia', component: ConfiguracionApariencia, meta: { title: 'Configuración - Apariencia' } },
           { path: 'privacidad', name: 'configuracion-privacidad', component: ConfiguracionPrivacidad, meta: { title: 'Configuración - Privacidad' } },
-          { path: 'etiquetas', name: 'configuracion-etiquetas', component: ConfiguracionEtiquetas, meta: { title: 'Configuración - Mis etiquetas' } },
-          { path: 'formulario-pedidos', name: 'configuracion-formulario-pedidos', component: ConfiguracionFormularioPedidos, meta: { title: 'Configuración - Formulario de pedidos', requiresArtist: true } },
-          { path: 'terminos-artista', name: 'configuracion-terminos-artista', component: ConfiguracionTerminosArtista, meta: { title: 'Configuración - Términos y condiciones', requiresArtist: true } },
           { path: 'cuenta', name: 'configuracion-cuenta', component: ConfiguracionCuenta, meta: { title: 'Configuración - Cuenta' } },
         ],
       },
@@ -167,6 +189,12 @@ const routes = [
         component: TiposAdmin,
         props: { tipo: 'servicio' },
         meta: { title: 'Tipos de servicio' },
+      },
+      {
+        path: 'servicios/archivados',
+        name: 'servicios-archivados',
+        component: ServiciosArchivados,
+        meta: { title: 'Servicios archivados' },
       },
       {
         path: 'etiquetas',
@@ -239,7 +267,7 @@ const { pedir } = useConfirmacionSalida()
 const { hayCambios: hayCambiosConfig, mensaje: mensajeConfig, limpiar: limpiarConfig } = useCambiosSinGuardar()
 
 router.beforeEach(async (to, from) => {
-  const saliendoDeSubir = from.path === '/portfolio/subir' && to.path !== from.path
+  const saliendoDeSubir = from.path === '/panel/portfolio' && to.path !== from.path
   if (!saliendoDeSubir || !proteccionActiva.value) {
     return true
   }
@@ -307,8 +335,8 @@ router.beforeEach((to, from, next) => {
     }
   }
 
-  if (to.matched.some((r) => r.meta.requiresCliente)) {
-    if (!token || rol !== 'CLIENTE') {
+  if (to.matched.some((r) => r.meta.requiresComprador)) {
+    if (!token || (rol !== 'CLIENTE' && rol !== 'ARTISTA')) {
       next({ name: 'inicio' })
       return
     }

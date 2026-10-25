@@ -19,6 +19,7 @@ public class SolicitudResumenDTO {
     private Long idSolicitud;
     private Long idServicio;
     private String nombreServicio;
+    private EstadoServicio estadoServicio;
     private UsuarioResumenDTO cliente;
     private UsuarioResumenDTO artista;
     private EstadoSolicitud estado;
@@ -37,6 +38,9 @@ public class SolicitudResumenDTO {
                 : null)
             .nombreServicio(solicitud.getServicio() != null
                 ? solicitud.getServicio().getNombre()
+                : null)
+            .estadoServicio(solicitud.getServicio() != null
+                ? solicitud.getServicio().getEstado()
                 : null)
             .cliente(UsuarioResumenDTO.desdeUsuario(solicitud.getCliente()))
             .artista(UsuarioResumenDTO.desdeUsuario(solicitud.getArtista()))

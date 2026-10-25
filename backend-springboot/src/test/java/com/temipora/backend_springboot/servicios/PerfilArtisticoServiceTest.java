@@ -17,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.Imagen;
 import com.temipora.backend_springboot.modelo.ImagenEtiqueta;
@@ -72,7 +73,7 @@ class PerfilArtisticoServiceTest {
 
         when(imagenRepository.findByUsuarioIdUsuarioInAndEstadoTrue(List.of(2L)))
             .thenReturn(List.of(primera, segunda, tercera));
-        when(servicioRepository.findByArtistaIdUsuarioInAndEstadoTrue(List.of(2L)))
+        when(servicioRepository.findByArtistaIdUsuarioInAndEstado(List.of(2L), EstadoServicio.PUBLICADO))
             .thenReturn(List.of(servicio1, servicio2, servicio3));
         when(imagenEtiquetaRepository.findByImagenIdImagenIn(List.of(1L, 2L, 3L)))
             .thenReturn(List.of(
@@ -96,7 +97,7 @@ class PerfilArtisticoServiceTest {
     void calcular_sinDatos_devuelvePerfilVacio() {
         when(imagenRepository.findByUsuarioIdUsuarioInAndEstadoTrue(List.of(2L)))
             .thenReturn(List.of());
-        when(servicioRepository.findByArtistaIdUsuarioInAndEstadoTrue(List.of(2L)))
+        when(servicioRepository.findByArtistaIdUsuarioInAndEstado(List.of(2L), EstadoServicio.PUBLICADO))
             .thenReturn(List.of());
 
         PerfilArtisticoDTO resultado = perfilArtisticoService.calcular(2L);
@@ -201,7 +202,7 @@ class PerfilArtisticoServiceTest {
         servicio.setNombre("Servicio " + id);
         servicio.setDescripcion("desc");
         servicio.setPrecioBase(BigDecimal.TEN);
-        servicio.setEstado(true);
+        servicio.setEstado(EstadoServicio.PUBLICADO);
 
         for (Etiqueta etiqueta : etiquetas) {
             ServicioEtiqueta asignacion = new ServicioEtiqueta();

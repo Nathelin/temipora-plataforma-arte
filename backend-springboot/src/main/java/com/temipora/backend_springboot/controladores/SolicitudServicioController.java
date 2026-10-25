@@ -39,7 +39,7 @@ public class SolicitudServicioController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('CLIENTE')")
+    @PreAuthorize("hasAnyRole('CLIENTE', 'ARTISTA')")
     public ResponseEntity<SolicitudDTO> crear(
             @Valid @RequestBody SolicitudServicioRequest request,
             Authentication authentication) {
@@ -57,7 +57,7 @@ public class SolicitudServicioController {
     }
 
     @GetMapping("/enviadas")
-    @PreAuthorize("hasRole('CLIENTE')")
+    @PreAuthorize("hasAnyRole('CLIENTE', 'ARTISTA')")
     public List<SolicitudResumenDTO> listarEnviadas(
             @RequestParam(required = false) EstadoSolicitud estado,
             Authentication authentication) {
@@ -82,6 +82,15 @@ public class SolicitudServicioController {
         String motivo = request != null ? request.getMotivo() : null;
         return solicitudServicioService.rechazar(
             idSolicitud, idAutenticado(authentication), motivo);
+    }
+
+    @PostMapping("/{idSolicitud}/retirar-presupuesto")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public SolicitudDTO retirarPresupuesto(
+            @PathVariable Long idSolicitud,
+            Authentication authentication) {
+        return solicitudServicioService.retirarPresupuesto(
+            idSolicitud, idAutenticado(authentication));
     }
 
     private Long idAutenticado(Authentication authentication) {

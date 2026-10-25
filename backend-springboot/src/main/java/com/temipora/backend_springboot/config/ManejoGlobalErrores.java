@@ -13,6 +13,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import com.temipora.backend_springboot.servicios.AccesoDenegadoException;
 import com.temipora.backend_springboot.servicios.ConflictoException;
+import com.temipora.backend_springboot.servicios.ServicioNoDisponibleException;
 
 @RestControllerAdvice
 public class ManejoGlobalErrores {
@@ -30,6 +31,12 @@ public class ManejoGlobalErrores {
     @ExceptionHandler(ConflictoException.class)
     public ResponseEntity<Map<String, String>> manejarConflicto(ConflictoException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
+    }
+
+    @ExceptionHandler(ServicioNoDisponibleException.class)
+    public ResponseEntity<Map<String, String>> manejarServicioNoDisponible(
+            ServicioNoDisponibleException e) {
+        return ResponseEntity.status(HttpStatus.GONE).body(Map.of("message", e.getMessage()));
     }
 
     @ExceptionHandler(NoSuchElementException.class)

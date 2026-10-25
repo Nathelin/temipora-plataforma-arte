@@ -22,7 +22,7 @@ const ctaFinal = computed(() => {
     return { to: '/registrarse', label: 'Crear mi cuenta' }
   }
   if (esArtista.value) {
-    return { to: '/portfolio/subir', label: 'Subir mi primera obra' }
+    return { to: '/panel/portfolio', label: 'Subir mi primera obra' }
   }
   return { to: '/servicios', label: 'Explorar servicios' }
 })

@@ -76,11 +76,15 @@ class PortfolioControllerTest {
     // ---------------------------------------------------------------
 
     @Test
-    void listar_sinToken_devuelve401YNoLlamaAlServicio() throws Exception {
-        mockMvc.perform(get("/api/portfolio/artista777"))
-                .andExpect(status().isUnauthorized());
+    void listar_sinToken_devuelve200ConImagenes() throws Exception {
+        when(portfolioService.listar("artista777"))
+                .thenReturn(List.of(imagenDe("Obra pública")));
 
-        verify(portfolioService, never()).listar(any());
+        mockMvc.perform(get("/api/portfolio/artista777"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].titulo").value("Obra pública"));
+
+        verify(portfolioService).listar("artista777");
     }
 
     @Test
@@ -178,11 +182,19 @@ class PortfolioControllerTest {
     // ---------------------------------------------------------------
 
     @Test
-    void etiquetasPortfolio_sinToken_devuelve401YNoLlamaAlServicio() throws Exception {
-        mockMvc.perform(get("/api/portfolio/artista777/etiquetas"))
-                .andExpect(status().isUnauthorized());
+    void etiquetasPortfolio_sinToken_devuelve200ConEtiquetas() throws Exception {
+        when(portfolioService.etiquetasDePortfolio("artista777"))
+                .thenReturn(List.of(EtiquetaDTO.builder()
+                        .idEtiqueta(1L)
+                        .nombre("Ilustración")
+                        .estado(EtiquetaEstado.VALIDA)
+                        .build()));
 
-        verify(portfolioService, never()).etiquetasDePortfolio(any());
+        mockMvc.perform(get("/api/portfolio/artista777/etiquetas"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].nombre").value("Ilustración"));
+
+        verify(portfolioService).etiquetasDePortfolio("artista777");
     }
 
     @Test

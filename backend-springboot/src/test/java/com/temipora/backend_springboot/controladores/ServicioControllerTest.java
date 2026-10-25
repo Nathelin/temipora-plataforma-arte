@@ -27,8 +27,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.temipora.backend_springboot.config.JwtUtils;
 import com.temipora.backend_springboot.config.SecurityConfig;
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.servicios.ServicioBajaService;
 import com.temipora.backend_springboot.servicios.ServicioService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -53,6 +55,9 @@ class ServicioControllerTest {
 
     @MockitoBean
     private ServicioService servicioService;
+
+    @MockitoBean
+    private ServicioBajaService servicioBajaService;
 
     @MockitoBean
     private UsuarioService usuarioService;
@@ -158,7 +163,7 @@ class ServicioControllerTest {
                 .tiempoEntregaUnidad("SEMANAS")
                 .tiempoEntregaDias(14)
                 .cupos(5)
-                .estado(true)
+                .estado(EstadoServicio.PUBLICADO)
                 .imagenes(List.of("a.png"))
                 .build();
     }

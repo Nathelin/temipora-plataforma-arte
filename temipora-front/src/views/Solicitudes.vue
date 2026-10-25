@@ -11,18 +11,36 @@ import {
   formatearFechaSolicitud,
   solicitudesEnGrupo,
 } from '../servicios/solicitudes'
+import { estadoServicioDe } from '../servicios/servicios'
 
 const router = useRouter()
 
 const esArtista = localStorage.getItem('rol') === 'ARTISTA'
-const endpoint = esArtista
-  ? '/solicitudes-servicio/recibidas'
-  : '/solicitudes-servicio/enviadas'
 
-const solicitudes = ref([])
+const recibidas = ref([])
+const enviadas = ref([])
+const bandejaActiva = ref(esArtista ? 'recibidas' : 'enviadas')
 const cargando = ref(true)
 const error = ref('')
 const grupoActivo = ref('todas')
+
+const esBandejaRecibidas = computed(() => bandejaActiva.value === 'recibidas')
+const solicitudes = computed(() =>
+  esBandejaRecibidas.value ? recibidas.value : enviadas.value,
+)
+
+const bandejas = computed(() => {
+  const opciones = [
+    { clave: 'recibidas', texto: 'Recibidas', cantidad: recibidas.value.length },
+    { clave: 'enviadas', texto: 'Enviadas', cantidad: enviadas.value.length },
+  ]
+  return esArtista ? opciones : opciones.filter((bandeja) => bandeja.clave === 'enviadas')
+})
+
+function cambiarBandeja(clave) {
+  bandejaActiva.value = clave
+  grupoActivo.value = 'todas'
+}
 
 const grupos = computed(() =>
   GRUPOS_ESTADO.map((grupo) => ({
@@ -42,15 +60,24 @@ const porResponder = computed(
 )
 
 function contraparte(solicitud) {
-  return datosContraparte(contraparteDe(solicitud, esArtista))
+  return datosContraparte(contraparteDe(solicitud, esBandejaRecibidas.value))
 }
 
 async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    const res = await api.get(endpoint)
-    solicitudes.value = res.data || []
+    if (esArtista) {
+      const [resRecibidas, resEnviadas] = await Promise.all([
+        api.get('/solicitudes-servicio/recibidas'),
+        api.get('/solicitudes-servicio/enviadas'),
+      ])
+      recibidas.value = resRecibidas.data || []
+      enviadas.value = resEnviadas.data || []
+    } else {
+      const res = await api.get('/solicitudes-servicio/enviadas')
+      enviadas.value = res.data || []
+    }
   } catch (e) {
     if (e.response?.status === 401) {
       router.push({ name: 'login' })
@@ -74,7 +101,7 @@ onMounted(cargar)
           Solicitudes
         </h1>
         <p class="mt-2 text-sm text-cafe/65">
-          {{ esArtista ? 'Solicitudes que recibiste de tus clientes.' : 'Solicitudes que enviaste a artistas.' }}
+          {{ esBandejaRecibidas ? 'Solicitudes que recibiste de tus clientes.' : 'Solicitudes que enviaste a otros artistas.' }}
         </p>
       </div>
 
@@ -82,7 +109,7 @@ onMounted(cargar)
         v-if="!cargando && !error && porResponder"
         class="inline-flex self-start rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral sm:self-auto"
       >
-        {{ porResponder }} {{ esArtista ? 'por responder' : 'esperando respuesta' }}
+        {{ porResponder }} {{ esBandejaRecibidas ? 'por responder' : 'esperando respuesta' }}
       </span>
     </header>
 
@@ -107,77 +134,106 @@ onMounted(cargar)
       </button>
     </div>
 
-    <div
-      v-else-if="!total"
-      class="mt-8 rounded-3xl border border-dashed border-rosa/70 bg-blanco px-6 py-16 text-center"
-    >
-      <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rosa/25 text-coral" aria-hidden="true">
-        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" />
-        </svg>
-      </span>
-      <p class="mt-4 text-base font-semibold text-granate">
-        {{ esArtista ? 'Todavía no recibiste solicitudes.' : 'Todavía no enviaste solicitudes.' }}
-      </p>
-      <p class="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-cafe/60">
-        {{ esArtista
-          ? 'Cuando un cliente te envíe una, aparecerá en esta página.'
-          : 'Explorá los servicios de artistas y enviá tu primera solicitud.' }}
-      </p>
-      <router-link
-        v-if="!esArtista"
-        to="/servicios"
-        class="mt-5 inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo"
-      >
-        Explorar servicios
-      </router-link>
-    </div>
-
-    <template v-else>
+    <div v-else>
       <div
-        class="mt-8 flex gap-1 overflow-x-auto rounded-xl border border-rosa/60 bg-blanco p-1"
+        v-if="bandejas.length > 1"
+        class="mt-8 flex gap-1 rounded-xl border border-rosa/60 bg-blanco p-1"
         role="group"
-        aria-label="Filtrar solicitudes por estado"
+        aria-label="Elegir bandeja de solicitudes"
       >
         <button
-          v-for="grupo in grupos"
-          :key="grupo.clave"
+          v-for="bandeja in bandejas"
+          :key="bandeja.clave"
           type="button"
-          class="flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-2 py-1.5 text-xs font-medium transition sm:flex-none sm:px-3 sm:text-sm"
-          :class="grupoActivo === grupo.clave
+          class="flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition"
+          :class="bandejaActiva === bandeja.clave
             ? 'bg-coral text-white shadow-sm'
             : 'text-cafe/70 hover:bg-rosa/20 hover:text-granate'"
-          :aria-pressed="grupoActivo === grupo.clave"
-          @click="grupoActivo = grupo.clave"
+          :aria-pressed="bandejaActiva === bandeja.clave"
+          @click="cambiarBandeja(bandeja.clave)"
         >
-          {{ grupo.texto }}
+          {{ bandeja.texto }}
           <span
             class="rounded-full px-1.5 py-0.5 text-[11px] leading-none"
-            :class="grupoActivo === grupo.clave ? 'bg-white/20 text-white' : 'bg-rosa/30 text-granate'"
+            :class="bandejaActiva === bandeja.clave ? 'bg-white/20 text-white' : 'bg-rosa/30 text-granate'"
           >
-            {{ grupo.cantidad }}
+            {{ bandeja.cantidad }}
           </span>
         </button>
       </div>
 
-      <p class="mt-3 text-xs text-cafe/50">
-        {{ solicitudesFiltradas.length }} de {{ total }}
-        {{ total === 1 ? 'solicitud' : 'solicitudes' }}
-      </p>
-
-      <div v-if="!solicitudesFiltradas.length" class="mt-4 rounded-2xl border border-dashed border-rosa/60 px-4 py-12 text-center">
-        <p class="text-sm font-medium text-granate">No hay solicitudes en este estado.</p>
-        <button
-          type="button"
-          class="mt-2 text-sm font-medium text-coral transition hover:text-rojizo"
-          @click="grupoActivo = 'todas'"
+      <div
+        v-if="!total"
+        class="mt-8 rounded-3xl border border-dashed border-rosa/70 bg-blanco px-6 py-16 text-center"
+      >
+        <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rosa/25 text-coral" aria-hidden="true">
+          <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z" />
+          </svg>
+        </span>
+        <p class="mt-4 text-base font-semibold text-granate">
+          {{ esBandejaRecibidas ? 'Todavía no recibiste solicitudes.' : 'Todavía no enviaste solicitudes.' }}
+        </p>
+        <p class="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-cafe/60">
+          {{ esBandejaRecibidas
+            ? 'Cuando alguien solicite uno de tus servicios, aparecerá en esta página.'
+            : 'Explorá los servicios de otros artistas y enviá tu primera solicitud.' }}
+        </p>
+        <router-link
+          v-if="!esBandejaRecibidas"
+          to="/servicios"
+          class="mt-5 inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo"
         >
-          Ver todas las solicitudes
-        </button>
+          Explorar servicios
+        </router-link>
       </div>
 
-      <ul v-else class="mt-4 space-y-3">
-        <li v-for="solicitud in solicitudesFiltradas" :key="solicitud.idSolicitud">
+      <template v-else>
+        <div
+          class="flex gap-1 overflow-x-auto rounded-xl border border-rosa/60 bg-blanco p-1"
+          :class="bandejas.length > 1 ? 'mt-3' : 'mt-8'"
+          role="group"
+          aria-label="Filtrar solicitudes por estado"
+        >
+          <button
+            v-for="grupo in grupos"
+            :key="grupo.clave"
+            type="button"
+            class="flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-2 py-1.5 text-xs font-medium transition sm:flex-none sm:px-3 sm:text-sm"
+            :class="grupoActivo === grupo.clave
+              ? 'bg-coral text-white shadow-sm'
+              : 'text-cafe/70 hover:bg-rosa/20 hover:text-granate'"
+            :aria-pressed="grupoActivo === grupo.clave"
+            @click="grupoActivo = grupo.clave"
+          >
+            {{ grupo.texto }}
+            <span
+              class="rounded-full px-1.5 py-0.5 text-[11px] leading-none"
+              :class="grupoActivo === grupo.clave ? 'bg-white/20 text-white' : 'bg-rosa/30 text-granate'"
+            >
+              {{ grupo.cantidad }}
+            </span>
+          </button>
+        </div>
+
+        <p class="mt-3 text-xs text-cafe/50">
+          {{ solicitudesFiltradas.length }} de {{ total }}
+          {{ total === 1 ? 'solicitud' : 'solicitudes' }}
+        </p>
+
+        <div v-if="!solicitudesFiltradas.length" class="mt-4 rounded-2xl border border-dashed border-rosa/60 px-4 py-12 text-center">
+          <p class="text-sm font-medium text-granate">No hay solicitudes en este estado.</p>
+          <button
+            type="button"
+            class="mt-2 text-sm font-medium text-coral transition hover:text-rojizo"
+            @click="grupoActivo = 'todas'"
+          >
+            Ver todas las solicitudes
+          </button>
+        </div>
+
+        <ul v-else class="mt-4 space-y-3">
+          <li v-for="solicitud in solicitudesFiltradas" :key="solicitud.idSolicitud">
           <router-link
             :to="{ name: 'solicitud-detalle', params: { idSolicitud: solicitud.idSolicitud } }"
             class="group flex flex-col gap-4 rounded-2xl border border-rosa/50 bg-blanco p-4 transition hover:border-coral/40 hover:bg-rosa/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/50 sm:flex-row sm:items-center sm:justify-between sm:p-5"
@@ -206,7 +262,16 @@ onMounted(cargar)
                     @{{ contraparte(solicitud).usuario }}
                   </span>
                 </p>
-                <p class="mt-1 truncate text-sm text-cafe/75">{{ solicitud.nombreServicio || 'Servicio' }}</p>
+                <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-cafe/75">
+                  <span class="truncate">{{ solicitud.nombreServicio || 'Servicio' }}</span>
+                  <span
+                    v-if="solicitud.estadoServicio && solicitud.estadoServicio !== 'PUBLICADO'"
+                    class="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                    :class="estadoServicioDe(solicitud.estadoServicio).clase"
+                  >
+                    Servicio {{ estadoServicioDe(solicitud.estadoServicio).texto.toLowerCase() }}
+                  </span>
+                </p>
                 <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-cafe/50">
                   <span>Solicitud #{{ solicitud.idSolicitud }}</span>
                   <span aria-hidden="true">·</span>
@@ -242,8 +307,9 @@ onMounted(cargar)
               </svg>
             </div>
           </router-link>
-        </li>
-      </ul>
-    </template>
+          </li>
+        </ul>
+      </template>
+    </div>
   </div>
 </template>
