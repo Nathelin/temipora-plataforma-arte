@@ -20,6 +20,8 @@ import Inicio from '../views/Inicio.vue'
 import PanelResumen from '../views/PanelResumen.vue'
 import Perfil from '../views/Perfil.vue'
 import Favoritos from '../views/Favoritos.vue'
+import FavoritosArtistas from '../views/FavoritosArtistas.vue'
+import FavoritosServicios from '../views/FavoritosServicios.vue'
 import Servicios from '../views/Servicios.vue'
 import ServicioDetalle from '../views/ServicioDetalle.vue'
 import SolicitudServicio from '../views/SolicitudServicio.vue'
@@ -82,7 +84,19 @@ const routes = [
         path: 'favoritos',
         name: 'favoritos',
         component: Favoritos,
+        meta: { title: 'Favoritos', requiresAuth: true },
+      },
+      {
+        path: 'favoritos/artistas',
+        name: 'favoritos-artistas',
+        component: FavoritosArtistas,
         meta: { title: 'Artistas favoritos', requiresAuth: true },
+      },
+      {
+        path: 'favoritos/servicios',
+        name: 'favoritos-servicios',
+        component: FavoritosServicios,
+        meta: { title: 'Servicios favoritos', requiresAuth: true },
       },
       {
         path: 'notificaciones',

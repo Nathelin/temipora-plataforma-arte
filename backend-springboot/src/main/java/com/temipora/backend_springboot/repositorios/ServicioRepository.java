@@ -20,6 +20,17 @@ public interface ServicioRepository extends JpaRepository<Servicio, Long>, JpaSp
 
     Optional<Servicio> findByIdServicio(Long idServicio);
 
+    @EntityGraph(attributePaths = {
+        "artista",
+        "tipoServicio",
+        "medio",
+        "moneda",
+        "imagenes",
+        "etiquetas",
+        "etiquetas.etiqueta"
+    })
+    List<Servicio> findByIdServicioIn(Collection<Long> ids);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM Servicio s WHERE s.idServicio = :idServicio")
     Optional<Servicio> findByIdServicioForUpdate(@Param("idServicio") Long idServicio);

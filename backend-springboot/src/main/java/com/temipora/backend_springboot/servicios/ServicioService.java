@@ -3,6 +3,7 @@ package com.temipora.backend_springboot.servicios;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -137,6 +138,22 @@ public class ServicioService {
         return servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre")).stream()
             .map(s -> aDTO(s, requiereAdvertencia(s, pref, viewerId), moneda))
             .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, ServicioDTO> convertirParaVisor(Collection<Servicio> servicios, Long viewerId) {
+        if (servicios == null || servicios.isEmpty()) {
+            return Map.of();
+        }
+        EPreferenciaContenidoSensible pref = preferenciaDe(viewerId);
+        Moneda moneda = monedaPreferidaDe(viewerId);
+        Map<Long, ServicioDTO> resultado = new HashMap<>();
+        for (Servicio servicio : servicios) {
+            resultado.put(
+                servicio.getIdServicio(),
+                aDTO(servicio, requiereAdvertencia(servicio, pref, viewerId), moneda));
+        }
+        return resultado;
     }
 
     private Specification<Servicio> activos(boolean ocultarSensibles) {

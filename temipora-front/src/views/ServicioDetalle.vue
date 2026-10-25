@@ -4,9 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
 import VistaPreviaTerminos from '../components/VistaPreviaTerminos.vue'
+import { useNotificaciones } from '../composables/useNotificaciones'
 
 const route = useRoute()
 const router = useRouter()
+const { exito, error: notificarError } = useNotificaciones()
 
 const servicio = ref(null)
 const terminos = ref(null)
@@ -16,6 +18,9 @@ const cargando = ref(true)
 const error = ref('')
 const autenticado = ref(!!localStorage.getItem('token'))
 const rol = ref(localStorage.getItem('rol') || '')
+const esFavorito = ref(false)
+const cargandoEstadoFavorito = ref(false)
+const actualizandoFavorito = ref(false)
 
 const CAMPOS_TERMINOS = [
   'informacionGeneral',
@@ -73,6 +78,13 @@ const esDuenio = computed(() => {
   return actual.toLowerCase() === (servicio.value?.nombreArtista || '').toLowerCase()
 })
 const puedeContratar = computed(() => rol.value === 'CLIENTE' || rol.value === 'ARTISTA')
+const puedeMarcarFavorito = computed(
+  () =>
+    autenticado.value &&
+    puedeContratar.value &&
+    !esDuenio.value &&
+    servicio.value?.estado === 'PUBLICADO',
+)
 const puedeSolicitar = computed(
   () =>
     autenticado.value &&
@@ -148,6 +160,58 @@ function aplicarSolicitudPublica(data) {
   terminosValidos.value = !!data.terminosValidos
 }
 
+async function cargarEstadoFavorito() {
+  esFavorito.value = false
+  if (!puedeMarcarFavorito.value) return
+
+  cargandoEstadoFavorito.value = true
+  try {
+    const res = await api.get(`/favoritos/servicios/${servicio.value.idServicio}`)
+    esFavorito.value = !!res.data?.esFavorito
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+    }
+  } finally {
+    cargandoEstadoFavorito.value = false
+  }
+}
+
+async function alternarFavoritoServicio() {
+  if (!autenticado.value) {
+    router.push({ name: 'login' })
+    return
+  }
+  if (
+    !puedeMarcarFavorito.value ||
+    actualizandoFavorito.value ||
+    cargandoEstadoFavorito.value
+  ) {
+    return
+  }
+
+  actualizandoFavorito.value = true
+  try {
+    if (esFavorito.value) {
+      await api.delete(`/favoritos/servicios/${servicio.value.idServicio}`)
+      esFavorito.value = false
+      exito(`Quitaste "${servicio.value.nombre}" de tus favoritos.`)
+    } else {
+      await api.post(`/favoritos/servicios/${servicio.value.idServicio}`)
+      esFavorito.value = true
+      exito(`Agregaste "${servicio.value.nombre}" a tus favoritos.`)
+    }
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    notificarError(e.response?.data?.message || 'No se pudieron actualizar tus favoritos.')
+  } finally {
+    actualizandoFavorito.value = false
+  }
+}
+
 async function cargar() {
   cargando.value = true
   error.value = ''
@@ -180,8 +244,9 @@ function manejarTecla(event) {
   if (mostrarSensible.value) mostrarSensible.value = false
 }
 
-onMounted(() => {
-  cargar()
+onMounted(async () => {
+  await cargar()
+  void cargarEstadoFavorito()
   window.addEventListener('keydown', manejarTecla)
 })
 
@@ -344,6 +409,29 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
               @click="irASolicitar"
             >
               Solicitar servicio
+            </button>
+            <button
+              v-if="puedeMarcarFavorito"
+              type="button"
+              class="flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60"
+              :class="esFavorito
+                ? 'border-coral bg-coral text-white hover:bg-rojizo'
+                : 'border-coral/50 bg-superficie text-granate hover:bg-rosa/25'"
+              :disabled="actualizandoFavorito || cargandoEstadoFavorito"
+              :aria-pressed="esFavorito"
+              @click="alternarFavoritoServicio"
+            >
+              <svg
+                class="h-4 w-4"
+                viewBox="0 0 24 24"
+                :fill="esFavorito ? 'currentColor' : 'none'"
+                stroke="currentColor"
+                stroke-width="1.8"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z" />
+              </svg>
+              {{ actualizandoFavorito ? 'Guardando...' : esFavorito ? 'En favoritos' : 'Guardar en favoritos' }}
             </button>
             <button
               type="button"

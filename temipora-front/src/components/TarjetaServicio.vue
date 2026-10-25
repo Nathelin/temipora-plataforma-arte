@@ -5,7 +5,12 @@ import { formatearPrecio } from '../servicios/moneda'
 
 const props = defineProps({
   servicio: { type: Object, required: true },
+  mostrarFavorito: { type: Boolean, default: false },
+  esFavorito: { type: Boolean, default: false },
+  actualizandoFavorito: { type: Boolean, default: false },
 })
+
+const emit = defineEmits(['alternar-favorito'])
 
 const router = useRouter()
 const revelado = ref(false)
@@ -50,32 +55,61 @@ function irAlArtista() {
 
 <template>
   <article class="group flex h-full flex-col overflow-hidden rounded-[26px] border border-borde/60 bg-superficie shadow-[0_12px_32px_rgba(74,29,46,0.08)] transition duration-300 hover:-translate-y-1.5 hover:border-coral/40 hover:shadow-[0_22px_48px_var(--sombra-acento)]">
-    <button type="button" class="relative h-48 w-full overflow-hidden bg-rosa/20 text-left" @click="irAlServicio">
-      <img
-        v-if="servicio.imagenPortada"
-        :src="servicio.imagenPortada"
-        :alt="servicio.nombre"
-        class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
-        :class="requiereAdvertencia && !revelado ? 'blur-[18px] scale-105' : ''"
-      />
-      <span
-        v-if="requiereAdvertencia && !revelado"
-        class="absolute inset-0 flex items-center justify-center gap-2 bg-granate/30 text-sm font-medium text-white drop-shadow"
-        :title="`Contenido sensible: ${textoSensible}`"
-      >
-        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-        </svg>
-        Contenido sensible
-      </span>
+    <div class="relative h-48 w-full overflow-hidden bg-rosa/20">
+      <button type="button" class="absolute inset-0 h-full w-full text-left" @click="irAlServicio">
+        <img
+          v-if="servicio.imagenPortada"
+          :src="servicio.imagenPortada"
+          :alt="servicio.nombre"
+          class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+          :class="requiereAdvertencia && !revelado ? 'blur-[18px] scale-105' : ''"
+        />
+        <span
+          v-if="requiereAdvertencia && !revelado"
+          class="absolute inset-0 flex items-center justify-center gap-2 bg-granate/30 text-sm font-medium text-white drop-shadow"
+          :title="`Contenido sensible: ${textoSensible}`"
+        >
+          <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+          </svg>
+          Contenido sensible
+        </span>
 
-      <span
-        v-if="esSensible"
-        class="absolute right-4 top-4 rounded-full bg-granate/80 px-3 py-1 text-xs font-semibold text-inverso-contraste backdrop-blur-sm"
+        <span
+          v-if="esSensible"
+          class="absolute right-4 top-4 rounded-full bg-granate/80 px-3 py-1 text-xs font-semibold text-inverso-contraste backdrop-blur-sm"
+        >
+          Sensible
+        </span>
+      </button>
+
+      <button
+        v-if="mostrarFavorito"
+        type="button"
+        class="absolute left-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full border shadow-sm backdrop-blur-sm transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema disabled:cursor-wait disabled:opacity-60"
+        :class="esFavorito
+          ? 'border-coral bg-coral text-white hover:bg-rojizo'
+          : 'border-white/70 bg-superficie/95 text-coral hover:bg-coral hover:text-white'"
+        :disabled="actualizandoFavorito"
+        :aria-pressed="esFavorito"
+        :aria-label="esFavorito
+          ? `Quitar ${servicio.nombre} de tus favoritos`
+          : `Agregar ${servicio.nombre} a tus favoritos`"
+        :title="esFavorito ? 'Quitar de favoritos' : 'Agregar a favoritos'"
+        @click.stop="emit('alternar-favorito', servicio)"
       >
-        Sensible
-      </span>
-    </button>
+        <svg
+          class="h-4 w-4"
+          viewBox="0 0 24 24"
+          :fill="esFavorito ? 'currentColor' : 'none'"
+          stroke="currentColor"
+          stroke-width="1.8"
+          aria-hidden="true"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z" />
+        </svg>
+      </button>
+    </div>
 
     <div class="flex flex-1 flex-col p-5">
       <div class="flex items-start justify-between gap-3">

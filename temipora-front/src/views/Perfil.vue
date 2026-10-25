@@ -231,7 +231,7 @@ async function cargarEstadoFavorito() {
 
   cargandoEstadoFavorito.value = true
   try {
-    const res = await api.get(`/favoritos/${encodeURIComponent(nombre)}`)
+    const res = await api.get(`/favoritos/artistas/${encodeURIComponent(nombre)}`)
     if (perfil.value.nombreUsuario === nombre) {
       esFavorito.value = !!res.data?.esFavorito
     }
@@ -263,13 +263,13 @@ async function alternarFavorito() {
   actualizandoFavorito.value = true
   try {
     if (esFavorito.value) {
-      await api.delete(`/favoritos/${encodeURIComponent(nombre)}`)
+      await api.delete(`/favoritos/artistas/${encodeURIComponent(nombre)}`)
       if (perfil.value.nombreUsuario === nombre) {
         esFavorito.value = false
         exito(`Quitaste a @${nombre} de tus favoritos.`)
       }
     } else {
-      await api.post(`/favoritos/${encodeURIComponent(nombre)}`)
+      await api.post(`/favoritos/artistas/${encodeURIComponent(nombre)}`)
       if (perfil.value.nombreUsuario === nombre) {
         esFavorito.value = true
         exito(`Agregaste a @${nombre} a tus favoritos.`)
