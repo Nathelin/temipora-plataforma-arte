@@ -6,6 +6,20 @@ export const ESTADOS_SOLICITUD = {
   FINALIZADA: { texto: 'Finalizada', clase: 'border-rosa bg-rosa/35 text-granate' },
   RECHAZADA: { texto: 'Rechazada', clase: 'border-rojizo/25 bg-rojizo/10 text-rojizo' },
   CANCELADA: { texto: 'Cancelada', clase: 'border-rojizo/25 bg-rojizo/10 text-rojizo' },
+  VENCIDA: { texto: 'Vencida', clase: 'border-cafe/25 bg-cafe/10 text-cafe' },
+}
+
+export const UNIDADES_ENTREGA = {
+  DIAS: { singular: 'día', plural: 'días' },
+  SEMANAS: { singular: 'semana', plural: 'semanas' },
+  MESES: { singular: 'mes', plural: 'meses' },
+}
+
+export function textoTiempoEntrega(valor, unidad) {
+  if (valor === null || valor === undefined || valor === '') return '—'
+  const info = UNIDADES_ENTREGA[unidad]
+  if (!info) return `${valor} ${unidad || ''}`.trim()
+  return `${valor} ${valor === 1 ? info.singular : info.plural}`
 }
 
 export const GRUPOS_ESTADO = [
@@ -14,7 +28,7 @@ export const GRUPOS_ESTADO = [
   { clave: 'espera', texto: 'En espera', estados: ['EN_LISTA_ESPERA'] },
   { clave: 'presupuestadas', texto: 'Presupuestadas', estados: ['PRESUPUESTADA'] },
   { clave: 'pagadas', texto: 'Pagadas', estados: ['PAGADA'] },
-  { clave: 'historial', texto: 'Historial', estados: ['RECHAZADA', 'CANCELADA'] },
+  { clave: 'historial', texto: 'Historial', estados: ['RECHAZADA', 'CANCELADA', 'VENCIDA'] },
 ]
 
 export function estadoDe(codigo) {
@@ -54,4 +68,32 @@ export function contraparteDe(solicitud, esArtista) {
 export function solicitudesEnGrupo(solicitudes, grupo) {
   if (!grupo?.estados?.length) return solicitudes
   return solicitudes.filter((solicitud) => grupo.estados.includes(solicitud.estado))
+}
+
+export function gruposDeRespuestas(item) {
+  const respuestas = [...(item?.respuestas || [])].sort((a, b) => {
+    const orden = (a.orden ?? 0) - (b.orden ?? 0)
+    return orden !== 0 ? orden : (a.suborden ?? 0) - (b.suborden ?? 0)
+  })
+  const grupos = new Map()
+
+  for (const respuesta of respuestas) {
+    const valor = respuesta.valor
+    if (valor === null || valor === undefined || String(valor).trim() === '') continue
+
+    const clave = respuesta.idPregunta != null
+      ? `pregunta-${respuesta.idPregunta}`
+      : `respuesta-${respuesta.orden}-${respuesta.enunciado}`
+    if (!grupos.has(clave)) {
+      grupos.set(clave, {
+        clave,
+        enunciado: respuesta.enunciado,
+        codigoTipo: respuesta.codigoTipo,
+        valores: [],
+      })
+    }
+    grupos.get(clave).valores.push(String(valor))
+  }
+
+  return [...grupos.values()]
 }

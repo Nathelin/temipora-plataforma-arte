@@ -10,6 +10,7 @@ import MaterialesAdmin from '../components/MaterialesAdmin.vue'
 import PaisesAdmin from '../components/PaisesAdmin.vue'
 import CotizacionAdmin from '../components/CotizacionAdmin.vue'
 import MonedasAdmin from '../components/MonedasAdmin.vue'
+import PresupuestoAdmin from '../components/PresupuestoAdmin.vue'
 import Registro from '../components/Registro.vue'
 import TOS from '../components/TOS.vue'
 import MainLayout from '../layouts/MainLayout.vue'
@@ -27,6 +28,7 @@ import ServicioDetalle from '../views/ServicioDetalle.vue'
 import SolicitudServicio from '../views/SolicitudServicio.vue'
 import SolicitudDetalle from '../views/SolicitudDetalle.vue'
 import Solicitudes from '../views/Solicitudes.vue'
+import PresupuestoForm from '../views/PresupuestoForm.vue'
 import Notificaciones from '../views/Notificaciones.vue'
 import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
 import ConfiguracionApariencia from '../views/ConfiguracionApariencia.vue'
@@ -130,6 +132,7 @@ const routes = [
           { path: 'servicios/:id/editar', name: 'servicio-editar', component: ServicioForm, meta: { title: 'Editar servicio' } },
           { path: 'servicios/:id/solicitudes', name: 'servicio-solicitudes', component: ServicioSolicitudes, meta: { title: 'Solicitudes del servicio' } },
           { path: 'solicitudes', name: 'panel-solicitudes', component: Solicitudes, meta: { title: 'Solicitudes' } },
+          { path: 'solicitudes/:idSolicitud/presupuesto', name: 'presupuesto-crear', component: PresupuestoForm, meta: { title: 'Enviar presupuesto' } },
           { path: 'formulario-pedidos', name: 'panel-formulario-pedidos', component: ConfiguracionFormularioPedidos, meta: { title: 'Formulario de pedidos' } },
           { path: 'terminos', name: 'panel-terminos', component: ConfiguracionTerminosArtista, meta: { title: 'Términos y condiciones' } },
           { path: 'etiquetas', name: 'panel-etiquetas', component: ConfiguracionEtiquetas, meta: { title: 'Mis etiquetas' } },
@@ -243,6 +246,12 @@ const routes = [
         name: 'monedas-admin',
         component: MonedasAdmin,
         meta: { title: 'Monedas' },
+      },
+      {
+        path: 'ajustes/presupuestos',
+        name: 'presupuestos-admin',
+        component: PresupuestoAdmin,
+        meta: { title: 'Presupuestos' },
       },
       {
         path: 'notificaciones',

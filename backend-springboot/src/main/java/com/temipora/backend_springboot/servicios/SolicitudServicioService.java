@@ -57,10 +57,6 @@ public class SolicitudServicioService {
         EstadoSolicitud.PRESUPUESTADA,
         EstadoSolicitud.PAGADA);
 
-    private static final List<EstadoSolicitud> ESTADOS_QUE_OCUPAN_CUPO = List.of(
-        EstadoSolicitud.PRESUPUESTADA,
-        EstadoSolicitud.PAGADA);
-
     private static final List<EstadoSolicitud> ESTADOS_RECHAZABLES = List.of(
         EstadoSolicitud.PENDIENTE,
         EstadoSolicitud.EN_LISTA_ESPERA);
@@ -94,6 +90,7 @@ public class SolicitudServicioService {
     private final TerminosService terminosService;
     private final ListaEsperaService listaEsperaService;
     private final NotificacionService notificacionService;
+    private final ColaSolicitudesService colaSolicitudesService;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -106,7 +103,8 @@ public class SolicitudServicioService {
             FormularioService formularioService,
             TerminosService terminosService,
             ListaEsperaService listaEsperaService,
-            NotificacionService notificacionService) {
+            NotificacionService notificacionService,
+            ColaSolicitudesService colaSolicitudesService) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -118,6 +116,7 @@ public class SolicitudServicioService {
         this.terminosService = terminosService;
         this.listaEsperaService = listaEsperaService;
         this.notificacionService = notificacionService;
+        this.colaSolicitudesService = colaSolicitudesService;
     }
 
     @Transactional(readOnly = true)
@@ -351,6 +350,14 @@ public class SolicitudServicioService {
                 dto.setMotivoRechazo(accion.getMotivo());
                 dto.setFechaRechazo(accion.getFecha());
             });
+
+        ColaSolicitudesService.EvaluacionPresupuesto evaluacion =
+            colaSolicitudesService.evaluar(solicitud);
+        dto.setPosicionCola(evaluacion.posicion());
+        if (esArtista) {
+            dto.setPuedePresupuestar(evaluacion.puede());
+            dto.setMotivoNoPresupuestable(evaluacion.motivo());
+        }
         return dto;
     }
 
@@ -505,9 +512,7 @@ public class SolicitudServicioService {
     }
 
     private int calcularOcupados(Long idServicio) {
-        long ocupados = solicitudRepository.countByServicioIdServicioAndEstadoIn(
-            idServicio, ESTADOS_QUE_OCUPAN_CUPO);
-        return (int) Math.min(ocupados, Integer.MAX_VALUE);
+        return colaSolicitudesService.cuposOcupados(idServicio);
     }
 
     private ModoRecepcionSolicitud modoDe(Servicio servicio) {

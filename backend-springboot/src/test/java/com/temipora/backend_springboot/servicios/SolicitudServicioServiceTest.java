@@ -103,6 +103,9 @@ class SolicitudServicioServiceTest {
     @Mock
     private NotificacionService notificacionService;
 
+    @Mock
+    private ColaSolicitudesService colaSolicitudesService;
+
     @InjectMocks
     private SolicitudServicioService solicitudServicioService;
 
@@ -171,6 +174,10 @@ class SolicitudServicioServiceTest {
                 .opciones(List.of())
                 .build()))
             .build();
+
+        lenient().when(colaSolicitudesService.evaluar(any(Solicitud.class)))
+            .thenReturn(new ColaSolicitudesService.EvaluacionPresupuesto(
+                false, null, null));
     }
 
     @Test
@@ -178,8 +185,7 @@ class SolicitudServicioServiceTest {
         when(servicioService.obtener(SERVICIO, CLIENTE))
             .thenReturn(ServicioDTO.builder().idServicio(SERVICIO).build());
         when(servicioRepository.findByIdServicio(SERVICIO)).thenReturn(Optional.of(servicio));
-        when(solicitudRepository.countByServicioIdServicioAndEstadoIn(any(), any()))
-            .thenReturn(2L);
+        when(colaSolicitudesService.cuposOcupados(SERVICIO)).thenReturn(2);
         lenient().when(solicitudRepository.existsByServicioIdServicioAndClienteIdUsuarioAndEstadoIn(
             any(), any(), any())).thenReturn(true);
         lenient().when(solicitudRepository.existsByServicioIdServicioAndClienteIdUsuarioAndEstado(
@@ -205,8 +211,7 @@ class SolicitudServicioServiceTest {
         when(servicioService.obtener(SERVICIO, CLIENTE))
             .thenReturn(ServicioDTO.builder().idServicio(SERVICIO).build());
         when(servicioRepository.findByIdServicio(SERVICIO)).thenReturn(Optional.of(servicio));
-        when(solicitudRepository.countByServicioIdServicioAndEstadoIn(any(), any()))
-            .thenReturn(3L);
+        when(colaSolicitudesService.cuposOcupados(SERVICIO)).thenReturn(3);
         lenient().when(solicitudRepository.existsByServicioIdServicioAndClienteIdUsuarioAndEstadoIn(
             any(), any(), any())).thenReturn(false);
         lenient().when(solicitudRepository.existsByServicioIdServicioAndClienteIdUsuarioAndEstado(

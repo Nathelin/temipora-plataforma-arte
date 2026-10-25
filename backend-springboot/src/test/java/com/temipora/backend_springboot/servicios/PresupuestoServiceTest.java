@@ -1,0 +1,489 @@
+package com.temipora.backend_springboot.servicios;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
+
+import com.temipora.backend_springboot.modelo.ConfiguracionPresupuesto;
+import com.temipora.backend_springboot.modelo.ETiempoEntregaUnidad;
+import com.temipora.backend_springboot.modelo.EstadoServicio;
+import com.temipora.backend_springboot.modelo.EstadoSolicitud;
+import com.temipora.backend_springboot.modelo.ItemPresupuestoRequest;
+import com.temipora.backend_springboot.modelo.ItemSolicitud;
+import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.Presupuesto;
+import com.temipora.backend_springboot.modelo.PresupuestoRequest;
+import com.temipora.backend_springboot.modelo.RecargoPresupuestoRequest;
+import com.temipora.backend_springboot.modelo.Servicio;
+import com.temipora.backend_springboot.modelo.Solicitud;
+import com.temipora.backend_springboot.modelo.SolicitudDTO;
+import com.temipora.backend_springboot.modelo.TipoRecargo;
+import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.PresupuestoRepository;
+import com.temipora.backend_springboot.repositorios.ServicioRepository;
+import com.temipora.backend_springboot.repositorios.SolicitudRepository;
+
+@ExtendWith(MockitoExtension.class)
+class PresupuestoServiceTest {
+
+    private static final Long CLIENTE = 1L;
+    private static final Long ARTISTA = 2L;
+    private static final Long SERVICIO = 7L;
+    private static final Long SOLICITUD = 11L;
+    private static final Long ITEM_1 = 21L;
+    private static final Long ITEM_2 = 22L;
+
+    @Mock
+    private SolicitudRepository solicitudRepository;
+
+    @Mock
+    private ServicioRepository servicioRepository;
+
+    @Mock
+    private PresupuestoRepository presupuestoRepository;
+
+    @Mock
+    private ColaSolicitudesService colaSolicitudesService;
+
+    @Mock
+    private ListaEsperaService listaEsperaService;
+
+    @Mock
+    private NotificacionService notificacionService;
+
+    @Mock
+    private ConfiguracionPresupuestoService configuracionPresupuestoService;
+
+    @InjectMocks
+    private PresupuestoService presupuestoService;
+
+    private Usuario cliente;
+    private Usuario artista;
+    private Servicio servicio;
+    private Moneda moneda;
+    private ConfiguracionPresupuesto configuracion;
+    private Solicitud solicitud;
+
+    @BeforeEach
+    void setUp() {
+        cliente = new Usuario();
+        cliente.setIdUsuario(CLIENTE);
+        cliente.setNombreUsuario("cliente");
+
+        artista = new Usuario();
+        artista.setIdUsuario(ARTISTA);
+        artista.setNombreUsuario("artista");
+
+        moneda = Moneda.builder()
+            .idMoneda(3L)
+            .codigo("ARS")
+            .nombre("Peso argentino")
+            .build();
+
+        servicio = new Servicio();
+        servicio.setIdServicio(SERVICIO);
+        servicio.setNombre("Ilustración");
+        servicio.setArtista(artista);
+        servicio.setEstado(EstadoServicio.PUBLICADO);
+        servicio.setCupos(3);
+        servicio.setPrecioBase(new BigDecimal("100.00"));
+        servicio.setMoneda(moneda);
+
+        configuracion = new ConfiguracionPresupuesto();
+        configuracion.setVigenciaHoras(72);
+
+        solicitud = crearSolicitud(EstadoSolicitud.PENDIENTE);
+    }
+
+    @Test
+    void crear_sinRecargos_calculaBasePorCantidad() {
+        prepararCreacion();
+
+        SolicitudDTO resultado = presupuestoService.crear(
+            SOLICITUD, ARTISTA, request());
+
+        assertThat(resultado.getEstado()).isEqualTo(EstadoSolicitud.PRESUPUESTADA);
+        assertThat(resultado.getPresupuesto().getPrecioBaseTotal())
+            .isEqualByComparingTo("200.00");
+        assertThat(resultado.getPresupuesto().getPrecioFinal())
+            .isEqualByComparingTo("200.00");
+        assertThat(resultado.getPresupuesto().getItems()).hasSize(2);
+        assertThat(resultado.getPresupuesto().getItems().get(0).getPrecioFinal())
+            .isEqualByComparingTo("100.00");
+        assertThat(resultado.getPresupuesto().getItems().get(1).getPrecioFinal())
+            .isEqualByComparingTo("100.00");
+
+        verify(listaEsperaService).marcarConvertida(solicitud);
+        verify(notificacionService).crearParaUsuario(
+            eq(CLIENTE),
+            eq("PRESUPUESTO_RECIBIDO"),
+            eq("Recibiste un presupuesto"),
+            contains("200.00 ARS"),
+            eq(SOLICITUD),
+            eq("SOLICITUD"));
+    }
+
+    @Test
+    void crear_conRecargosPorDibujo_calculaCadaItem() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.getItems().get(0).getRecargos().add(
+            recargo("Personaje extra", TipoRecargo.PORCENTAJE, "50"));
+        request.getItems().get(0).getRecargos().add(
+            recargo("Fondo detallado", TipoRecargo.FIJO, "20"));
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request);
+
+        assertThat(resultado.getPresupuesto().getPrecioBaseTotal())
+            .isEqualByComparingTo("200.00");
+        assertThat(resultado.getPresupuesto().getItems().get(0).getPrecioFinal())
+            .isEqualByComparingTo("170.00");
+        assertThat(resultado.getPresupuesto().getItems().get(1).getPrecioFinal())
+            .isEqualByComparingTo("100.00");
+        assertThat(resultado.getPresupuesto().getPrecioFinal())
+            .isEqualByComparingTo("270.00");
+    }
+
+    @Test
+    void crear_variosPorcentajes_seSumanSinComponer() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.getItems().get(0).getRecargos().add(
+            recargo("Personaje extra", TipoRecargo.PORCENTAJE, "50"));
+        request.getItems().get(0).getRecargos().add(
+            recargo("Armadura", TipoRecargo.PORCENTAJE, "25"));
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request);
+
+        assertThat(resultado.getPresupuesto().getItems().get(0).getPrecioFinal())
+            .isEqualByComparingTo("175.00");
+        assertThat(resultado.getPresupuesto().getPrecioFinal())
+            .isEqualByComparingTo("275.00");
+    }
+
+    @Test
+    void crear_faltanDibujos_lanzaError() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.getItems().remove(1);
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("todos los dibujos");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_dibujoAjeno_lanzaError() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.getItems().get(0).setIdItemSolicitud(99L);
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("no pertenece a la solicitud");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_dibujoDuplicado_lanzaError() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.getItems().get(1).setIdItemSolicitud(ITEM_1);
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("repetir un dibujo");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_sinCupos_lanzaConflicto() {
+        prepararCreacion();
+        when(colaSolicitudesService.evaluar(solicitud))
+            .thenReturn(new ColaSolicitudesService.EvaluacionPresupuesto(
+                false, 1, "No hay cupos libres. Podés ampliar los cupos del servicio."));
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request()))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("No hay cupos libres");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_fueraDeTurno_lanzaConflicto() {
+        prepararCreacion();
+        when(colaSolicitudesService.evaluar(solicitud))
+            .thenReturn(new ColaSolicitudesService.EvaluacionPresupuesto(
+                false, 2, "Hay solicitudes anteriores esperando cupo."));
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request()))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("solicitudes anteriores");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_otroArtista_lanzaAccesoDenegado() {
+        prepararCreacion();
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, 99L, request()))
+            .isInstanceOf(AccesoDenegadoException.class)
+            .hasMessageContaining("No podés presupuestar");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_estadoInvalido_lanzaConflicto() {
+        solicitud.setEstado(EstadoSolicitud.PRESUPUESTADA);
+        prepararCreacion();
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request()))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("pendientes o en lista de espera");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_presupuestoExistente_lanzaConflicto() {
+        prepararCreacion();
+        when(presupuestoRepository.existsBySolicitudIdSolicitud(SOLICITUD)).thenReturn(true);
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request()))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("Ya enviaste un presupuesto");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_servicioArchivado_lanzaConflicto() {
+        servicio.setEstado(EstadoServicio.ARCHIVADO);
+        prepararCreacion();
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request()))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("archivado");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_sinFecha_usaVigenciaPorDefecto() {
+        prepararCreacion();
+        LocalDateTime antes = LocalDateTime.now();
+
+        SolicitudDTO resultado = presupuestoService.crear(
+            SOLICITUD, ARTISTA, request());
+
+        LocalDateTime vencimiento = resultado.getPresupuesto().getFechaVencimiento();
+        assertThat(vencimiento).isAfter(antes.plusHours(71));
+        assertThat(vencimiento).isBefore(antes.plusHours(73));
+    }
+
+    @Test
+    void crear_conFecha_usaFinDelDiaElegido() {
+        prepararCreacion();
+        LocalDate fecha = LocalDate.now().plusDays(3);
+        PresupuestoRequest request = request();
+        request.setFechaVencimiento(fecha);
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request);
+
+        assertThat(resultado.getPresupuesto().getFechaVencimiento())
+            .isEqualTo(fecha.atTime(23, 59, 59));
+    }
+
+    @Test
+    void crear_conFechaPasada_lanzaError() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.setFechaVencimiento(LocalDate.now().minusDays(1));
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("futura");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_conNotaYMensaje_losGuarda() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.setMensaje("  Hola, este es el presupuesto.  ");
+        request.getItems().get(0).setNota("  Incluye dos personajes  ");
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request);
+
+        assertThat(resultado.getPresupuesto().getMensaje())
+            .isEqualTo("Hola, este es el presupuesto.");
+        assertThat(resultado.getPresupuesto().getItems().get(0).getNota())
+            .isEqualTo("Incluye dos personajes");
+    }
+
+    @Test
+    void expirarVencidos_marcaVencidaYNotifica() {
+        Solicitud presupuestada = crearSolicitud(EstadoSolicitud.PRESUPUESTADA);
+        Presupuesto presupuesto = new Presupuesto();
+        presupuesto.setIdPresupuesto(5L);
+        presupuesto.setSolicitud(presupuestada);
+        presupuesto.setFechaVencimiento(LocalDateTime.now().minusMinutes(1));
+        when(presupuestoRepository.findVencidos(
+            any(), eq(EstadoSolicitud.PRESUPUESTADA), any(Pageable.class)))
+            .thenReturn(List.of(presupuesto));
+        when(solicitudRepository.findByIdSolicitudForUpdate(SOLICITUD))
+            .thenReturn(Optional.of(presupuestada));
+
+        int expirados = presupuestoService.expirarVencidos();
+
+        assertThat(expirados).isEqualTo(1);
+        assertThat(presupuestada.getEstado()).isEqualTo(EstadoSolicitud.VENCIDA);
+        verify(notificacionService).crearParaUsuario(
+            eq(CLIENTE), eq("PRESUPUESTO_VENCIDO"), eq("Presupuesto vencido"),
+            contains("venció"), eq(SOLICITUD), eq("SOLICITUD"));
+        verify(notificacionService).crearParaUsuario(
+            eq(ARTISTA), eq("PRESUPUESTO_VENCIDO"), eq("Presupuesto vencido"),
+            contains("se liberó el cupo"), eq(SOLICITUD), eq("SOLICITUD"));
+    }
+
+    @Test
+    void expirarVencidos_ignoraSolicitudYaCerrada() {
+        Solicitud rechazada = crearSolicitud(EstadoSolicitud.RECHAZADA);
+        Presupuesto presupuesto = new Presupuesto();
+        presupuesto.setIdPresupuesto(5L);
+        presupuesto.setSolicitud(rechazada);
+        presupuesto.setFechaVencimiento(LocalDateTime.now().minusMinutes(1));
+        when(presupuestoRepository.findVencidos(
+            any(), eq(EstadoSolicitud.PRESUPUESTADA), any(Pageable.class)))
+            .thenReturn(List.of(presupuesto));
+        when(solicitudRepository.findByIdSolicitudForUpdate(SOLICITUD))
+            .thenReturn(Optional.of(rechazada));
+
+        int expirados = presupuestoService.expirarVencidos();
+
+        assertThat(expirados).isZero();
+        assertThat(rechazada.getEstado()).isEqualTo(EstadoSolicitud.RECHAZADA);
+        verifyNoInteractions(notificacionService);
+    }
+
+    @Test
+    void expirarVencidos_ignoraFechaFutura() {
+        Solicitud presupuestada = crearSolicitud(EstadoSolicitud.PRESUPUESTADA);
+        Presupuesto presupuesto = new Presupuesto();
+        presupuesto.setIdPresupuesto(5L);
+        presupuesto.setSolicitud(presupuestada);
+        presupuesto.setFechaVencimiento(LocalDateTime.now().plusHours(1));
+        when(presupuestoRepository.findVencidos(
+            any(), eq(EstadoSolicitud.PRESUPUESTADA), any(Pageable.class)))
+            .thenReturn(List.of(presupuesto));
+        when(solicitudRepository.findByIdSolicitudForUpdate(SOLICITUD))
+            .thenReturn(Optional.of(presupuestada));
+
+        int expirados = presupuestoService.expirarVencidos();
+
+        assertThat(expirados).isZero();
+        assertThat(presupuestada.getEstado()).isEqualTo(EstadoSolicitud.PRESUPUESTADA);
+        verifyNoInteractions(notificacionService);
+    }
+
+    private void prepararCreacion() {
+        lenient().when(solicitudRepository.findByIdSolicitudForUpdate(SOLICITUD))
+            .thenReturn(Optional.of(solicitud));
+        lenient().when(presupuestoRepository.existsBySolicitudIdSolicitud(SOLICITUD))
+            .thenReturn(false);
+        lenient().when(servicioRepository.findByIdServicioForUpdate(SERVICIO))
+            .thenReturn(Optional.of(servicio));
+        lenient().when(colaSolicitudesService.evaluar(solicitud))
+            .thenReturn(new ColaSolicitudesService.EvaluacionPresupuesto(
+                true, 1, null));
+        lenient().when(configuracionPresupuestoService.obtener())
+            .thenReturn(configuracion);
+        lenient().when(presupuestoRepository.save(any(Presupuesto.class)))
+            .thenAnswer(inv -> {
+                Presupuesto guardado = inv.getArgument(0);
+                guardado.setIdPresupuesto(99L);
+                return guardado;
+            });
+    }
+
+    private Solicitud crearSolicitud(EstadoSolicitud estado) {
+        Solicitud nueva = new Solicitud();
+        nueva.setIdSolicitud(SOLICITUD);
+        nueva.setServicio(servicio);
+        nueva.setCliente(cliente);
+        nueva.setArtista(artista);
+        nueva.setEstado(estado);
+        nueva.setCantidadDibujos(2);
+        nueva.setPrecioBase(new BigDecimal("100.00"));
+        nueva.setMoneda(moneda);
+        nueva.setFechaCreacion(LocalDateTime.now().minusHours(1));
+        nueva.agregarItem(crearItem(ITEM_1, "Dibujo 1", 0));
+        nueva.agregarItem(crearItem(ITEM_2, "Dibujo 2", 1));
+        return nueva;
+    }
+
+    private ItemSolicitud crearItem(Long id, String nombre, int orden) {
+        ItemSolicitud item = new ItemSolicitud();
+        item.setIdItemSolicitud(id);
+        item.setNombre(nombre);
+        item.setOrden(orden);
+        item.setEstado("PENDIENTE");
+        return item;
+    }
+
+    private PresupuestoRequest request() {
+        PresupuestoRequest request = new PresupuestoRequest();
+        request.setTiempoEntregaValor(2);
+        request.setTiempoEntregaUnidad(ETiempoEntregaUnidad.SEMANAS);
+        request.setItems(new ArrayList<>(List.of(
+            itemRequest(ITEM_1),
+            itemRequest(ITEM_2))));
+        return request;
+    }
+
+    private ItemPresupuestoRequest itemRequest(Long idItemSolicitud) {
+        ItemPresupuestoRequest item = new ItemPresupuestoRequest();
+        item.setIdItemSolicitud(idItemSolicitud);
+        item.setRecargos(new ArrayList<>());
+        return item;
+    }
+
+    private RecargoPresupuestoRequest recargo(
+            String descripcion, TipoRecargo tipo, String valor) {
+        RecargoPresupuestoRequest recargo = new RecargoPresupuestoRequest();
+        recargo.setDescripcion(descripcion);
+        recargo.setTipo(tipo);
+        recargo.setValor(new BigDecimal(valor));
+        return recargo;
+    }
+}

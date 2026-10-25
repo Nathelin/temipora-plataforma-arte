@@ -290,8 +290,17 @@ onMounted(cargar)
                 >
                   {{ estadoDe(solicitud.estado).texto }}
                 </span>
-                <span v-if="solicitud.precioBase != null" class="text-xs text-cafe/50">
+                <span v-if="solicitud.precioFinal != null" class="text-xs font-semibold text-coral">
+                  Presupuesto: {{ formatearPrecio(solicitud.precioFinal, solicitud.moneda) }}
+                </span>
+                <span v-else-if="solicitud.precioBase != null" class="text-xs text-cafe/50">
                   {{ formatearPrecio(solicitud.precioBase, solicitud.moneda) }} por dibujo
+                </span>
+                <span
+                  v-if="solicitud.fechaVencimiento && solicitud.estado === 'PRESUPUESTADA'"
+                  class="text-xs text-cafe/50"
+                >
+                  Vence {{ formatearFechaSolicitud(solicitud.fechaVencimiento, { corta: true }) }}
                 </span>
               </div>
 

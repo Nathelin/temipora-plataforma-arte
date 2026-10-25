@@ -43,6 +43,7 @@ const secciones = [
       { nombre: 'Países', to: '/admin/ajustes/paises' },
       { nombre: 'Monedas', to: '/admin/ajustes/monedas' },
       { nombre: 'Cotización', to: '/admin/ajustes/cotizacion' },
+      { nombre: 'Presupuestos', to: '/admin/ajustes/presupuestos' },
     ],
   },
   { nombre: 'Moderación', to: null, activa: false },

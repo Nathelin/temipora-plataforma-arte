@@ -29,6 +29,8 @@ public class SolicitudResumenDTO {
     private boolean prioridadDefinidaPorCliente;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaActualizacion;
+    private BigDecimal precioFinal;
+    private LocalDateTime fechaVencimiento;
 
     public static SolicitudResumenDTO desdeSolicitud(Solicitud solicitud) {
         return SolicitudResumenDTO.builder()
@@ -51,6 +53,12 @@ public class SolicitudResumenDTO {
             .prioridadDefinidaPorCliente(solicitud.isPrioridadDefinidaPorCliente())
             .fechaCreacion(solicitud.getFechaCreacion())
             .fechaActualizacion(solicitud.getFechaActualizacion())
+            .precioFinal(solicitud.getPresupuesto() != null
+                ? solicitud.getPresupuesto().getPrecioFinal()
+                : null)
+            .fechaVencimiento(solicitud.getPresupuesto() != null
+                ? solicitud.getPresupuesto().getFechaVencimiento()
+                : null)
             .build();
     }
 }

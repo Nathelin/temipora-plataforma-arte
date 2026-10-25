@@ -7,5 +7,6 @@ public enum EstadoSolicitud {
     PAGADA,
     FINALIZADA,
     RECHAZADA,
-    CANCELADA
+    CANCELADA,
+    VENCIDA
 }

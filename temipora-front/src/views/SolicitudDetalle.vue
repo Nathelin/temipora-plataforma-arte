@@ -8,10 +8,13 @@ import {
   datosContraparte,
   estadoDe,
   formatearFechaSolicitud,
+  gruposDeRespuestas,
 } from '../servicios/solicitudes'
 import { estadoServicioDe } from '../servicios/servicios'
 import VisorImagenes from '../components/VisorImagenes.vue'
 import ModalRechazo from '../components/ModalRechazo.vue'
+import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+import TarjetaPresupuesto from '../components/TarjetaPresupuesto.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -59,10 +62,28 @@ const modalRechazoAbierto = ref(false)
 const rechazando = ref(false)
 const errorRechazo = ref('')
 const avisoExito = ref('')
+const modalRetiroAbierto = ref(false)
+const retirando = ref(false)
+const errorRetiro = ref('')
 
 const puedeRechazar = computed(
   () => esArtistaDeLaSolicitud.value
     && ['PENDIENTE', 'EN_LISTA_ESPERA'].includes(solicitud.value?.estado),
+)
+const puedePresupuestar = computed(
+  () => esArtistaDeLaSolicitud.value
+    && ['PENDIENTE', 'EN_LISTA_ESPERA'].includes(solicitud.value?.estado)
+    && solicitud.value?.puedePresupuestar === true,
+)
+const bloqueoPresupuesto = computed(() => {
+  if (!esArtistaDeLaSolicitud.value) return ''
+  if (!['PENDIENTE', 'EN_LISTA_ESPERA'].includes(solicitud.value?.estado)) return ''
+  if (solicitud.value?.puedePresupuestar) return ''
+  return solicitud.value?.motivoNoPresupuestable
+    || 'No podés presupuestar esta solicitud todavía.'
+})
+const puedeEditarServicio = computed(
+  () => solicitud.value?.estadoServicio !== 'ARCHIVADO',
 )
 const textoMotivoRechazo = computed(() => {
   if (solicitud.value?.motivoRechazo) return solicitud.value.motivoRechazo
@@ -70,34 +91,6 @@ const textoMotivoRechazo = computed(() => {
     ? 'No especificaste un motivo.'
     : 'El artista decidió no mencionar el motivo.'
 })
-
-function gruposDeRespuestas(item) {
-  const respuestas = [...(item?.respuestas || [])].sort((a, b) => {
-    const orden = (a.orden ?? 0) - (b.orden ?? 0)
-    return orden !== 0 ? orden : (a.suborden ?? 0) - (b.suborden ?? 0)
-  })
-  const grupos = new Map()
-
-  for (const respuesta of respuestas) {
-    const valor = respuesta.valor
-    if (valor === null || valor === undefined || String(valor).trim() === '') continue
-
-    const clave = respuesta.idPregunta != null
-      ? `pregunta-${respuesta.idPregunta}`
-      : `respuesta-${respuesta.orden}-${respuesta.enunciado}`
-    if (!grupos.has(clave)) {
-      grupos.set(clave, {
-        clave,
-        enunciado: respuesta.enunciado,
-        codigoTipo: respuesta.codigoTipo,
-        valores: [],
-      })
-    }
-    grupos.get(clave).valores.push(String(valor))
-  }
-
-  return [...grupos.values()]
-}
 
 const dibujosAbiertos = ref(new Set())
 const visor = ref({ abierto: false, imagenes: [], indice: 0, etiqueta: '', descripcion: '' })
@@ -173,6 +166,45 @@ async function confirmarRechazo(motivo) {
     errorRechazo.value = e.response?.data?.message || 'No se pudo rechazar la solicitud.'
   } finally {
     rechazando.value = false
+  }
+}
+
+function irAPresupuestar() {
+  if (!solicitud.value?.idSolicitud) return
+  router.push({
+    name: 'presupuesto-crear',
+    params: { idSolicitud: solicitud.value.idSolicitud },
+  })
+}
+
+function abrirModalRetiro() {
+  errorRetiro.value = ''
+  modalRetiroAbierto.value = true
+}
+
+function cerrarModalRetiro() {
+  if (!retirando.value) modalRetiroAbierto.value = false
+}
+
+async function confirmarRetiro() {
+  if (retirando.value) return
+  retirando.value = true
+  errorRetiro.value = ''
+  try {
+    const res = await api.post(
+      `/solicitudes-servicio/${solicitud.value.idSolicitud}/retirar-presupuesto`,
+    )
+    solicitud.value = res.data
+    modalRetiroAbierto.value = false
+    avisoExito.value = 'El presupuesto fue retirado y el cupo quedó liberado.'
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    errorRetiro.value = e.response?.data?.message || 'No se pudo retirar el presupuesto.'
+  } finally {
+    retirando.value = false
   }
 }
 
@@ -274,6 +306,14 @@ onMounted(cargar)
         >
           {{ estadoServicioInfo.texto }}
         </span>
+      </p>
+
+      <p
+        v-if="solicitud.estado === 'VENCIDA'"
+        class="mt-4 rounded-xl border border-cafe/25 bg-cafe/5 px-4 py-3 text-sm leading-relaxed text-cafe"
+        role="status"
+      >
+        El presupuesto venció y el cupo quedó liberado. Si querés, podés volver a solicitar el servicio.
       </p>
 
       <div class="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -457,6 +497,14 @@ onMounted(cargar)
               </article>
             </div>
           </section>
+
+          <TarjetaPresupuesto
+            v-if="solicitud.presupuesto"
+            :presupuesto="solicitud.presupuesto"
+            :estado="solicitud.estado"
+            :es-artista="esArtistaDeLaSolicitud"
+            @retirar="abrirModalRetiro"
+          />
         </div>
 
         <aside class="space-y-4 lg:sticky lg:top-16 lg:h-fit lg:self-start">
@@ -485,6 +533,13 @@ onMounted(cargar)
                 <dt class="text-cafe/55">Lista de espera</dt>
                 <dd class="text-right font-medium text-cafe">Posición {{ solicitud.posicionListaEspera }}</dd>
               </div>
+              <div
+                v-if="solicitud.posicionCola && ['PENDIENTE', 'EN_LISTA_ESPERA'].includes(solicitud.estado)"
+                class="flex items-start justify-between gap-4"
+              >
+                <dt class="text-cafe/55">Posición en la cola</dt>
+                <dd class="text-right font-medium text-cafe">{{ solicitud.posicionCola }}</dd>
+              </div>
             </dl>
           </section>
 
@@ -508,8 +563,35 @@ onMounted(cargar)
             >
               Rechazaste esta solicitud.
             </p>
+            <p
+              v-else-if="esArtistaDeLaSolicitud && solicitud.estado === 'VENCIDA'"
+              class="mt-2 text-xs leading-relaxed text-cafe/60"
+            >
+              El presupuesto venció y el cupo quedó liberado.
+            </p>
+            <p
+              v-else-if="esArtistaDeLaSolicitud && solicitud.presupuesto"
+              class="mt-2 text-xs leading-relaxed text-cafe/60"
+            >
+              Ya enviaste el presupuesto. Podés retirarlo si necesitás cambiarlo.
+            </p>
             <p v-else-if="esArtistaDeLaSolicitud" class="mt-2 text-xs leading-relaxed text-cafe/60">
               Esta solicitud ya no se puede rechazar.
+            </p>
+            <p
+              v-else-if="solicitud.estado === 'RECHAZADA'"
+              class="mt-2 text-xs leading-relaxed text-cafe/60"
+            >
+              Esta solicitud fue rechazada. Podés volver a solicitar el servicio.
+            </p>
+            <p
+              v-else-if="solicitud.estado === 'VENCIDA'"
+              class="mt-2 text-xs leading-relaxed text-cafe/60"
+            >
+              El presupuesto venció. Podés volver a solicitar el servicio.
+            </p>
+            <p v-else-if="solicitud.presupuesto" class="mt-2 text-xs leading-relaxed text-cafe/60">
+              El artista ya envió el presupuesto. El pago va a estar disponible en el próximo paso.
             </p>
             <p v-else class="mt-2 text-xs leading-relaxed text-cafe/60">
               Cuando el artista envíe el presupuesto, vas a poder pagarlo desde acá.
@@ -525,12 +607,31 @@ onMounted(cargar)
                 Rechazar
               </button>
               <button
+                v-if="puedePresupuestar"
+                type="button"
+                class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+                @click="irAPresupuestar"
+              >
+                Presupuestar
+              </button>
+              <button
+                v-else-if="solicitud.estado === 'PENDIENTE' || solicitud.estado === 'EN_LISTA_ESPERA'"
                 type="button"
                 disabled
                 class="inline-flex min-h-10 cursor-not-allowed items-center justify-center rounded-full bg-coral/40 px-4 text-sm font-semibold text-white/70"
               >
                 Presupuestar
               </button>
+              <p v-if="bloqueoPresupuesto" class="text-xs leading-relaxed text-cafe/60">
+                {{ bloqueoPresupuesto }}
+              </p>
+              <router-link
+                v-if="bloqueoPresupuesto && puedeEditarServicio"
+                :to="{ name: 'servicio-editar', params: { id: solicitud.idServicio } }"
+                class="inline-flex text-xs font-semibold text-coral transition hover:text-rojizo"
+              >
+                Editar servicio para ampliar cupos →
+              </router-link>
             </div>
           </section>
         </aside>
@@ -553,5 +654,24 @@ onMounted(cargar)
       @cerrar="cerrarModalRechazo"
       @confirmar="confirmarRechazo"
     />
+
+    <ModalConfirmacion
+      :abierto="modalRetiroAbierto"
+      titulo="¿Retirar el presupuesto?"
+      mensaje="El cliente va a poder volver a solicitar el servicio. Si el presupuesto estaba reservando un cupo, se libera."
+      :texto-confirmar="retirando ? 'Retirando...' : 'Retirar presupuesto'"
+      texto-cancelar="Volver"
+      :destructivo="true"
+      @confirmar="confirmarRetiro"
+      @cerrar="cerrarModalRetiro"
+    >
+      <p
+        v-if="errorRetiro"
+        class="mt-3 rounded-xl border border-rojizo/25 bg-rojizo/5 px-3 py-2 text-xs leading-relaxed text-rojizo"
+        role="alert"
+      >
+        {{ errorRetiro }}
+      </p>
+    </ModalConfirmacion>
   </div>
 </template>
