@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,6 +59,9 @@ public class Presupuesto {
 
     @Column(name = "tiempo_entrega_dias", nullable = false)
     private Integer tiempoEntregaDias;
+
+    @Column(name = "fecha_inicio_estimada")
+    private LocalDate fechaInicioEstimada;
 
     @Column(length = 500)
     private String mensaje;

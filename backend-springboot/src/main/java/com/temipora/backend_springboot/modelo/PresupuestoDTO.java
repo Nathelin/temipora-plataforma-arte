@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -24,6 +25,7 @@ public class PresupuestoDTO {
     private Integer tiempoEntregaValor;
     private String tiempoEntregaUnidad;
     private Integer tiempoEntregaDias;
+    private LocalDate fechaInicioEstimada;
     private String mensaje;
     private LocalDateTime fechaEmision;
     private LocalDateTime fechaVencimiento;
@@ -42,6 +44,7 @@ public class PresupuestoDTO {
                 ? presupuesto.getTiempoEntregaUnidad().name()
                 : null)
             .tiempoEntregaDias(presupuesto.getTiempoEntregaDias())
+            .fechaInicioEstimada(presupuesto.getFechaInicioEstimada())
             .mensaje(presupuesto.getMensaje())
             .fechaEmision(presupuesto.getFechaEmision())
             .fechaVencimiento(presupuesto.getFechaVencimiento())

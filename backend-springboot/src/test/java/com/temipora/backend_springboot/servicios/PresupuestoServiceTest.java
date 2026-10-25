@@ -337,6 +337,77 @@ class PresupuestoServiceTest {
     }
 
     @Test
+    void crear_guardaFechaInicioEstimada() {
+        prepararCreacion();
+        LocalDate inicio = LocalDate.now().plusDays(10);
+        PresupuestoRequest request = request();
+        request.setFechaInicioEstimada(inicio);
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request);
+
+        assertThat(resultado.getPresupuesto().getFechaInicioEstimada())
+            .isEqualTo(inicio);
+        assertThat(resultado.getPresupuesto().getTiempoEntregaDias())
+            .isEqualTo(14);
+    }
+
+    @Test
+    void crear_inicioEstimadoPasado_lanzaError() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.setFechaInicioEstimada(LocalDate.now().minusDays(1));
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("anterior a hoy");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_inicioEstimadoMayorAUnAnio_lanzaError() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.setFechaInicioEstimada(LocalDate.now().plusYears(1).plusDays(1));
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("superar un año");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_plazoMayorAUnAnio_lanzaError() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.setTiempoEntregaValor(53);
+        request.setTiempoEntregaUnidad(ETiempoEntregaUnidad.SEMANAS);
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("plazo máximo")
+            .hasMessageContaining("1 año");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_plazoDeUnAnio_esValido() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.setTiempoEntregaValor(12);
+        request.setTiempoEntregaUnidad(ETiempoEntregaUnidad.MESES);
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request);
+
+        assertThat(resultado.getPresupuesto().getTiempoEntregaValor()).isEqualTo(12);
+        assertThat(resultado.getPresupuesto().getTiempoEntregaUnidad())
+            .isEqualTo("MESES");
+        assertThat(resultado.getPresupuesto().getTiempoEntregaDias()).isEqualTo(360);
+    }
+
+    @Test
     void crear_conNotaYMensaje_losGuarda() {
         prepararCreacion();
         PresupuestoRequest request = request();

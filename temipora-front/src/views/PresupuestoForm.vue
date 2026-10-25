@@ -4,8 +4,13 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
 import {
+  MAX_PLAZO_POR_UNIDAD,
   UNIDADES_ENTREGA,
+  aFechaISO,
+  fechaEntregaEstimada,
+  formatearFechaISO,
   gruposDeRespuestas,
+  sumarPlazo,
   textoTiempoEntrega,
 } from '../servicios/solicitudes'
 import { useNotificaciones } from '../composables/useNotificaciones'
@@ -17,7 +22,8 @@ const { exito } = useNotificaciones()
 const idSolicitud = computed(() => Number(route.params.idSolicitud))
 const idActual = Number(localStorage.getItem('idUsuario'))
 const fechaActual = new Date()
-const hoy = `${fechaActual.getFullYear()}-${String(fechaActual.getMonth() + 1).padStart(2, '0')}-${String(fechaActual.getDate()).padStart(2, '0')}`
+const hoy = aFechaISO(fechaActual)
+const maxInicio = aFechaISO(sumarPlazo(hoy, 12, 'MESES'))
 
 const solicitud = ref(null)
 const cargando = ref(true)
@@ -35,6 +41,7 @@ const pasos = [
 const form = ref({
   tiempoEntregaValor: 1,
   tiempoEntregaUnidad: 'SEMANAS',
+  fechaInicioEstimada: '',
   fechaVencimiento: '',
   mensaje: '',
   items: [],
@@ -74,6 +81,37 @@ const entregaTexto = computed(() => textoTiempoEntrega(
   form.value.tiempoEntregaValor,
   form.value.tiempoEntregaUnidad,
 ))
+const maxPlazo = computed(
+  () => MAX_PLAZO_POR_UNIDAD[form.value.tiempoEntregaUnidad] || 365,
+)
+const maxPlazoTexto = computed(() => textoTiempoEntrega(
+  maxPlazo.value,
+  form.value.tiempoEntregaUnidad,
+))
+const entregaSiPagaHoy = computed(() => fechaEntregaEstimada({
+  fechaPago: hoy,
+  fechaInicioEstimada: form.value.fechaInicioEstimada,
+  valor: form.value.tiempoEntregaValor,
+  unidad: form.value.tiempoEntregaUnidad,
+}))
+const entregaAlVencer = computed(() => {
+  if (!form.value.fechaVencimiento) return null
+  return fechaEntregaEstimada({
+    fechaPago: form.value.fechaVencimiento,
+    fechaInicioEstimada: form.value.fechaInicioEstimada,
+    valor: form.value.tiempoEntregaValor,
+    unidad: form.value.tiempoEntregaUnidad,
+  })
+})
+const inicioEstimadoTexto = computed(() => form.value.fechaInicioEstimada
+  ? formatearFechaISO(form.value.fechaInicioEstimada, { larga: true })
+  : 'Al confirmarse el pago')
+const entregaSiPagaHoyTexto = computed(
+  () => formatearFechaISO(entregaSiPagaHoy.value, { larga: true }),
+)
+const entregaAlVencerTexto = computed(
+  () => formatearFechaISO(entregaAlVencer.value, { larga: true }),
+)
 
 function formatear(valor) {
   return formatearPrecio(valor, moneda.value)
@@ -174,6 +212,20 @@ function validarPaso1() {
     errorEnvio.value = 'Elegí la unidad del tiempo de entrega.'
     return false
   }
+  if (valor > maxPlazo.value) {
+    errorEnvio.value = `El plazo máximo es de un año (${maxPlazoTexto.value}).`
+    return false
+  }
+  if (form.value.fechaInicioEstimada) {
+    if (form.value.fechaInicioEstimada < hoy) {
+      errorEnvio.value = 'La fecha de inicio estimada no puede ser anterior a hoy.'
+      return false
+    }
+    if (form.value.fechaInicioEstimada > maxInicio) {
+      errorEnvio.value = 'La fecha de inicio estimada no puede superar un año desde hoy.'
+      return false
+    }
+  }
   if (form.value.fechaVencimiento) {
     const fecha = new Date(`${form.value.fechaVencimiento}T23:59:59`)
     if (Number.isNaN(fecha.getTime()) || fecha <= new Date()) {
@@ -248,6 +300,7 @@ async function enviar() {
     const payload = {
       tiempoEntregaValor: Number(form.value.tiempoEntregaValor),
       tiempoEntregaUnidad: form.value.tiempoEntregaUnidad,
+      fechaInicioEstimada: form.value.fechaInicioEstimada || null,
       fechaVencimiento: form.value.fechaVencimiento || null,
       mensaje: form.value.mensaje?.trim() || null,
       items: items.value.map((item) => ({
@@ -397,19 +450,39 @@ onMounted(cargar)
         >
           <h2 class="text-xl font-semibold text-granate">Tiempo de entrega</h2>
           <p class="mt-1 text-sm text-cafe/60">
-            Definí el máximo de tiempo desde que el cliente paga hasta que entregás el trabajo.
+            Definí cuándo podés empezar y cuánto vas a tardar como máximo. La fecha de
+            entrega se recalcula al confirmarse el pago.
           </p>
+
+          <div class="mt-5">
+            <label for="inicio-estimado" class="block text-sm text-cafe">
+              Inicio estimado <span class="text-cafe/40">(opcional)</span>
+            </label>
+            <input
+              id="inicio-estimado"
+              v-model="form.fechaInicioEstimada"
+              type="date"
+              :min="hoy"
+              :max="maxInicio"
+              class="mt-2 block w-full rounded-lg border-0 px-3 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral sm:max-w-xs"
+            />
+            <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+              Si no elegís una fecha, el plazo se cuenta desde el pago. Podés indicar
+              hasta un año a futuro.
+            </p>
+          </div>
 
           <div class="mt-5 grid gap-4 sm:grid-cols-2">
             <div>
               <label for="tiempo-entrega" class="block text-sm text-cafe">
-                Tiempo máximo <span class="text-rojizo">*</span>
+                Plazo máximo <span class="text-rojizo">*</span>
               </label>
               <input
                 id="tiempo-entrega"
                 v-model.number="form.tiempoEntregaValor"
                 type="number"
                 min="1"
+                :max="maxPlazo"
                 step="1"
                 required
                 class="mt-2 block w-full rounded-lg border-0 px-3 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
@@ -438,12 +511,12 @@ onMounted(cargar)
           </div>
 
           <p class="mt-3 text-xs text-cafe/50">
-            Entrega estimada: <span class="font-semibold text-cafe">{{ entregaTexto }}</span>
+            Máximo un año: {{ maxPlazoTexto }}.
           </p>
 
           <div class="mt-6 border-t border-rosa/40 pt-5">
             <label for="fecha-vencimiento" class="block text-sm text-cafe">
-              Vencimiento del presupuesto <span class="text-cafe/40">(opcional)</span>
+              Oferta válida hasta <span class="text-cafe/40">(opcional)</span>
             </label>
             <input
               id="fecha-vencimiento"
@@ -454,6 +527,28 @@ onMounted(cargar)
             />
             <p class="mt-2 text-xs leading-relaxed text-cafe/50">
               Si no elegís una fecha, se usa el vencimiento por defecto configurado por el sistema.
+            </p>
+          </div>
+
+          <div class="mt-6 rounded-xl border border-coral/25 bg-coral/5 p-4">
+            <p class="text-sm font-semibold text-granate">Fecha de entrega estimada</p>
+            <dl class="mt-3 space-y-2 text-sm">
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-cafe/55">Inicio estimado</dt>
+                <dd class="text-right font-medium text-cafe">{{ inicioEstimadoTexto }}</dd>
+              </div>
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-cafe/55">Si el cliente paga hoy</dt>
+                <dd class="text-right font-semibold text-granate">{{ entregaSiPagaHoyTexto }}</dd>
+              </div>
+              <div v-if="form.fechaVencimiento" class="flex items-start justify-between gap-4">
+                <dt class="text-cafe/55">Si paga al vencer la oferta</dt>
+                <dd class="text-right font-semibold text-granate">{{ entregaAlVencerTexto }}</dd>
+              </div>
+            </dl>
+            <p class="mt-3 text-xs leading-relaxed text-cafe/50">
+              La fecha se recalcula al confirmarse el pago. Si el pago llega después del
+              inicio estimado, el plazo se cuenta desde el pago.
             </p>
           </div>
         </section>
@@ -614,9 +709,23 @@ onMounted(cargar)
                 <dd class="text-right font-medium text-cafe">{{ entregaTexto }}</dd>
               </div>
               <div class="flex items-start justify-between gap-4">
-                <dt class="text-cafe/55">Vencimiento</dt>
+                <dt class="text-cafe/55">Inicio estimado</dt>
+                <dd class="text-right font-medium text-cafe">{{ inicioEstimadoTexto }}</dd>
+              </div>
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-cafe/55">Entrega si paga hoy</dt>
+                <dd class="text-right font-medium text-cafe">{{ entregaSiPagaHoyTexto }}</dd>
+              </div>
+              <div v-if="form.fechaVencimiento" class="flex items-start justify-between gap-4">
+                <dt class="text-cafe/55">Si paga al vencer</dt>
+                <dd class="text-right font-medium text-cafe">{{ entregaAlVencerTexto }}</dd>
+              </div>
+              <div class="flex items-start justify-between gap-4">
+                <dt class="text-cafe/55">Oferta válida hasta</dt>
                 <dd class="text-right font-medium text-cafe">
-                  {{ form.fechaVencimiento || 'Según la configuración del sistema' }}
+                  {{ form.fechaVencimiento
+                    ? formatearFechaISO(form.fechaVencimiento, { larga: true })
+                    : 'Según la configuración del sistema' }}
                 </dd>
               </div>
               <div class="flex items-start justify-between gap-4 border-t border-coral/15 pt-3">

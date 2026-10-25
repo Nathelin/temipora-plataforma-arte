@@ -22,6 +22,8 @@ public class PresupuestoRequest {
     @NotNull(message = "La unidad del tiempo de entrega es obligatoria.")
     private ETiempoEntregaUnidad tiempoEntregaUnidad;
 
+    private LocalDate fechaInicioEstimada;
+
     private LocalDate fechaVencimiento;
 
     @Size(max = 500, message = "El mensaje no puede superar los 500 caracteres.")

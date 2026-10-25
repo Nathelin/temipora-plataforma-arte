@@ -312,7 +312,7 @@ onMounted(cargar)
                       v-if="solicitud.fechaVencimiento && solicitud.estado === 'PRESUPUESTADA'"
                     >
                       <span aria-hidden="true">·</span>
-                      Vence {{ formatearFechaSolicitud(solicitud.fechaVencimiento, { corta: true }) }}
+                      Oferta vence {{ formatearFechaSolicitud(solicitud.fechaVencimiento, { corta: true }) }}
                     </span>
                   </p>
                 </div>

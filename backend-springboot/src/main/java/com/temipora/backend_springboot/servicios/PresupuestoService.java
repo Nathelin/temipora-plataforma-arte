@@ -84,6 +84,28 @@ public class PresupuestoService {
         if (request.getTiempoEntregaUnidad() == null) {
             throw new IllegalArgumentException("La unidad del tiempo de entrega es obligatoria.");
         }
+
+        LocalDateTime ahora = LocalDateTime.now();
+        LocalDate hoy = ahora.toLocalDate();
+
+        if (CalculadoraEntrega.excedePlazoMaximo(
+                request.getTiempoEntregaValor(),
+                request.getTiempoEntregaUnidad())) {
+            throw new IllegalArgumentException(
+                "El plazo máximo de entrega es de 1 año "
+                    + "(365 días, 52 semanas o 12 meses).");
+        }
+        if (request.getFechaInicioEstimada() != null) {
+            if (request.getFechaInicioEstimada().isBefore(hoy)) {
+                throw new IllegalArgumentException(
+                    "La fecha de inicio estimada no puede ser anterior a hoy.");
+            }
+            if (request.getFechaInicioEstimada().isAfter(
+                    hoy.plusYears(CalculadoraEntrega.MAX_ANIOS_INICIO_ESTIMADO))) {
+                throw new IllegalArgumentException(
+                    "La fecha de inicio estimada no puede superar un año desde hoy.");
+            }
+        }
         if (request.getItems() == null || request.getItems().isEmpty()) {
             throw new IllegalArgumentException(
                 "Tenés que incluir todos los dibujos de la solicitud.");
@@ -150,19 +172,17 @@ public class PresupuestoService {
             throw new ConflictoException("El servicio no tiene una moneda definida.");
         }
 
-        long diasEntrega = (long) request.getTiempoEntregaValor()
-            * request.getTiempoEntregaUnidad().getFactorDias();
-        if (diasEntrega > Integer.MAX_VALUE) {
-            throw new IllegalArgumentException("El tiempo de entrega es demasiado grande.");
-        }
+        long diasEntrega = CalculadoraEntrega.diasNormalizados(
+            request.getTiempoEntregaValor(),
+            request.getTiempoEntregaUnidad());
 
-        LocalDateTime ahora = LocalDateTime.now();
         Presupuesto presupuesto = new Presupuesto();
         presupuesto.setSolicitud(solicitud);
         presupuesto.setMoneda(moneda);
         presupuesto.setTiempoEntregaValor(request.getTiempoEntregaValor());
         presupuesto.setTiempoEntregaUnidad(request.getTiempoEntregaUnidad());
         presupuesto.setTiempoEntregaDias((int) diasEntrega);
+        presupuesto.setFechaInicioEstimada(request.getFechaInicioEstimada());
         presupuesto.setMensaje(limpiarTexto(request.getMensaje(), 500));
         presupuesto.setFechaEmision(ahora);
         presupuesto.setFechaVencimiento(

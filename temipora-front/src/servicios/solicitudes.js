@@ -22,6 +22,82 @@ export function textoTiempoEntrega(valor, unidad) {
   return `${valor} ${valor === 1 ? info.singular : info.plural}`
 }
 
+export const MAX_PLAZO_POR_UNIDAD = {
+  DIAS: 365,
+  SEMANAS: 52,
+  MESES: 12,
+}
+
+export function aFechaISO(fecha) {
+  if (!(fecha instanceof Date) || Number.isNaN(fecha.getTime())) return ''
+  const anio = fecha.getFullYear()
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0')
+  const dia = String(fecha.getDate()).padStart(2, '0')
+  return `${anio}-${mes}-${dia}`
+}
+
+export function fechaISOlocal(valor) {
+  if (valor instanceof Date) {
+    if (Number.isNaN(valor.getTime())) return null
+    return new Date(valor.getFullYear(), valor.getMonth(), valor.getDate())
+  }
+  if (!valor) return null
+  const texto = String(valor).slice(0, 10)
+  const [anio, mes, dia] = texto.split('-').map(Number)
+  if (!anio || !mes || !dia) return null
+  const fecha = new Date(anio, mes - 1, dia)
+  return Number.isNaN(fecha.getTime()) ? null : fecha
+}
+
+function sumarPlazoAFecha(fecha, valor, unidad) {
+  const cantidad = Number(valor)
+  if (!fecha || !Number.isFinite(cantidad) || cantidad < 1) return null
+
+  if (unidad === 'MESES') {
+    const dia = fecha.getDate()
+    const destino = new Date(fecha.getFullYear(), fecha.getMonth() + cantidad, 1)
+    const ultimoDia = new Date(
+      destino.getFullYear(),
+      destino.getMonth() + 1,
+      0,
+    ).getDate()
+    destino.setDate(Math.min(dia, ultimoDia))
+    return destino
+  }
+
+  const dias = unidad === 'SEMANAS' ? cantidad * 7 : cantidad
+  const resultado = new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate())
+  resultado.setDate(resultado.getDate() + dias)
+  return resultado
+}
+
+export function sumarPlazo(fechaISO, valor, unidad) {
+  const fecha = fechaISOlocal(fechaISO)
+  if (!fecha) return null
+  return sumarPlazoAFecha(fecha, valor, unidad)
+}
+
+export function fechaEntregaEstimada({
+  fechaPago,
+  fechaInicioEstimada,
+  valor,
+  unidad,
+} = {}) {
+  const pago = fechaISOlocal(fechaPago)
+  const inicio = fechaISOlocal(fechaInicioEstimada)
+  if (!pago) return null
+  const inicioReal = inicio && inicio > pago ? inicio : pago
+  return sumarPlazoAFecha(inicioReal, valor, unidad)
+}
+
+export function formatearFechaISO(valor, { larga = false } = {}) {
+  const fecha = valor instanceof Date ? valor : fechaISOlocal(valor)
+  if (!fecha) return ''
+  return new Intl.DateTimeFormat('es', larga
+    ? { dateStyle: 'long' }
+    : { dateStyle: 'medium' }).format(fecha)
+}
+
 export const GRUPOS_ESTADO = [
   { clave: 'todas', texto: 'Todas', estados: [] },
   { clave: 'pendientes', texto: 'Pendientes', estados: ['PENDIENTE'] },

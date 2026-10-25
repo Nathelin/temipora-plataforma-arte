@@ -1,7 +1,13 @@
 <script setup>
 import { computed } from 'vue'
 import { formatearPrecio } from '../servicios/moneda'
-import { formatearFechaSolicitud, textoTiempoEntrega } from '../servicios/solicitudes'
+import {
+  aFechaISO,
+  fechaEntregaEstimada,
+  formatearFechaISO,
+  formatearFechaSolicitud,
+  textoTiempoEntrega,
+} from '../servicios/solicitudes'
 
 const props = defineProps({
   presupuesto: { type: Object, required: true },
@@ -11,10 +17,38 @@ const props = defineProps({
 
 defineEmits(['retirar'])
 
+const hoy = aFechaISO(new Date())
 const entrega = computed(() => textoTiempoEntrega(
   props.presupuesto?.tiempoEntregaValor,
   props.presupuesto?.tiempoEntregaUnidad,
 ))
+const inicioEstimado = computed(
+  () => props.presupuesto?.fechaInicioEstimada || null,
+)
+const inicioEstimadoTexto = computed(() => inicioEstimado.value
+  ? formatearFechaISO(inicioEstimado.value, { larga: true })
+  : 'Al confirmarse el pago')
+const entregaSiPagaHoy = computed(() => fechaEntregaEstimada({
+  fechaPago: hoy,
+  fechaInicioEstimada: inicioEstimado.value,
+  valor: props.presupuesto?.tiempoEntregaValor,
+  unidad: props.presupuesto?.tiempoEntregaUnidad,
+}))
+const entregaSiPagaHoyTexto = computed(
+  () => formatearFechaISO(entregaSiPagaHoy.value, { larga: true }),
+)
+const entregaAlVencer = computed(() => {
+  if (!props.presupuesto?.fechaVencimiento) return null
+  return fechaEntregaEstimada({
+    fechaPago: props.presupuesto.fechaVencimiento,
+    fechaInicioEstimada: inicioEstimado.value,
+    valor: props.presupuesto?.tiempoEntregaValor,
+    unidad: props.presupuesto?.tiempoEntregaUnidad,
+  })
+})
+const entregaAlVencerTexto = computed(
+  () => formatearFechaISO(entregaAlVencer.value, { larga: true }),
+)
 const puedeRetirar = computed(
   () => props.esArtista && props.estado === 'PRESUPUESTADA',
 )
@@ -74,7 +108,7 @@ function formatearRecargo(recargo) {
         <dd class="text-right font-semibold text-cafe sm:mt-1 sm:text-left">{{ entrega }}</dd>
       </div>
       <div class="flex items-start justify-between gap-3 rounded-xl bg-rosa/10 px-3 py-2 sm:block">
-        <dt class="text-cafe/55">Vence</dt>
+        <dt class="text-cafe/55">Oferta válida hasta</dt>
         <dd class="text-right font-semibold text-cafe sm:mt-1 sm:text-left">
           {{ presupuesto.fechaVencimiento
             ? formatearFechaSolicitud(presupuesto.fechaVencimiento, { corta: true })
@@ -82,6 +116,33 @@ function formatearRecargo(recargo) {
         </dd>
       </div>
     </dl>
+
+    <div class="mt-4 rounded-xl border border-coral/20 bg-coral/5 p-4">
+      <p class="text-xs font-semibold uppercase tracking-[0.14em] text-coral">
+        Fecha de entrega estimada
+      </p>
+      <dl class="mt-3 space-y-2 text-sm">
+        <div class="flex items-start justify-between gap-4">
+          <dt class="text-cafe/55">Inicio estimado</dt>
+          <dd class="text-right font-medium text-cafe">{{ inicioEstimadoTexto }}</dd>
+        </div>
+        <div v-if="vigente && entregaSiPagaHoy" class="flex items-start justify-between gap-4">
+          <dt class="text-cafe/55">
+            {{ esArtista ? 'Si el cliente paga hoy' : 'Si pagás hoy' }}
+          </dt>
+          <dd class="text-right font-semibold text-granate">{{ entregaSiPagaHoyTexto }}</dd>
+        </div>
+        <div v-if="vigente && entregaAlVencer" class="flex items-start justify-between gap-4">
+          <dt class="text-cafe/55">
+            {{ esArtista ? 'Si el cliente paga al vencer' : 'Si pagás al vencer' }}
+          </dt>
+          <dd class="text-right font-semibold text-granate">{{ entregaAlVencerTexto }}</dd>
+        </div>
+      </dl>
+      <p v-if="vigente" class="mt-3 text-xs leading-relaxed text-cafe/50">
+        La fecha se recalcula al confirmarse el pago.
+      </p>
+    </div>
 
     <p
       v-if="presupuesto.mensaje"
