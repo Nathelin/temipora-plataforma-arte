@@ -131,6 +131,44 @@ class SolicitudServicioControllerTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void cancelar_sinToken_devuelve401() throws Exception {
+        mockMvc.perform(post("/api/solicitudes-servicio/9/cancelar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\":\"Cambié de idea\"}"))
+                .andExpect(status().isUnauthorized());
+
+        verify(solicitudServicioService, never()).cancelar(any(), any(), any());
+    }
+
+    @Test
+    void cancelar_tokenDeCliente_devuelve200() throws Exception {
+        stubUsuarioConRol("cliente1", ERol.CLIENTE);
+        when(usuarioService.getByNombreUsuario("cliente1")).thenReturn(usuario(5L));
+        when(solicitudServicioService.cancelar(eq(9L), eq(5L), eq("Cambié de idea")))
+                .thenReturn(dto());
+
+        mockMvc.perform(post("/api/solicitudes-servicio/9/cancelar")
+                .header("Authorization", "Bearer " + token("cliente1", ERol.CLIENTE))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\":\"Cambié de idea\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.idSolicitud").value(1));
+    }
+
+    @Test
+    void cancelar_tokenDeAdmin_devuelve403() throws Exception {
+        stubUsuarioConRol("admin1", ERol.ADMIN);
+
+        mockMvc.perform(post("/api/solicitudes-servicio/9/cancelar")
+                .header("Authorization", "Bearer " + token("admin1", ERol.ADMIN))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"motivo\":\"Cambié de idea\"}"))
+                .andExpect(status().isForbidden());
+
+        verify(solicitudServicioService, never()).cancelar(any(), any(), any());
+    }
+
     // ---------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------

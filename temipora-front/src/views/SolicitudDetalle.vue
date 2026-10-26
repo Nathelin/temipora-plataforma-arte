@@ -13,6 +13,7 @@ import {
 import { estadoServicioDe } from '../servicios/servicios'
 import VisorImagenes from '../components/VisorImagenes.vue'
 import ModalRechazo from '../components/ModalRechazo.vue'
+import ModalCancelacion from '../components/ModalCancelacion.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import TarjetaPresupuesto from '../components/TarjetaPresupuesto.vue'
 
@@ -69,6 +70,9 @@ const avisoExito = ref('')
 const modalRetiroAbierto = ref(false)
 const retirando = ref(false)
 const errorRetiro = ref('')
+const modalCancelacionAbierto = ref(false)
+const cancelando = ref(false)
+const errorCancelacion = ref('')
 
 const puedeRechazar = computed(
   () => esArtistaDeLaSolicitud.value
@@ -94,6 +98,23 @@ const textoMotivoRechazo = computed(() => {
   return esArtistaDeLaSolicitud.value
     ? 'No especificaste un motivo.'
     : 'El artista decidió no mencionar el motivo.'
+})
+const puedeCancelar = computed(
+  () => !esArtistaDeLaSolicitud.value && solicitud.value?.puedeCancelar === true,
+)
+const textoMotivoCancelacion = computed(() => {
+  if (solicitud.value?.motivoCancelacion) return solicitud.value.motivoCancelacion
+  return esArtistaDeLaSolicitud.value
+    ? 'El cliente decidió no mencionar el motivo.'
+    : 'Decidiste no mencionar el motivo.'
+})
+const mensajeCancelacion = computed(() => {
+  if (solicitud.value?.estado === 'PRESUPUESTADA') {
+    return 'El presupuesto quedará sin efecto y el cupo reservado se va a liberar. '
+      + 'El artista recibirá un aviso y esta acción no se puede deshacer.'
+  }
+  return 'La solicitud saldrá de la cola del artista y recibirá un aviso. '
+    + 'Esta acción no se puede deshacer.'
 })
 
 const dibujosAbiertos = ref(new Set())
@@ -230,6 +251,38 @@ async function confirmarRetiro() {
   }
 }
 
+function abrirModalCancelacion() {
+  errorCancelacion.value = ''
+  modalCancelacionAbierto.value = true
+}
+
+function cerrarModalCancelacion() {
+  if (!cancelando.value) modalCancelacionAbierto.value = false
+}
+
+async function confirmarCancelacion(motivo) {
+  if (cancelando.value) return
+  cancelando.value = true
+  errorCancelacion.value = ''
+  try {
+    const res = await api.post(
+      `/solicitudes-servicio/${solicitud.value.idSolicitud}/cancelar`,
+      { motivo: motivo || null },
+    )
+    solicitud.value = { ...solicitud.value, ...res.data }
+    modalCancelacionAbierto.value = false
+    avisoExito.value = 'La solicitud fue cancelada y el artista recibió el aviso.'
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    errorCancelacion.value = e.response?.data?.message || 'No se pudo cancelar la solicitud.'
+  } finally {
+    cancelando.value = false
+  }
+}
+
 function volver() {
   const destino = localStorage.getItem('rol') === 'ARTISTA' ? 'panel-solicitudes' : 'solicitudes'
   router.push({ name: destino })
@@ -351,6 +404,19 @@ onMounted(cargar)
             <p class="mt-2 text-sm leading-relaxed text-cafe/80">{{ textoMotivoRechazo }}</p>
             <p v-if="solicitud.fechaRechazo" class="mt-2 text-xs text-cafe/50">
               {{ formatearFechaSolicitud(solicitud.fechaRechazo) }}
+            </p>
+          </section>
+
+          <section
+            v-if="solicitud.estado === 'CANCELADA'"
+            class="rounded-2xl border border-rojizo/25 bg-rojizo/5 p-5 sm:p-6"
+          >
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-rojizo">
+              Solicitud cancelada
+            </p>
+            <p class="mt-2 text-sm leading-relaxed text-cafe/80">{{ textoMotivoCancelacion }}</p>
+            <p v-if="solicitud.fechaCancelacion" class="mt-2 text-xs text-cafe/50">
+              {{ formatearFechaSolicitud(solicitud.fechaCancelacion) }}
             </p>
           </section>
 
@@ -645,6 +711,12 @@ onMounted(cargar)
               El presupuesto venció y el cupo quedó liberado.
             </p>
             <p
+              v-else-if="esArtistaDeLaSolicitud && solicitud.estado === 'CANCELADA'"
+              class="mt-2 text-xs leading-relaxed text-cafe/60"
+            >
+              El cliente canceló esta solicitud.
+            </p>
+            <p
               v-else-if="esArtistaDeLaSolicitud && solicitud.presupuesto"
               class="mt-2 text-xs leading-relaxed text-cafe/60"
             >
@@ -652,6 +724,12 @@ onMounted(cargar)
             </p>
             <p v-else-if="esArtistaDeLaSolicitud" class="mt-2 text-xs leading-relaxed text-cafe/60">
               Esta solicitud ya no se puede rechazar.
+            </p>
+            <p
+              v-else-if="solicitud.estado === 'CANCELADA'"
+              class="mt-2 text-xs leading-relaxed text-cafe/60"
+            >
+              Cancelaste esta solicitud. Podés volver a solicitarla cuando quieras.
             </p>
             <p
               v-else-if="solicitud.estado === 'RECHAZADA'"
@@ -666,7 +744,8 @@ onMounted(cargar)
               El presupuesto venció. Podés volver a solicitar el servicio.
             </p>
             <p v-else-if="solicitud.presupuesto" class="mt-2 text-xs leading-relaxed text-cafe/60">
-              El artista ya envió el presupuesto. El pago va a estar disponible en el próximo paso.
+              El artista ya envió el presupuesto. Podés pagarlo cuando esté disponible o cancelar
+              la solicitud si no te sirve.
             </p>
             <p v-else class="mt-2 text-xs leading-relaxed text-cafe/60">
               Cuando el artista envíe el presupuesto, vas a poder pagarlo desde acá.
@@ -708,6 +787,16 @@ onMounted(cargar)
                 Editar servicio para ampliar cupos →
               </router-link>
             </div>
+
+            <div v-if="puedeCancelar" class="mt-4 grid gap-2">
+              <button
+                type="button"
+                class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-4 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10"
+                @click="abrirModalCancelacion"
+              >
+                Cancelar solicitud
+              </button>
+            </div>
           </section>
         </aside>
       </div>
@@ -728,6 +817,15 @@ onMounted(cargar)
       :error="errorRechazo"
       @cerrar="cerrarModalRechazo"
       @confirmar="confirmarRechazo"
+    />
+
+    <ModalCancelacion
+      :abierto="modalCancelacionAbierto"
+      :cargando="cancelando"
+      :error="errorCancelacion"
+      :mensaje="mensajeCancelacion"
+      @cerrar="cerrarModalCancelacion"
+      @confirmar="confirmarCancelacion"
     />
 
     <ModalConfirmacion

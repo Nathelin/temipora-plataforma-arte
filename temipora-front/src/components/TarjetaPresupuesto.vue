@@ -54,6 +54,7 @@ const puedeRetirar = computed(
 )
 const vencido = computed(() => props.estado === 'VENCIDA')
 const retirado = computed(() => props.estado === 'RECHAZADA')
+const cancelado = computed(() => props.estado === 'CANCELADA')
 const vigente = computed(() => props.estado === 'PRESUPUESTADA')
 const items = computed(() => props.presupuesto?.items || [])
 
@@ -72,7 +73,7 @@ function formatearRecargo(recargo) {
 <template>
   <section
     class="rounded-2xl border bg-blanco p-5 sm:p-6"
-    :class="vencido ? 'border-cafe/25' : 'border-coral/30'"
+    :class="vencido ? 'border-cafe/25' : cancelado ? 'border-rojizo/25' : 'border-coral/30'"
   >
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -92,6 +93,12 @@ function formatearRecargo(recargo) {
         class="rounded-full border border-rojizo/25 bg-rojizo/10 px-3 py-1 text-xs font-semibold text-rojizo"
       >
         Retirado
+      </span>
+      <span
+        v-else-if="cancelado"
+        class="rounded-full border border-rojizo/25 bg-rojizo/10 px-3 py-1 text-xs font-semibold text-rojizo"
+      >
+        Sin efecto
       </span>
     </div>
 
@@ -225,6 +232,9 @@ function formatearRecargo(recargo) {
         </p>
         <p v-else-if="retirado" class="text-xs leading-relaxed text-cafe/60">
           El artista retiró este presupuesto.
+        </p>
+        <p v-else-if="cancelado" class="text-xs leading-relaxed text-cafe/60">
+          Cancelaste esta solicitud; el presupuesto quedó sin efecto.
         </p>
       </template>
     </div>

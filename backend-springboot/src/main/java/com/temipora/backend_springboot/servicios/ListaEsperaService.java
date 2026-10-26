@@ -60,6 +60,15 @@ public class ListaEsperaService {
     }
 
     @Transactional
+    public void marcarCancelada(Solicitud solicitud) {
+        listaEsperaRepository.findBySolicitudIdSolicitud(solicitud.getIdSolicitud())
+            .ifPresent(lista -> {
+                lista.setEstado("CANCELADA");
+                lista.setFechaActualizacion(LocalDateTime.now());
+            });
+    }
+
+    @Transactional
     public void marcarConvertida(Solicitud solicitud) {
         listaEsperaRepository.findBySolicitudIdSolicitud(solicitud.getIdSolicitud())
             .ifPresent(lista -> {
