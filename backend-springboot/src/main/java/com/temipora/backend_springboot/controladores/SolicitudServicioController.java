@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
+import com.temipora.backend_springboot.modelo.SolicitudCancelacionRequest;
 import com.temipora.backend_springboot.modelo.SolicitudDTO;
 import com.temipora.backend_springboot.modelo.SolicitudRechazoRequest;
 import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
@@ -81,6 +82,17 @@ public class SolicitudServicioController {
             Authentication authentication) {
         String motivo = request != null ? request.getMotivo() : null;
         return solicitudServicioService.rechazar(
+            idSolicitud, idAutenticado(authentication), motivo);
+    }
+
+    @PostMapping("/{idSolicitud}/cancelar")
+    @PreAuthorize("hasAnyRole('CLIENTE', 'ARTISTA')")
+    public SolicitudDTO cancelar(
+            @PathVariable Long idSolicitud,
+            @Valid @RequestBody(required = false) SolicitudCancelacionRequest request,
+            Authentication authentication) {
+        String motivo = request != null ? request.getMotivo() : null;
+        return solicitudServicioService.cancelar(
             idSolicitud, idAutenticado(authentication), motivo);
     }
 

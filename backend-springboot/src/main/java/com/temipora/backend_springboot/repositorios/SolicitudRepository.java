@@ -23,17 +23,17 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
     @Query("SELECT s FROM Solicitud s WHERE s.idSolicitud = :idSolicitud")
     Optional<Solicitud> findByIdSolicitudForUpdate(@Param("idSolicitud") Long idSolicitud);
 
-    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda" })
+    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda", "presupuesto" })
     List<Solicitud> findByArtistaIdUsuarioOrderByFechaCreacionDesc(Long idArtista);
 
-    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda" })
+    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda", "presupuesto" })
     List<Solicitud> findByArtistaIdUsuarioAndEstadoOrderByFechaCreacionDesc(
             Long idArtista, EstadoSolicitud estado);
 
-    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda" })
+    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda", "presupuesto" })
     List<Solicitud> findByClienteIdUsuarioOrderByFechaCreacionDesc(Long idCliente);
 
-    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda" })
+    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda", "presupuesto" })
     List<Solicitud> findByClienteIdUsuarioAndEstadoOrderByFechaCreacionDesc(
             Long idCliente, EstadoSolicitud estado);
 
@@ -48,11 +48,15 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
     long countByServicioIdServicioAndEstadoIn(
             Long idServicio, Collection<EstadoSolicitud> estados);
 
-    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda" })
+    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda", "presupuesto" })
     List<Solicitud> findByServicioIdServicioOrderByFechaCreacionDesc(Long idServicio);
 
-    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda" })
+    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda", "presupuesto" })
     List<Solicitud> findByServicioIdServicioAndEstadoInOrderByFechaCreacionDesc(
+            Long idServicio, Collection<EstadoSolicitud> estados);
+
+    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda" })
+    List<Solicitud> findByServicioIdServicioAndEstadoInOrderByFechaCreacionAscIdSolicitudAsc(
             Long idServicio, Collection<EstadoSolicitud> estados);
 
     @Query("""

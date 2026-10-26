@@ -103,6 +103,9 @@ class SolicitudServicioServiceTest {
     @Mock
     private NotificacionService notificacionService;
 
+    @Mock
+    private ColaSolicitudesService colaSolicitudesService;
+
     @InjectMocks
     private SolicitudServicioService solicitudServicioService;
 
@@ -171,6 +174,10 @@ class SolicitudServicioServiceTest {
                 .opciones(List.of())
                 .build()))
             .build();
+
+        lenient().when(colaSolicitudesService.evaluar(any(Solicitud.class)))
+            .thenReturn(new ColaSolicitudesService.EvaluacionPresupuesto(
+                false, null, null));
     }
 
     @Test
@@ -178,8 +185,7 @@ class SolicitudServicioServiceTest {
         when(servicioService.obtener(SERVICIO, CLIENTE))
             .thenReturn(ServicioDTO.builder().idServicio(SERVICIO).build());
         when(servicioRepository.findByIdServicio(SERVICIO)).thenReturn(Optional.of(servicio));
-        when(solicitudRepository.countByServicioIdServicioAndEstadoIn(any(), any()))
-            .thenReturn(2L);
+        when(colaSolicitudesService.cuposOcupados(SERVICIO)).thenReturn(2);
         lenient().when(solicitudRepository.existsByServicioIdServicioAndClienteIdUsuarioAndEstadoIn(
             any(), any(), any())).thenReturn(true);
         lenient().when(solicitudRepository.existsByServicioIdServicioAndClienteIdUsuarioAndEstado(
@@ -205,8 +211,7 @@ class SolicitudServicioServiceTest {
         when(servicioService.obtener(SERVICIO, CLIENTE))
             .thenReturn(ServicioDTO.builder().idServicio(SERVICIO).build());
         when(servicioRepository.findByIdServicio(SERVICIO)).thenReturn(Optional.of(servicio));
-        when(solicitudRepository.countByServicioIdServicioAndEstadoIn(any(), any()))
-            .thenReturn(3L);
+        when(colaSolicitudesService.cuposOcupados(SERVICIO)).thenReturn(3);
         lenient().when(solicitudRepository.existsByServicioIdServicioAndClienteIdUsuarioAndEstadoIn(
             any(), any(), any())).thenReturn(false);
         lenient().when(solicitudRepository.existsByServicioIdServicioAndClienteIdUsuarioAndEstado(
@@ -597,6 +602,190 @@ class SolicitudServicioServiceTest {
 
         verify(accionSolicitudRepository, never()).save(any());
         assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.PENDIENTE);
+    }
+
+    @Test
+    void cancelar_pendiente_registraAccionYNotificaAlArtista() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PENDIENTE, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+        when(accionSolicitudRepository.save(any(AccionSolicitud.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        SolicitudDTO resultado = solicitudServicioService.cancelar(
+            solicitud.getIdSolicitud(), CLIENTE, "  Cambié de idea  ");
+
+        assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.CANCELADA);
+        assertThat(resultado.getEstado()).isEqualTo(EstadoSolicitud.CANCELADA);
+        assertThat(resultado.getMotivoCancelacion()).isEqualTo("Cambié de idea");
+        assertThat(resultado.getFechaCancelacion()).isNotNull();
+        assertThat(resultado.isPuedeCancelar()).isFalse();
+
+        ArgumentCaptor<AccionSolicitud> captor = ArgumentCaptor.forClass(AccionSolicitud.class);
+        verify(accionSolicitudRepository).save(captor.capture());
+        AccionSolicitud accion = captor.getValue();
+        assertThat(accion.getTipoAccion()).isEqualTo(TipoAccionSolicitud.CANCELACION);
+        assertThat(accion.getSolicitud()).isSameAs(solicitud);
+        assertThat(accion.getUsuario()).isSameAs(cliente);
+        assertThat(accion.getMotivo()).isEqualTo("Cambié de idea");
+        assertThat(accion.getOrigen()).isEqualTo("CLIENTE");
+
+        verify(notificacionService).crearParaUsuario(
+            eq(ARTISTA), eq("SOLICITUD_CANCELADA"), eq("Solicitud cancelada"),
+            contains("Motivo: Cambié de idea"), eq(solicitud.getIdSolicitud()), eq("SOLICITUD"));
+        verify(listaEsperaService, never()).marcarCancelada(any());
+    }
+
+    @Test
+    void cancelar_sinMotivo_usaMensajePorDefecto() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PENDIENTE, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+        when(accionSolicitudRepository.save(any(AccionSolicitud.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        SolicitudDTO resultado = solicitudServicioService.cancelar(
+            solicitud.getIdSolicitud(), CLIENTE, "   ");
+
+        assertThat(resultado.getMotivoCancelacion()).isNull();
+
+        verify(notificacionService).crearParaUsuario(
+            eq(ARTISTA), eq("SOLICITUD_CANCELADA"), eq("Solicitud cancelada"),
+            contains("no mencionar el motivo"), eq(solicitud.getIdSolicitud()), eq("SOLICITUD"));
+    }
+
+    @Test
+    void cancelar_enListaDeEspera_marcaLaLista() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.EN_LISTA_ESPERA, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+        when(accionSolicitudRepository.save(any(AccionSolicitud.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        solicitudServicioService.cancelar(solicitud.getIdSolicitud(), CLIENTE, null);
+
+        verify(listaEsperaService).marcarCancelada(solicitud);
+        assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.CANCELADA);
+    }
+
+    @Test
+    void cancelar_presupuestada_avisaQueSeLiberoElCupo() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PRESUPUESTADA, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+        when(accionSolicitudRepository.save(any(AccionSolicitud.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        SolicitudDTO resultado = solicitudServicioService.cancelar(
+            solicitud.getIdSolicitud(), CLIENTE, null);
+
+        assertThat(resultado.getEstado()).isEqualTo(EstadoSolicitud.CANCELADA);
+        verify(notificacionService).crearParaUsuario(
+            eq(ARTISTA), eq("SOLICITUD_CANCELADA"), eq("Solicitud cancelada"),
+            contains("cupo reservado quedó liberado"),
+            eq(solicitud.getIdSolicitud()), eq("SOLICITUD"));
+    }
+
+    @Test
+    void cancelar_deOtroCliente_lanzaAccesoDenegado() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PENDIENTE, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+
+        assertThatThrownBy(() -> solicitudServicioService.cancelar(
+            solicitud.getIdSolicitud(), 99L, null))
+            .isInstanceOf(AccesoDenegadoException.class)
+            .hasMessageContaining("No podés cancelar");
+
+        verify(accionSolicitudRepository, never()).save(any());
+        assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.PENDIENTE);
+    }
+
+    @Test
+    void cancelar_artistaDeLaSolicitud_lanzaAccesoDenegado() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PENDIENTE, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+
+        assertThatThrownBy(() -> solicitudServicioService.cancelar(
+            solicitud.getIdSolicitud(), ARTISTA, null))
+            .isInstanceOf(AccesoDenegadoException.class)
+            .hasMessageContaining("No podés cancelar");
+
+        verify(accionSolicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelar_yaCancelada_lanzaConflicto() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.CANCELADA, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+
+        assertThatThrownBy(() -> solicitudServicioService.cancelar(
+            solicitud.getIdSolicitud(), CLIENTE, null))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("ya fue cancelada");
+
+        verify(accionSolicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelar_rechazada_lanzaConflicto() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.RECHAZADA, 1);
+        when(solicitudRepository.findByIdSolicitudForUpdate(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+
+        assertThatThrownBy(() -> solicitudServicioService.cancelar(
+            solicitud.getIdSolicitud(), CLIENTE, null))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("estado RECHAZADA");
+
+        verify(accionSolicitudRepository, never()).save(any());
+    }
+
+    @Test
+    void obtenerSolicitud_clienteIncluyePuedeCancelarYLosDatosDeCancelacion() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.CANCELADA, 1);
+        AccionSolicitud accion = new AccionSolicitud();
+        accion.setMotivo("Cambié de idea");
+        accion.setFecha(LocalDateTime.now());
+        when(solicitudRepository.findByIdSolicitud(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+        lenient().when(accionSolicitudRepository
+            .findFirstBySolicitudIdSolicitudAndTipoAccionOrderByFechaDesc(
+                solicitud.getIdSolicitud(), TipoAccionSolicitud.CANCELACION))
+            .thenReturn(Optional.of(accion));
+
+        SolicitudDTO resultado = solicitudServicioService.obtenerSolicitud(
+            solicitud.getIdSolicitud(), CLIENTE);
+
+        assertThat(resultado.getMotivoCancelacion()).isEqualTo("Cambié de idea");
+        assertThat(resultado.getFechaCancelacion()).isNotNull();
+        assertThat(resultado.isPuedeCancelar()).isFalse();
+    }
+
+    @Test
+    void obtenerSolicitud_clientePendientePuedeCancelar() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PENDIENTE, 1);
+        when(solicitudRepository.findByIdSolicitud(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+
+        SolicitudDTO resultado = solicitudServicioService.obtenerSolicitud(
+            solicitud.getIdSolicitud(), CLIENTE);
+
+        assertThat(resultado.isPuedeCancelar()).isTrue();
+    }
+
+    @Test
+    void obtenerSolicitud_artistaNoPuedeCancelar() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PENDIENTE, 1);
+        when(solicitudRepository.findByIdSolicitud(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+
+        SolicitudDTO resultado = solicitudServicioService.obtenerSolicitud(
+            solicitud.getIdSolicitud(), ARTISTA);
+
+        assertThat(resultado.isPuedeCancelar()).isFalse();
     }
 
     @Test

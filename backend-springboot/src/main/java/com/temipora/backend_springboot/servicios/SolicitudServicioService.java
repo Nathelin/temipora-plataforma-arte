@@ -57,10 +57,6 @@ public class SolicitudServicioService {
         EstadoSolicitud.PRESUPUESTADA,
         EstadoSolicitud.PAGADA);
 
-    private static final List<EstadoSolicitud> ESTADOS_QUE_OCUPAN_CUPO = List.of(
-        EstadoSolicitud.PRESUPUESTADA,
-        EstadoSolicitud.PAGADA);
-
     private static final List<EstadoSolicitud> ESTADOS_RECHAZABLES = List.of(
         EstadoSolicitud.PENDIENTE,
         EstadoSolicitud.EN_LISTA_ESPERA);
@@ -69,12 +65,19 @@ public class SolicitudServicioService {
         EstadoSolicitud.PENDIENTE,
         EstadoSolicitud.EN_LISTA_ESPERA);
 
+    private static final List<EstadoSolicitud> ESTADOS_CANCELABLES = List.of(
+        EstadoSolicitud.PENDIENTE,
+        EstadoSolicitud.EN_LISTA_ESPERA,
+        EstadoSolicitud.PRESUPUESTADA);
+
     private static final String ORIGEN_ARTISTA = "ARTISTA";
+    private static final String ORIGEN_CLIENTE = "CLIENTE";
     private static final String ORIGEN_BAJA_SERVICIO = "BAJA_SERVICIO";
 
     private static final String NOTIFICACION_SOLICITUD = "SOLICITUD_RECIBIDA";
     private static final String NOTIFICACION_ESPERA = "SOLICITUD_EN_LISTA_ESPERA";
     private static final String NOTIFICACION_RECHAZO = "SOLICITUD_RECHAZADA";
+    private static final String NOTIFICACION_CANCELACION = "SOLICITUD_CANCELADA";
     private static final String TIPO_REFERENCIA_SOLICITUD = "SOLICITUD";
 
     private static final String TEXTO = "TEXTO";
@@ -94,6 +97,7 @@ public class SolicitudServicioService {
     private final TerminosService terminosService;
     private final ListaEsperaService listaEsperaService;
     private final NotificacionService notificacionService;
+    private final ColaSolicitudesService colaSolicitudesService;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -106,7 +110,8 @@ public class SolicitudServicioService {
             FormularioService formularioService,
             TerminosService terminosService,
             ListaEsperaService listaEsperaService,
-            NotificacionService notificacionService) {
+            NotificacionService notificacionService,
+            ColaSolicitudesService colaSolicitudesService) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -118,6 +123,7 @@ public class SolicitudServicioService {
         this.terminosService = terminosService;
         this.listaEsperaService = listaEsperaService;
         this.notificacionService = notificacionService;
+        this.colaSolicitudesService = colaSolicitudesService;
     }
 
     @Transactional(readOnly = true)
@@ -351,6 +357,24 @@ public class SolicitudServicioService {
                 dto.setMotivoRechazo(accion.getMotivo());
                 dto.setFechaRechazo(accion.getFecha());
             });
+        accionSolicitudRepository
+            .findFirstBySolicitudIdSolicitudAndTipoAccionOrderByFechaDesc(
+                idSolicitud, TipoAccionSolicitud.CANCELACION)
+            .ifPresent(accion -> {
+                dto.setMotivoCancelacion(accion.getMotivo());
+                dto.setFechaCancelacion(accion.getFecha());
+            });
+
+        ColaSolicitudesService.EvaluacionPresupuesto evaluacion =
+            colaSolicitudesService.evaluar(solicitud);
+        dto.setPosicionCola(evaluacion.posicion());
+        if (esArtista) {
+            dto.setPuedePresupuestar(evaluacion.puede());
+            dto.setMotivoNoPresupuestable(evaluacion.motivo());
+        }
+        if (esCliente) {
+            dto.setPuedeCancelar(ESTADOS_CANCELABLES.contains(solicitud.getEstado()));
+        }
         return dto;
     }
 
@@ -378,6 +402,53 @@ public class SolicitudServicioService {
         SolicitudDTO dto = SolicitudDTO.desdeSolicitud(solicitud);
         dto.setMotivoRechazo(motivoLimpio);
         dto.setFechaRechazo(ahora);
+        return dto;
+    }
+
+    @Transactional
+    public SolicitudDTO cancelar(Long idSolicitud, Long idCliente, String motivo) {
+        Solicitud solicitud = solicitudRepository.findByIdSolicitudForUpdate(idSolicitud)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Solicitud no encontrada: " + idSolicitud));
+        boolean esCliente = solicitud.getCliente() != null
+            && solicitud.getCliente().getIdUsuario().equals(idCliente);
+        if (!esCliente) {
+            throw new AccesoDenegadoException("No podés cancelar esta solicitud.");
+        }
+        if (solicitud.getEstado() == EstadoSolicitud.CANCELADA) {
+            throw new ConflictoException("La solicitud ya fue cancelada.");
+        }
+        if (!ESTADOS_CANCELABLES.contains(solicitud.getEstado())) {
+            throw new ConflictoException(
+                "No podés cancelar una solicitud en estado " + solicitud.getEstado() + ".");
+        }
+
+        EstadoSolicitud estadoAnterior = solicitud.getEstado();
+        String motivoLimpio = limpiarMotivo(motivo);
+        LocalDateTime ahora = LocalDateTime.now();
+
+        if (estadoAnterior == EstadoSolicitud.EN_LISTA_ESPERA) {
+            listaEsperaService.marcarCancelada(solicitud);
+        }
+
+        solicitud.setEstado(EstadoSolicitud.CANCELADA);
+        solicitud.setFechaActualizacion(ahora);
+
+        AccionSolicitud accion = new AccionSolicitud();
+        accion.setSolicitud(solicitud);
+        accion.setTipoAccion(TipoAccionSolicitud.CANCELACION);
+        accion.setUsuario(solicitud.getCliente());
+        accion.setFecha(ahora);
+        accion.setMotivo(motivoLimpio);
+        accion.setOrigen(ORIGEN_CLIENTE);
+        accionSolicitudRepository.save(accion);
+
+        notificarCancelacion(solicitud, motivoLimpio, estadoAnterior);
+
+        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(solicitud);
+        dto.setMotivoCancelacion(motivoLimpio);
+        dto.setFechaCancelacion(ahora);
+        dto.setPuedeCancelar(false);
         return dto;
     }
 
@@ -474,6 +545,30 @@ public class SolicitudServicioService {
             : "tu servicio";
     }
 
+    private void notificarCancelacion(
+            Solicitud solicitud, String motivo, EstadoSolicitud estadoAnterior) {
+        StringBuilder descripcion = new StringBuilder()
+            .append("El cliente canceló la solicitud de '")
+            .append(nombreServicioDe(solicitud))
+            .append("'. ");
+        if (motivo != null) {
+            descripcion.append("Motivo: ").append(motivo);
+        } else {
+            descripcion.append("El cliente decidió no mencionar el motivo.");
+        }
+        if (estadoAnterior == EstadoSolicitud.PRESUPUESTADA) {
+            descripcion.append(" El cupo reservado quedó liberado.");
+        }
+
+        notificacionService.crearParaUsuario(
+            solicitud.getArtista().getIdUsuario(),
+            NOTIFICACION_CANCELACION,
+            "Solicitud cancelada",
+            descripcion.toString(),
+            solicitud.getIdSolicitud(),
+            TIPO_REFERENCIA_SOLICITUD);
+    }
+
     @Transactional(readOnly = true)
     public List<SolicitudResumenDTO> listarRecibidas(Long idArtista, EstadoSolicitud estado) {
         List<Solicitud> solicitudes = estado == null
@@ -505,9 +600,7 @@ public class SolicitudServicioService {
     }
 
     private int calcularOcupados(Long idServicio) {
-        long ocupados = solicitudRepository.countByServicioIdServicioAndEstadoIn(
-            idServicio, ESTADOS_QUE_OCUPAN_CUPO);
-        return (int) Math.min(ocupados, Integer.MAX_VALUE);
+        return colaSolicitudesService.cuposOcupados(idServicio);
     }
 
     private ModoRecepcionSolicitud modoDe(Servicio servicio) {

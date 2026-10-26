@@ -298,9 +298,21 @@ onMounted(cargar)
                     <span>{{ solicitud.cantidadDibujos }} {{ solicitud.cantidadDibujos === 1 ? 'dibujo' : 'dibujos' }}</span>
                     <span aria-hidden="true">·</span>
                     <span>{{ formatearFechaSolicitud(solicitud.fechaCreacion, { corta: true }) }}</span>
-                    <span v-if="solicitud.precioBase != null" aria-hidden="true">·</span>
-                    <span v-if="solicitud.precioBase != null">
-                      {{ formatearPrecio(solicitud.precioBase, solicitud.moneda) }} por dibujo
+                    <template v-if="solicitud.precioFinal != null">
+                      <span aria-hidden="true">·</span>
+                      <span class="font-semibold text-coral">
+                        Presupuesto: {{ formatearPrecio(solicitud.precioFinal, solicitud.moneda) }}
+                      </span>
+                    </template>
+                    <template v-else-if="solicitud.precioBase != null">
+                      <span aria-hidden="true">·</span>
+                      <span>{{ formatearPrecio(solicitud.precioBase, solicitud.moneda) }} por dibujo</span>
+                    </template>
+                    <span
+                      v-if="solicitud.fechaVencimiento && solicitud.estado === 'PRESUPUESTADA'"
+                    >
+                      <span aria-hidden="true">·</span>
+                      Oferta vence {{ formatearFechaSolicitud(solicitud.fechaVencimiento, { corta: true }) }}
                     </span>
                   </p>
                 </div>

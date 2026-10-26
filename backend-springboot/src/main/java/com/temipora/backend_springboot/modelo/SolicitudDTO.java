@@ -35,7 +35,14 @@ public class SolicitudDTO {
     private Integer posicionListaEspera;
     private String motivoRechazo;
     private LocalDateTime fechaRechazo;
+    private String motivoCancelacion;
+    private LocalDateTime fechaCancelacion;
     private List<ItemSolicitudDTO> items;
+    private PresupuestoDTO presupuesto;
+    private Integer posicionCola;
+    private boolean puedePresupuestar;
+    private String motivoNoPresupuestable;
+    private boolean puedeCancelar;
 
     public static SolicitudDTO desdeSolicitud(Solicitud solicitud) {
         return SolicitudDTO.builder()
@@ -69,6 +76,9 @@ public class SolicitudDTO {
             .items(solicitud.getItems().stream()
                 .map(ItemSolicitudDTO::desdeItem)
                 .toList())
+            .presupuesto(solicitud.getPresupuesto() != null
+                ? PresupuestoDTO.desdePresupuesto(solicitud.getPresupuesto())
+                : null)
             .build();
     }
 }
