@@ -465,7 +465,6 @@ onMounted(cargar)
                 :presupuesto="solicitud.presupuesto"
                 :estado="solicitud.estado"
                 :es-artista="esArtistaDeLaSolicitud"
-                @retirar="abrirModalRetiro"
               />
             </section>
           </template>
@@ -753,12 +752,21 @@ onMounted(cargar)
 
             <div v-if="esArtistaDeLaSolicitud" class="mt-4 grid gap-2">
               <button
+                v-if="!solicitud.presupuesto"
                 type="button"
                 class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-4 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10 disabled:cursor-not-allowed disabled:border-rosa disabled:text-cafe/40 disabled:hover:bg-transparent"
                 :disabled="!puedeRechazar"
                 @click="abrirModalRechazo"
               >
                 Rechazar
+              </button>
+              <button
+                v-if="solicitud.estado === 'PRESUPUESTADA' && solicitud.presupuesto"
+                type="button"
+                class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-4 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10"
+                @click="abrirModalRetiro"
+              >
+                Retirar presupuesto
               </button>
               <button
                 v-if="puedePresupuestar"

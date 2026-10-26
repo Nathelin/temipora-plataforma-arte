@@ -15,8 +15,6 @@ const props = defineProps({
   esArtista: { type: Boolean, default: false },
 })
 
-defineEmits(['retirar'])
-
 const hoy = aFechaISO(new Date())
 const entrega = computed(() => textoTiempoEntrega(
   props.presupuesto?.tiempoEntregaValor,
@@ -48,9 +46,6 @@ const entregaAlVencer = computed(() => {
 })
 const entregaAlVencerTexto = computed(
   () => formatearFechaISO(entregaAlVencer.value, { larga: true }),
-)
-const puedeRetirar = computed(
-  () => props.esArtista && props.estado === 'PRESUPUESTADA',
 )
 const vencido = computed(() => props.estado === 'VENCIDA')
 const retirado = computed(() => props.estado === 'RECHAZADA')
@@ -206,17 +201,7 @@ function formatearRecargo(recargo) {
     </div>
 
     <div class="mt-5 flex flex-wrap items-center gap-3">
-      <template v-if="esArtista">
-        <button
-          v-if="puedeRetirar"
-          type="button"
-          class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-4 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10"
-          @click="$emit('retirar')"
-        >
-          Retirar presupuesto
-        </button>
-      </template>
-      <template v-else>
+      <template v-if="!esArtista">
         <template v-if="vigente">
           <button
             type="button"
