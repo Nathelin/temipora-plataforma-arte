@@ -8,7 +8,7 @@ import {
   UNIDADES_ENTREGA,
   aFechaISO,
   fechaEntregaEstimada,
-  formatearFechaISO,
+  formatearFechaDDMMAAAA,
   gruposDeRespuestas,
   sumarPlazo,
   textoTiempoEntrega,
@@ -31,6 +31,14 @@ const errorCarga = ref('')
 const enviando = ref(false)
 const errorEnvio = ref('')
 const paso = ref(1)
+const fechasVisibles = ref({
+  fechaInicioEstimada: '',
+  fechaVencimiento: '',
+})
+const fechasInvalidas = ref({
+  fechaInicioEstimada: false,
+  fechaVencimiento: false,
+})
 
 const pasos = [
   { numero: 1, titulo: 'Entrega' },
@@ -104,17 +112,50 @@ const entregaAlVencer = computed(() => {
   })
 })
 const inicioEstimadoTexto = computed(() => form.value.fechaInicioEstimada
-  ? formatearFechaISO(form.value.fechaInicioEstimada, { larga: true })
+  ? formatearFechaDDMMAAAA(form.value.fechaInicioEstimada)
   : 'Al confirmarse el pago')
 const entregaSiPagaHoyTexto = computed(
-  () => formatearFechaISO(entregaSiPagaHoy.value, { larga: true }),
+  () => formatearFechaDDMMAAAA(entregaSiPagaHoy.value),
 )
 const entregaAlVencerTexto = computed(
-  () => formatearFechaISO(entregaAlVencer.value, { larga: true }),
+  () => formatearFechaDDMMAAAA(entregaAlVencer.value),
 )
 
 function formatear(valor) {
   return formatearPrecio(valor, moneda.value)
+}
+
+function actualizarFechaFormulario(campo, event) {
+  const digitos = event.target.value.replace(/\D/g, '').slice(0, 8)
+  const partes = []
+
+  if (digitos.length > 0) partes.push(digitos.slice(0, 2))
+  if (digitos.length > 2) partes.push(digitos.slice(2, 4))
+  if (digitos.length > 4) partes.push(digitos.slice(4, 8))
+
+  const visible = partes.join('/')
+  event.target.value = visible
+  fechasVisibles.value[campo] = visible
+
+  if (digitos.length < 8) {
+    form.value[campo] = ''
+    fechasInvalidas.value[campo] = false
+    return
+  }
+
+  const dia = Number(digitos.slice(0, 2))
+  const mes = Number(digitos.slice(2, 4))
+  const anio = Number(digitos.slice(4, 8))
+  const fecha = new Date(anio, mes - 1, dia)
+  const invalida = fecha.getFullYear() !== anio
+    || fecha.getMonth() !== mes - 1
+    || fecha.getDate() !== dia
+
+  fechasInvalidas.value[campo] = invalida
+
+  form.value[campo] = !invalida
+    ? `${digitos.slice(4, 8)}-${digitos.slice(2, 4)}-${digitos.slice(0, 2)}`
+    : ''
 }
 
 function baseItem() {
@@ -214,6 +255,10 @@ function validarPaso1() {
   }
   if (valor > maxPlazo.value) {
     errorEnvio.value = `El plazo máximo es de un año (${maxPlazoTexto.value}).`
+    return false
+  }
+  if (fechasInvalidas.value.fechaInicioEstimada || fechasInvalidas.value.fechaVencimiento) {
+    errorEnvio.value = 'Ingresá fechas válidas con el formato DD/MM/AAAA.'
     return false
   }
   if (form.value.fechaInicioEstimada) {
@@ -460,11 +505,14 @@ onMounted(cargar)
             </label>
             <input
               id="inicio-estimado"
-              v-model="form.fechaInicioEstimada"
-              type="date"
-              :min="hoy"
-              :max="maxInicio"
+              :value="fechasVisibles.fechaInicioEstimada"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              maxlength="10"
+              placeholder="DD/MM/AAAA"
               class="mt-2 block w-full rounded-lg border-0 px-3 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral sm:max-w-xs"
+              @input="actualizarFechaFormulario('fechaInicioEstimada', $event)"
             />
             <p class="mt-2 text-xs leading-relaxed text-cafe/50">
               Si no elegís una fecha, el plazo se cuenta desde el pago. Podés indicar
@@ -520,10 +568,14 @@ onMounted(cargar)
             </label>
             <input
               id="fecha-vencimiento"
-              v-model="form.fechaVencimiento"
-              type="date"
-              :min="hoy"
+              :value="fechasVisibles.fechaVencimiento"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              maxlength="10"
+              placeholder="DD/MM/AAAA"
               class="mt-2 block w-full rounded-lg border-0 px-3 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral sm:max-w-xs"
+              @input="actualizarFechaFormulario('fechaVencimiento', $event)"
             />
             <p class="mt-2 text-xs leading-relaxed text-cafe/50">
               Si no elegís una fecha, se usa el vencimiento por defecto configurado por el sistema.
@@ -724,7 +776,7 @@ onMounted(cargar)
                 <dt class="text-cafe/55">Oferta válida hasta</dt>
                 <dd class="text-right font-medium text-cafe">
                   {{ form.fechaVencimiento
-                    ? formatearFechaISO(form.fechaVencimiento, { larga: true })
+                    ? formatearFechaDDMMAAAA(form.fechaVencimiento)
                     : 'Según la configuración del sistema' }}
                 </dd>
               </div>

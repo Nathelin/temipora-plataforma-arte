@@ -98,6 +98,14 @@ export function formatearFechaISO(valor, { larga = false } = {}) {
     : { dateStyle: 'medium' }).format(fecha)
 }
 
+export function formatearFechaDDMMAAAA(valor) {
+  const fecha = valor instanceof Date ? valor : fechaISOlocal(valor)
+  if (!fecha) return ''
+  const dia = String(fecha.getDate()).padStart(2, '0')
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0')
+  return `${dia}/${mes}/${fecha.getFullYear()}`
+}
+
 export const GRUPOS_ESTADO = [
   { clave: 'todas', texto: 'Todas', estados: [] },
   { clave: 'pendientes', texto: 'Pendientes', estados: ['PENDIENTE'] },
