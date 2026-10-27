@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { formatearPrecio } from '../servicios/moneda'
+import { formatearMonto, formatearPrecio } from '../servicios/moneda'
 import {
   aFechaISO,
   fechaEntregaEstimada,
@@ -52,16 +52,36 @@ const retirado = computed(() => props.estado === 'RECHAZADA')
 const cancelado = computed(() => props.estado === 'CANCELADA')
 const vigente = computed(() => props.estado === 'PRESUPUESTADA')
 const items = computed(() => props.presupuesto?.items || [])
+const monedaMostrada = computed(
+  () => props.presupuesto?.monedaMostrada || props.presupuesto?.moneda,
+)
+const totalMostrado = computed(
+  () => props.presupuesto?.precioFinalMostrado ?? props.presupuesto?.precioFinal,
+)
+const baseMostrada = computed(
+  () => props.presupuesto?.precioBaseTotalMostrado ?? props.presupuesto?.precioBaseTotal,
+)
+const cobroDistinto = computed(
+  () => props.presupuesto?.precioFinalCobro != null
+    && props.presupuesto?.monedaCobro
+    && props.presupuesto.monedaCobro !== monedaMostrada.value,
+)
+const cotizacionAlEmitir = computed(() => {
+  const cotizacion = Number(props.presupuesto?.cotizacionCobro)
+  if (!Number.isFinite(cotizacion) || cotizacion <= 0) return null
+  if (props.presupuesto?.monedaCobro === props.presupuesto?.moneda) return null
+  return cotizacion
+})
 
 function formatearMoneda(valor) {
-  return formatearPrecio(valor, props.presupuesto?.moneda)
+  return formatearPrecio(valor, monedaMostrada.value)
 }
 
 function formatearRecargo(recargo) {
   if (recargo?.tipo === 'PORCENTAJE') {
     return `${Number(recargo.valor)}%`
   }
-  return formatearMoneda(recargo?.valor)
+  return formatearMoneda(recargo?.valorMostrado ?? recargo?.valor)
 }
 </script>
 
@@ -98,10 +118,24 @@ function formatearRecargo(recargo) {
     </div>
 
     <p class="mt-4 text-3xl font-bold text-granate">
-      {{ formatearMoneda(presupuesto.precioFinal) }}
+      {{ formatearMoneda(totalMostrado) }}
     </p>
     <p class="mt-1 text-xs text-cafe/50">
-      Precio base {{ formatearMoneda(presupuesto.precioBaseTotal) }} + recargos
+      Precio base {{ formatearMoneda(baseMostrada) }} + recargos
+    </p>
+    <p
+      v-if="cobroDistinto"
+      class="mt-2 text-sm font-semibold text-granate"
+    >
+      Total a pagar: {{ formatearPrecio(presupuesto.precioFinalCobro, presupuesto.monedaCobro) }}
+    </p>
+    <p
+      v-if="cotizacionAlEmitir"
+      class="mt-1 text-xs leading-relaxed text-cafe/50"
+    >
+      Cotización al emitir: 1 {{ presupuesto.moneda }} =
+      {{ formatearMonto(cotizacionAlEmitir) }} {{ presupuesto.monedaCobro }}.
+      El importe en {{ presupuesto.monedaCobro }} queda congelado.
     </p>
 
     <dl class="mt-5 grid gap-3 text-sm sm:grid-cols-2">
@@ -168,13 +202,13 @@ function formatearRecargo(recargo) {
             </p>
             <p class="mt-0.5 text-sm font-semibold text-granate">{{ item.nombre || 'Dibujo' }}</p>
           </div>
-          <p class="text-sm font-semibold text-granate">{{ formatearMoneda(item.precioFinal) }}</p>
+          <p class="text-sm font-semibold text-granate">{{ formatearMoneda(item.precioFinalMostrado ?? item.precioFinal) }}</p>
         </div>
 
         <dl class="mt-3 space-y-1.5 text-xs">
           <div class="flex items-center justify-between gap-3">
             <dt class="text-cafe/55">Base</dt>
-            <dd class="text-cafe">{{ formatearMoneda(item.precioBase) }}</dd>
+            <dd class="text-cafe">{{ formatearMoneda(item.precioBaseMostrado ?? item.precioBase) }}</dd>
           </div>
           <div
             v-for="recargo in item.recargos || []"

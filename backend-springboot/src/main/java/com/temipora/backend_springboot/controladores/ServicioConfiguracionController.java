@@ -80,7 +80,7 @@ public class ServicioConfiguracionController {
             Authentication authentication) {
         Long idArtista = idAutenticado(authentication);
         servicioService.verificarPropietario(idServicio, idArtista);
-        return solicitudServicioService.listarPorServicio(idServicio);
+        return solicitudServicioService.listarPorServicio(idServicio, idArtista);
     }
 
     @GetMapping("/lista-espera")

@@ -6,6 +6,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -58,6 +59,12 @@ public class UsuarioService {
 
         if (dto.getRol() == ERol.ADMIN) {
             throw new IllegalArgumentException("No se puede auto-registrar un usuario con rol ADMIN");
+        }
+
+        if (!EdadCalculadora.esMayorDeEdad(dto.getFechaNacimiento(), LocalDate.now())) {
+            throw new IllegalArgumentException(
+                "Tenés que tener al menos " + EdadCalculadora.EDAD_MINIMA
+                    + " años para crear una cuenta en Temipora.");
         }
 
         Rol rol = rolRepository

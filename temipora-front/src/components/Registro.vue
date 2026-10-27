@@ -79,6 +79,17 @@ function obtenerFechaNacimientoIso() {
   return `${coincidencia[3]}-${coincidencia[2]}-${coincidencia[1]}`
 }
 
+function esMayorDeEdad(fechaIso) {
+  const [anio, mes, dia] = fechaIso.split('-').map(Number)
+  const hoy = new Date()
+  let edad = hoy.getFullYear() - anio
+  const diferenciaMes = hoy.getMonth() + 1 - mes
+  if (diferenciaMes < 0 || (diferenciaMes === 0 && hoy.getDate() < dia)) {
+    edad -= 1
+  }
+  return edad >= 18
+}
+
 const etiquetaRegistro = computed(() => {
   if (fase.value === 'procesando') return 'Procesando imagen…'
   if (fase.value === 'subiendo') return `Subiendo foto… ${progreso.value}%`
@@ -99,7 +110,12 @@ function validarPaso() {
   if (paso.value === 2) {
     if (nombre.value.trim().length < 2) errs.push('El nombre debe tener al menos 2 caracteres.')
     if (apellido.value.trim().length < 2) errs.push('El apellido debe tener al menos 2 caracteres.')
-    if (!obtenerFechaNacimientoIso()) errs.push('La fecha de nacimiento debe tener el formato DD/MM/AAAA y ser válida.')
+    const fechaIso = obtenerFechaNacimientoIso()
+    if (!fechaIso) {
+      errs.push('La fecha de nacimiento debe tener el formato DD/MM/AAAA y ser válida.')
+    } else if (!esMayorDeEdad(fechaIso)) {
+      errs.push('Tenés que ser mayor de 18 años para registrarte en Temipora.')
+    }
   }
   if (paso.value === 3) {
     if (!rol.value) errs.push('Debés elegir una opción de rol.')
@@ -376,6 +392,9 @@ const pasosRouter = [
             class="pl-4 pr-4 block w-full rounded-lg border-0 py-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
             @input="actualizarFechaNacimiento"
           />
+          <p class="mt-2 text-xs text-cafe/50">
+            Tenés que ser mayor de 18 años para crear una cuenta.
+          </p>
         </div>
       </div>
 

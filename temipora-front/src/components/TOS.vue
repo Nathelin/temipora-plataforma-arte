@@ -20,8 +20,8 @@ const router = useRouter()
       <article class=" bg-blanco text-cafe rounded-3xl p-8 shadow-xl shadow-rosa/40 leading-relaxed">
         <h2 class="text-lg font-normal text-granate mb-4">Términos y condiciones de Temipora</h2>
 
-        <p class="mb-4 text-sm text-cafe/50">Versión de los términos y condiciones: 0.0.1</p> <!--TODO: conseguir valores del back-->
-        <p class="mb-4 text-sm text-cafe/50">Última actualización: 06/09/2026</p>
+        <p class="mb-4 text-sm text-cafe/50">Versión de los términos y condiciones: 0.0.2</p> <!--TODO: conseguir valores del back-->
+        <p class="mb-4 text-sm text-cafe/50">Última actualización: 26/10/2026</p>
 
         <p class="mb-4">
           Este es un texto de ejemplo. Aquí irá el contenido real de los términos y condiciones
@@ -34,19 +34,27 @@ const router = useRouter()
           plataforma.
         </p>
 
-        <h3 class="font-normal text-granate mb-2 mt-6">2. Uso de la plataforma</h3>
+        <h3 class="font-normal text-granate mb-2 mt-6">2. Requisitos de edad</h3>
+        <p class="mb-4">
+          Para crear una cuenta y usar Temipora tenés que ser mayor de 18 años. Al registrarte
+          declarás que cumplís este requisito y que la fecha de nacimiento que informás es
+          correcta. Si detectamos que una cuenta pertenece a una persona menor de edad, podemos
+          suspenderla o darla de baja.
+        </p>
+
+        <h3 class="font-normal text-granate mb-2 mt-6">3. Uso de la plataforma</h3>
         <p class="mb-4">
           Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla facilisi. Sed ut purus
           vitae nisl tincidunt tincidunt.
         </p>
 
-        <h3 class="font-normal text-granate mb-2 mt-6">3. Contenido y propiedad intelectual</h3>
+        <h3 class="font-normal text-granate mb-2 mt-6">4. Contenido y propiedad intelectual</h3>
         <p class="mb-4">
           Los artistas conservan los derechos sobre sus obras. Al subir contenido, garantizás que
           tenés los derechos necesarios.
         </p>
 
-        <h3 class="font-normal text-granate mb-2 mt-6">4. Responsabilidad</h3>
+        <h3 class="font-normal text-granate mb-2 mt-6">5. Responsabilidad</h3>
         <p class="mb-4">
           La plataforma se ofrece "tal cual". No nos hacemos responsables por daños derivados del
           uso de la misma.

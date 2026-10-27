@@ -34,6 +34,7 @@ import com.temipora.backend_springboot.modelo.ItemPresupuestoRequest;
 import com.temipora.backend_springboot.modelo.ItemSolicitud;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Presupuesto;
+import com.temipora.backend_springboot.modelo.PresupuestoDTO;
 import com.temipora.backend_springboot.modelo.PresupuestoRequest;
 import com.temipora.backend_springboot.modelo.RecargoPresupuestoRequest;
 import com.temipora.backend_springboot.modelo.Servicio;
@@ -75,6 +76,9 @@ class PresupuestoServiceTest {
 
     @Mock
     private ConfiguracionPresupuestoService configuracionPresupuestoService;
+
+    @Mock
+    private MonedaVistaService monedaVistaService;
 
     @InjectMocks
     private PresupuestoService presupuestoService;
@@ -143,6 +147,59 @@ class PresupuestoServiceTest {
             contains("200.00 ARS"),
             eq(SOLICITUD),
             eq("SOLICITUD"));
+    }
+
+    @Test
+    void crear_conMonedaDistinta_guardaCotizacionYCobroEnArs() {
+        Moneda usd = Moneda.builder()
+            .idMoneda(4L)
+            .codigo("USD")
+            .nombre("Dólar estadounidense")
+            .build();
+        servicio.setMoneda(usd);
+        solicitud.setMoneda(usd);
+        prepararCreacion();
+        when(monedaVistaService.factorCobro(eq(usd), any(LocalDateTime.class)))
+            .thenReturn(new BigDecimal("1200"));
+        when(monedaVistaService.factorOrigenAMostrada(
+                eq(usd), eq(moneda), any(LocalDateTime.class)))
+            .thenReturn(new BigDecimal("1200"));
+        when(monedaVistaService.factorCobroAMostrada(
+                eq(moneda), any(LocalDateTime.class)))
+            .thenReturn(BigDecimal.ONE);
+
+        SolicitudDTO resultado = presupuestoService.crear(
+            SOLICITUD, ARTISTA, request());
+
+        PresupuestoDTO presupuesto = resultado.getPresupuesto();
+        assertThat(presupuesto.getMoneda()).isEqualTo("USD");
+        assertThat(presupuesto.getMonedaCobro()).isEqualTo("ARS");
+        assertThat(presupuesto.getCotizacionCobro())
+            .isEqualByComparingTo("1200");
+        assertThat(presupuesto.getPrecioBaseTotalCobro())
+            .isEqualByComparingTo("240000.00");
+        assertThat(presupuesto.getPrecioFinalCobro())
+            .isEqualByComparingTo("240000.00");
+        assertThat(presupuesto.getMonedaMostrada()).isEqualTo("ARS");
+        assertThat(presupuesto.getPrecioFinalMostrado())
+            .isEqualByComparingTo("240000.00");
+        assertThat(presupuesto.getItems().get(0).getPrecioFinalMostrado())
+            .isEqualByComparingTo("120000.00");
+    }
+
+    @Test
+    void crear_sinCotizacion_lanzaConflictoYNoGuarda() {
+        prepararCreacion();
+        when(monedaVistaService.factorCobro(
+                eq(moneda), any(LocalDateTime.class)))
+            .thenReturn(null);
+
+        assertThatThrownBy(() -> presupuestoService.crear(
+            SOLICITUD, ARTISTA, request()))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("cotización");
+
+        verify(presupuestoRepository, never()).save(any());
     }
 
     @Test
@@ -499,6 +556,17 @@ class PresupuestoServiceTest {
                 true, 1, null));
         lenient().when(configuracionPresupuestoService.obtener())
             .thenReturn(configuracion);
+        lenient().when(monedaVistaService.monedaCobro()).thenReturn(moneda);
+        lenient().when(monedaVistaService.factorCobro(
+                eq(moneda), any(LocalDateTime.class)))
+            .thenReturn(BigDecimal.ONE);
+        lenient().when(monedaVistaService.preferidaDe(ARTISTA)).thenReturn(moneda);
+        lenient().when(monedaVistaService.factorOrigenAMostrada(
+                eq(moneda), eq(moneda), any(LocalDateTime.class)))
+            .thenReturn(BigDecimal.ONE);
+        lenient().when(monedaVistaService.factorCobroAMostrada(
+                eq(moneda), any(LocalDateTime.class)))
+            .thenReturn(BigDecimal.ONE);
         lenient().when(presupuestoRepository.save(any(Presupuesto.class)))
             .thenAnswer(inv -> {
                 Presupuesto guardado = inv.getArgument(0);

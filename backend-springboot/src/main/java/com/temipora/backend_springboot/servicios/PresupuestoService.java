@@ -55,6 +55,7 @@ public class PresupuestoService {
     private final ListaEsperaService listaEsperaService;
     private final NotificacionService notificacionService;
     private final ConfiguracionPresupuestoService configuracionPresupuestoService;
+    private final MonedaVistaService monedaVistaService;
 
     public PresupuestoService(
             SolicitudRepository solicitudRepository,
@@ -63,7 +64,8 @@ public class PresupuestoService {
             ColaSolicitudesService colaSolicitudesService,
             ListaEsperaService listaEsperaService,
             NotificacionService notificacionService,
-            ConfiguracionPresupuestoService configuracionPresupuestoService) {
+            ConfiguracionPresupuestoService configuracionPresupuestoService,
+            MonedaVistaService monedaVistaService) {
         this.solicitudRepository = solicitudRepository;
         this.servicioRepository = servicioRepository;
         this.presupuestoRepository = presupuestoRepository;
@@ -71,6 +73,7 @@ public class PresupuestoService {
         this.listaEsperaService = listaEsperaService;
         this.notificacionService = notificacionService;
         this.configuracionPresupuestoService = configuracionPresupuestoService;
+        this.monedaVistaService = monedaVistaService;
     }
 
     @Transactional
@@ -172,6 +175,20 @@ public class PresupuestoService {
             throw new ConflictoException("El servicio no tiene una moneda definida.");
         }
 
+        Moneda monedaCobro = monedaVistaService.monedaCobro();
+        if (monedaCobro == null) {
+            throw new ConflictoException(
+                "La moneda de cobro (" + MonedaVistaService.CODIGO_COBRO
+                    + ") no está configurada.");
+        }
+        BigDecimal cotizacionCobro = monedaVistaService.factorCobro(moneda, ahora);
+        if (cotizacionCobro == null || cotizacionCobro.signum() <= 0) {
+            throw new ConflictoException(
+                "No hay cotización de " + moneda.getCodigo() + " a "
+                    + monedaCobro.getCodigo()
+                    + ". No se puede emitir el presupuesto en este momento.");
+        }
+
         long diasEntrega = CalculadoraEntrega.diasNormalizados(
             request.getTiempoEntregaValor(),
             request.getTiempoEntregaUnidad());
@@ -223,6 +240,12 @@ public class PresupuestoService {
 
         presupuesto.setPrecioBaseTotal(totalBase.setScale(2, RoundingMode.HALF_UP));
         presupuesto.setPrecioFinal(totalFinal.setScale(2, RoundingMode.HALF_UP));
+        presupuesto.setMonedaCobro(monedaCobro);
+        presupuesto.setCotizacionCobro(cotizacionCobro);
+        presupuesto.setPrecioBaseTotalCobro(
+            enMoneda(presupuesto.getPrecioBaseTotal(), cotizacionCobro));
+        presupuesto.setPrecioFinalCobro(
+            enMoneda(presupuesto.getPrecioFinal(), cotizacionCobro));
 
         solicitud.setPresupuesto(presupuesto);
         presupuestoRepository.save(presupuesto);
@@ -235,13 +258,24 @@ public class PresupuestoService {
             solicitud.getCliente().getIdUsuario(),
             NOTIFICACION_PRESUPUESTO_RECIBIDO,
             "Recibiste un presupuesto",
-            "El artista envió un presupuesto de "
-                + presupuesto.getPrecioFinal().toPlainString() + " " + moneda.getCodigo()
+            "El artista envió un presupuesto de " + detalleImporte(
+                presupuesto.getPrecioFinal(),
+                moneda.getCodigo(),
+                presupuesto.getPrecioFinalCobro(),
+                monedaCobro.getCodigo())
                 + " para '" + nombreServicio(servicio) + "'.",
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
 
-        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(solicitud);
+        Moneda monedaMostrada = monedaVistaService.preferidaDe(idArtista);
+        BigDecimal factorOrigen = monedaMostrada != null
+            ? monedaVistaService.factorOrigenAMostrada(moneda, monedaMostrada, ahora)
+            : null;
+        BigDecimal factorCobro = monedaMostrada != null
+            ? monedaVistaService.factorCobroAMostrada(monedaMostrada, ahora)
+            : null;
+        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(
+            solicitud, monedaMostrada, factorOrigen, factorCobro);
         dto.setPuedePresupuestar(false);
         dto.setMotivoNoPresupuestable(null);
         dto.setPosicionCola(null);
@@ -392,6 +426,22 @@ public class PresupuestoService {
             "El presupuesto de '" + nombre + "' venció y se liberó el cupo.",
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
+    }
+
+    private BigDecimal enMoneda(BigDecimal monto, BigDecimal factor) {
+        return monto.multiply(factor).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private String detalleImporte(
+            BigDecimal nativo,
+            String codigoNativo,
+            BigDecimal cobro,
+            String codigoCobro) {
+        if (codigoNativo != null && codigoNativo.equalsIgnoreCase(codigoCobro)) {
+            return nativo.toPlainString() + " " + codigoNativo;
+        }
+        return nativo.toPlainString() + " " + codigoNativo
+            + " (" + codigoCobro + " " + cobro.toPlainString() + ")";
     }
 
     private String nombreServicio(Servicio servicio) {

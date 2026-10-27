@@ -50,6 +50,24 @@ public class Presupuesto {
     @JoinColumn(name = "id_moneda", nullable = false)
     private Moneda moneda;
 
+    /**
+     * Moneda en la que se cobra el presupuesto. Hoy siempre es ARS.
+     * Se guarda la cotización usada al emitir para que el importe a pagar
+     * quede congelado aunque después cambie el tipo de cambio.
+     */
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "id_moneda_cobro", nullable = false)
+    private Moneda monedaCobro;
+
+    @Column(name = "cotizacion_cobro", nullable = false, precision = 18, scale = 8)
+    private BigDecimal cotizacionCobro;
+
+    @Column(name = "precio_base_total_cobro", nullable = false, precision = 12, scale = 2)
+    private BigDecimal precioBaseTotalCobro;
+
+    @Column(name = "precio_final_cobro", nullable = false, precision = 12, scale = 2)
+    private BigDecimal precioFinalCobro;
+
     @Column(name = "tiempo_entrega_valor", nullable = false)
     private Integer tiempoEntregaValor;
 

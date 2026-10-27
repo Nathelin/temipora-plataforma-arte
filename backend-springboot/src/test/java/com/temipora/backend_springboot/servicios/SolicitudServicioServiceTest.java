@@ -106,6 +106,9 @@ class SolicitudServicioServiceTest {
     @Mock
     private ColaSolicitudesService colaSolicitudesService;
 
+    @Mock
+    private MonedaVistaService monedaVistaService;
+
     @InjectMocks
     private SolicitudServicioService solicitudServicioService;
 

@@ -394,10 +394,10 @@ onBeforeUnmount(() => {
         <textarea
           v-model="form.biografia"
           rows="4"
-          maxlength="500"
+          maxlength="250"
           class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"
         ></textarea>
-        <p class="text-right text-xs text-cafe/50">{{ form.biografia.length }}/500</p>
+        <p class="text-right text-xs text-cafe/50">{{ form.biografia.length }}/250</p>
       </div>
 
       <!-- Datos personales -->

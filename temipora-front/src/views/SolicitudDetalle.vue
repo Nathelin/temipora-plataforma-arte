@@ -662,7 +662,12 @@ onMounted(cargar)
               <div class="flex items-start justify-between gap-4">
                 <dt class="text-cafe/55">Precio base por dibujo</dt>
                 <dd class="text-right font-medium text-cafe">
-                  {{ solicitud.precioBase != null ? formatearPrecio(solicitud.precioBase, solicitud.moneda) : 'A definir' }}
+                  {{ (solicitud.precioBaseMostrado ?? solicitud.precioBase) != null
+                    ? formatearPrecio(
+                      solicitud.precioBaseMostrado ?? solicitud.precioBase,
+                      solicitud.monedaMostrada ?? solicitud.moneda,
+                    )
+                    : 'A definir' }}
                 </dd>
               </div>
               <div v-if="solicitud.terminosVersion" class="flex items-start justify-between gap-4">

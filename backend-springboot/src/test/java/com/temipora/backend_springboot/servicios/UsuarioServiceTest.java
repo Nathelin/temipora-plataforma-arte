@@ -9,6 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -77,6 +78,32 @@ class UsuarioServiceTest {
         assertThatThrownBy(() -> usuarioService.registrarUsuario(dto))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("No se puede auto-registrar un usuario con rol ADMIN");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+        verify(rolRepository, never()).findByNombre(any(ERol.class));
+    }
+
+    @Test
+    void registrarUsuario_menorDeEdad_lanzaExcepcionYNoGuarda() {
+        RegistroUsuarioDTO dto = registroConRol(ERol.CLIENTE);
+        dto.setFechaNacimiento(LocalDate.now().minusYears(17));
+
+        assertThatThrownBy(() -> usuarioService.registrarUsuario(dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("18");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+        verify(rolRepository, never()).findByNombre(any(ERol.class));
+    }
+
+    @Test
+    void registrarUsuario_sinFechaNacimiento_lanzaExcepcionYNoGuarda() {
+        RegistroUsuarioDTO dto = registroConRol(ERol.CLIENTE);
+        dto.setFechaNacimiento(null);
+
+        assertThatThrownBy(() -> usuarioService.registrarUsuario(dto))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("18");
 
         verify(usuarioRepository, never()).save(any(Usuario.class));
         verify(rolRepository, never()).findByNombre(any(ERol.class));
@@ -796,6 +823,7 @@ class UsuarioServiceTest {
         dto.setContrasenia("secreta123");
         dto.setConfirmarContrasenia("secreta123");
         dto.setAcceptaTOS(true);
+        dto.setFechaNacimiento(LocalDate.of(2000, 1, 1));
         dto.setRol(rol);
         return dto;
     }
