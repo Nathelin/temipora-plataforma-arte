@@ -11,6 +11,8 @@ import PaisesAdmin from '../components/PaisesAdmin.vue'
 import CotizacionAdmin from '../components/CotizacionAdmin.vue'
 import MonedasAdmin from '../components/MonedasAdmin.vue'
 import PresupuestoAdmin from '../components/PresupuestoAdmin.vue'
+import ComisionAdmin from '../components/ComisionAdmin.vue'
+import TerminosPlataformaAdmin from '../components/TerminosPlataformaAdmin.vue'
 import Registro from '../components/Registro.vue'
 import TOS from '../components/TOS.vue'
 import MainLayout from '../layouts/MainLayout.vue'
@@ -252,6 +254,18 @@ const routes = [
         name: 'presupuestos-admin',
         component: PresupuestoAdmin,
         meta: { title: 'Presupuestos' },
+      },
+      {
+        path: 'ajustes/comisiones',
+        name: 'comisiones-admin',
+        component: ComisionAdmin,
+        meta: { title: 'Comisión de la plataforma' },
+      },
+      {
+        path: 'ajustes/terminos-plataforma',
+        name: 'terminos-plataforma-admin',
+        component: TerminosPlataformaAdmin,
+        meta: { title: 'Términos de la plataforma' },
       },
       {
         path: 'notificaciones',

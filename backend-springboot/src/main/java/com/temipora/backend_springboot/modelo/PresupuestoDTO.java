@@ -36,6 +36,15 @@ public class PresupuestoDTO {
     private BigDecimal precioFinalMostrado;
     private String monedaMostrada;
 
+    // Comisión de la plataforma, descontada del precio del artista.
+    private BigDecimal comisionPorcentaje;
+    private BigDecimal comisionMonto;
+    private BigDecimal comisionMontoCobro;
+    private BigDecimal comisionMontoMostrado;
+    private BigDecimal montoNetoArtista;
+    private BigDecimal montoNetoArtistaCobro;
+    private BigDecimal montoNetoArtistaMostrado;
+
     private Integer tiempoEntregaValor;
     private String tiempoEntregaUnidad;
     private Integer tiempoEntregaDias;
@@ -92,6 +101,21 @@ public class PresupuestoDTO {
             factorCobroDestino,
             factorOrigenDestino);
 
+        BigDecimal comisionMostrada = totalMostrado(
+            presupuesto.getComisionMonto(),
+            presupuesto.getComisionMontoCobro(),
+            muestraOrigen,
+            muestraCobro,
+            factorCobroDestino,
+            factorOrigenDestino);
+        BigDecimal netoMostrado = totalMostrado(
+            presupuesto.getMontoNetoArtista(),
+            presupuesto.getMontoNetoArtistaCobro(),
+            muestraOrigen,
+            muestraCobro,
+            factorCobroDestino,
+            factorOrigenDestino);
+
         return PresupuestoDTO.builder()
             .idPresupuesto(presupuesto.getIdPresupuesto())
             .precioBaseTotal(presupuesto.getPrecioBaseTotal())
@@ -104,6 +128,13 @@ public class PresupuestoDTO {
             .precioBaseTotalMostrado(baseMostrado)
             .precioFinalMostrado(finalMostrado)
             .monedaMostrada(codigoMostrado)
+            .comisionPorcentaje(presupuesto.getComisionPorcentaje())
+            .comisionMonto(presupuesto.getComisionMonto())
+            .comisionMontoCobro(presupuesto.getComisionMontoCobro())
+            .comisionMontoMostrado(comisionMostrada)
+            .montoNetoArtista(presupuesto.getMontoNetoArtista())
+            .montoNetoArtistaCobro(presupuesto.getMontoNetoArtistaCobro())
+            .montoNetoArtistaMostrado(netoMostrado)
             .tiempoEntregaValor(presupuesto.getTiempoEntregaValor())
             .tiempoEntregaUnidad(presupuesto.getTiempoEntregaUnidad() != null
                 ? presupuesto.getTiempoEntregaUnidad().name()

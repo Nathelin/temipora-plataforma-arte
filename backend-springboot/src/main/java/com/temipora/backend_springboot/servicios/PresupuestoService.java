@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.ConfiguracionPresupuesto;
+import com.temipora.backend_springboot.modelo.ConfiguracionComision;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.ItemPresupuesto;
@@ -55,6 +56,7 @@ public class PresupuestoService {
     private final ListaEsperaService listaEsperaService;
     private final NotificacionService notificacionService;
     private final ConfiguracionPresupuestoService configuracionPresupuestoService;
+    private final ComisionService comisionService;
     private final MonedaVistaService monedaVistaService;
 
     public PresupuestoService(
@@ -65,6 +67,7 @@ public class PresupuestoService {
             ListaEsperaService listaEsperaService,
             NotificacionService notificacionService,
             ConfiguracionPresupuestoService configuracionPresupuestoService,
+            ComisionService comisionService,
             MonedaVistaService monedaVistaService) {
         this.solicitudRepository = solicitudRepository;
         this.servicioRepository = servicioRepository;
@@ -73,6 +76,7 @@ public class PresupuestoService {
         this.listaEsperaService = listaEsperaService;
         this.notificacionService = notificacionService;
         this.configuracionPresupuestoService = configuracionPresupuestoService;
+        this.comisionService = comisionService;
         this.monedaVistaService = monedaVistaService;
     }
 
@@ -246,6 +250,23 @@ public class PresupuestoService {
             enMoneda(presupuesto.getPrecioBaseTotal(), cotizacionCobro));
         presupuesto.setPrecioFinalCobro(
             enMoneda(presupuesto.getPrecioFinal(), cotizacionCobro));
+
+        ConfiguracionComision comision = comisionService.obtener();
+        BigDecimal comisionPorcentaje = comision.getPorcentajeServicio()
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal comisionMonto = comisionService.calcularComision(
+            presupuesto.getPrecioFinal(), comisionPorcentaje);
+        BigDecimal comisionMontoCobro = enMoneda(comisionMonto, cotizacionCobro);
+
+        presupuesto.setComisionPorcentaje(comisionPorcentaje);
+        presupuesto.setComisionMonto(comisionMonto);
+        presupuesto.setComisionMontoCobro(comisionMontoCobro);
+        presupuesto.setMontoNetoArtista(
+            presupuesto.getPrecioFinal().subtract(comisionMonto)
+                .setScale(2, RoundingMode.HALF_UP));
+        presupuesto.setMontoNetoArtistaCobro(
+            presupuesto.getPrecioFinalCobro().subtract(comisionMontoCobro)
+                .setScale(2, RoundingMode.HALF_UP));
 
         solicitud.setPresupuesto(presupuesto);
         presupuestoRepository.save(presupuesto);

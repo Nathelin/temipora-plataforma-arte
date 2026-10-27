@@ -72,6 +72,19 @@ const cotizacionAlEmitir = computed(() => {
   if (props.presupuesto?.monedaCobro === props.presupuesto?.moneda) return null
   return cotizacion
 })
+const comisionPorcentaje = computed(() => {
+  const valor = Number(props.presupuesto?.comisionPorcentaje)
+  return Number.isFinite(valor) ? valor : null
+})
+const comisionMostrada = computed(
+  () => props.presupuesto?.comisionMontoMostrado ?? props.presupuesto?.comisionMonto,
+)
+const netoMostrado = computed(
+  () => props.presupuesto?.montoNetoArtistaMostrado ?? props.presupuesto?.montoNetoArtista,
+)
+const muestraComision = computed(
+  () => comisionPorcentaje.value != null && comisionMostrada.value != null,
+)
 
 function formatearMoneda(valor) {
   return formatearPrecio(valor, monedaMostrada.value)
@@ -137,6 +150,35 @@ function formatearRecargo(recargo) {
       {{ formatearMonto(cotizacionAlEmitir) }} {{ presupuesto.monedaCobro }}.
       El importe en {{ presupuesto.monedaCobro }} queda congelado.
     </p>
+
+    <div
+      v-if="muestraComision"
+      class="mt-4 rounded-xl border border-cafe/15 bg-cafe/5 p-4"
+    >
+      <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/50">
+        Comisión de la plataforma
+      </p>
+      <dl class="mt-2 space-y-1.5 text-sm">
+        <div class="flex items-center justify-between gap-3">
+          <dt class="text-cafe/60">
+            Comisión ({{ formatearMonto(comisionPorcentaje) }}%)
+          </dt>
+          <dd class="text-cafe">− {{ formatearMoneda(comisionMostrada) }}</dd>
+        </div>
+        <div
+          v-if="esArtista"
+          class="flex items-center justify-between gap-3 border-t border-cafe/10 pt-1.5"
+        >
+          <dt class="font-semibold text-granate">Recibís</dt>
+          <dd class="text-base font-bold text-granate">{{ formatearMoneda(netoMostrado) }}</dd>
+        </div>
+      </dl>
+      <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+        {{ esArtista
+          ? 'La comisión se descuenta de tu precio. El cliente paga el total sin cambios.'
+          : 'La comisión está incluida en el precio: no se suma al total.' }}
+      </p>
+    </div>
 
     <dl class="mt-5 grid gap-3 text-sm sm:grid-cols-2">
       <div class="flex items-start justify-between gap-3 rounded-xl bg-rosa/10 px-3 py-2 sm:block">

@@ -68,6 +68,25 @@ public class Presupuesto {
     @Column(name = "precio_final_cobro", nullable = false, precision = 12, scale = 2)
     private BigDecimal precioFinalCobro;
 
+    /**
+     * Comisión de la plataforma congelada al emitir el presupuesto. Se descuenta
+     * del precio del artista: el cliente paga el precio final sin cambios.
+     */
+    @Column(name = "comision_porcentaje", nullable = false, precision = 5, scale = 2)
+    private BigDecimal comisionPorcentaje;
+
+    @Column(name = "comision_monto", nullable = false, precision = 12, scale = 2)
+    private BigDecimal comisionMonto;
+
+    @Column(name = "comision_monto_cobro", nullable = false, precision = 12, scale = 2)
+    private BigDecimal comisionMontoCobro;
+
+    @Column(name = "monto_neto_artista", nullable = false, precision = 12, scale = 2)
+    private BigDecimal montoNetoArtista;
+
+    @Column(name = "monto_neto_artista_cobro", nullable = false, precision = 12, scale = 2)
+    private BigDecimal montoNetoArtistaCobro;
+
     @Column(name = "tiempo_entrega_valor", nullable = false)
     private Integer tiempoEntregaValor;
 

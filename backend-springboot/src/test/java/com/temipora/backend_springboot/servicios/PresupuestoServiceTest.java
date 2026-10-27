@@ -26,6 +26,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 
+import com.temipora.backend_springboot.modelo.ConfiguracionComision;
 import com.temipora.backend_springboot.modelo.ConfiguracionPresupuesto;
 import com.temipora.backend_springboot.modelo.ETiempoEntregaUnidad;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
@@ -76,6 +77,9 @@ class PresupuestoServiceTest {
 
     @Mock
     private ConfiguracionPresupuestoService configuracionPresupuestoService;
+
+    @Mock
+    private ComisionService comisionService;
 
     @Mock
     private MonedaVistaService monedaVistaService;
@@ -147,6 +151,20 @@ class PresupuestoServiceTest {
             contains("200.00 ARS"),
             eq(SOLICITUD),
             eq("SOLICITUD"));
+    }
+
+    @Test
+    void crear_calculaComisionYNetoDelArtista() {
+        prepararCreacion();
+
+        SolicitudDTO resultado = presupuestoService.crear(
+            SOLICITUD, ARTISTA, request());
+
+        PresupuestoDTO presupuesto = resultado.getPresupuesto();
+        assertThat(presupuesto.getPrecioFinal()).isEqualByComparingTo("200.00");
+        assertThat(presupuesto.getComisionPorcentaje()).isEqualByComparingTo("10.00");
+        assertThat(presupuesto.getComisionMonto()).isEqualByComparingTo("20.00");
+        assertThat(presupuesto.getMontoNetoArtista()).isEqualByComparingTo("180.00");
     }
 
     @Test
@@ -556,6 +574,17 @@ class PresupuestoServiceTest {
                 true, 1, null));
         lenient().when(configuracionPresupuestoService.obtener())
             .thenReturn(configuracion);
+        ConfiguracionComision comision = new ConfiguracionComision();
+        comision.setPorcentajeServicio(new BigDecimal("10.00"));
+        comision.setPorcentajeProducto(new BigDecimal("10.00"));
+        lenient().when(comisionService.obtener()).thenReturn(comision);
+        lenient().when(comisionService.calcularComision(any(), any()))
+            .thenAnswer(inv -> {
+                BigDecimal monto = inv.getArgument(0);
+                BigDecimal porcentaje = inv.getArgument(1);
+                return monto.multiply(porcentaje)
+                    .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+            });
         lenient().when(monedaVistaService.monedaCobro()).thenReturn(moneda);
         lenient().when(monedaVistaService.factorCobro(
                 eq(moneda), any(LocalDateTime.class)))

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
-import { formatearPrecio } from '../servicios/moneda'
+import { formatearMonto, formatearPrecio } from '../servicios/moneda'
 import {
   MAX_PLAZO_POR_UNIDAD,
   UNIDADES_ENTREGA,
@@ -26,6 +26,7 @@ const hoy = aFechaISO(fechaActual)
 const maxInicio = aFechaISO(sumarPlazo(hoy, 12, 'MESES'))
 
 const solicitud = ref(null)
+const comisionPorcentaje = ref(null)
 const cargando = ref(true)
 const errorCarga = ref('')
 const enviando = ref(false)
@@ -189,6 +190,14 @@ const totalFinal = computed(
 const totalRecargos = computed(
   () => Math.round((totalFinal.value - totalBase.value) * 100) / 100,
 )
+const comisionMonto = computed(() => {
+  if (comisionPorcentaje.value == null) return null
+  return Math.round(totalFinal.value * comisionPorcentaje.value) / 100
+})
+const netoArtista = computed(() => {
+  if (comisionMonto.value == null) return null
+  return Math.round((totalFinal.value - comisionMonto.value) * 100) / 100
+})
 
 function agregarRecargo(item) {
   if (item.recargos.length >= 20) return
@@ -215,8 +224,15 @@ async function cargar() {
   cargando.value = true
   errorCarga.value = ''
   try {
-    const res = await api.get(`/solicitudes-servicio/${idSolicitud.value}`)
+    const [res, resComision] = await Promise.all([
+      api.get(`/solicitudes-servicio/${idSolicitud.value}`),
+      api.get('/comisiones/vigentes').catch(() => null),
+    ])
     solicitud.value = res.data
+    const porcentaje = Number(resComision?.data?.porcentajeServicio)
+    if (Number.isFinite(porcentaje)) {
+      comisionPorcentaje.value = porcentaje
+    }
 
     if (!puedePresupuestar.value) return
 
@@ -792,6 +808,21 @@ onMounted(cargar)
                 <dt class="text-base font-semibold text-granate">Total</dt>
                 <dd class="text-right text-2xl font-bold text-granate">{{ formatear(totalFinal) }}</dd>
               </div>
+              <template v-if="comisionMonto !== null">
+                <div class="flex items-start justify-between gap-4 border-t border-coral/15 pt-3">
+                  <dt class="text-cafe/55">
+                    Comisión de la plataforma ({{ formatearMonto(comisionPorcentaje) }}%)
+                  </dt>
+                  <dd class="text-right font-medium text-cafe">− {{ formatear(comisionMonto) }}</dd>
+                </div>
+                <div class="flex items-start justify-between gap-4">
+                  <dt class="text-base font-semibold text-granate">Recibís</dt>
+                  <dd class="text-right text-xl font-bold text-granate">{{ formatear(netoArtista) }}</dd>
+                </div>
+                <p class="text-xs leading-relaxed text-cafe/50">
+                  La comisión se descuenta de tu precio. El cliente paga el total sin cambios.
+                </p>
+              </template>
             </dl>
           </div>
 
