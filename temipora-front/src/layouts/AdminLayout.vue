@@ -44,6 +44,8 @@ const secciones = [
       { nombre: 'Monedas', to: '/admin/ajustes/monedas' },
       { nombre: 'Cotización', to: '/admin/ajustes/cotizacion' },
       { nombre: 'Presupuestos', to: '/admin/ajustes/presupuestos' },
+      { nombre: 'Comisiones', to: '/admin/ajustes/comisiones' },
+      { nombre: 'Términos de la plataforma', to: '/admin/ajustes/terminos-plataforma' },
     ],
   },
   { nombre: 'Moderación', to: null, activa: false },
