@@ -48,7 +48,7 @@ public class SolicitudDTO {
     private boolean puedeCancelar;
 
     public static SolicitudDTO desdeSolicitud(Solicitud solicitud) {
-        return desdeSolicitud(solicitud, null, null, null);
+        return desdeSolicitud(solicitud, null, null, null, false);
     }
 
     public static SolicitudDTO desdeSolicitud(
@@ -56,6 +56,16 @@ public class SolicitudDTO {
             Moneda monedaDestino,
             BigDecimal factorOrigenDestino,
             BigDecimal factorCobroDestino) {
+        return desdeSolicitud(
+            solicitud, monedaDestino, factorOrigenDestino, factorCobroDestino, false);
+    }
+
+    public static SolicitudDTO desdeSolicitud(
+            Solicitud solicitud,
+            Moneda monedaDestino,
+            BigDecimal factorOrigenDestino,
+            BigDecimal factorCobroDestino,
+            boolean incluirComision) {
         Moneda origen = solicitud.getMoneda();
         Moneda destino = monedaDestino != null ? monedaDestino : origen;
         boolean muestraOrigen = PresupuestoDTO.mismaMoneda(destino, origen);
@@ -106,7 +116,8 @@ public class SolicitudDTO {
                     solicitud.getPresupuesto(),
                     monedaDestino,
                     factorOrigenDestino,
-                    factorCobroDestino)
+                    factorCobroDestino,
+                    incluirComision)
                 : null)
             .build();
     }

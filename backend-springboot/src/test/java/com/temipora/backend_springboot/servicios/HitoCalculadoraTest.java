@@ -17,13 +17,13 @@ class HitoCalculadoraTest {
         4, new BigDecimal("50.00"), new BigDecimal("10.00"));
 
     @Test
-    void sinHitos_creaUnicoHitoDeEntregaAlCien() {
+    void sinHitos_creaUnicoPagoAlInicio() {
         List<HitoPresupuesto> hitos = construir(null,
             "200.00", "200.00", "20.00", "20.00");
 
         assertThat(hitos).hasSize(1);
-        assertThat(hitos.get(0).getTipo().name()).isEqualTo("ENTREGA");
-        assertThat(hitos.get(0).getNombre()).isEqualTo("Entrega final");
+        assertThat(hitos.get(0).getTipo().name()).isEqualTo("SENA");
+        assertThat(hitos.get(0).getNombre()).isEqualTo("Pago único");
         assertThat(hitos.get(0).getPorcentaje()).isEqualByComparingTo("100.00");
         assertThat(hitos.get(0).getMonto()).isEqualByComparingTo("200.00");
         assertThat(hitos.get(0).getMontoNeto()).isEqualByComparingTo("180.00");
@@ -38,12 +38,59 @@ class HitoCalculadoraTest {
         assertThat(hitos).hasSize(2);
         assertThat(hitos.get(0).getTipo().name()).isEqualTo("SENA");
         assertThat(hitos.get(0).getNombre()).isEqualTo("Seña");
-        assertThat(hitos.get(0).isRequiereEntrega()).isFalse();
+        assertThat(hitos.get(0).isRequiereEntrega()).isTrue();
         assertThat(hitos.get(0).getComisionMonto()).isEqualByComparingTo("10.00");
         assertThat(hitos.get(0).getMontoNeto()).isEqualByComparingTo("90.00");
 
         assertThat(hitos.get(1).getTipo().name()).isEqualTo("ENTREGA");
         assertThat(hitos.get(1).isRequiereEntrega()).isTrue();
+    }
+
+    @Test
+    void senaSkeb_sinEntregable() {
+        HitoPresupuestoRequest sena = hito("50");
+        sena.setRequiereEntrega(false);
+
+        List<HitoPresupuesto> hitos = construir(
+            List.of(sena, hito("50")),
+            "200.00", "200.00", "20.00", "20.00");
+
+        assertThat(hitos).hasSize(2);
+        assertThat(hitos.get(0).getTipo().name()).isEqualTo("SENA");
+        assertThat(hitos.get(0).isRequiereEntrega()).isFalse();
+        assertThat(hitos.get(1).getTipo().name()).isEqualTo("ENTREGA");
+        assertThat(hitos.get(1).isRequiereEntrega()).isTrue();
+    }
+
+    @Test
+    void pagoUnico_fuerzaEntregableAunqueSeSoliciteFalse() {
+        HitoPresupuestoRequest unico = hito("100");
+        unico.setRequiereEntrega(false);
+
+        List<HitoPresupuesto> hitos = construir(
+            List.of(unico), "100.00", "100.00", "10.00", "10.00");
+
+        assertThat(hitos).hasSize(1);
+        assertThat(hitos.get(0).getTipo().name()).isEqualTo("SENA");
+        assertThat(hitos.get(0).isRequiereEntrega()).isTrue();
+    }
+
+    @Test
+    void tresHitos_entregaSiempreTieneEntregable() {
+        HitoPresupuestoRequest cuota = hito("40");
+        cuota.setRequiereEntrega(false);
+        HitoPresupuestoRequest entrega = hito("30");
+        entrega.setRequiereEntrega(false);
+
+        List<HitoPresupuesto> hitos = construir(
+            List.of(hito("30"), cuota, entrega),
+            "100.00", "100.00", "10.00", "10.00");
+
+        assertThat(hitos).hasSize(3);
+        assertThat(hitos.get(1).getTipo().name()).isEqualTo("CUOTA");
+        assertThat(hitos.get(1).isRequiereEntrega()).isTrue();
+        assertThat(hitos.get(2).getTipo().name()).isEqualTo("ENTREGA");
+        assertThat(hitos.get(2).isRequiereEntrega()).isTrue();
     }
 
     @Test

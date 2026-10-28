@@ -173,7 +173,7 @@ class PresupuestoServiceTest {
     }
 
     @Test
-    void crear_sinHitos_creaUnaEntregaUnicaAlCienPorCiento() {
+    void crear_sinHitos_creaUnPagoUnicoAlInicio() {
         prepararCreacion();
 
         SolicitudDTO resultado = presupuestoService.crear(
@@ -181,11 +181,31 @@ class PresupuestoServiceTest {
 
         assertThat(resultado.getPresupuesto().getHitos()).hasSize(1);
         assertThat(resultado.getPresupuesto().getHitos().get(0).getTipo())
-            .isEqualTo("ENTREGA");
+            .isEqualTo("SENA");
         assertThat(resultado.getPresupuesto().getHitos().get(0).getPorcentaje())
             .isEqualByComparingTo("100.00");
         assertThat(resultado.getPresupuesto().getHitos().get(0).getMonto())
             .isEqualByComparingTo("200.00");
+        assertThat(resultado.getPresupuesto().getHitos().get(0).isRequiereEntrega())
+            .isTrue();
+    }
+
+    @Test
+    void crear_conSenaSkeb_laSenaNoRequiereEntregable() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        HitoPresupuestoRequest sena = hito("50");
+        sena.setRequiereEntrega(false);
+        request.setHitos(new ArrayList<>(List.of(sena, hito("50"))));
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request);
+
+        var hitos = resultado.getPresupuesto().getHitos();
+        assertThat(hitos).hasSize(2);
+        assertThat(hitos.get(0).getTipo()).isEqualTo("SENA");
+        assertThat(hitos.get(0).isRequiereEntrega()).isFalse();
+        assertThat(hitos.get(1).getTipo()).isEqualTo("ENTREGA");
+        assertThat(hitos.get(1).isRequiereEntrega()).isTrue();
     }
 
     @Test

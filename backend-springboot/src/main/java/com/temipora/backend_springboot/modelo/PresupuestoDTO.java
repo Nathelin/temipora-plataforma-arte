@@ -7,6 +7,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -37,12 +39,20 @@ public class PresupuestoDTO {
     private String monedaMostrada;
 
     // Comisión de la plataforma, descontada del precio del artista.
+    // Solo se envía al artista dueño o a un admin: el cliente no debe verla.
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal comisionPorcentaje;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal comisionMonto;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal comisionMontoCobro;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal comisionMontoMostrado;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal montoNetoArtista;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal montoNetoArtistaCobro;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal montoNetoArtistaMostrado;
 
     private Integer tiempoEntregaValor;
@@ -56,7 +66,7 @@ public class PresupuestoDTO {
     private List<HitoPresupuestoDTO> hitos;
 
     public static PresupuestoDTO desdePresupuesto(Presupuesto presupuesto) {
-        return desdePresupuesto(presupuesto, null, null, null);
+        return desdePresupuesto(presupuesto, null, null, null, false);
     }
 
     /**
@@ -70,6 +80,20 @@ public class PresupuestoDTO {
             Moneda monedaDestino,
             BigDecimal factorOrigenDestino,
             BigDecimal factorCobroDestino) {
+        return desdePresupuesto(
+            presupuesto, monedaDestino, factorOrigenDestino, factorCobroDestino, false);
+    }
+
+    /**
+     * @param incluirComision true solo para el artista dueño o un admin. El
+     *        cliente no debe recibir la comisión ni el neto del artista.
+     */
+    public static PresupuestoDTO desdePresupuesto(
+            Presupuesto presupuesto,
+            Moneda monedaDestino,
+            BigDecimal factorOrigenDestino,
+            BigDecimal factorCobroDestino,
+            boolean incluirComision) {
         Moneda origen = presupuesto.getMoneda();
         Moneda cobro = presupuesto.getMonedaCobro();
         Moneda destino = monedaDestino != null ? monedaDestino : origen;
@@ -102,20 +126,24 @@ public class PresupuestoDTO {
             factorCobroDestino,
             factorOrigenDestino);
 
-        BigDecimal comisionMostrada = totalMostrado(
-            presupuesto.getComisionMonto(),
-            presupuesto.getComisionMontoCobro(),
-            muestraOrigen,
-            muestraCobro,
-            factorCobroDestino,
-            factorOrigenDestino);
-        BigDecimal netoMostrado = totalMostrado(
-            presupuesto.getMontoNetoArtista(),
-            presupuesto.getMontoNetoArtistaCobro(),
-            muestraOrigen,
-            muestraCobro,
-            factorCobroDestino,
-            factorOrigenDestino);
+        BigDecimal comisionMostrada = incluirComision
+            ? totalMostrado(
+                presupuesto.getComisionMonto(),
+                presupuesto.getComisionMontoCobro(),
+                muestraOrigen,
+                muestraCobro,
+                factorCobroDestino,
+                factorOrigenDestino)
+            : null;
+        BigDecimal netoMostrado = incluirComision
+            ? totalMostrado(
+                presupuesto.getMontoNetoArtista(),
+                presupuesto.getMontoNetoArtistaCobro(),
+                muestraOrigen,
+                muestraCobro,
+                factorCobroDestino,
+                factorOrigenDestino)
+            : null;
 
         return PresupuestoDTO.builder()
             .idPresupuesto(presupuesto.getIdPresupuesto())
@@ -129,12 +157,17 @@ public class PresupuestoDTO {
             .precioBaseTotalMostrado(baseMostrado)
             .precioFinalMostrado(finalMostrado)
             .monedaMostrada(codigoMostrado)
-            .comisionPorcentaje(presupuesto.getComisionPorcentaje())
-            .comisionMonto(presupuesto.getComisionMonto())
-            .comisionMontoCobro(presupuesto.getComisionMontoCobro())
+            .comisionPorcentaje(incluirComision
+                ? presupuesto.getComisionPorcentaje() : null)
+            .comisionMonto(incluirComision
+                ? presupuesto.getComisionMonto() : null)
+            .comisionMontoCobro(incluirComision
+                ? presupuesto.getComisionMontoCobro() : null)
             .comisionMontoMostrado(comisionMostrada)
-            .montoNetoArtista(presupuesto.getMontoNetoArtista())
-            .montoNetoArtistaCobro(presupuesto.getMontoNetoArtistaCobro())
+            .montoNetoArtista(incluirComision
+                ? presupuesto.getMontoNetoArtista() : null)
+            .montoNetoArtistaCobro(incluirComision
+                ? presupuesto.getMontoNetoArtistaCobro() : null)
             .montoNetoArtistaMostrado(netoMostrado)
             .tiempoEntregaValor(presupuesto.getTiempoEntregaValor())
             .tiempoEntregaUnidad(presupuesto.getTiempoEntregaUnidad() != null
@@ -154,7 +187,8 @@ public class PresupuestoDTO {
                     muestraOrigen,
                     muestraCobro,
                     factorCobroDestino,
-                    factorOrigenDestino))
+                    factorOrigenDestino,
+                    incluirComision))
                 .toList())
             .build();
     }

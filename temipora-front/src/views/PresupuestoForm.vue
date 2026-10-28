@@ -238,35 +238,72 @@ const hitosPreview = computed(() => {
 })
 
 function tipoHito(indice, cantidad) {
-  if (cantidad === 1) return 'ENTREGA'
+  if (cantidad === 1) return 'SENA'
   if (indice === 0) return 'SENA'
   if (indice === cantidad - 1) return 'ENTREGA'
   return 'CUOTA'
 }
 
-function etiquetaTipoHito(tipo) {
-  if (tipo === 'SENA') return 'Seña'
+function etiquetaTipoHito(tipo, cantidad) {
+  if (tipo === 'SENA') return cantidad === 1 ? 'Pago único' : 'Seña'
   if (tipo === 'ENTREGA') return 'Entrega final'
   return 'Cuota'
 }
 
 function hitosPorDefecto() {
   if (maxHitos.value < 2) {
-    return [{ nombre: 'Entrega final', porcentaje: 100 }]
+    return [{ nombre: 'Pago único', porcentaje: 100, requiereEntrega: true }]
   }
   const primera = Math.min(50, porcentajeMaxPrimerHito.value)
   return [
-    { nombre: 'Seña', porcentaje: primera },
-    { nombre: 'Entrega final', porcentaje: Math.round((100 - primera) * 100) / 100 },
+    { nombre: 'Seña', porcentaje: primera, requiereEntrega: true },
+    {
+      nombre: 'Entrega final',
+      porcentaje: Math.round((100 - primera) * 100) / 100,
+      requiereEntrega: true,
+    },
   ]
 }
 
 function usarPagoUnico() {
-  form.value.hitos = [{ nombre: 'Entrega final', porcentaje: 100 }]
+  form.value.hitos = [
+    { nombre: 'Pago único', porcentaje: 100, requiereEntrega: true },
+  ]
 }
 
-function usarHitosPorDefecto() {
+function usarSenaEntrega() {
   form.value.hitos = hitosPorDefecto()
+}
+
+function usarSkeb() {
+  const primera = Math.min(50, porcentajeMaxPrimerHito.value)
+  form.value.hitos = [
+    { nombre: 'Seña', porcentaje: primera, requiereEntrega: false },
+    {
+      nombre: 'Entrega final',
+      porcentaje: Math.round((100 - primera) * 100) / 100,
+      requiereEntrega: true,
+    },
+  ]
+}
+
+function usarTresEtapas() {
+  if (maxHitos.value < 3) {
+    usarSenaEntrega()
+    return
+  }
+  const primera = Math.min(30, porcentajeMaxPrimerHito.value)
+  const resto = Math.round((100 - primera) * 100) / 100
+  const cuota = Math.round((resto / 2) * 100) / 100
+  form.value.hitos = [
+    { nombre: 'Seña', porcentaje: primera, requiereEntrega: true },
+    { nombre: 'Cuota 2', porcentaje: cuota, requiereEntrega: true },
+    {
+      nombre: 'Entrega final',
+      porcentaje: Math.round((resto - cuota) * 100) / 100,
+      requiereEntrega: true,
+    },
+  ]
 }
 
 function agregarHito() {
@@ -274,6 +311,7 @@ function agregarHito() {
   form.value.hitos.push({
     nombre: `Cuota ${form.value.hitos.length + 1}`,
     porcentaje: 0,
+    requiereEntrega: true,
   })
 }
 
@@ -504,6 +542,7 @@ async function enviar() {
       hitos: form.value.hitos.map((hito) => ({
         nombre: hito.nombre?.trim() || null,
         porcentaje: Number(hito.porcentaje),
+        requiereEntrega: hito.requiereEntrega !== false,
       })),
     }
 
@@ -897,14 +936,28 @@ onMounted(cargar)
                 class="rounded-full border border-coral/40 bg-coral/5 px-4 py-2 text-xs font-semibold text-coral transition hover:bg-coral/10"
                 @click="usarPagoUnico"
               >
-                Pago único (sin revisiones)
+                100% al inicio
               </button>
               <button
                 type="button"
                 class="rounded-full border border-coral/40 bg-coral/5 px-4 py-2 text-xs font-semibold text-coral transition hover:bg-coral/10"
-                @click="usarHitosPorDefecto"
+                @click="usarSenaEntrega"
               >
                 Seña y entrega
+              </button>
+              <button
+                type="button"
+                class="rounded-full border border-coral/40 bg-coral/5 px-4 py-2 text-xs font-semibold text-coral transition hover:bg-coral/10"
+                @click="usarSkeb"
+              >
+                Skeb (sin revisiones)
+              </button>
+              <button
+                type="button"
+                class="rounded-full border border-coral/40 bg-coral/5 px-4 py-2 text-xs font-semibold text-coral transition hover:bg-coral/10"
+                @click="usarTresEtapas"
+              >
+                Tres etapas
               </button>
             </div>
           </div>
@@ -917,7 +970,7 @@ onMounted(cargar)
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
-                  {{ etiquetaTipoHito(hito.tipo) }}
+                  {{ etiquetaTipoHito(hito.tipo, form.hitos.length) }}
                 </p>
                 <p class="mt-1 text-lg font-semibold text-granate">{{ formatear(hito.monto) }}</p>
               </div>
@@ -962,9 +1015,35 @@ onMounted(cargar)
             </div>
 
             <p class="mt-2 text-xs text-cafe/50">
-              {{ hito.tipo === 'SENA'
-                ? 'Se paga al aceptar el presupuesto.'
-                : 'Se habilita cuando el cliente aprueba el entregable anterior.' }}
+              {{ hito.tipo === 'ENTREGA'
+                ? 'Se paga contra entrega, cuando el cliente ve el preview protegido.'
+                : hito.tipo === 'SENA'
+                  ? 'Se paga al aceptar el presupuesto.'
+                  : 'Se paga después de aprobar el avance anterior.' }}
+            </p>
+
+            <label
+              v-if="hito.tipo === 'SENA' && form.hitos.length > 1"
+              class="mt-3 flex items-start gap-2 rounded-lg bg-rosa/10 px-3 py-2 text-xs text-cafe/70"
+            >
+              <input
+                v-model="form.hitos[indice].requiereEntrega"
+                type="checkbox"
+                class="mt-0.5 h-4 w-4 rounded border-rosa text-coral focus:ring-coral"
+              />
+              <span>
+                Pedir aprobación de un avance antes de la siguiente cuota.
+                Desmarcalo para encargos tipo skeb.
+              </span>
+            </label>
+            <p
+              v-else-if="hito.tipo === 'SENA'"
+              class="mt-2 text-xs text-cafe/45"
+            >
+              El pago único incluye la entrega final, que el cliente aprueba.
+            </p>
+            <p v-else class="mt-2 text-xs text-cafe/45">
+              Requiere un entregable que el cliente aprueba.
             </p>
           </article>
 
@@ -1078,7 +1157,7 @@ onMounted(cargar)
                 class="flex items-center justify-between gap-3 rounded-xl bg-rosa/10 px-3 py-2 text-sm"
               >
                 <span class="min-w-0 truncate text-cafe">
-                  {{ hito.nombre || etiquetaTipoHito(hito.tipo) }} · {{ hito.porcentaje }}%
+                  {{ hito.nombre || etiquetaTipoHito(hito.tipo, form.hitos.length) }} · {{ hito.porcentaje }}%
                 </span>
                 <span class="shrink-0 font-semibold text-granate">
                   {{ formatear(hito.monto) }}

@@ -91,6 +91,18 @@ function formatearMoneda(valor) {
   return formatearPrecio(valor, monedaMostrada.value)
 }
 
+function descripcionHito(hito) {
+  if (hito.tipo === 'ENTREGA') {
+    return 'Se paga contra entrega, al ver el preview protegido'
+  }
+  if (hito.tipo === 'CUOTA') {
+    return 'Se paga después de aprobar el avance anterior'
+  }
+  return hito.requiereEntrega
+    ? 'Se paga al aceptar; incluye un avance para aprobar'
+    : 'Se paga al aceptar el presupuesto'
+}
+
 function formatearRecargo(recargo) {
   if (recargo?.tipo === 'PORCENTAJE') {
     return `${Number(recargo.valor)}%`
@@ -153,7 +165,7 @@ function formatearRecargo(recargo) {
     </p>
 
     <div
-      v-if="muestraComision"
+      v-if="muestraComision && esArtista"
       class="mt-4 rounded-xl border border-cafe/15 bg-cafe/5 p-4"
     >
       <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/50">
@@ -175,9 +187,7 @@ function formatearRecargo(recargo) {
         </div>
       </dl>
       <p class="mt-2 text-xs leading-relaxed text-cafe/50">
-        {{ esArtista
-          ? 'La comisión se descuenta de tu precio. El cliente paga el total sin cambios.'
-          : 'La comisión está incluida en el precio: no se suma al total.' }}
+        La comisión se descuenta de tu precio. El cliente paga el total sin cambios.
       </p>
     </div>
 
@@ -197,9 +207,7 @@ function formatearRecargo(recargo) {
               </span>
             </p>
             <p class="text-xs text-cafe/50">
-              {{ hito.tipo === 'SENA'
-                ? 'Se paga al aceptar el presupuesto'
-                : 'Se habilita al aprobar el entregable anterior' }}
+              {{ descripcionHito(hito) }}
             </p>
           </div>
           <div class="shrink-0 text-right">

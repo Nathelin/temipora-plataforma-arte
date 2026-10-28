@@ -26,4 +26,11 @@ public class HitoPresupuestoRequest {
     @Digits(integer = 3, fraction = 2,
         message = "El porcentaje del hito admite hasta 2 decimales.")
     private BigDecimal porcentaje;
+
+    /**
+     * Si el hito exige un entregable que el cliente debe aprobar. Por defecto
+     * se exige en todos los hitos; la seña puede desactivarlo (encargo tipo
+     * skeb, sin entregas intermedias).
+     */
+    private Boolean requiereEntrega;
 }

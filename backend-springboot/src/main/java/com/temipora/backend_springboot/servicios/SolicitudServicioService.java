@@ -619,8 +619,11 @@ public class SolicitudServicioService {
         BigDecimal factorCobro = mostrada != null
             ? monedaVistaService.factorCobroAMostrada(mostrada, ahora)
             : null;
+        boolean incluirComision = idVista != null
+            && solicitud.getArtista() != null
+            && idVista.equals(solicitud.getArtista().getIdUsuario());
         return SolicitudDTO.desdeSolicitud(
-            solicitud, mostrada, factorOrigen, factorCobro);
+            solicitud, mostrada, factorOrigen, factorCobro, incluirComision);
     }
 
     private SolicitudResumenDTO aResumen(Solicitud solicitud, Long idVista) {

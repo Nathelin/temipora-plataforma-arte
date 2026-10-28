@@ -2,6 +2,8 @@ package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -24,11 +26,17 @@ public class HitoPresupuestoDTO {
     private BigDecimal monto;
     private BigDecimal montoCobro;
     private BigDecimal montoMostrado;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal comisionMonto;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal comisionMontoCobro;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal comisionMontoMostrado;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal montoNeto;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal montoNetoCobro;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal montoNetoMostrado;
     private boolean requiereEntrega;
 
@@ -37,7 +45,8 @@ public class HitoPresupuestoDTO {
             boolean muestraOrigen,
             boolean muestraCobro,
             BigDecimal factorCobroDestino,
-            BigDecimal factorOrigenDestino) {
+            BigDecimal factorOrigenDestino,
+            boolean incluirComision) {
         BigDecimal montoMostrado = PresupuestoDTO.totalMostrado(
             hito.getMonto(),
             hito.getMontoCobro(),
@@ -45,20 +54,24 @@ public class HitoPresupuestoDTO {
             muestraCobro,
             factorCobroDestino,
             factorOrigenDestino);
-        BigDecimal comisionMostrada = PresupuestoDTO.totalMostrado(
-            hito.getComisionMonto(),
-            hito.getComisionMontoCobro(),
-            muestraOrigen,
-            muestraCobro,
-            factorCobroDestino,
-            factorOrigenDestino);
-        BigDecimal netoMostrado = PresupuestoDTO.totalMostrado(
-            hito.getMontoNeto(),
-            hito.getMontoNetoCobro(),
-            muestraOrigen,
-            muestraCobro,
-            factorCobroDestino,
-            factorOrigenDestino);
+        BigDecimal comisionMostrada = incluirComision
+            ? PresupuestoDTO.totalMostrado(
+                hito.getComisionMonto(),
+                hito.getComisionMontoCobro(),
+                muestraOrigen,
+                muestraCobro,
+                factorCobroDestino,
+                factorOrigenDestino)
+            : null;
+        BigDecimal netoMostrado = incluirComision
+            ? PresupuestoDTO.totalMostrado(
+                hito.getMontoNeto(),
+                hito.getMontoNetoCobro(),
+                muestraOrigen,
+                muestraCobro,
+                factorCobroDestino,
+                factorOrigenDestino)
+            : null;
 
         return HitoPresupuestoDTO.builder()
             .idHitoPresupuesto(hito.getIdHitoPresupuesto())
@@ -70,11 +83,12 @@ public class HitoPresupuestoDTO {
             .monto(hito.getMonto())
             .montoCobro(hito.getMontoCobro())
             .montoMostrado(montoMostrado)
-            .comisionMonto(hito.getComisionMonto())
-            .comisionMontoCobro(hito.getComisionMontoCobro())
+            .comisionMonto(incluirComision ? hito.getComisionMonto() : null)
+            .comisionMontoCobro(incluirComision
+                ? hito.getComisionMontoCobro() : null)
             .comisionMontoMostrado(comisionMostrada)
-            .montoNeto(hito.getMontoNeto())
-            .montoNetoCobro(hito.getMontoNetoCobro())
+            .montoNeto(incluirComision ? hito.getMontoNeto() : null)
+            .montoNetoCobro(incluirComision ? hito.getMontoNetoCobro() : null)
             .montoNetoMostrado(netoMostrado)
             .requiereEntrega(hito.isRequiereEntrega())
             .build();

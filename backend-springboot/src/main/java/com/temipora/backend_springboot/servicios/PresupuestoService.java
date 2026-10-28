@@ -313,7 +313,7 @@ public class PresupuestoService {
             ? monedaVistaService.factorCobroAMostrada(monedaMostrada, ahora)
             : null;
         SolicitudDTO dto = SolicitudDTO.desdeSolicitud(
-            solicitud, monedaMostrada, factorOrigen, factorCobro);
+            solicitud, monedaMostrada, factorOrigen, factorCobro, true);
         dto.setPuedePresupuestar(false);
         dto.setMotivoNoPresupuestable(null);
         dto.setPosicionCola(null);

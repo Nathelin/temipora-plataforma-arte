@@ -129,11 +129,13 @@ public final class HitoCalculadora {
                 "El nombre del hito no puede superar los "
                     + MAX_NOMBRE + " caracteres.");
             if (nombre == null) {
-                nombre = nombrePorDefecto(tipo, i);
+                nombre = nombrePorDefecto(tipo, i, porcentajes.size());
             }
             String descripcion = limpiar(request.getDescripcion(), MAX_DESCRIPCION,
                 "La descripción del hito no puede superar los "
                     + MAX_DESCRIPCION + " caracteres.");
+            boolean requiereEntrega = resolverRequiereEntrega(
+                tipo, porcentajes.size(), request.getRequiereEntrega());
 
             HitoPresupuesto hito = new HitoPresupuesto();
             hito.setOrden(i);
@@ -150,7 +152,7 @@ public final class HitoCalculadora {
                 .setScale(2, RoundingMode.HALF_UP));
             hito.setMontoNetoCobro(montoCobro.subtract(comisionCobro)
                 .setScale(2, RoundingMode.HALF_UP));
-            hito.setRequiereEntrega(tipo != TipoHito.SENA);
+            hito.setRequiereEntrega(requiereEntrega);
             hitos.add(hito);
 
             acumuladoMonto = acumuladoMonto.add(monto);
@@ -174,7 +176,7 @@ public final class HitoCalculadora {
 
     private static TipoHito tipoDe(int indice, int total) {
         if (total == 1) {
-            return TipoHito.ENTREGA;
+            return TipoHito.SENA;
         }
         if (indice == 0) {
             return TipoHito.SENA;
@@ -185,7 +187,25 @@ public final class HitoCalculadora {
         return TipoHito.CUOTA;
     }
 
-    private static String nombrePorDefecto(TipoHito tipo, int indice) {
+    private static boolean resolverRequiereEntrega(
+            TipoHito tipo, int total, Boolean solicitado) {
+        if (tipo == TipoHito.ENTREGA) {
+            return true;
+        }
+        if (total == 1) {
+            // El pago único incluye la entrega final, que el cliente aprueba.
+            return true;
+        }
+        if (tipo == TipoHito.SENA) {
+            return solicitado == null || solicitado;
+        }
+        return true;
+    }
+
+    private static String nombrePorDefecto(TipoHito tipo, int indice, int total) {
+        if (total == 1) {
+            return "Pago único";
+        }
         return switch (tipo) {
             case SENA -> "Seña";
             case ENTREGA -> "Entrega final";
