@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
 import EntregasHito from '../components/EntregasHito.vue'
+import IconoDescarga from '../components/IconoDescarga.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import SubirEntregable from '../components/SubirEntregable.vue'
 import {
@@ -27,6 +28,7 @@ const error = ref('')
 const errorAccion = ref('')
 const aviso = ref('')
 const procesando = ref(false)
+const descargandoConstancia = ref(false)
 const revisionHitoId = ref(null)
 const motivoRevision = ref('')
 const visor = reactive({ abierto: false, imagen: '' })
@@ -200,6 +202,30 @@ function cerrarVisor() {
   visor.abierto = false
 }
 
+async function descargarConstancia() {
+  if (descargandoConstancia.value) return
+  descargandoConstancia.value = true
+  errorAccion.value = ''
+  try {
+    const res = await api.get(
+      `/pedidos/${idPedido.value}/constancia`,
+      { responseType: 'blob' },
+    )
+    const url = URL.createObjectURL(res.data)
+    const enlace = document.createElement('a')
+    enlace.href = url
+    enlace.download = `constancia-pedido-${idPedido.value}.pdf`
+    document.body.appendChild(enlace)
+    enlace.click()
+    enlace.remove()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    errorAccion.value = 'No se pudo descargar la constancia.'
+  } finally {
+    descargandoConstancia.value = false
+  }
+}
+
 function volver() {
   if (route.path.startsWith('/admin')) {
     router.push({ name: 'pedidos-admin' })
@@ -313,6 +339,24 @@ onMounted(cargar)
         </div>
       </section>
 
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-coral/25 bg-coral/5 p-4">
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-granate">Constancia del pedido</p>
+          <p class="text-xs leading-relaxed text-cafe/60">
+            Presupuesto, hitos, entregas, hashes y pagos en un PDF.
+          </p>
+        </div>
+        <button
+          type="button"
+          :disabled="descargandoConstancia"
+          class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-rojizo disabled:cursor-not-allowed disabled:opacity-60"
+          @click="descargarConstancia"
+        >
+          <IconoDescarga />
+          {{ descargandoConstancia ? 'Generando...' : 'Descargar PDF' }}
+        </button>
+      </div>
+
       <p
         v-if="errorAccion"
         class="mt-4 rounded-xl border border-rojizo/25 bg-rojizo/5 px-4 py-3 text-sm text-rojizo"
@@ -378,6 +422,7 @@ onMounted(cargar)
           <EntregasHito
             v-if="hito.entregas?.length"
             :id-pedido="idPedido"
+            :id-hito="hito.idHitoPedido"
             :entregas="hito.entregas"
             :ver-original="esArtista || pedido.rolVista === 'ADMIN'"
           />

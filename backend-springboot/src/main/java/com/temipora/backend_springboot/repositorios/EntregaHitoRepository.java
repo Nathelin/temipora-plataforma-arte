@@ -31,6 +31,8 @@ public interface EntregaHitoRepository extends JpaRepository<EntregaHito, Long> 
         select e from EntregaHito e
         join fetch e.hitoPedido h
         join fetch h.pedido p
+        join fetch p.artista
+        join fetch p.cliente
         where e.idEntrega = :idEntrega and p.idPedido = :idPedido
         """)
     Optional<EntregaHito> buscarDelPedido(

@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.controladores;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 
@@ -18,10 +19,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.temipora.backend_springboot.modelo.EntregaArchivo;
+import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.Pedido;
+import com.temipora.backend_springboot.modelo.TipoDescarga;
 import com.temipora.backend_springboot.servicios.AccesoDenegadoException;
+import com.temipora.backend_springboot.servicios.DescargaService;
 import com.temipora.backend_springboot.servicios.EntregaService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/api/pedidos")
@@ -29,12 +36,15 @@ public class ArchivoPedidoController {
 
     private final EntregaService entregaService;
     private final UsuarioService usuarioService;
+    private final DescargaService descargaService;
 
     public ArchivoPedidoController(
             EntregaService entregaService,
-            UsuarioService usuarioService) {
+            UsuarioService usuarioService,
+            DescargaService descargaService) {
         this.entregaService = entregaService;
         this.usuarioService = usuarioService;
+        this.descargaService = descargaService;
     }
 
     @GetMapping("/{idPedido}/entregas/{idEntrega}/archivos/{idArchivo}/original")
@@ -43,7 +53,8 @@ public class ArchivoPedidoController {
             @PathVariable Long idPedido,
             @PathVariable Long idEntrega,
             @PathVariable Long idArchivo,
-            Authentication authentication) {
+            Authentication authentication,
+            HttpServletRequest request) {
         Acceso acceso = cargarAutorizado(
             idPedido, idEntrega, idArchivo, authentication);
 
@@ -52,6 +63,13 @@ public class ArchivoPedidoController {
             throw new AccesoDenegadoException(
                 "El archivo final se libera al pagar la última cuota.");
         }
+
+        descargaService.registrar(
+            idPedido,
+            acceso.idUsuario(),
+            idArchivo,
+            TipoDescarga.ORIGINAL,
+            request.getRemoteAddr());
 
         return respuesta(
             entregaService.abrir(acceso.archivo()),
@@ -77,6 +95,60 @@ public class ArchivoPedidoController {
             false);
     }
 
+    @GetMapping("/{idPedido}/hitos/{idHito}/entregas/{idEntrega}/zip")
+    @PreAuthorize("hasAnyRole('CLIENTE', 'ARTISTA', 'ADMIN')")
+    public void zip(
+            @PathVariable Long idPedido,
+            @PathVariable Long idHito,
+            @PathVariable Long idEntrega,
+            Authentication authentication,
+            HttpServletRequest request,
+            HttpServletResponse response) throws IOException {
+        EntregaService.EntregaConArchivos entrega =
+            entregaService.obtenerEntrega(idPedido, idEntrega);
+        HitoPedido hito = entrega.entrega().getHitoPedido();
+
+        if (!hito.getIdHitoPedido().equals(idHito)) {
+            throw new NoSuchElementException("Entrega no encontrada.");
+        }
+
+        Pedido pedido = hito.getPedido();
+        Long idUsuario = usuarioService
+            .getByNombreUsuario(authentication.getName())
+            .getIdUsuario();
+        boolean esArtista = pedido.getArtista().getIdUsuario().equals(idUsuario);
+        boolean esCliente = pedido.getCliente().getIdUsuario().equals(idUsuario);
+        boolean esAdmin = esAdmin(authentication);
+
+        if (!esArtista && !esCliente && !esAdmin) {
+            throw new AccesoDenegadoException("No podés ver esta entrega.");
+        }
+        if (!entregaService.puedeVerOriginal(hito, esArtista, esAdmin)) {
+            throw new AccesoDenegadoException(
+                "El archivo final se libera al pagar la última cuota.");
+        }
+
+        descargaService.registrar(
+            idPedido,
+            idUsuario,
+            null,
+            TipoDescarga.ZIP,
+            request.getRemoteAddr());
+
+        String nombre = "pedido-" + idPedido
+            + "-entrega-v" + entrega.entrega().getNumero() + ".zip";
+        ContentDisposition disposition = ContentDisposition.attachment()
+            .filename(nombre, StandardCharsets.UTF_8)
+            .build();
+
+        response.setContentType("application/zip");
+        response.setHeader(
+            HttpHeaders.CONTENT_DISPOSITION, disposition.toString());
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        entregaService.escribirZip(entrega, response.getOutputStream());
+    }
+
     private Acceso cargarAutorizado(
             Long idPedido,
             Long idEntrega,
@@ -100,7 +172,7 @@ public class ArchivoPedidoController {
             throw new NoSuchElementException("Archivo no disponible.");
         }
 
-        return new Acceso(archivo, esArtista, esAdmin);
+        return new Acceso(archivo, idUsuario, esArtista, esAdmin);
     }
 
     private ResponseEntity<Resource> respuesta(
@@ -138,6 +210,9 @@ public class ArchivoPedidoController {
     }
 
     private record Acceso(
-            EntregaArchivo archivo, boolean esArtista, boolean esAdmin) {
+            EntregaArchivo archivo,
+            Long idUsuario,
+            boolean esArtista,
+            boolean esAdmin) {
     }
 }

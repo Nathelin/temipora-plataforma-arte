@@ -1,17 +1,27 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import api from '../servicios/api'
 import { formatearFechaHora } from '../servicios/pedidos'
 import ArchivoProtegido from './ArchivoProtegido.vue'
+import IconoDescarga from './IconoDescarga.vue'
 import VisorImagenes from './VisorImagenes.vue'
 
 const props = defineProps({
   idPedido: { type: Number, required: true },
+  idHito: { type: Number, required: true },
   entregas: { type: Array, default: () => [] },
   verOriginal: { type: Boolean, default: false },
 })
 
 const descargaError = ref('')
+const descargandoZip = ref(null)
+const descargandoArchivo = ref(null)
+
+const entregaVigente = computed(
+  () => props.entregas.find((entrega) => entrega.vigente)
+    || props.entregas[0]
+    || null,
+)
 
 const visor = reactive({
   abierto: false,
@@ -54,27 +64,84 @@ function esPreview(archivo) {
 }
 
 async function descargar(archivo) {
-  if (!archivo.urlOriginal) return
+  if (!archivo.urlOriginal || descargandoArchivo.value) return
   descargaError.value = ''
+  descargandoArchivo.value = archivo.idArchivo
   try {
     const res = await api.get(archivo.urlOriginal, { responseType: 'blob' })
-    const url = URL.createObjectURL(res.data)
-    const enlace = document.createElement('a')
-    enlace.href = url
-    enlace.download = archivo.nombre || 'archivo'
-    document.body.appendChild(enlace)
-    enlace.click()
-    enlace.remove()
-    URL.revokeObjectURL(url)
+    descargarBlob(res.data, archivo.nombre || 'archivo')
   } catch (e) {
     descargaError.value = 'No se pudo descargar el original.'
+  } finally {
+    descargandoArchivo.value = null
   }
+}
+
+function puedeZip(entrega) {
+  return (entrega.archivos || [])
+    .some((archivo) => Boolean(archivo.urlOriginal))
+}
+
+async function descargarZip(entrega) {
+  if (!puedeZip(entrega) || descargandoZip.value) return
+  descargaError.value = ''
+  descargandoZip.value = entrega.idEntrega
+  try {
+    const res = await api.get(
+      `/pedidos/${props.idPedido}/hitos/${props.idHito}/entregas/${entrega.idEntrega}/zip`,
+      { responseType: 'blob' },
+    )
+    descargarBlob(
+      res.data,
+      `pedido-${props.idPedido}-entrega-v${entrega.numero}.zip`,
+    )
+  } catch (e) {
+    descargaError.value = 'No se pudo descargar el ZIP.'
+  } finally {
+    descargandoZip.value = null
+  }
+}
+
+function descargarBlob(blob, nombre) {
+  const url = URL.createObjectURL(blob)
+  const enlace = document.createElement('a')
+  enlace.href = url
+  enlace.download = nombre
+  document.body.appendChild(enlace)
+  enlace.click()
+  enlace.remove()
+  URL.revokeObjectURL(url)
 }
 </script>
 
 <template>
   <section v-if="entregas.length" class="mt-4 space-y-3">
-    <h4 class="text-sm font-semibold text-granate">Entregas</h4>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h4 class="text-sm font-semibold text-granate">Entregas</h4>
+        <p class="text-xs text-cafe/55">Cada versión conserva su historial.</p>
+      </div>
+      <button
+        v-if="entregaVigente && puedeZip(entregaVigente)"
+        type="button"
+        :disabled="descargandoZip === entregaVigente.idEntrega"
+        class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-rojizo disabled:cursor-not-allowed disabled:opacity-60"
+        @click="descargarZip(entregaVigente)"
+      >
+        <IconoDescarga />
+        {{
+          descargandoZip === entregaVigente.idEntrega
+            ? 'Descargando...'
+            : 'Descargar ZIP de la entrega'
+        }}
+      </button>
+      <p
+        v-else-if="entregaVigente"
+        class="rounded-full border border-durazno bg-durazno/20 px-3 py-1.5 text-xs font-medium text-cafe/60"
+      >
+        El ZIP se habilita al pagar la última cuota.
+      </p>
+    </div>
 
     <p
       v-if="descargaError"
@@ -118,6 +185,16 @@ async function descargar(archivo) {
           >
             Aprobada
           </span>
+          <button
+            v-if="!entrega.vigente && puedeZip(entrega)"
+            type="button"
+            :disabled="descargandoZip === entrega.idEntrega"
+            class="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full border border-coral/40 bg-coral/5 px-3 text-[11px] font-semibold text-coral transition hover:bg-coral/10 disabled:opacity-60"
+            @click="descargarZip(entrega)"
+          >
+            <IconoDescarga />
+            {{ descargandoZip === entrega.idEntrega ? 'Descargando...' : 'ZIP' }}
+          </button>
         </div>
       </header>
 
@@ -182,14 +259,21 @@ async function descargar(archivo) {
             <button
               v-if="archivo.urlOriginal"
               type="button"
-              class="mt-1 text-[11px] font-semibold text-coral underline-offset-2 hover:underline"
+              :disabled="descargandoArchivo === archivo.idArchivo"
+              class="mt-2 inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-full border border-coral/40 bg-blanco px-3 text-xs font-semibold text-coral transition hover:bg-coral/10 disabled:cursor-not-allowed disabled:opacity-60"
               @click="descargar(archivo)"
             >
-              Descargar original
+              <IconoDescarga />
+              {{
+                descargandoArchivo === archivo.idArchivo
+                  ? 'Descargando...'
+                  : 'Descargar original'
+              }}
             </button>
           </div>
         </div>
       </div>
+
     </article>
 
     <VisorImagenes

@@ -64,14 +64,14 @@ class AlmacenPrivadoServiceTest {
     }
 
     @Test
-    void guardarArchivoMayorA25MB_lanzaError() {
+    void guardarArchivoMayorA5MB_lanzaError() {
         MultipartFile grande = mock(MultipartFile.class);
         when(grande.isEmpty()).thenReturn(false);
         when(grande.getSize()).thenReturn(AlmacenPrivadoService.MAX_BYTES + 1);
 
         assertThatThrownBy(() -> servicio().guardarOriginal(grande, "pedidos/1"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("25 MB");
+            .hasMessageContaining("5 MB");
     }
 
     @Test

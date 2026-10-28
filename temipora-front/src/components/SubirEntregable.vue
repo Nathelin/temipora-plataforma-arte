@@ -137,7 +137,7 @@ onBeforeUnmount(limpiar)
 
     <label :for="`archivos-${hito.idHitoPedido}`" class="mt-3 block text-xs text-cafe/60">
       Archivos <span class="text-rojizo">*</span>
-      <span class="text-cafe/40">(hasta {{ MAX_ARCHIVOS_ENTREGA }}, 25 MB cada uno)</span>
+      <span class="text-cafe/40">(hasta {{ MAX_ARCHIVOS_ENTREGA }}, 5 MB cada uno)</span>
     </label>
     <input
       :id="`archivos-${hito.idHitoPedido}`"

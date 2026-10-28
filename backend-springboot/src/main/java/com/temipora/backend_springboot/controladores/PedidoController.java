@@ -1,8 +1,13 @@
 package com.temipora.backend_springboot.controladores;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,9 +26,13 @@ import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.PedidoDTO;
 import com.temipora.backend_springboot.modelo.PedidoResumenDTO;
 import com.temipora.backend_springboot.modelo.SolicitudRevisionRequest;
+import com.temipora.backend_springboot.modelo.TipoDescarga;
+import com.temipora.backend_springboot.servicios.ConstanciaService;
+import com.temipora.backend_springboot.servicios.DescargaService;
 import com.temipora.backend_springboot.servicios.PedidoService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 @RestController
@@ -32,12 +41,18 @@ public class PedidoController {
 
     private final PedidoService pedidoService;
     private final UsuarioService usuarioService;
+    private final ConstanciaService constanciaService;
+    private final DescargaService descargaService;
 
     public PedidoController(
             PedidoService pedidoService,
-            UsuarioService usuarioService) {
+            UsuarioService usuarioService,
+            ConstanciaService constanciaService,
+            DescargaService descargaService) {
         this.pedidoService = pedidoService;
         this.usuarioService = usuarioService;
+        this.constanciaService = constanciaService;
+        this.descargaService = descargaService;
     }
 
     @GetMapping("/{idPedido}")
@@ -48,6 +63,39 @@ public class PedidoController {
             idPedido,
             idAutenticado(authentication),
             esAdmin(authentication));
+    }
+
+    @GetMapping("/{idPedido}/constancia")
+    @PreAuthorize("hasAnyRole('CLIENTE', 'ARTISTA', 'ADMIN')")
+    public ResponseEntity<byte[]> constancia(
+            @PathVariable Long idPedido,
+            Authentication authentication,
+            HttpServletRequest request) {
+        Long idUsuario = idAutenticado(authentication);
+        boolean esAdmin = esAdmin(authentication);
+        PedidoDTO pedido = pedidoService.obtener(
+            idPedido, idUsuario, esAdmin);
+        byte[] pdf = constanciaService.generar(pedido);
+
+        descargaService.registrar(
+            idPedido,
+            idUsuario,
+            null,
+            TipoDescarga.CONSTANCIA,
+            request.getRemoteAddr());
+
+        ContentDisposition disposition = ContentDisposition.attachment()
+            .filename(
+                "constancia-pedido-" + idPedido + ".pdf",
+                StandardCharsets.UTF_8)
+            .build();
+
+        return ResponseEntity.ok()
+            .contentType(MediaType.APPLICATION_PDF)
+            .cacheControl(CacheControl.noStore())
+            .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+            .header("X-Content-Type-Options", "nosniff")
+            .body(pdf);
     }
 
     @GetMapping("/recibidos")

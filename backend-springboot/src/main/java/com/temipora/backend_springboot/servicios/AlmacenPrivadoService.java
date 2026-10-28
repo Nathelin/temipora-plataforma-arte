@@ -32,7 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class AlmacenPrivadoService {
 
-    static final long MAX_BYTES = 25L * 1024 * 1024;
+    static final long MAX_BYTES = 5L * 1024 * 1024;
     static final int MAX_LADO = 12_000;
     static final long MAX_PIXELES = 80_000_000L;
 
@@ -49,7 +49,7 @@ public class AlmacenPrivadoService {
         }
         if (archivo.getSize() > MAX_BYTES) {
             throw new IllegalArgumentException(
-                "Cada archivo puede pesar como máximo 25 MB.");
+                "Cada archivo puede pesar como máximo 5 MB.");
         }
 
         byte[] bytes;

@@ -1,7 +1,7 @@
 import api from './api'
 
 export const MAX_ARCHIVOS_ENTREGA = 20
-export const MAX_BYTES_ENTREGA = 25 * 1024 * 1024
+export const MAX_BYTES_ENTREGA = 5 * 1024 * 1024
 export const MAX_BYTES_TOTAL_ENTREGA = 100 * 1024 * 1024
 
 export function validarArchivoEntrega(archivo) {
@@ -10,7 +10,7 @@ export function validarArchivoEntrega(archivo) {
     return 'Cada archivo tiene que ser una imagen.'
   }
   if (archivo.size > MAX_BYTES_ENTREGA) {
-    return 'Cada archivo puede pesar como máximo 25 MB.'
+    return 'Cada archivo puede pesar como máximo 5 MB.'
   }
   return ''
 }

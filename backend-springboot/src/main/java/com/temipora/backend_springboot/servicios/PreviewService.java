@@ -7,6 +7,8 @@ import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.awt.image.ConvolveOp;
+import java.awt.image.Kernel;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -24,7 +26,7 @@ import org.springframework.stereotype.Service;
 public class PreviewService {
 
     static final int MAX_LADO = 1200;
-    private static final float OPACIDAD = 0.22f;
+    private static final float OPACIDAD = 0.38f;
 
     public byte[] generar(byte[] original, String marca) {
         if (original == null || original.length == 0) {
@@ -43,7 +45,7 @@ public class PreviewService {
                 "No se pudo leer la imagen para generar la preview.");
         }
 
-        BufferedImage preview = escalar(fuente);
+        BufferedImage preview = desenfocar(escalar(fuente));
         dibujarMarca(preview, marca);
 
         try (ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
@@ -106,10 +108,41 @@ public class PreviewService {
         return new BufferedImage(ancho, alto, tipo);
     }
 
+    private BufferedImage desenfocar(BufferedImage imagen) {
+        int radio = Math.max(3,
+            Math.min(imagen.getWidth(), imagen.getHeight()) / 160);
+        radio = Math.min(radio, 10);
+        int tam = radio * 2 + 1;
+        float sigma = Math.max(1f, radio / 2f);
+        float[] valores = new float[tam * tam];
+        float suma = 0f;
+
+        for (int y = -radio; y <= radio; y++) {
+            for (int x = -radio; x <= radio; x++) {
+                float valor = (float) Math.exp(
+                    -(x * x + y * y) / (2.0 * sigma * sigma));
+                valores[(y + radio) * tam + (x + radio)] = valor;
+                suma += valor;
+            }
+        }
+        for (int i = 0; i < valores.length; i++) {
+            valores[i] /= suma;
+        }
+
+        BufferedImage destino = new BufferedImage(
+            imagen.getWidth(), imagen.getHeight(), imagen.getType());
+        new ConvolveOp(
+            new Kernel(tam, tam, valores),
+            ConvolveOp.EDGE_NO_OP,
+            null).filter(imagen, destino);
+        return destino;
+    }
+
     private void dibujarMarca(BufferedImage imagen, String marca) {
         if (marca == null || marca.isBlank()) {
             return;
         }
+        String texto = "PREVIEW · " + marca;
 
         Graphics2D grafico = imagen.createGraphics();
         try {
@@ -120,14 +153,14 @@ public class PreviewService {
                 RenderingHints.KEY_TEXT_ANTIALIASING,
                 RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-            int base = Math.max(14,
-                Math.min(imagen.getWidth(), imagen.getHeight()) / 16);
+            int base = Math.max(15,
+                Math.min(imagen.getWidth(), imagen.getHeight()) / 14);
             grafico.setFont(new Font(Font.SANS_SERIF, Font.BOLD, base));
             FontMetrics metricas = grafico.getFontMetrics();
-            int anchoTexto = metricas.stringWidth(marca);
+            int anchoTexto = metricas.stringWidth(texto);
             int altoTexto = metricas.getHeight();
-            int pasoX = Math.max(anchoTexto + base * 3, 260);
-            int pasoY = Math.max(altoTexto + base * 4, 140);
+            int pasoX = Math.max(anchoTexto + base * 3, 280);
+            int pasoY = Math.max(altoTexto + base * 4, 150);
 
             grafico.setComposite(AlphaComposite.getInstance(
                 AlphaComposite.SRC_OVER, OPACIDAD));
@@ -137,10 +170,10 @@ public class PreviewService {
             int limiteY = imagen.getHeight() * 2;
             for (int y = -imagen.getHeight(); y < limiteY; y += pasoY) {
                 for (int x = -imagen.getWidth(); x < limiteX; x += pasoX) {
-                    grafico.setColor(new Color(0, 0, 0, 140));
-                    grafico.drawString(marca, x + 1, y + 1);
+                    grafico.setColor(new Color(0, 0, 0, 170));
+                    grafico.drawString(texto, x + 1, y + 1);
                     grafico.setColor(Color.WHITE);
-                    grafico.drawString(marca, x, y);
+                    grafico.drawString(texto, x, y);
                 }
             }
         } finally {
