@@ -21,12 +21,34 @@ const hayNotificaciones = computed(() => notificaciones.value.length > 0)
 const hayNoLeidas = computed(() => noLeidas.value > 0)
 
 function destinoDe(notificacion) {
-  if (notificacion?.tipoReferencia !== 'SOLICITUD') return null
+  const tipo = notificacion?.tipoReferencia
+  if (tipo !== 'SOLICITUD' && tipo !== 'PEDIDO') return null
+
   const rol = localStorage.getItem('rol')
-  if (rol !== 'ARTISTA' && rol !== 'CLIENTE') return null
+  if (rol !== 'ARTISTA' && rol !== 'CLIENTE' && rol !== 'ADMIN') return null
+
   const id = Number(notificacion.idReferencia)
   if (!Number.isInteger(id) || id <= 0) return null
-  return { name: 'solicitud-detalle', params: { idSolicitud: id } }
+
+  if (tipo === 'SOLICITUD') {
+    if (rol === 'ADMIN') return null
+    return { name: 'solicitud-detalle', params: { idSolicitud: id } }
+  }
+
+  if (rol === 'ADMIN') {
+    return { name: 'admin-pedido-detalle', params: { idPedido: id } }
+  }
+  if (rol === 'ARTISTA'
+    && router.currentRoute.value.path.startsWith('/panel')) {
+    return { name: 'panel-pedido-detalle', params: { idPedido: id } }
+  }
+  return { name: 'pedido-detalle', params: { idPedido: id } }
+}
+
+function textoDestino(notificacion) {
+  if (notificacion?.tipoReferencia === 'PEDIDO') return 'Ver pedido →'
+  if (notificacion?.tipoReferencia === 'SOLICITUD') return 'Ver solicitud →'
+  return ''
 }
 
 async function abrir(notificacion) {
@@ -125,7 +147,8 @@ onMounted(() => {
       </span>
       <p class="mt-4 text-base font-semibold text-granate">No tenés notificaciones.</p>
       <p class="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-cafe/60">
-        Cuando recibas una solicitud o una novedad importante, aparecerá en esta página.
+        Cuando recibas una solicitud, un pedido o una novedad importante,
+        aparecerá en esta página.
       </p>
     </div>
 
@@ -163,7 +186,7 @@ onMounted(() => {
             <span class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-cafe/50">
               <span>{{ formatearFecha(notificacion.fechaCreacion) }}</span>
               <span v-if="destinoDe(notificacion)" class="font-semibold text-coral transition group-hover:text-rojizo">
-                Ver solicitud →
+                {{ textoDestino(notificacion) }}
               </span>
             </span>
           </span>

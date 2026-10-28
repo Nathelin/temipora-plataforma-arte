@@ -67,7 +67,7 @@ export function descripcionHito(hito) {
     return 'Se paga después de aprobar el avance anterior.'
   }
   return hito?.requiereEntrega
-    ? 'Se paga al aceptar; incluye un avance para aprobar.'
+    ? 'Se paga al inicio; incluye un entregable que el cliente aprueba.'
     : 'Se paga al aceptar el presupuesto.'
 }
 

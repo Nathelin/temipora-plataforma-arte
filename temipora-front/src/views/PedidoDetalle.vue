@@ -424,7 +424,6 @@ onMounted(cargar)
             :id-pedido="idPedido"
             :id-hito="hito.idHitoPedido"
             :entregas="hito.entregas"
-            :ver-original="esArtista || pedido.rolVista === 'ADMIN'"
           />
 
           <div

@@ -32,7 +32,6 @@ public class PagoService {
 
     private static final String TIPO_REFERENCIA_PEDIDO = "PEDIDO";
     private static final String NOTIFICACION_PAGO_RECIBIDO = "PAGO_RECIBIDO";
-    private static final String NOTIFICACION_PEDIDO_FINALIZADO = "PEDIDO_FINALIZADO";
     private static final String NOTIFICACION_PAGO_RECHAZADO = "PAGO_RECHAZADO";
 
     private final PagoRepository pagoRepository;
@@ -41,6 +40,7 @@ public class PagoService {
     private final SolicitudRepository solicitudRepository;
     private final NotificacionService notificacionService;
     private final HitoFlujoService hitoFlujoService;
+    private final PedidoCierreService pedidoCierreService;
     private final ProveedorPago proveedorPago;
 
     public PagoService(
@@ -50,6 +50,7 @@ public class PagoService {
             SolicitudRepository solicitudRepository,
             NotificacionService notificacionService,
             HitoFlujoService hitoFlujoService,
+            PedidoCierreService pedidoCierreService,
             ProveedorPago proveedorPago) {
         this.pagoRepository = pagoRepository;
         this.hitoPedidoRepository = hitoPedidoRepository;
@@ -57,6 +58,7 @@ public class PagoService {
         this.solicitudRepository = solicitudRepository;
         this.notificacionService = notificacionService;
         this.hitoFlujoService = hitoFlujoService;
+        this.pedidoCierreService = pedidoCierreService;
         this.proveedorPago = proveedorPago;
     }
 
@@ -124,6 +126,12 @@ public class PagoService {
         }
 
         LocalDateTime ahora = LocalDateTime.now();
+        if (hito.getTipo() == TipoHito.ENTREGA
+                && hito.getEstadoEntrega() != EstadoEntregaHito.ENTREGADO) {
+            throw new ConflictoException(
+                "La entrega final todavía no está disponible para pagar.");
+        }
+
         pago.setEstado(EstadoPago.APROBADO);
         pago.setFechaAcreditacion(ahora);
         if (payload != null && !payload.isBlank()) {
@@ -139,19 +147,15 @@ public class PagoService {
             iniciarPedido(pedido, ahora);
         }
 
+        HitoPedido siguiente = null;
         if (hito.getTipo() == TipoHito.ENTREGA) {
             hito.setEstadoEntrega(EstadoEntregaHito.APROBADO);
             hito.setFechaAprobacion(ahora);
-            pedido.setEstado(EstadoPedido.FINALIZADO);
-            pedido.setFinalizadoEn(ahora);
-            Solicitud solicitud = pedido.getSolicitud();
-            solicitud.setEstado(EstadoSolicitud.FINALIZADA);
-            solicitud.setFechaActualizacion(ahora);
-            solicitudRepository.save(solicitud);
         } else if (!hito.isRequiereEntrega()) {
             hito.setEstadoEntrega(EstadoEntregaHito.APROBADO);
             hito.setFechaAprobacion(ahora);
-            hitoFlujoService.habilitarSiguiente(pedido, hito, ahora);
+            siguiente = hitoFlujoService.habilitarSiguiente(
+                pedido, hito, ahora);
         }
 
         hitoPedidoRepository.save(hito);
@@ -159,8 +163,10 @@ public class PagoService {
         pagoRepository.save(pago);
 
         notificarPagoRecibido(pedido, hito);
-        if (hito.getTipo() == TipoHito.ENTREGA) {
-            notificarFinalizado(pedido);
+
+        if (hito.getTipo() == TipoHito.ENTREGA
+                || (!hito.isRequiereEntrega() && siguiente == null)) {
+            pedidoCierreService.finalizar(pedido, ahora);
         }
         return pedido;
     }
@@ -232,25 +238,6 @@ public class PagoService {
             "Pago recibido",
             "El cliente pagó '" + hito.getNombre()
                 + "' del pedido de '" + nombreServicio(pedido) + "'.",
-            pedido.getIdPedido(),
-            TIPO_REFERENCIA_PEDIDO);
-    }
-
-    private void notificarFinalizado(Pedido pedido) {
-        String descripcion = "El pedido de '" + nombreServicio(pedido)
-            + "' se completó.";
-        notificacionService.crearParaUsuario(
-            pedido.getCliente().getIdUsuario(),
-            NOTIFICACION_PEDIDO_FINALIZADO,
-            "Pedido finalizado",
-            descripcion,
-            pedido.getIdPedido(),
-            TIPO_REFERENCIA_PEDIDO);
-        notificacionService.crearParaUsuario(
-            pedido.getArtista().getIdUsuario(),
-            NOTIFICACION_PEDIDO_FINALIZADO,
-            "Pedido finalizado",
-            descripcion,
             pedido.getIdPedido(),
             TIPO_REFERENCIA_PEDIDO);
     }

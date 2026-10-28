@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { formatearMonto, formatearPrecio } from '../servicios/moneda'
+import { descripcionHito } from '../servicios/pedidos'
 import {
   aFechaISO,
   fechaEntregaEstimada,
@@ -89,18 +90,6 @@ const muestraComision = computed(
 
 function formatearMoneda(valor) {
   return formatearPrecio(valor, monedaMostrada.value)
-}
-
-function descripcionHito(hito) {
-  if (hito.tipo === 'ENTREGA') {
-    return 'Se paga contra entrega, al ver el preview protegido'
-  }
-  if (hito.tipo === 'CUOTA') {
-    return 'Se paga después de aprobar el avance anterior'
-  }
-  return hito.requiereEntrega
-    ? 'Se paga al aceptar; incluye un avance para aprobar'
-    : 'Se paga al aceptar el presupuesto'
 }
 
 function formatearRecargo(recargo) {

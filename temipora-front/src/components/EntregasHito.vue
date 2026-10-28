@@ -10,7 +10,6 @@ const props = defineProps({
   idPedido: { type: Number, required: true },
   idHito: { type: Number, required: true },
   entregas: { type: Array, default: () => [] },
-  verOriginal: { type: Boolean, default: false },
 })
 
 const descargaError = ref('')
@@ -55,12 +54,11 @@ function abrirVisor(entrega, grupo, archivo, src) {
 }
 
 function urlVisible(archivo) {
-  if (props.verOriginal && archivo.urlOriginal) return archivo.urlOriginal
-  return archivo.urlPreview || archivo.urlOriginal
+  return archivo.urlOriginal || archivo.urlPreview || ''
 }
 
 function esPreview(archivo) {
-  return !props.verOriginal && Boolean(archivo.urlPreview)
+  return !archivo.urlOriginal && Boolean(archivo.urlPreview)
 }
 
 async function descargar(archivo) {

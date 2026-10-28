@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.servicios;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -62,6 +63,8 @@ class PagoServiceTest {
     private NotificacionService notificacionService;
     @Mock
     private HitoFlujoService hitoFlujoService;
+    @Mock
+    private PedidoCierreService pedidoCierreService;
     @Mock
     private ProveedorPago proveedorPago;
 
@@ -175,10 +178,12 @@ class PagoServiceTest {
         verify(hitoFlujoService).habilitarSiguiente(
             eq(pedido), eq(hito), any(LocalDateTime.class));
         verify(solicitudRepository).save(solicitud);
+        verify(pedidoCierreService).finalizar(
+            eq(pedido), any(LocalDateTime.class));
     }
 
     @Test
-    void confirmarEntregaFinal_finalizaElPedido() {
+    void confirmarEntregaFinal_delegaElCierreDelPedido() {
         hito.setTipo(TipoHito.ENTREGA);
         hito.setRequiereEntrega(true);
         hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
@@ -195,12 +200,32 @@ class PagoServiceTest {
 
         Pedido resultado = pagoService.confirmar(PAGO, CLIENTE, null);
 
-        assertThat(resultado.getEstado()).isEqualTo(EstadoPedido.FINALIZADO);
-        assertThat(resultado.getFinalizadoEn()).isNotNull();
-        assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.FINALIZADA);
+        assertThat(resultado).isSameAs(pedido);
         assertThat(hito.getEstadoPago()).isEqualTo(EstadoPagoHito.PAGADO);
         assertThat(hito.getEstadoEntrega())
             .isEqualTo(EstadoEntregaHito.APROBADO);
+        verify(pedidoCierreService).finalizar(
+            eq(pedido), any(LocalDateTime.class));
+    }
+
+    @Test
+    void confirmarEntregaSinEntregar_lanzaConflicto() {
+        hito.setTipo(TipoHito.ENTREGA);
+        hito.setRequiereEntrega(true);
+        hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
+        hito.setEstadoEntrega(EstadoEntregaHito.NO_INICIADO);
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+
+        when(pagoRepository.findByIdPagoForUpdate(PAGO))
+            .thenReturn(Optional.of(pago));
+        when(hitoPedidoRepository.findByIdHitoPedidoForUpdate(HITO))
+            .thenReturn(Optional.of(hito));
+        when(pedidoRepository.findByIdPedidoForUpdate(PEDIDO))
+            .thenReturn(Optional.of(pedido));
+
+        assertThatThrownBy(() -> pagoService.confirmar(PAGO, CLIENTE, null))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("entrega final");
     }
 
     @Test

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearMonto, formatearPrecio } from '../servicios/moneda'
+import { descripcionHito } from '../servicios/pedidos'
 import {
   MAX_PLAZO_POR_UNIDAD,
   UNIDADES_ENTREGA,
@@ -1071,11 +1072,7 @@ onMounted(cargar)
             </div>
 
             <p class="mt-2 text-xs text-cafe/50">
-              {{ hito.tipo === 'ENTREGA'
-                ? 'Se paga contra entrega, cuando el cliente ve el preview protegido.'
-                : hito.tipo === 'SENA'
-                  ? 'Se paga al aceptar el presupuesto.'
-                  : 'Se paga después de aprobar el avance anterior.' }}
+              {{ descripcionHito(hito) }}
             </p>
 
             <label

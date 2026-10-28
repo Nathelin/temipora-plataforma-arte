@@ -38,6 +38,18 @@ const pago = computed(() => {
   const hito = pedido.value?.hitos?.[0]
   return (hito?.pagos || []).find((item) => item.estado === 'PENDIENTE') || null
 })
+const primerHito = computed(() => hitos.value[0] || null)
+const pagaAlInicio = computed(
+  () => primerHito.value?.tipo !== 'ENTREGA',
+)
+const esPagoUnico = computed(() => hitos.value.length === 1)
+const enCursoSinPago = computed(
+  () => pedido.value?.estado === 'EN_CURSO' && !pago.value,
+)
+const textoBotonPago = computed(() => {
+  if (!pagaAlInicio.value) return 'Aceptar y comenzar el pedido'
+  return esPagoUnico.value ? 'Pagar el total' : 'Pagar primera cuota'
+})
 
 function formatear(valor, codigo) {
   return formatearPrecio(valor, codigo || moneda.value)
@@ -198,9 +210,26 @@ onMounted(cargar)
           class="inline-flex min-h-11 items-center justify-center rounded-full bg-coral px-6 text-sm font-semibold text-white transition hover:bg-rojizo disabled:cursor-not-allowed disabled:bg-coral/40"
           @click="pagar"
         >
-          {{ enviando ? 'Iniciando pago...' : 'Pagar primera cuota' }}
+          {{ enviando ? 'Iniciando...' : textoBotonPago }}
         </button>
       </div>
+
+      <section
+        v-else-if="enCursoSinPago"
+        class="mt-5 rounded-2xl border border-coral/30 bg-coral/5 p-5 sm:p-6"
+      >
+        <h2 class="text-lg font-semibold text-granate">Pedido en curso</h2>
+        <p class="mt-1 text-sm leading-relaxed text-cafe/70">
+          El pedido ya está activo. El artista va a subir la entrega; cuando la
+          suba, vas a poder pagar y descargar el original.
+        </p>
+        <router-link
+          :to="{ name: 'pedido-detalle', params: { idPedido: pedido.idPedido } }"
+          class="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-coral px-6 text-sm font-semibold text-white transition hover:bg-rojizo"
+        >
+          Ir al pedido
+        </router-link>
+      </section>
 
       <section
         v-else

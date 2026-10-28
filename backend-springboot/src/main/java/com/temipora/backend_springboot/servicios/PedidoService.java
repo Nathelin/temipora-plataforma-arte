@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.servicios;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -71,6 +72,7 @@ public class PedidoService {
     private final NotificacionService notificacionService;
     private final MonedaVistaService monedaVistaService;
     private final EntregaService entregaService;
+    private final PedidoCierreService pedidoCierreService;
 
     public PedidoService(
             PedidoRepository pedidoRepository,
@@ -82,7 +84,8 @@ public class PedidoService {
             TerminosPlataformaService terminosPlataformaService,
             NotificacionService notificacionService,
             MonedaVistaService monedaVistaService,
-            EntregaService entregaService) {
+            EntregaService entregaService,
+            PedidoCierreService pedidoCierreService) {
         this.pedidoRepository = pedidoRepository;
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.pagoRepository = pagoRepository;
@@ -93,6 +96,7 @@ public class PedidoService {
         this.notificacionService = notificacionService;
         this.monedaVistaService = monedaVistaService;
         this.entregaService = entregaService;
+        this.pedidoCierreService = pedidoCierreService;
     }
 
     @Transactional
@@ -115,12 +119,17 @@ public class PedidoService {
                     ? null
                     : pedidoExistente.getHitos().get(0);
                 if (primero != null
+                        && primero.getTipo() == TipoHito.SENA
                         && primero.getEstadoPago() == EstadoPagoHito.PENDIENTE
                         && pagoRepository
                             .findFirstByHitoPedidoIdHitoPedidoAndEstado(
                                 primero.getIdHitoPedido(), EstadoPago.PENDIENTE)
                             .isEmpty()) {
                     pagoService.iniciarPago(primero, pedidoExistente);
+                } else if (primero != null
+                        && primero.getTipo() == TipoHito.ENTREGA) {
+                    pagoService.cancelarPendientes(primero);
+                    iniciarPedidoSinPago(pedidoExistente, LocalDateTime.now());
                 }
             } else if (pedidoExistente.getEstado() != EstadoPedido.EN_CURSO) {
                 throw new ConflictoException("El pedido ya está cerrado.");
@@ -196,8 +205,29 @@ public class PedidoService {
         }
 
         pedidoRepository.save(pedido);
-        pagoService.iniciarPago(pedido.getHitos().get(0), pedido);
+        HitoPedido primero = pedido.getHitos().get(0);
+        if (primero.getTipo() == TipoHito.SENA) {
+            pagoService.iniciarPago(primero, pedido);
+        } else {
+            pagoService.cancelarPendientes(primero);
+            iniciarPedidoSinPago(pedido, ahora);
+        }
         return construirDTO(pedido, idCliente);
+    }
+
+    private void iniciarPedidoSinPago(
+            Pedido pedido, LocalDateTime ahora) {
+        Presupuesto presupuesto = pedido.getPresupuesto();
+        LocalDate inicio = CalculadoraEntrega.inicioReal(
+            ahora.toLocalDate(), presupuesto.getFechaInicioEstimada());
+        LocalDate limite = CalculadoraEntrega.sumarPlazo(
+            inicio,
+            presupuesto.getTiempoEntregaValor(),
+            presupuesto.getTiempoEntregaUnidad());
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        pedido.setFechaInicio(inicio);
+        pedido.setLimiteEntrega(limite);
+        pedidoRepository.save(pedido);
     }
 
     @Transactional
@@ -253,7 +283,7 @@ public class PedidoService {
         }
         if (hito.getTipo() == TipoHito.ENTREGA) {
             HitoPedido anterior = hitoAnterior(pedido, hito);
-            if (anterior == null || !esAprobado(anterior)) {
+            if (anterior != null && !esAprobado(anterior)) {
                 throw new ConflictoException(
                     "Primero tiene que aprobarse la etapa anterior.");
             }
@@ -313,8 +343,12 @@ public class PedidoService {
         hito.setFechaAprobacion(ahora);
         hito.setFechaLimiteAprobacion(null);
         hitoPedidoRepository.save(hito);
-        hitoFlujoService.habilitarSiguiente(pedido, hito, ahora);
+        HitoPedido siguiente = hitoFlujoService.habilitarSiguiente(
+            pedido, hito, ahora);
         notificarAprobado(pedido, hito, false);
+        if (siguiente == null) {
+            pedidoCierreService.finalizar(pedido, ahora);
+        }
         return construirDTO(pedido, idCliente);
     }
 
@@ -448,8 +482,12 @@ public class PedidoService {
             hito.setFechaAprobacion(ahora);
             hito.setFechaLimiteAprobacion(null);
             hitoPedidoRepository.save(hito);
-            hitoFlujoService.habilitarSiguiente(pedido, hito, ahora);
+            HitoPedido siguiente = hitoFlujoService.habilitarSiguiente(
+                pedido, hito, ahora);
             notificarAprobado(pedido, hito, true);
+            if (siguiente == null) {
+                pedidoCierreService.finalizar(pedido, ahora);
+            }
             aprobados++;
         }
         return aprobados;
@@ -806,7 +844,8 @@ public class PedidoService {
         }
         if (hito.getTipo() == TipoHito.ENTREGA) {
             HitoPedido anterior = hitoAnterior(pedido, hito);
-            return anterior != null && esAprobado(anterior)
+            boolean anteriorOk = anterior == null || esAprobado(anterior);
+            return anteriorOk
                 && hito.getEstadoPago() == EstadoPagoHito.PENDIENTE;
         }
         return hito.getEstadoPago() == EstadoPagoHito.PAGADO;
