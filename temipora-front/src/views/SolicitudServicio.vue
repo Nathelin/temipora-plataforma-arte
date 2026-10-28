@@ -480,13 +480,13 @@ onBeforeUnmount(() => {
             <p class="text-xs text-cafe/50">El total base se multiplica por la cantidad de dibujos solicitados.</p>
           </div>
 
-          <div class="mt-5 grid gap-4 sm:grid-cols-3">
-            <div class="rounded-xl bg-rosa/20 p-4">
+          <div class="mt-5 grid gap-4 sm:grid-cols-2">
+            <!--div class="rounded-xl bg-rosa/20 p-4">
               <p class="text-xs uppercase tracking-wide text-cafe/50">Cupos totales</p>
               <p class="mt-1 text-2xl text-granate">{{ cuposTotales }}</p>
-            </div>
+            </div-->
             <div class="rounded-xl bg-rosa/20 p-4">
-              <p class="text-xs uppercase tracking-wide text-cafe/50">Disponibles</p>
+              <p class="text-xs uppercase tracking-wide text-cafe/50">Cupos disponibles</p>
               <p class="mt-1 text-2xl text-granate">{{ cuposDisponibles }}</p>
             </div>
             <div class="rounded-xl bg-rosa/20 p-4">
