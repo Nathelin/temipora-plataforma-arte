@@ -31,6 +31,9 @@ public class SolicitudDTO {
     private Integer cantidadDibujos;
     private BigDecimal precioBase;
     private String moneda;
+    // Precio base listo para mostrar según la preferencia del usuario.
+    private BigDecimal precioBaseMostrado;
+    private String monedaMostrada;
     private LocalDateTime fechaCreacion;
     private Integer posicionListaEspera;
     private String motivoRechazo;
@@ -39,12 +42,44 @@ public class SolicitudDTO {
     private LocalDateTime fechaCancelacion;
     private List<ItemSolicitudDTO> items;
     private PresupuestoDTO presupuesto;
+    private Long idPedido;
+    private EstadoPedido estadoPedido;
     private Integer posicionCola;
     private boolean puedePresupuestar;
     private String motivoNoPresupuestable;
     private boolean puedeCancelar;
 
     public static SolicitudDTO desdeSolicitud(Solicitud solicitud) {
+        return desdeSolicitud(solicitud, null, null, null, false);
+    }
+
+    public static SolicitudDTO desdeSolicitud(
+            Solicitud solicitud,
+            Moneda monedaDestino,
+            BigDecimal factorOrigenDestino,
+            BigDecimal factorCobroDestino) {
+        return desdeSolicitud(
+            solicitud, monedaDestino, factorOrigenDestino, factorCobroDestino, false);
+    }
+
+    public static SolicitudDTO desdeSolicitud(
+            Solicitud solicitud,
+            Moneda monedaDestino,
+            BigDecimal factorOrigenDestino,
+            BigDecimal factorCobroDestino,
+            boolean incluirComision) {
+        Moneda origen = solicitud.getMoneda();
+        Moneda destino = monedaDestino != null ? monedaDestino : origen;
+        boolean muestraOrigen = PresupuestoDTO.mismaMoneda(destino, origen);
+
+        BigDecimal precioBaseMostrado = solicitud.getPrecioBase();
+        String codigoMostrado = origen != null ? origen.getCodigo() : null;
+        if (!muestraOrigen && destino != null && factorOrigenDestino != null) {
+            precioBaseMostrado = PresupuestoDTO.convertir(
+                solicitud.getPrecioBase(), factorOrigenDestino);
+            codigoMostrado = destino.getCodigo();
+        }
+
         return SolicitudDTO.builder()
             .idSolicitud(solicitud.getIdSolicitud())
             .idServicio(solicitud.getServicio() != null
@@ -67,7 +102,9 @@ public class SolicitudDTO {
             .estado(solicitud.getEstado())
             .cantidadDibujos(solicitud.getCantidadDibujos())
             .precioBase(solicitud.getPrecioBase())
-            .moneda(solicitud.getMoneda() != null ? solicitud.getMoneda().getCodigo() : null)
+            .moneda(origen != null ? origen.getCodigo() : null)
+            .precioBaseMostrado(precioBaseMostrado)
+            .monedaMostrada(codigoMostrado)
             .fechaCreacion(solicitud.getFechaCreacion())
             .posicionListaEspera(solicitud.getListaEspera() != null
                 && "ESPERANDO".equals(solicitud.getListaEspera().getEstado())
@@ -77,7 +114,18 @@ public class SolicitudDTO {
                 .map(ItemSolicitudDTO::desdeItem)
                 .toList())
             .presupuesto(solicitud.getPresupuesto() != null
-                ? PresupuestoDTO.desdePresupuesto(solicitud.getPresupuesto())
+                ? PresupuestoDTO.desdePresupuesto(
+                    solicitud.getPresupuesto(),
+                    monedaDestino,
+                    factorOrigenDestino,
+                    factorCobroDestino,
+                    incluirComision)
+                : null)
+            .idPedido(solicitud.getPedido() != null
+                ? solicitud.getPedido().getIdPedido()
+                : null)
+            .estadoPedido(solicitud.getPedido() != null
+                ? solicitud.getPedido().getEstado()
                 : null)
             .build();
     }

@@ -1,7 +1,38 @@
 <script setup>
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import api from '../servicios/api'
 
 const router = useRouter()
+const terminos = ref(null)
+const cargando = ref(true)
+const error = ref('')
+
+async function cargar() {
+  cargando.value = true
+  error.value = ''
+  try {
+    const res = await api.get('/terminos-plataforma')
+    terminos.value = res.data
+  } catch (e) {
+    error.value = e.response?.status === 404
+      ? 'La plataforma todavía no publicó sus términos y condiciones.'
+      : (e.response?.data?.message || 'No se pudieron cargar los términos y condiciones.')
+  } finally {
+    cargando.value = false
+  }
+}
+
+function formatearFecha(valor) {
+  if (!valor) return '—'
+  try {
+    return new Date(valor).toLocaleString('es-AR')
+  } catch {
+    return valor
+  }
+}
+
+onMounted(cargar)
 </script>
 
 <template>
@@ -18,39 +49,22 @@ const router = useRouter()
 
     <main class="flex-1 px-6 py-8 overflow-auto min-h-screen w-full">
       <article class=" bg-blanco text-cafe rounded-3xl p-8 shadow-xl shadow-rosa/40 leading-relaxed">
-        <h2 class="text-lg font-normal text-granate mb-4">Términos y condiciones de Temipora</h2>
+        <p v-if="cargando" class="py-10 text-center text-cafe/60">Cargando...</p>
 
-        <p class="mb-4 text-sm text-cafe/50">Versión de los términos y condiciones: 0.0.1</p> <!--TODO: conseguir valores del back-->
-        <p class="mb-4 text-sm text-cafe/50">Última actualización: 06/09/2026</p>
+        <p v-else-if="error" class="py-10 text-center text-cafe/70">{{ error }}</p>
 
-        <p class="mb-4">
-          Este es un texto de ejemplo. Aquí irá el contenido real de los términos y condiciones
-          de la plataforma.
-        </p>
+        <template v-else>
+          <h2 class="text-lg font-normal text-granate mb-4">{{ terminos.titulo }}</h2>
 
-        <h3 class="font-normal text-granate mb-2 mt-6">1. Aceptación de los términos</h3>
-        <p class="mb-4">
-          Al utilizar Temipora, aceptás estos términos. Si no estás de acuerdo, no utilices la
-          plataforma.
-        </p>
+          <p class="mb-1 text-sm text-cafe/50">
+            Versión de los términos y condiciones: {{ terminos.version }}
+          </p>
+          <p class="mb-4 text-sm text-cafe/50">
+            Última actualización: {{ formatearFecha(terminos.fechaPublicacion) }}
+          </p>
 
-        <h3 class="font-normal text-granate mb-2 mt-6">2. Uso de la plataforma</h3>
-        <p class="mb-4">
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla facilisi. Sed ut purus
-          vitae nisl tincidunt tincidunt.
-        </p>
-
-        <h3 class="font-normal text-granate mb-2 mt-6">3. Contenido y propiedad intelectual</h3>
-        <p class="mb-4">
-          Los artistas conservan los derechos sobre sus obras. Al subir contenido, garantizás que
-          tenés los derechos necesarios.
-        </p>
-
-        <h3 class="font-normal text-granate mb-2 mt-6">4. Responsabilidad</h3>
-        <p class="mb-4">
-          La plataforma se ofrece "tal cual". No nos hacemos responsables por daños derivados del
-          uso de la misma.
-        </p>
+          <p class="whitespace-pre-line">{{ terminos.contenido }}</p>
+        </template>
       </article>
     </main>
   </div>

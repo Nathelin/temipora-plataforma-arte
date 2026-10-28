@@ -25,6 +25,7 @@ const secciones = [
       { nombre: 'Resumen', to: '/panel', icono: ICONOS.resumen },
       { nombre: 'Servicios', to: '/panel/servicios', base: '/panel/servicios', icono: ICONOS.servicios },
       { nombre: 'Solicitudes', to: '/panel/solicitudes', base: '/panel/solicitudes', icono: ICONOS.solicitudes },
+      { nombre: 'Pedidos', to: '/panel/pedidos', base: '/panel/pedidos', icono: ICONOS.solicitudes },
       { nombre: 'Portfolio', to: '/panel/portfolio', base: '/panel/portfolio', icono: ICONOS.portfolio },
     ],
   },

@@ -48,6 +48,48 @@ const errores = ref([])
 const fase = ref('')
 const progreso = ref(0)
 
+function actualizarFechaNacimiento(event) {
+  const digitos = event.target.value.replace(/\D/g, '').slice(0, 8)
+  const partes = []
+
+  if (digitos.length > 0) partes.push(digitos.slice(0, 2))
+  if (digitos.length > 2) partes.push(digitos.slice(2, 4))
+  if (digitos.length > 4) partes.push(digitos.slice(4, 8))
+
+  fechaNacimiento.value = partes.join('/')
+}
+
+function obtenerFechaNacimientoIso() {
+  const coincidencia = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(fechaNacimiento.value)
+  if (!coincidencia) return ''
+
+  const dia = Number(coincidencia[1])
+  const mes = Number(coincidencia[2])
+  const anio = Number(coincidencia[3])
+  const fecha = new Date(anio, mes - 1, dia)
+
+  if (
+    fecha.getFullYear() !== anio
+    || fecha.getMonth() !== mes - 1
+    || fecha.getDate() !== dia
+  ) {
+    return ''
+  }
+
+  return `${coincidencia[3]}-${coincidencia[2]}-${coincidencia[1]}`
+}
+
+function esMayorDeEdad(fechaIso) {
+  const [anio, mes, dia] = fechaIso.split('-').map(Number)
+  const hoy = new Date()
+  let edad = hoy.getFullYear() - anio
+  const diferenciaMes = hoy.getMonth() + 1 - mes
+  if (diferenciaMes < 0 || (diferenciaMes === 0 && hoy.getDate() < dia)) {
+    edad -= 1
+  }
+  return edad >= 18
+}
+
 const etiquetaRegistro = computed(() => {
   if (fase.value === 'procesando') return 'Procesando imagen…'
   if (fase.value === 'subiendo') return `Subiendo foto… ${progreso.value}%`
@@ -68,7 +110,12 @@ function validarPaso() {
   if (paso.value === 2) {
     if (nombre.value.trim().length < 2) errs.push('El nombre debe tener al menos 2 caracteres.')
     if (apellido.value.trim().length < 2) errs.push('El apellido debe tener al menos 2 caracteres.')
-    if (!fechaNacimiento.value) errs.push('La fecha de nacimiento es obligatoria.')
+    const fechaIso = obtenerFechaNacimientoIso()
+    if (!fechaIso) {
+      errs.push('La fecha de nacimiento debe tener el formato DD/MM/AAAA y ser válida.')
+    } else if (!esMayorDeEdad(fechaIso)) {
+      errs.push('Tenés que ser mayor de 18 años para registrarte en Temipora.')
+    }
   }
   if (paso.value === 3) {
     if (!rol.value) errs.push('Debés elegir una opción de rol.')
@@ -180,7 +227,7 @@ async function registrarse() {
       acceptaTOS: acceptaTOS.value,
       nombre: nombre.value,
       apellido: apellido.value,
-      fechaNacimiento: fechaNacimiento.value,
+      fechaNacimiento: obtenerFechaNacimientoIso(),
       biografia: biografia.value,
       rol: rol.value,
       urlFotoPerfil: urlFotoPerfil.value || null,
@@ -235,7 +282,7 @@ const pasosRouter = [
       </div>
 
       <!-- Indicador de pasos -->
-      <div class="flex items-center justify-center gap-2 mt-8 mb-8">
+      <div class="flex items-center justify-center gap-2 mt-2 mb-2">
         <template v-for="p in pasosRouter" :key="p.n">
           <div
             class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-normal transition"
@@ -250,12 +297,12 @@ const pasosRouter = [
           ></div>
         </template>
       </div>
-      <p class="text-center text-sm text-cafe/60 mb-8">
+      <p class="text-center text-sm text-cafe/60 mb-5">
         Paso {{ paso }} de {{ totalPasos }}
       </p>
 
       <!-- Paso 1 -->
-      <div v-if="paso === 1" class="space-y-8 pt-10 sm:pt-14 ">
+      <div v-if="paso === 1" class="space-y-4 pt-10 sm:pt-14 ">
         <div>
           <label class="block text-sm text-cafe mb-2">Nombre de usuario<span class="text-rojizo">*</span></label>
           <input
@@ -335,7 +382,19 @@ const pasosRouter = [
         </div>
         <div>
           <label class="block text-sm text-cafe mb-2">Fecha de nacimiento<span class="text-rojizo">*</span></label>
-          <input v-model="fechaNacimiento" type="date" class="pl-4 pr-4 block w-full rounded-lg border-0 py-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none" />
+          <input
+            :value="fechaNacimiento"
+            type="text"
+            inputmode="numeric"
+            autocomplete="bday"
+            maxlength="10"
+            placeholder="DD/MM/AAAA"
+            class="pl-4 pr-4 block w-full rounded-lg border-0 py-3 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+            @input="actualizarFechaNacimiento"
+          />
+          <p class="mt-2 text-xs text-cafe/50">
+            Tenés que ser mayor de 18 años para crear una cuenta.
+          </p>
         </div>
       </div>
 

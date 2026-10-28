@@ -52,12 +52,34 @@ function manejarTecla(event) {
 }
 
 function destinoDe(notificacion) {
-  if (notificacion?.tipoReferencia !== 'SOLICITUD') return null
+  const tipo = notificacion?.tipoReferencia
+  if (tipo !== 'SOLICITUD' && tipo !== 'PEDIDO') return null
+
   const rol = localStorage.getItem('rol')
-  if (rol !== 'ARTISTA' && rol !== 'CLIENTE') return null
+  if (rol !== 'ARTISTA' && rol !== 'CLIENTE' && rol !== 'ADMIN') return null
+
   const id = Number(notificacion.idReferencia)
   if (!Number.isInteger(id) || id <= 0) return null
-  return { name: 'solicitud-detalle', params: { idSolicitud: id } }
+
+  if (tipo === 'SOLICITUD') {
+    if (rol === 'ADMIN') return null
+    return { name: 'solicitud-detalle', params: { idSolicitud: id } }
+  }
+
+  if (rol === 'ADMIN') {
+    return { name: 'admin-pedido-detalle', params: { idPedido: id } }
+  }
+  if (rol === 'ARTISTA'
+    && router.currentRoute.value.path.startsWith('/panel')) {
+    return { name: 'panel-pedido-detalle', params: { idPedido: id } }
+  }
+  return { name: 'pedido-detalle', params: { idPedido: id } }
+}
+
+function textoDestino(notificacion) {
+  if (notificacion?.tipoReferencia === 'PEDIDO') return 'Ver pedido →'
+  if (notificacion?.tipoReferencia === 'SOLICITUD') return 'Ver solicitud →'
+  return ''
 }
 
 async function seleccionar(notificacion) {
@@ -169,7 +191,7 @@ onBeforeUnmount(() => {
       <div v-else-if="!hayNotificaciones" class="px-4 py-10 text-center">
         <p class="text-sm font-medium text-granate">No tenés notificaciones.</p>
         <p class="mt-1 text-xs leading-relaxed text-cafe/60">
-          Cuando recibas una solicitud o novedad, aparecerá acá.
+          Cuando recibas una solicitud, un pedido o una novedad, aparecerá acá.
         </p>
       </div>
 
@@ -206,7 +228,7 @@ onBeforeUnmount(() => {
               <span class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-cafe/50">
                 <span>{{ formatearFecha(notificacion.fechaCreacion) }}</span>
                 <span v-if="destinoDe(notificacion)" class="font-semibold text-coral">
-                  Ver solicitud →
+                  {{ textoDestino(notificacion) }}
                 </span>
               </span>
             </span>

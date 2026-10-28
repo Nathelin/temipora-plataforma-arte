@@ -26,14 +26,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 
+import com.temipora.backend_springboot.modelo.ConfiguracionComision;
+import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.ConfiguracionPresupuesto;
 import com.temipora.backend_springboot.modelo.ETiempoEntregaUnidad;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
+import com.temipora.backend_springboot.modelo.HitoPresupuestoRequest;
 import com.temipora.backend_springboot.modelo.ItemPresupuestoRequest;
 import com.temipora.backend_springboot.modelo.ItemSolicitud;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Presupuesto;
+import com.temipora.backend_springboot.modelo.PresupuestoDTO;
 import com.temipora.backend_springboot.modelo.PresupuestoRequest;
 import com.temipora.backend_springboot.modelo.RecargoPresupuestoRequest;
 import com.temipora.backend_springboot.modelo.Servicio;
@@ -75,6 +79,15 @@ class PresupuestoServiceTest {
 
     @Mock
     private ConfiguracionPresupuestoService configuracionPresupuestoService;
+
+    @Mock
+    private ComisionService comisionService;
+
+    @Mock
+    private ConfiguracionPedidoService configuracionPedidoService;
+
+    @Mock
+    private MonedaVistaService monedaVistaService;
 
     @InjectMocks
     private PresupuestoService presupuestoService;
@@ -143,6 +156,155 @@ class PresupuestoServiceTest {
             contains("200.00 ARS"),
             eq(SOLICITUD),
             eq("SOLICITUD"));
+    }
+
+    @Test
+    void crear_calculaComisionYNetoDelArtista() {
+        prepararCreacion();
+
+        SolicitudDTO resultado = presupuestoService.crear(
+            SOLICITUD, ARTISTA, request());
+
+        PresupuestoDTO presupuesto = resultado.getPresupuesto();
+        assertThat(presupuesto.getPrecioFinal()).isEqualByComparingTo("200.00");
+        assertThat(presupuesto.getComisionPorcentaje()).isEqualByComparingTo("10.00");
+        assertThat(presupuesto.getComisionMonto()).isEqualByComparingTo("20.00");
+        assertThat(presupuesto.getMontoNetoArtista()).isEqualByComparingTo("180.00");
+    }
+
+    @Test
+    void crear_sinHitos_creaUnPagoUnicoAlInicio() {
+        prepararCreacion();
+
+        SolicitudDTO resultado = presupuestoService.crear(
+            SOLICITUD, ARTISTA, request());
+
+        assertThat(resultado.getPresupuesto().getHitos()).hasSize(1);
+        assertThat(resultado.getPresupuesto().getHitos().get(0).getTipo())
+            .isEqualTo("SENA");
+        assertThat(resultado.getPresupuesto().getHitos().get(0).getPorcentaje())
+            .isEqualByComparingTo("100.00");
+        assertThat(resultado.getPresupuesto().getHitos().get(0).getMonto())
+            .isEqualByComparingTo("200.00");
+        assertThat(resultado.getPresupuesto().getHitos().get(0).isRequiereEntrega())
+            .isTrue();
+    }
+
+    @Test
+    void crear_conSenaSkeb_laSenaNoRequiereEntregable() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        HitoPresupuestoRequest sena = hito("50");
+        sena.setRequiereEntrega(false);
+        request.setHitos(new ArrayList<>(List.of(sena, hito("50"))));
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request);
+
+        var hitos = resultado.getPresupuesto().getHitos();
+        assertThat(hitos).hasSize(2);
+        assertThat(hitos.get(0).getTipo()).isEqualTo("SENA");
+        assertThat(hitos.get(0).isRequiereEntrega()).isFalse();
+        assertThat(hitos.get(1).getTipo()).isEqualTo("ENTREGA");
+        assertThat(hitos.get(1).isRequiereEntrega()).isTrue();
+    }
+
+    @Test
+    void crear_conAlcance_loExponeEnElHitoDelPresupuesto() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        HitoPresupuestoRequest sena = hito("50");
+        sena.setDescripcion("Bocetos de los 2 dibujos");
+        request.setHitos(new ArrayList<>(List.of(sena, hito("50"))));
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request);
+
+        assertThat(resultado.getPresupuesto().getHitos().get(0).getDescripcion())
+            .isEqualTo("Bocetos de los 2 dibujos");
+    }
+
+    @Test
+    void crear_conDosHitos_losGuardaConComisionYNeto() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.setHitos(new ArrayList<>(List.of(hito("50"), hito("50"))));
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request);
+
+        assertThat(resultado.getPresupuesto().getHitos()).hasSize(2);
+        var sena = resultado.getPresupuesto().getHitos().get(0);
+        var entrega = resultado.getPresupuesto().getHitos().get(1);
+        assertThat(sena.getTipo()).isEqualTo("SENA");
+        assertThat(sena.getMonto()).isEqualByComparingTo("100.00");
+        assertThat(sena.getComisionMonto()).isEqualByComparingTo("10.00");
+        assertThat(sena.getMontoNeto()).isEqualByComparingTo("90.00");
+        assertThat(entrega.getTipo()).isEqualTo("ENTREGA");
+        assertThat(entrega.getMonto()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void crear_conHitosQueNoSumanCien_lanzaError() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.setHitos(new ArrayList<>(List.of(hito("50"), hito("40"))));
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("sumar 100");
+
+        verify(presupuestoRepository, never()).save(any());
+    }
+
+    @Test
+    void crear_conMonedaDistinta_guardaCotizacionYCobroEnArs() {
+        Moneda usd = Moneda.builder()
+            .idMoneda(4L)
+            .codigo("USD")
+            .nombre("Dólar estadounidense")
+            .build();
+        servicio.setMoneda(usd);
+        solicitud.setMoneda(usd);
+        prepararCreacion();
+        when(monedaVistaService.factorCobro(eq(usd), any(LocalDateTime.class)))
+            .thenReturn(new BigDecimal("1200"));
+        when(monedaVistaService.factorOrigenAMostrada(
+                eq(usd), eq(moneda), any(LocalDateTime.class)))
+            .thenReturn(new BigDecimal("1200"));
+        when(monedaVistaService.factorCobroAMostrada(
+                eq(moneda), any(LocalDateTime.class)))
+            .thenReturn(BigDecimal.ONE);
+
+        SolicitudDTO resultado = presupuestoService.crear(
+            SOLICITUD, ARTISTA, request());
+
+        PresupuestoDTO presupuesto = resultado.getPresupuesto();
+        assertThat(presupuesto.getMoneda()).isEqualTo("USD");
+        assertThat(presupuesto.getMonedaCobro()).isEqualTo("ARS");
+        assertThat(presupuesto.getCotizacionCobro())
+            .isEqualByComparingTo("1200");
+        assertThat(presupuesto.getPrecioBaseTotalCobro())
+            .isEqualByComparingTo("240000.00");
+        assertThat(presupuesto.getPrecioFinalCobro())
+            .isEqualByComparingTo("240000.00");
+        assertThat(presupuesto.getMonedaMostrada()).isEqualTo("ARS");
+        assertThat(presupuesto.getPrecioFinalMostrado())
+            .isEqualByComparingTo("240000.00");
+        assertThat(presupuesto.getItems().get(0).getPrecioFinalMostrado())
+            .isEqualByComparingTo("120000.00");
+    }
+
+    @Test
+    void crear_sinCotizacion_lanzaConflictoYNoGuarda() {
+        prepararCreacion();
+        when(monedaVistaService.factorCobro(
+                eq(moneda), any(LocalDateTime.class)))
+            .thenReturn(null);
+
+        assertThatThrownBy(() -> presupuestoService.crear(
+            SOLICITUD, ARTISTA, request()))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("cotización");
+
+        verify(presupuestoRepository, never()).save(any());
     }
 
     @Test
@@ -499,6 +661,34 @@ class PresupuestoServiceTest {
                 true, 1, null));
         lenient().when(configuracionPresupuestoService.obtener())
             .thenReturn(configuracion);
+        ConfiguracionComision comision = new ConfiguracionComision();
+        comision.setPorcentajeServicio(new BigDecimal("10.00"));
+        comision.setPorcentajeProducto(new BigDecimal("10.00"));
+        lenient().when(comisionService.obtener()).thenReturn(comision);
+        lenient().when(comisionService.calcularComision(any(), any()))
+            .thenAnswer(inv -> {
+                BigDecimal monto = inv.getArgument(0);
+                BigDecimal porcentaje = inv.getArgument(1);
+                return monto.multiply(porcentaje)
+                    .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
+            });
+        ConfiguracionPedido configuracionPedido = new ConfiguracionPedido();
+        configuracionPedido.setMaxHitos(4);
+        configuracionPedido.setPorcentajeMaxPrimerHito(new BigDecimal("50.00"));
+        configuracionPedido.setMontoMinimoCuota(BigDecimal.ZERO);
+        lenient().when(configuracionPedidoService.obtener())
+            .thenReturn(configuracionPedido);
+        lenient().when(monedaVistaService.monedaCobro()).thenReturn(moneda);
+        lenient().when(monedaVistaService.factorCobro(
+                eq(moneda), any(LocalDateTime.class)))
+            .thenReturn(BigDecimal.ONE);
+        lenient().when(monedaVistaService.preferidaDe(ARTISTA)).thenReturn(moneda);
+        lenient().when(monedaVistaService.factorOrigenAMostrada(
+                eq(moneda), eq(moneda), any(LocalDateTime.class)))
+            .thenReturn(BigDecimal.ONE);
+        lenient().when(monedaVistaService.factorCobroAMostrada(
+                eq(moneda), any(LocalDateTime.class)))
+            .thenReturn(BigDecimal.ONE);
         lenient().when(presupuestoRepository.save(any(Presupuesto.class)))
             .thenAnswer(inv -> {
                 Presupuesto guardado = inv.getArgument(0);
@@ -556,5 +746,11 @@ class PresupuestoServiceTest {
         recargo.setTipo(tipo);
         recargo.setValor(new BigDecimal(valor));
         return recargo;
+    }
+
+    private HitoPresupuestoRequest hito(String porcentaje) {
+        HitoPresupuestoRequest hito = new HitoPresupuestoRequest();
+        hito.setPorcentaje(new BigDecimal(porcentaje));
+        return hito;
     }
 }

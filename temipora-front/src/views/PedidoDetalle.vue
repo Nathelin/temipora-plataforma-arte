@@ -1,0 +1,608 @@
+<script setup>
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import api from '../servicios/api'
+import { formatearPrecio } from '../servicios/moneda'
+import EntregasHito from '../components/EntregasHito.vue'
+import IconoDescarga from '../components/IconoDescarga.vue'
+import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+import SubirEntregable from '../components/SubirEntregable.vue'
+import {
+  descripcionHito,
+  estadoPedidoDe,
+  etiquetaEntrega,
+  etiquetaPago,
+  etiquetaTipoHito,
+  formatearFecha,
+  formatearFechaHora,
+  pagoPendiente,
+} from '../servicios/pedidos'
+
+const route = useRoute()
+const router = useRouter()
+const idPedido = computed(() => Number(route.params.idPedido))
+
+const pedido = ref(null)
+const cargando = ref(true)
+const error = ref('')
+const errorAccion = ref('')
+const aviso = ref('')
+const procesando = ref(false)
+const descargandoConstancia = ref(false)
+const revisionHitoId = ref(null)
+const motivoRevision = ref('')
+const visor = reactive({ abierto: false, imagen: '' })
+const confirmacion = reactive({
+  abierto: false,
+  titulo: '',
+  mensaje: '',
+  textoConfirmar: 'Confirmar',
+  accion: null,
+})
+
+const esArtista = computed(() => pedido.value?.rolVista === 'ARTISTA')
+const esCliente = computed(() => pedido.value?.rolVista === 'CLIENTE')
+const estadoInfo = computed(() => estadoPedidoDe(pedido.value?.estado))
+const hitos = computed(() => pedido.value?.hitos || [])
+const moneda = computed(
+  () => pedido.value?.monedaMostrada || pedido.value?.moneda || 'ARS',
+)
+const monedaCobro = computed(() => pedido.value?.monedaCobro || 'ARS')
+const total = computed(() => formatearPrecio(
+  pedido.value?.precioFinalMostrado ?? pedido.value?.precioFinal,
+  moneda.value,
+))
+const cobroDistinto = computed(
+  () => pedido.value?.precioFinalCobro != null
+    && moneda.value !== monedaCobro.value,
+)
+
+function formatearMontoHito(hito) {
+  return formatearPrecio(
+    hito.montoMostrado ?? hito.monto,
+    moneda.value,
+  )
+}
+
+async function cargar() {
+  cargando.value = true
+  error.value = ''
+  try {
+    const res = await api.get(`/pedidos/${idPedido.value}`)
+    pedido.value = res.data
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    error.value = e.response?.status === 403 || e.response?.status === 404
+      ? 'No podés ver este pedido o ya no existe.'
+      : (e.response?.data?.message || 'No se pudo cargar el pedido.')
+  } finally {
+    cargando.value = false
+  }
+}
+
+async function ejecutar(accion, mensaje) {
+  if (procesando.value) return false
+  procesando.value = true
+  errorAccion.value = ''
+  aviso.value = ''
+  try {
+    const res = await accion()
+    if (res?.data) pedido.value = res.data
+    aviso.value = mensaje
+    return true
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return false
+    }
+    errorAccion.value = e.response?.data?.message
+      || 'No se pudo completar la acción.'
+    return false
+  } finally {
+    procesando.value = false
+  }
+}
+
+function pagarHito(hito) {
+  ejecutar(
+    () => api.post(`/pedidos/${idPedido.value}/hitos/${hito.idHitoPedido}/pagar`),
+    'Pago iniciado. Confirmalo para activar el hito.',
+  )
+}
+
+function confirmarPago(pago) {
+  ejecutar(
+    () => api.post(`/pagos/simulado/${pago.idPago}/confirmar`),
+    'Pago confirmado.',
+  )
+}
+
+function pedirConfirmacion({ titulo, mensaje, textoConfirmar }, accion) {
+  Object.assign(confirmacion, {
+    abierto: true,
+    titulo,
+    mensaje,
+    textoConfirmar,
+    accion,
+  })
+}
+
+function cerrarConfirmacion() {
+  confirmacion.abierto = false
+  confirmacion.accion = null
+}
+
+function confirmarAccion() {
+  const accion = confirmacion.accion
+  cerrarConfirmacion()
+  if (accion) accion()
+}
+
+function aprobar(hito) {
+  pedirConfirmacion({
+    titulo: '¿Aprobar el entregable?',
+    mensaje: 'Confirmás que estás satisfecho con esta entrega y querés que el artista siga trabajando. Se habilita la siguiente cuota del plan de pagos.',
+    textoConfirmar: 'Sí, aprobar',
+  }, () => ejecutar(
+    () => api.post(`/pedidos/${idPedido.value}/hitos/${hito.idHitoPedido}/aprobar`),
+    'Aprobaste el entregable.',
+  ))
+}
+
+function abrirRevision(hito) {
+  revisionHitoId.value = hito.idHitoPedido
+  motivoRevision.value = ''
+}
+
+function cerrarRevision() {
+  revisionHitoId.value = null
+  motivoRevision.value = ''
+}
+
+async function solicitarRevision(hito) {
+  if (!motivoRevision.value.trim()) {
+    errorAccion.value = 'Escribí el motivo de la revisión.'
+    return
+  }
+  const ok = await ejecutar(
+    () => api.post(
+      `/pedidos/${idPedido.value}/hitos/${hito.idHitoPedido}/solicitar-revision`,
+      { motivo: motivoRevision.value.trim() },
+    ),
+    'Pediste una revisión al artista.',
+  )
+  if (ok) cerrarRevision()
+}
+
+function cancelar() {
+  if (!window.confirm(
+    '¿Cancelar el pedido? Los pagos ya realizados no se devuelven automáticamente.',
+  )) return
+  ejecutar(
+    () => api.post(`/pedidos/${idPedido.value}/cancelar`),
+    'El pedido fue cancelado.',
+  )
+}
+
+function alEntregar(data) {
+  if (data) pedido.value = data
+  errorAccion.value = ''
+  aviso.value = 'Entregable subido. El cliente fue notificado.'
+}
+
+function abrirVisor(imagen) {
+  visor.imagen = imagen
+  visor.abierto = true
+}
+
+function cerrarVisor() {
+  visor.abierto = false
+}
+
+async function descargarConstancia() {
+  if (descargandoConstancia.value) return
+  descargandoConstancia.value = true
+  errorAccion.value = ''
+  try {
+    const res = await api.get(
+      `/pedidos/${idPedido.value}/constancia`,
+      { responseType: 'blob' },
+    )
+    const url = URL.createObjectURL(res.data)
+    const enlace = document.createElement('a')
+    enlace.href = url
+    enlace.download = `constancia-pedido-${idPedido.value}.pdf`
+    document.body.appendChild(enlace)
+    enlace.click()
+    enlace.remove()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    errorAccion.value = 'No se pudo descargar la constancia.'
+  } finally {
+    descargandoConstancia.value = false
+  }
+}
+
+function volver() {
+  if (route.path.startsWith('/admin')) {
+    router.push({ name: 'pedidos-admin' })
+    return
+  }
+  const enPanel = route.path.startsWith('/panel')
+  router.push({ name: enPanel ? 'panel-pedidos' : 'pedidos' })
+}
+
+onMounted(cargar)
+</script>
+
+<template>
+  <div class="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
+    <button
+      type="button"
+      class="text-sm font-medium text-cafe/70 transition hover:text-coral"
+      @click="volver"
+    >
+      ← Volver a pedidos
+    </button>
+
+    <p v-if="cargando" class="mt-8 py-16 text-center text-sm text-cafe/60">
+      Cargando pedido...
+    </p>
+    <p v-else-if="error" class="mt-8 py-16 text-center text-sm text-rojizo">
+      {{ error }}
+    </p>
+
+    <template v-else>
+      <header class="mt-6 flex flex-wrap items-start justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-sm font-semibold uppercase tracking-[0.18em] text-coral">
+            Pedido #{{ pedido.idPedido }}
+          </p>
+          <h1 class="mt-1 font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">
+            {{ pedido.nombreServicio || 'Servicio' }}
+          </h1>
+          <p v-if="pedido.rolVista === 'ADMIN'" class="mt-2 text-sm text-cafe/65">
+            Cliente: @{{ pedido.cliente?.nombreUsuario || '—' }}
+            <span aria-hidden="true"> · </span>
+            Artista: @{{ pedido.artista?.nombreUsuario || '—' }}
+          </p>
+          <p v-else class="mt-2 text-sm text-cafe/65">
+            {{ esArtista ? 'Cliente' : 'Artista' }}:
+            @{{ (esArtista ? pedido.cliente : pedido.artista)?.nombreUsuario || '—' }}
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span
+            v-if="pedido.rolVista === 'ADMIN'"
+            class="rounded-full border border-coral/30 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral"
+          >
+            Vista de administración
+          </span>
+          <span
+            class="rounded-full border px-3 py-1.5 text-xs font-semibold"
+            :class="estadoInfo.clase"
+          >
+            {{ estadoInfo.etiqueta }}
+          </span>
+        </div>
+      </header>
+
+      <section class="mt-6 rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
+        <dl class="grid gap-3 text-sm sm:grid-cols-3">
+          <div class="rounded-xl bg-rosa/10 px-3 py-2">
+            <dt class="text-xs text-cafe/50">Total</dt>
+            <dd class="mt-0.5 text-xl font-bold text-granate">{{ total }}</dd>
+            <dd v-if="cobroDistinto" class="text-xs text-cafe/50">
+              A pagar: {{ formatearPrecio(pedido.precioFinalCobro, monedaCobro) }}
+            </dd>
+          </div>
+          <div class="rounded-xl bg-rosa/10 px-3 py-2">
+            <dt class="text-xs text-cafe/50">Inicio</dt>
+            <dd class="mt-0.5 font-medium text-cafe">
+              {{ pedido.fechaInicio ? formatearFecha(pedido.fechaInicio) : 'Al confirmar el pago' }}
+            </dd>
+          </div>
+          <div class="rounded-xl bg-rosa/10 px-3 py-2">
+            <dt class="text-xs text-cafe/50">Límite de entrega</dt>
+            <dd class="mt-0.5 font-medium text-cafe">
+              {{ pedido.limiteEntrega ? formatearFecha(pedido.limiteEntrega) : 'A confirmar' }}
+            </dd>
+          </div>
+        </dl>
+
+        <div
+          v-if="(esArtista || pedido.rolVista === 'ADMIN') && pedido.comisionMonto != null"
+          class="mt-4 rounded-xl border border-cafe/15 bg-cafe/5 p-4"
+        >
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/50">
+            Comisión de la plataforma
+          </p>
+          <dl class="mt-2 space-y-1.5 text-sm">
+            <div class="flex items-center justify-between gap-3">
+              <dt class="text-cafe/60">
+                Comisión ({{ pedido.comisionPorcentaje }}%)
+              </dt>
+              <dd class="text-cafe">
+                − {{ formatearPrecio(pedido.comisionMontoMostrado ?? pedido.comisionMonto, moneda) }}
+              </dd>
+            </div>
+            <div class="flex items-center justify-between gap-3 border-t border-cafe/10 pt-1.5">
+              <dt class="font-semibold text-granate">Recibís</dt>
+              <dd class="text-base font-bold text-granate">
+                {{ formatearPrecio(pedido.montoNetoArtistaMostrado ?? pedido.montoNetoArtista, moneda) }}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-coral/25 bg-coral/5 p-4">
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-granate">Constancia del pedido</p>
+          <p class="text-xs leading-relaxed text-cafe/60">
+            Presupuesto, hitos, entregas, hashes y pagos en un PDF.
+          </p>
+        </div>
+        <button
+          type="button"
+          :disabled="descargandoConstancia"
+          class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-rojizo disabled:cursor-not-allowed disabled:opacity-60"
+          @click="descargarConstancia"
+        >
+          <IconoDescarga />
+          {{ descargandoConstancia ? 'Generando...' : 'Descargar PDF' }}
+        </button>
+      </div>
+
+      <p
+        v-if="errorAccion"
+        class="mt-4 rounded-xl border border-rojizo/25 bg-rojizo/5 px-4 py-3 text-sm text-rojizo"
+        role="alert"
+      >
+        {{ errorAccion }}
+      </p>
+      <p
+        v-else-if="aviso"
+        class="mt-4 rounded-xl border border-green-700/25 bg-green-700/5 px-4 py-3 text-sm text-green-700"
+        role="status"
+      >
+        {{ aviso }}
+      </p>
+
+      <section class="mt-6 space-y-4">
+        <h2 class="text-xl font-semibold text-granate">Plan de pagos</h2>
+
+        <article
+          v-for="hito in hitos"
+          :key="hito.idHitoPedido"
+          class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                {{ etiquetaTipoHito(hito.tipo) }}
+              </p>
+              <h3 class="mt-1 text-lg font-semibold text-granate">{{ hito.nombre }}</h3>
+              <p v-if="hito.descripcion" class="mt-1 text-sm leading-relaxed text-cafe/70">
+                {{ hito.descripcion }}
+              </p>
+              <p class="mt-1 text-xs text-cafe/55">{{ descripcionHito(hito) }}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-lg font-bold text-granate">{{ formatearMontoHito(hito) }}</p>
+              <div class="mt-1 flex flex-wrap justify-end gap-1.5">
+                <span class="rounded-full bg-rosa/20 px-2.5 py-1 text-[11px] font-semibold text-cafe/70">
+                  Pago: {{ etiquetaPago(hito.estadoPago) }}
+                </span>
+                <span class="rounded-full bg-coral/10 px-2.5 py-1 text-[11px] font-semibold text-coral">
+                  Entrega: {{ etiquetaEntrega(hito.estadoEntrega) }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <dl class="mt-4 grid gap-2 text-xs sm:grid-cols-3">
+            <div v-if="hito.fechaLimitePago">
+              <dt class="text-cafe/50">Pagar antes de</dt>
+              <dd class="mt-0.5 text-cafe">{{ formatearFechaHora(hito.fechaLimitePago) }}</dd>
+            </div>
+            <div v-if="hito.fechaPago">
+              <dt class="text-cafe/50">Pagado</dt>
+              <dd class="mt-0.5 text-cafe">{{ formatearFechaHora(hito.fechaPago) }}</dd>
+            </div>
+            <div v-if="hito.fechaLimiteAprobacion">
+              <dt class="text-cafe/50">Aprobación automática</dt>
+              <dd class="mt-0.5 text-cafe">{{ formatearFechaHora(hito.fechaLimiteAprobacion) }}</dd>
+            </div>
+          </dl>
+
+          <EntregasHito
+            v-if="hito.entregas?.length"
+            :id-pedido="idPedido"
+            :id-hito="hito.idHitoPedido"
+            :entregas="hito.entregas"
+          />
+
+          <div
+            v-if="!hito.entregas?.length && (hito.entregaDescripcion || hito.entregaImagen)"
+            class="mt-4 rounded-xl border border-rosa/40 bg-rosa/5 p-4"
+          >
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/50">
+              Entregable
+            </p>
+            <p
+              v-if="hito.entregaDescripcion"
+              class="mt-2 whitespace-pre-line text-sm leading-relaxed text-cafe/75"
+            >
+              {{ hito.entregaDescripcion }}
+            </p>
+            <button
+              v-if="hito.entregaImagen"
+              type="button"
+              class="mt-3 block overflow-hidden rounded-xl border border-rosa/50"
+              @click="abrirVisor(hito.entregaImagen)"
+            >
+              <img
+                :src="hito.entregaImagen"
+                alt="Entregable del hito"
+                class="max-h-72 w-full object-contain"
+              />
+            </button>
+          </div>
+          <p
+            v-else-if="!hito.entregas?.length && hito.tipo === 'ENTREGA' && hito.estadoEntrega === 'ENTREGADO'"
+            class="mt-4 rounded-xl border border-coral/25 bg-coral/5 px-4 py-3 text-sm text-cafe/70"
+          >
+            El artista subió la entrega final. Pagá esta cuota para desbloquear el archivo.
+          </p>
+
+          <div
+            v-if="(esArtista || pedido.rolVista === 'ADMIN') && hito.comisionMonto != null"
+            class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-cafe/5 px-3 py-2 text-xs text-cafe/65"
+          >
+            <span>Comisión: − {{ formatearPrecio(hito.comisionMontoMostrado ?? hito.comisionMonto, moneda) }}</span>
+            <span class="font-semibold text-granate">
+              Recibís: {{ formatearPrecio(hito.montoNetoMostrado ?? hito.montoNeto, moneda) }}
+            </span>
+          </div>
+
+          <div
+            v-if="pagoPendiente(hito)"
+            class="mt-4 rounded-xl border border-coral/30 bg-coral/5 px-4 py-3"
+          >
+            <p class="text-sm text-cafe/75">
+              {{ pagoPendiente(hito).instruccion || 'Pago pendiente de confirmación.' }}
+            </p>
+            <button
+              v-if="esCliente && pagoPendiente(hito).proveedor === 'SIMULADO'"
+              type="button"
+              :disabled="procesando"
+              class="mt-3 inline-flex min-h-9 items-center justify-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo disabled:opacity-50"
+              @click="confirmarPago(pagoPendiente(hito))"
+            >
+              Confirmar pago (simulado)
+            </button>
+          </div>
+
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button
+              v-if="hito.puedePagar"
+              type="button"
+              :disabled="procesando"
+              class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition hover:bg-rojizo disabled:opacity-50"
+              @click="pagarHito(hito)"
+            >
+              {{
+                hito.tipo === 'ENTREGA'
+                  ? 'Pagar y desbloquear entrega'
+                  : `Pagar ${hito.nombre}`
+              }}
+            </button>
+          </div>
+
+          <div v-if="hito.puedeAprobar" class="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              :disabled="procesando"
+              class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition hover:bg-rojizo disabled:opacity-50"
+              @click="aprobar(hito)"
+            >
+              Aprobar entregable
+            </button>
+            <button
+              type="button"
+              class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-5 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10"
+              @click="abrirRevision(hito)"
+            >
+              Solicitar revisión
+            </button>
+          </div>
+
+          <div
+            v-if="revisionHitoId === hito.idHitoPedido"
+            class="mt-3 rounded-xl border border-rojizo/25 bg-rojizo/5 p-3"
+          >
+            <label :for="`motivo-revision-${hito.idHitoPedido}`" class="block text-xs text-cafe/60">
+              ¿Qué querés que revise el artista?
+            </label>
+            <textarea
+              :id="`motivo-revision-${hito.idHitoPedido}`"
+              v-model="motivoRevision"
+              rows="3"
+              maxlength="500"
+              class="mt-2 block w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+            ></textarea>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                :disabled="procesando"
+                class="inline-flex min-h-9 items-center justify-center rounded-full bg-rojizo px-4 text-sm font-semibold text-white transition hover:bg-granate disabled:opacity-50"
+                @click="solicitarRevision(hito)"
+              >
+                Enviar revisión
+              </button>
+              <button
+                type="button"
+                class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+                @click="cerrarRevision"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+
+          <SubirEntregable
+            v-if="esArtista && hito.puedeEntregar"
+            :id-pedido="idPedido"
+            :hito="hito"
+            :dibujos="pedido.dibujos || []"
+            @entregado="alEntregar"
+          />
+        </article>
+      </section>
+
+      <div v-if="pedido.puedeCancelar" class="mt-6">
+        <button
+          type="button"
+          :disabled="procesando"
+          class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-5 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10 disabled:opacity-50"
+          @click="cancelar"
+        >
+          Cancelar pedido
+        </button>
+      </div>
+    </template>
+
+    <div
+      v-if="visor.abierto"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-granate/80 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Entregable"
+      @click.self="cerrarVisor"
+    >
+      <div class="relative max-h-full max-w-4xl overflow-auto rounded-2xl bg-blanco p-3">
+        <button
+          type="button"
+          class="absolute right-3 top-3 rounded-full bg-blanco/90 px-3 py-1 text-sm font-semibold text-granate shadow"
+          @click="cerrarVisor"
+        >
+          Cerrar
+        </button>
+        <img :src="visor.imagen" alt="Entregable ampliado" class="max-h-[80vh] w-auto" />
+      </div>
+    </div>
+
+    <ModalConfirmacion
+      :abierto="confirmacion.abierto"
+      :titulo="confirmacion.titulo"
+      :mensaje="confirmacion.mensaje"
+      :texto-confirmar="confirmacion.textoConfirmar"
+      @confirmar="confirmarAccion"
+      @cerrar="cerrarConfirmacion"
+    />
+  </div>
+</template>

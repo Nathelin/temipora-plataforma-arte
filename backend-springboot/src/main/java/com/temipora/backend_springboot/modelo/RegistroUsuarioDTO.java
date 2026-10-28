@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.AssertTrue;
@@ -40,6 +41,8 @@ public class RegistroUsuarioDTO {
     @Size(min = 2, max = 25, message = "El apellido debe tener entre 2 y 25 caracteres")
     private String apellido;
 
+    @NotNull(message = "La fecha de nacimiento es obligatoria")
+    @Past(message = "La fecha de nacimiento debe ser una fecha pasada")
     private LocalDate fechaNacimiento;
 
     @Size(max = 500, message = "La biografía no puede superar los 500 caracteres")

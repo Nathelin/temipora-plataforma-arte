@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
-import { formatearPrecio } from '../servicios/moneda'
+import { formatearMonto, formatearPrecio } from '../servicios/moneda'
+import { descripcionHito } from '../servicios/pedidos'
 import {
   aFechaISO,
   fechaEntregaEstimada,
@@ -14,8 +15,6 @@ const props = defineProps({
   estado: { type: String, default: '' },
   esArtista: { type: Boolean, default: false },
 })
-
-defineEmits(['retirar'])
 
 const hoy = aFechaISO(new Date())
 const entrega = computed(() => textoTiempoEntrega(
@@ -49,24 +48,55 @@ const entregaAlVencer = computed(() => {
 const entregaAlVencerTexto = computed(
   () => formatearFechaISO(entregaAlVencer.value, { larga: true }),
 )
-const puedeRetirar = computed(
-  () => props.esArtista && props.estado === 'PRESUPUESTADA',
-)
 const vencido = computed(() => props.estado === 'VENCIDA')
 const retirado = computed(() => props.estado === 'RECHAZADA')
 const cancelado = computed(() => props.estado === 'CANCELADA')
 const vigente = computed(() => props.estado === 'PRESUPUESTADA')
 const items = computed(() => props.presupuesto?.items || [])
+const hitos = computed(() => props.presupuesto?.hitos || [])
+const monedaMostrada = computed(
+  () => props.presupuesto?.monedaMostrada || props.presupuesto?.moneda,
+)
+const totalMostrado = computed(
+  () => props.presupuesto?.precioFinalMostrado ?? props.presupuesto?.precioFinal,
+)
+const baseMostrada = computed(
+  () => props.presupuesto?.precioBaseTotalMostrado ?? props.presupuesto?.precioBaseTotal,
+)
+const cobroDistinto = computed(
+  () => props.presupuesto?.precioFinalCobro != null
+    && props.presupuesto?.monedaCobro
+    && props.presupuesto.monedaCobro !== monedaMostrada.value,
+)
+const cotizacionAlEmitir = computed(() => {
+  const cotizacion = Number(props.presupuesto?.cotizacionCobro)
+  if (!Number.isFinite(cotizacion) || cotizacion <= 0) return null
+  if (props.presupuesto?.monedaCobro === props.presupuesto?.moneda) return null
+  return cotizacion
+})
+const comisionPorcentaje = computed(() => {
+  const valor = Number(props.presupuesto?.comisionPorcentaje)
+  return Number.isFinite(valor) ? valor : null
+})
+const comisionMostrada = computed(
+  () => props.presupuesto?.comisionMontoMostrado ?? props.presupuesto?.comisionMonto,
+)
+const netoMostrado = computed(
+  () => props.presupuesto?.montoNetoArtistaMostrado ?? props.presupuesto?.montoNetoArtista,
+)
+const muestraComision = computed(
+  () => comisionPorcentaje.value != null && comisionMostrada.value != null,
+)
 
 function formatearMoneda(valor) {
-  return formatearPrecio(valor, props.presupuesto?.moneda)
+  return formatearPrecio(valor, monedaMostrada.value)
 }
 
 function formatearRecargo(recargo) {
   if (recargo?.tipo === 'PORCENTAJE') {
     return `${Number(recargo.valor)}%`
   }
-  return formatearMoneda(recargo?.valor)
+  return formatearMoneda(recargo?.valorMostrado ?? recargo?.valor)
 }
 </script>
 
@@ -103,11 +133,90 @@ function formatearRecargo(recargo) {
     </div>
 
     <p class="mt-4 text-3xl font-bold text-granate">
-      {{ formatearMoneda(presupuesto.precioFinal) }}
+      {{ formatearMoneda(totalMostrado) }}
     </p>
     <p class="mt-1 text-xs text-cafe/50">
-      Precio base {{ formatearMoneda(presupuesto.precioBaseTotal) }} + recargos
+      Precio base {{ formatearMoneda(baseMostrada) }} + recargos
     </p>
+    <p
+      v-if="cobroDistinto"
+      class="mt-2 text-sm font-semibold text-granate"
+    >
+      Total a pagar: {{ formatearPrecio(presupuesto.precioFinalCobro, presupuesto.monedaCobro) }}
+    </p>
+    <p
+      v-if="cotizacionAlEmitir"
+      class="mt-1 text-xs leading-relaxed text-cafe/50"
+    >
+      Cotización al emitir: 1 {{ presupuesto.moneda }} =
+      {{ formatearMonto(cotizacionAlEmitir) }} {{ presupuesto.monedaCobro }}.
+      El importe en {{ presupuesto.monedaCobro }} queda congelado.
+    </p>
+
+    <div
+      v-if="muestraComision && esArtista"
+      class="mt-4 rounded-xl border border-cafe/15 bg-cafe/5 p-4"
+    >
+      <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/50">
+        Comisión de la plataforma
+      </p>
+      <dl class="mt-2 space-y-1.5 text-sm">
+        <div class="flex items-center justify-between gap-3">
+          <dt class="text-cafe/60">
+            Comisión ({{ formatearMonto(comisionPorcentaje) }}%)
+          </dt>
+          <dd class="text-cafe">− {{ formatearMoneda(comisionMostrada) }}</dd>
+        </div>
+        <div
+          v-if="esArtista"
+          class="flex items-center justify-between gap-3 border-t border-cafe/10 pt-1.5"
+        >
+          <dt class="font-semibold text-granate">Recibís</dt>
+          <dd class="text-base font-bold text-granate">{{ formatearMoneda(netoMostrado) }}</dd>
+        </div>
+      </dl>
+      <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+        La comisión se descuenta de tu precio. El cliente paga el total sin cambios.
+      </p>
+    </div>
+
+    <div v-if="hitos.length" class="mt-4 rounded-xl border border-rosa/40 p-4">
+      <h3 class="text-sm font-semibold text-granate">Plan de pagos</h3>
+      <ol class="mt-3 space-y-2">
+        <li
+          v-for="hito in hitos"
+          :key="hito.idHitoPresupuesto || hito.orden"
+          class="flex items-start justify-between gap-3 rounded-lg bg-rosa/10 px-3 py-2"
+        >
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-cafe">
+              {{ hito.nombre }}
+              <span class="text-xs text-cafe/45">
+                ({{ formatearMonto(hito.porcentaje) }}%)
+              </span>
+            </p>
+            <p v-if="hito.descripcion" class="text-xs leading-relaxed text-cafe/65">
+              {{ hito.descripcion }}
+            </p>
+            <p class="text-xs text-cafe/50">
+              {{ descripcionHito(hito) }}
+            </p>
+          </div>
+          <div class="shrink-0 text-right">
+            <p class="text-sm font-semibold text-granate">
+              {{ formatearMoneda(hito.montoMostrado ?? hito.monto) }}
+            </p>
+            <p v-if="esArtista" class="text-xs text-cafe/50">
+              Recibís {{ formatearMoneda(hito.montoNetoMostrado ?? hito.montoNeto) }}
+            </p>
+          </div>
+        </li>
+      </ol>
+      <p class="mt-3 text-xs leading-relaxed text-cafe/50">
+        La primera cuota se paga al aceptar el presupuesto. Cada cuota siguiente se habilita
+        cuando el cliente aprueba el entregable anterior.
+      </p>
+    </div>
 
     <dl class="mt-5 grid gap-3 text-sm sm:grid-cols-2">
       <div class="flex items-start justify-between gap-3 rounded-xl bg-rosa/10 px-3 py-2 sm:block">
@@ -173,13 +282,13 @@ function formatearRecargo(recargo) {
             </p>
             <p class="mt-0.5 text-sm font-semibold text-granate">{{ item.nombre || 'Dibujo' }}</p>
           </div>
-          <p class="text-sm font-semibold text-granate">{{ formatearMoneda(item.precioFinal) }}</p>
+          <p class="text-sm font-semibold text-granate">{{ formatearMoneda(item.precioFinalMostrado ?? item.precioFinal) }}</p>
         </div>
 
         <dl class="mt-3 space-y-1.5 text-xs">
           <div class="flex items-center justify-between gap-3">
             <dt class="text-cafe/55">Base</dt>
-            <dd class="text-cafe">{{ formatearMoneda(item.precioBase) }}</dd>
+            <dd class="text-cafe">{{ formatearMoneda(item.precioBaseMostrado ?? item.precioBase) }}</dd>
           </div>
           <div
             v-for="recargo in item.recargos || []"
@@ -206,28 +315,8 @@ function formatearRecargo(recargo) {
     </div>
 
     <div class="mt-5 flex flex-wrap items-center gap-3">
-      <template v-if="esArtista">
-        <button
-          v-if="puedeRetirar"
-          type="button"
-          class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-4 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10"
-          @click="$emit('retirar')"
-        >
-          Retirar presupuesto
-        </button>
-      </template>
-      <template v-else>
-        <template v-if="vigente">
-          <button
-            type="button"
-            disabled
-            class="inline-flex min-h-10 cursor-not-allowed items-center justify-center rounded-full bg-coral/40 px-5 text-sm font-semibold text-white/70"
-          >
-            Aceptar y pagar
-          </button>
-          <p class="text-xs text-cafe/50">El pago va a estar disponible en el próximo paso.</p>
-        </template>
-        <p v-else-if="vencido" class="text-xs leading-relaxed text-cafe/60">
+      <template v-if="!esArtista">
+        <p v-if="vencido" class="text-xs leading-relaxed text-cafe/60">
           El presupuesto venció y ya no se puede pagar.
         </p>
         <p v-else-if="retirado" class="text-xs leading-relaxed text-cafe/60">

@@ -50,6 +50,43 @@ public class Presupuesto {
     @JoinColumn(name = "id_moneda", nullable = false)
     private Moneda moneda;
 
+    /**
+     * Moneda en la que se cobra el presupuesto. Hoy siempre es ARS.
+     * Se guarda la cotización usada al emitir para que el importe a pagar
+     * quede congelado aunque después cambie el tipo de cambio.
+     */
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "id_moneda_cobro", nullable = false)
+    private Moneda monedaCobro;
+
+    @Column(name = "cotizacion_cobro", nullable = false, precision = 18, scale = 8)
+    private BigDecimal cotizacionCobro;
+
+    @Column(name = "precio_base_total_cobro", nullable = false, precision = 12, scale = 2)
+    private BigDecimal precioBaseTotalCobro;
+
+    @Column(name = "precio_final_cobro", nullable = false, precision = 12, scale = 2)
+    private BigDecimal precioFinalCobro;
+
+    /**
+     * Comisión de la plataforma congelada al emitir el presupuesto. Se descuenta
+     * del precio del artista: el cliente paga el precio final sin cambios.
+     */
+    @Column(name = "comision_porcentaje", nullable = false, precision = 5, scale = 2)
+    private BigDecimal comisionPorcentaje;
+
+    @Column(name = "comision_monto", nullable = false, precision = 12, scale = 2)
+    private BigDecimal comisionMonto;
+
+    @Column(name = "comision_monto_cobro", nullable = false, precision = 12, scale = 2)
+    private BigDecimal comisionMontoCobro;
+
+    @Column(name = "monto_neto_artista", nullable = false, precision = 12, scale = 2)
+    private BigDecimal montoNetoArtista;
+
+    @Column(name = "monto_neto_artista_cobro", nullable = false, precision = 12, scale = 2)
+    private BigDecimal montoNetoArtistaCobro;
+
     @Column(name = "tiempo_entrega_valor", nullable = false)
     private Integer tiempoEntregaValor;
 
@@ -76,8 +113,17 @@ public class Presupuesto {
     @OrderBy("orden ASC")
     private List<ItemPresupuesto> items = new ArrayList<>();
 
+    @OneToMany(mappedBy = "presupuesto", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("orden ASC")
+    private List<HitoPresupuesto> hitos = new ArrayList<>();
+
     public void agregarItem(ItemPresupuesto item) {
         item.setPresupuesto(this);
         this.items.add(item);
+    }
+
+    public void agregarHito(HitoPresupuesto hito) {
+        hito.setPresupuesto(this);
+        this.hitos.add(hito);
     }
 }

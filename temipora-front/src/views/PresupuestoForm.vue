@@ -2,13 +2,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
-import { formatearPrecio } from '../servicios/moneda'
+import { formatearMonto, formatearPrecio } from '../servicios/moneda'
+import { descripcionHito } from '../servicios/pedidos'
 import {
   MAX_PLAZO_POR_UNIDAD,
   UNIDADES_ENTREGA,
   aFechaISO,
   fechaEntregaEstimada,
-  formatearFechaISO,
+  formatearFechaDDMMAAAA,
   gruposDeRespuestas,
   sumarPlazo,
   textoTiempoEntrega,
@@ -26,16 +27,31 @@ const hoy = aFechaISO(fechaActual)
 const maxInicio = aFechaISO(sumarPlazo(hoy, 12, 'MESES'))
 
 const solicitud = ref(null)
+const comisionPorcentaje = ref(null)
+const configPedido = ref({
+  maxHitos: 4,
+  porcentajeMaxPrimerHito: 50,
+  montoMinimoCuota: 1,
+})
 const cargando = ref(true)
 const errorCarga = ref('')
 const enviando = ref(false)
 const errorEnvio = ref('')
 const paso = ref(1)
+const fechasVisibles = ref({
+  fechaInicioEstimada: '',
+  fechaVencimiento: '',
+})
+const fechasInvalidas = ref({
+  fechaInicioEstimada: false,
+  fechaVencimiento: false,
+})
 
 const pasos = [
   { numero: 1, titulo: 'Entrega' },
   { numero: 2, titulo: 'Dibujos' },
-  { numero: 3, titulo: 'Resumen' },
+  { numero: 3, titulo: 'Hitos' },
+  { numero: 4, titulo: 'Resumen' },
 ]
 
 const form = ref({
@@ -45,6 +61,7 @@ const form = ref({
   fechaVencimiento: '',
   mensaje: '',
   items: [],
+  hitos: [],
 })
 
 const esArtista = computed(
@@ -104,17 +121,50 @@ const entregaAlVencer = computed(() => {
   })
 })
 const inicioEstimadoTexto = computed(() => form.value.fechaInicioEstimada
-  ? formatearFechaISO(form.value.fechaInicioEstimada, { larga: true })
+  ? formatearFechaDDMMAAAA(form.value.fechaInicioEstimada)
   : 'Al confirmarse el pago')
 const entregaSiPagaHoyTexto = computed(
-  () => formatearFechaISO(entregaSiPagaHoy.value, { larga: true }),
+  () => formatearFechaDDMMAAAA(entregaSiPagaHoy.value),
 )
 const entregaAlVencerTexto = computed(
-  () => formatearFechaISO(entregaAlVencer.value, { larga: true }),
+  () => formatearFechaDDMMAAAA(entregaAlVencer.value),
 )
 
 function formatear(valor) {
   return formatearPrecio(valor, moneda.value)
+}
+
+function actualizarFechaFormulario(campo, event) {
+  const digitos = event.target.value.replace(/\D/g, '').slice(0, 8)
+  const partes = []
+
+  if (digitos.length > 0) partes.push(digitos.slice(0, 2))
+  if (digitos.length > 2) partes.push(digitos.slice(2, 4))
+  if (digitos.length > 4) partes.push(digitos.slice(4, 8))
+
+  const visible = partes.join('/')
+  event.target.value = visible
+  fechasVisibles.value[campo] = visible
+
+  if (digitos.length < 8) {
+    form.value[campo] = ''
+    fechasInvalidas.value[campo] = false
+    return
+  }
+
+  const dia = Number(digitos.slice(0, 2))
+  const mes = Number(digitos.slice(2, 4))
+  const anio = Number(digitos.slice(4, 8))
+  const fecha = new Date(anio, mes - 1, dia)
+  const invalida = fecha.getFullYear() !== anio
+    || fecha.getMonth() !== mes - 1
+    || fecha.getDate() !== dia
+
+  fechasInvalidas.value[campo] = invalida
+
+  form.value[campo] = !invalida
+    ? `${digitos.slice(4, 8)}-${digitos.slice(2, 4)}-${digitos.slice(0, 2)}`
+    : ''
 }
 
 function baseItem() {
@@ -148,6 +198,162 @@ const totalFinal = computed(
 const totalRecargos = computed(
   () => Math.round((totalFinal.value - totalBase.value) * 100) / 100,
 )
+const comisionMonto = computed(() => {
+  if (comisionPorcentaje.value == null) return null
+  return Math.round(totalFinal.value * comisionPorcentaje.value) / 100
+})
+const netoArtista = computed(() => {
+  if (comisionMonto.value == null) return null
+  return Math.round((totalFinal.value - comisionMonto.value) * 100) / 100
+})
+const maxHitos = computed(() => Number(configPedido.value?.maxHitos) || 4)
+const porcentajeMaxPrimerHito = computed(
+  () => Number(configPedido.value?.porcentajeMaxPrimerHito) || 50,
+)
+const montoMinimoCuota = computed(
+  () => Number(configPedido.value?.montoMinimoCuota) || 0,
+)
+const totalPorcentajeHitos = computed(
+  () => Math.round(form.value.hitos.reduce(
+    (total, hito) => total + (Number(hito.porcentaje) || 0),
+    0,
+  ) * 100) / 100,
+)
+const hitosPreview = computed(() => {
+  const hitos = form.value.hitos
+  const cantidad = hitos.length
+  let acumulado = 0
+  return hitos.map((hito, indice) => {
+    const porcentaje = Number(hito.porcentaje) || 0
+    const ultimo = indice === cantidad - 1
+    const monto = ultimo
+      ? Math.round((totalFinal.value - acumulado) * 100) / 100
+      : Math.round(totalFinal.value * porcentaje) / 100
+    acumulado = Math.round((acumulado + Math.max(0, monto)) * 100) / 100
+    return {
+      ...hito,
+      monto: Math.max(0, monto),
+      tipo: tipoHito(indice, cantidad),
+    }
+  })
+})
+
+function tipoHito(indice, cantidad) {
+  if (cantidad === 1) return 'SENA'
+  if (indice === 0) return 'SENA'
+  if (indice === cantidad - 1) return 'ENTREGA'
+  return 'CUOTA'
+}
+
+function etiquetaTipoHito(tipo, cantidad) {
+  if (tipo === 'SENA') return cantidad === 1 ? 'Pago único' : 'Seña'
+  if (tipo === 'ENTREGA') return 'Entrega final'
+  return 'Cuota'
+}
+
+function hitosPorDefecto() {
+  if (maxHitos.value < 2) {
+    return [{
+      nombre: 'Pago único',
+      descripcion: '',
+      porcentaje: 100,
+      requiereEntrega: true,
+    }]
+  }
+  const primera = Math.min(50, porcentajeMaxPrimerHito.value)
+  return [
+    {
+      nombre: 'Seña',
+      descripcion: '',
+      porcentaje: primera,
+      requiereEntrega: true,
+    },
+    {
+      nombre: 'Entrega final',
+      descripcion: '',
+      porcentaje: Math.round((100 - primera) * 100) / 100,
+      requiereEntrega: true,
+    },
+  ]
+}
+
+function usarPagoUnico() {
+  form.value.hitos = [
+    {
+      nombre: 'Pago único',
+      descripcion: '',
+      porcentaje: 100,
+      requiereEntrega: true,
+    },
+  ]
+}
+
+function usarSenaEntrega() {
+  form.value.hitos = hitosPorDefecto()
+}
+
+function usarSkeb() {
+  const primera = Math.min(50, porcentajeMaxPrimerHito.value)
+  form.value.hitos = [
+    {
+      nombre: 'Seña',
+      descripcion: '',
+      porcentaje: primera,
+      requiereEntrega: false,
+    },
+    {
+      nombre: 'Entrega final',
+      descripcion: '',
+      porcentaje: Math.round((100 - primera) * 100) / 100,
+      requiereEntrega: true,
+    },
+  ]
+}
+
+function usarTresEtapas() {
+  if (maxHitos.value < 3) {
+    usarSenaEntrega()
+    return
+  }
+  const primera = Math.min(30, porcentajeMaxPrimerHito.value)
+  const resto = Math.round((100 - primera) * 100) / 100
+  const cuota = Math.round((resto / 2) * 100) / 100
+  form.value.hitos = [
+    {
+      nombre: 'Seña',
+      descripcion: '',
+      porcentaje: primera,
+      requiereEntrega: true,
+    },
+    {
+      nombre: 'Cuota 2',
+      descripcion: '',
+      porcentaje: cuota,
+      requiereEntrega: true,
+    },
+    {
+      nombre: 'Entrega final',
+      descripcion: '',
+      porcentaje: Math.round((resto - cuota) * 100) / 100,
+      requiereEntrega: true,
+    },
+  ]
+}
+
+function agregarHito() {
+  if (form.value.hitos.length >= maxHitos.value) return
+  form.value.hitos.push({
+    nombre: `Cuota ${form.value.hitos.length + 1}`,
+    descripcion: '',
+    porcentaje: 0,
+    requiereEntrega: true,
+  })
+}
+
+function quitarHito(indice) {
+  if (form.value.hitos.length <= 1) return
+  form.value.hitos.splice(indice, 1)
+}
 
 function agregarRecargo(item) {
   if (item.recargos.length >= 20) return
@@ -174,8 +380,24 @@ async function cargar() {
   cargando.value = true
   errorCarga.value = ''
   try {
-    const res = await api.get(`/solicitudes-servicio/${idSolicitud.value}`)
+    const [res, resComision, resConfig] = await Promise.all([
+      api.get(`/solicitudes-servicio/${idSolicitud.value}`),
+      api.get('/comisiones/vigentes').catch(() => null),
+      api.get('/configuracion-pedido').catch(() => null),
+    ])
     solicitud.value = res.data
+    const porcentaje = Number(resComision?.data?.porcentajeServicio)
+    if (Number.isFinite(porcentaje)) {
+      comisionPorcentaje.value = porcentaje
+    }
+    if (resConfig?.data) {
+      configPedido.value = {
+        maxHitos: Number(resConfig.data.maxHitos) || 4,
+        porcentajeMaxPrimerHito:
+          Number(resConfig.data.porcentajeMaxPrimerHito) || 50,
+        montoMinimoCuota: Number(resConfig.data.montoMinimoCuota) || 0,
+      }
+    }
 
     if (!puedePresupuestar.value) return
 
@@ -186,6 +408,7 @@ async function cargar() {
       recargos: [],
       respuestas: gruposDeRespuestas(item),
     }))
+    form.value.hitos = hitosPorDefecto()
   } catch (e) {
     if (e.response?.status === 401) {
       router.push({ name: 'login' })
@@ -214,6 +437,10 @@ function validarPaso1() {
   }
   if (valor > maxPlazo.value) {
     errorEnvio.value = `El plazo máximo es de un año (${maxPlazoTexto.value}).`
+    return false
+  }
+  if (fechasInvalidas.value.fechaInicioEstimada || fechasInvalidas.value.fechaVencimiento) {
+    errorEnvio.value = 'Ingresá fechas válidas con el formato DD/MM/AAAA.'
     return false
   }
   if (form.value.fechaInicioEstimada) {
@@ -261,6 +488,44 @@ function validarPaso2() {
   return true
 }
 
+function validarPasoHitos() {
+  errorEnvio.value = ''
+  const hitos = form.value.hitos
+  if (!hitos.length) {
+    errorEnvio.value = 'Definí al menos un hito para el plan de pagos.'
+    return false
+  }
+  if (hitos.length > maxHitos.value) {
+    errorEnvio.value = `Podés definir como máximo ${maxHitos.value} hitos.`
+    return false
+  }
+  for (const hito of hitos) {
+    if ((hito.descripcion || '').length > 250) {
+      errorEnvio.value = 'El alcance de un hito no puede superar los 250 caracteres.'
+      return false
+    }
+    const porcentaje = Number(hito.porcentaje)
+    if (!Number.isFinite(porcentaje) || porcentaje <= 0 || porcentaje > 100) {
+      errorEnvio.value = 'Cada hito debe tener un porcentaje mayor a 0 y hasta 100%.'
+      return false
+    }
+    if (Math.round(porcentaje * 100) !== porcentaje * 100) {
+      errorEnvio.value = 'Los porcentajes admiten hasta 2 decimales.'
+      return false
+    }
+  }
+  if (Math.abs(totalPorcentajeHitos.value - 100) > 0.001) {
+    errorEnvio.value = `Los porcentajes de los hitos deben sumar 100%. Ahora suman ${totalPorcentajeHitos.value}%.`
+    return false
+  }
+  if (hitos.length > 1
+    && Number(hitos[0].porcentaje) > porcentajeMaxPrimerHito.value) {
+    errorEnvio.value = `La primera cuota no puede superar el ${porcentajeMaxPrimerHito.value}%.`
+    return false
+  }
+  return true
+}
+
 function validarPaso3() {
   errorEnvio.value = ''
   if ((form.value.mensaje || '').length > 500) {
@@ -273,7 +538,8 @@ function validarPaso3() {
 function siguiente() {
   if (paso.value === 1 && !validarPaso1()) return
   if (paso.value === 2 && !validarPaso2()) return
-  paso.value = Math.min(3, paso.value + 1)
+  if (paso.value === 3 && !validarPasoHitos()) return
+  paso.value = Math.min(4, paso.value + 1)
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -292,7 +558,7 @@ function volver() {
 
 async function enviar() {
   if (enviando.value) return
-  if (!validarPaso1() || !validarPaso2() || !validarPaso3()) return
+  if (!validarPaso1() || !validarPaso2() || !validarPasoHitos() || !validarPaso3()) return
 
   enviando.value = true
   errorEnvio.value = ''
@@ -311,6 +577,12 @@ async function enviar() {
           tipo: recargo.tipo,
           valor: valorRecargo(recargo),
         })),
+      })),
+      hitos: form.value.hitos.map((hito) => ({
+        nombre: hito.nombre?.trim() || null,
+        descripcion: hito.descripcion?.trim() || null,
+        porcentaje: Number(hito.porcentaje),
+        requiereEntrega: hito.requiereEntrega !== false,
       })),
     }
 
@@ -460,11 +732,14 @@ onMounted(cargar)
             </label>
             <input
               id="inicio-estimado"
-              v-model="form.fechaInicioEstimada"
-              type="date"
-              :min="hoy"
-              :max="maxInicio"
+              :value="fechasVisibles.fechaInicioEstimada"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              maxlength="10"
+              placeholder="DD/MM/AAAA"
               class="mt-2 block w-full rounded-lg border-0 px-3 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral sm:max-w-xs"
+              @input="actualizarFechaFormulario('fechaInicioEstimada', $event)"
             />
             <p class="mt-2 text-xs leading-relaxed text-cafe/50">
               Si no elegís una fecha, el plazo se cuenta desde el pago. Podés indicar
@@ -520,10 +795,14 @@ onMounted(cargar)
             </label>
             <input
               id="fecha-vencimiento"
-              v-model="form.fechaVencimiento"
-              type="date"
-              :min="hoy"
+              :value="fechasVisibles.fechaVencimiento"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              maxlength="10"
+              placeholder="DD/MM/AAAA"
               class="mt-2 block w-full rounded-lg border-0 px-3 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral sm:max-w-xs"
+              @input="actualizarFechaFormulario('fechaVencimiento', $event)"
             />
             <p class="mt-2 text-xs leading-relaxed text-cafe/50">
               Si no elegís una fecha, se usa el vencimiento por defecto configurado por el sistema.
@@ -682,6 +961,170 @@ onMounted(cargar)
           </article>
         </section>
 
+        <section v-else-if="paso === 3" class="space-y-4">
+          <div class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
+            <h2 class="text-xl font-semibold text-granate">Plan de pagos</h2>
+            <p class="mt-1 text-sm text-cafe/60">
+              Podés cobrar todo junto o dividir el trabajo en hitos. La primera cuota la paga
+              el cliente al aceptar el presupuesto; las siguientes se habilitan al aprobar
+              cada entregable.
+            </p>
+
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="rounded-full border border-coral/40 bg-coral/5 px-4 py-2 text-xs font-semibold text-coral transition hover:bg-coral/10"
+                @click="usarPagoUnico"
+              >
+                100% al inicio
+              </button>
+              <button
+                type="button"
+                class="rounded-full border border-coral/40 bg-coral/5 px-4 py-2 text-xs font-semibold text-coral transition hover:bg-coral/10"
+                @click="usarSenaEntrega"
+              >
+                Seña y entrega
+              </button>
+              <button
+                type="button"
+                class="rounded-full border border-coral/40 bg-coral/5 px-4 py-2 text-xs font-semibold text-coral transition hover:bg-coral/10"
+                @click="usarSkeb"
+              >
+                Skeb (sin revisiones)
+              </button>
+              <button
+                type="button"
+                class="rounded-full border border-coral/40 bg-coral/5 px-4 py-2 text-xs font-semibold text-coral transition hover:bg-coral/10"
+                @click="usarTresEtapas"
+              >
+                Tres etapas
+              </button>
+            </div>
+          </div>
+
+          <article
+            v-for="(hito, indice) in hitosPreview"
+            :key="indice"
+            class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6"
+          >
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                  {{ etiquetaTipoHito(hito.tipo, form.hitos.length) }}
+                </p>
+                <p class="mt-1 text-lg font-semibold text-granate">{{ formatear(hito.monto) }}</p>
+              </div>
+              <button
+                v-if="form.hitos.length > 1"
+                type="button"
+                class="inline-flex min-h-9 items-center justify-center rounded-full border border-rojizo/30 px-3 text-xs font-semibold text-rojizo transition hover:bg-rojizo/10"
+                @click="quitarHito(indice)"
+              >
+                Quitar
+              </button>
+            </div>
+
+            <div class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]">
+              <div>
+                <label :for="`hito-nombre-${indice}`" class="block text-xs text-cafe/60">
+                  Nombre
+                </label>
+                <input
+                  :id="`hito-nombre-${indice}`"
+                  v-model="form.hitos[indice].nombre"
+                  type="text"
+                  maxlength="60"
+                  placeholder="Ej. Boceto"
+                  class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                />
+              </div>
+              <div>
+                <label :for="`hito-porcentaje-${indice}`" class="block text-xs text-cafe/60">
+                  Porcentaje
+                </label>
+                <input
+                  :id="`hito-porcentaje-${indice}`"
+                  v-model.number="form.hitos[indice].porcentaje"
+                  type="number"
+                  min="0.01"
+                  max="100"
+                  step="0.01"
+                  class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                />
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <label :for="`hito-alcance-${indice}`" class="block text-xs text-cafe/60">
+                Alcance <span class="text-cafe/40">(opcional)</span>
+              </label>
+              <textarea
+                :id="`hito-alcance-${indice}`"
+                v-model="form.hitos[indice].descripcion"
+                rows="2"
+                maxlength="250"
+                placeholder="Ej. Bocetos de los 3 dibujos, o los dibujos 1 y 2 terminados."
+                class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              ></textarea>
+              <p class="mt-1 text-right text-[11px] text-cafe/40">
+                {{ (form.hitos[indice].descripcion || '').length }}/250
+              </p>
+            </div>
+
+            <p class="mt-2 text-xs text-cafe/50">
+              {{ descripcionHito(hito) }}
+            </p>
+
+            <label
+              v-if="hito.tipo === 'SENA' && form.hitos.length > 1"
+              class="mt-3 flex items-start gap-2 rounded-lg bg-rosa/10 px-3 py-2 text-xs text-cafe/70"
+            >
+              <input
+                v-model="form.hitos[indice].requiereEntrega"
+                type="checkbox"
+                class="mt-0.5 h-4 w-4 rounded border-rosa text-coral focus:ring-coral"
+              />
+              <span>
+                Pedir aprobación de un avance antes de la siguiente cuota.
+                Desmarcalo para encargos tipo skeb.
+              </span>
+            </label>
+            <p
+              v-else-if="hito.tipo === 'SENA'"
+              class="mt-2 text-xs text-cafe/45"
+            >
+              El pago único incluye la entrega final, que el cliente aprueba.
+            </p>
+            <p v-else class="mt-2 text-xs text-cafe/45">
+              Requiere un entregable que el cliente aprueba.
+            </p>
+          </article>
+
+          <div class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <button
+                type="button"
+                :disabled="form.hitos.length >= maxHitos"
+                class="rounded-full border border-coral/40 bg-coral/5 px-4 py-2 text-xs font-semibold text-coral transition hover:bg-coral/10 disabled:cursor-not-allowed disabled:opacity-50"
+                @click="agregarHito"
+              >
+                + Agregar hito
+              </button>
+              <p
+                class="text-sm font-semibold"
+                :class="Math.abs(totalPorcentajeHitos - 100) < 0.001 ? 'text-green-700' : 'text-rojizo'"
+              >
+                Suma: {{ totalPorcentajeHitos }}%
+              </p>
+            </div>
+            <p class="mt-3 text-xs leading-relaxed text-cafe/50">
+              Máximo {{ maxHitos }} hitos. La primera cuota no puede superar el
+              {{ porcentajeMaxPrimerHito }}%. Cuando hay más de un hito, cada cuota debe ser
+              de al menos $ {{ formatearMonto(montoMinimoCuota) }} en moneda de cobro.
+            </p>
+          </div>
+        </section>
+
         <section v-else class="space-y-4">
           <div class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
             <h2 class="text-xl font-semibold text-granate">Mensaje para el cliente</h2>
@@ -724,7 +1167,7 @@ onMounted(cargar)
                 <dt class="text-cafe/55">Oferta válida hasta</dt>
                 <dd class="text-right font-medium text-cafe">
                   {{ form.fechaVencimiento
-                    ? formatearFechaISO(form.fechaVencimiento, { larga: true })
+                    ? formatearFechaDDMMAAAA(form.fechaVencimiento)
                     : 'Según la configuración del sistema' }}
                 </dd>
               </div>
@@ -740,7 +1183,49 @@ onMounted(cargar)
                 <dt class="text-base font-semibold text-granate">Total</dt>
                 <dd class="text-right text-2xl font-bold text-granate">{{ formatear(totalFinal) }}</dd>
               </div>
+              <template v-if="comisionMonto !== null">
+                <div class="flex items-start justify-between gap-4 border-t border-coral/15 pt-3">
+                  <dt class="text-cafe/55">
+                    Comisión de la plataforma ({{ formatearMonto(comisionPorcentaje) }}%)
+                  </dt>
+                  <dd class="text-right font-medium text-cafe">− {{ formatear(comisionMonto) }}</dd>
+                </div>
+                <div class="flex items-start justify-between gap-4">
+                  <dt class="text-base font-semibold text-granate">Recibís</dt>
+                  <dd class="text-right text-xl font-bold text-granate">{{ formatear(netoArtista) }}</dd>
+                </div>
+                <p class="text-xs leading-relaxed text-cafe/50">
+                  La comisión se descuenta de tu precio. El cliente paga el total sin cambios.
+                </p>
+              </template>
             </dl>
+          </div>
+
+          <div class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
+            <h3 class="text-sm font-semibold text-granate">Plan de pagos</h3>
+            <ul class="mt-3 space-y-2">
+              <li
+                v-for="(hito, indice) in hitosPreview"
+                :key="indice"
+                class="flex items-start justify-between gap-3 rounded-xl bg-rosa/10 px-3 py-2 text-sm"
+              >
+                <span class="min-w-0 text-cafe">
+                  <span class="block truncate">
+                    {{ hito.nombre || etiquetaTipoHito(hito.tipo, form.hitos.length) }} · {{ hito.porcentaje }}%
+                  </span>
+                  <span v-if="hito.descripcion" class="mt-0.5 block text-xs leading-relaxed text-cafe/55">
+                    {{ hito.descripcion }}
+                  </span>
+                </span>
+                <span class="shrink-0 font-semibold text-granate">
+                  {{ formatear(hito.monto) }}
+                </span>
+              </li>
+            </ul>
+            <p class="mt-3 text-xs leading-relaxed text-cafe/50">
+              La primera cuota se paga al aceptar el presupuesto. Las siguientes se habilitan
+              cuando el cliente aprueba el entregable anterior.
+            </p>
           </div>
 
           <div class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
@@ -780,7 +1265,7 @@ onMounted(cargar)
           <span v-else></span>
 
           <button
-            v-if="paso < 3"
+            v-if="paso < 4"
             type="button"
             class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition hover:bg-rojizo"
             @click="siguiente"

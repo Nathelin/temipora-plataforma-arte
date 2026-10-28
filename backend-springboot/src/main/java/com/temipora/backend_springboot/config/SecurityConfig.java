@@ -70,7 +70,10 @@ public class SecurityConfig {
                     "/error",
                     "/api/servicios/**",
                     "/api/perfil/**",
-                    "/api/portfolio/**"
+                    "/api/portfolio/**",
+                    "/api/terminos-plataforma",
+                    "/api/comisiones/**",
+                    "/api/configuracion-pedido"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

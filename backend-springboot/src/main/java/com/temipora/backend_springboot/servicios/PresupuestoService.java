@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.ConfiguracionPresupuesto;
+import com.temipora.backend_springboot.modelo.ConfiguracionComision;
+import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.ItemPresupuesto;
@@ -55,6 +57,9 @@ public class PresupuestoService {
     private final ListaEsperaService listaEsperaService;
     private final NotificacionService notificacionService;
     private final ConfiguracionPresupuestoService configuracionPresupuestoService;
+    private final ComisionService comisionService;
+    private final ConfiguracionPedidoService configuracionPedidoService;
+    private final MonedaVistaService monedaVistaService;
 
     public PresupuestoService(
             SolicitudRepository solicitudRepository,
@@ -63,7 +68,10 @@ public class PresupuestoService {
             ColaSolicitudesService colaSolicitudesService,
             ListaEsperaService listaEsperaService,
             NotificacionService notificacionService,
-            ConfiguracionPresupuestoService configuracionPresupuestoService) {
+            ConfiguracionPresupuestoService configuracionPresupuestoService,
+            ComisionService comisionService,
+            ConfiguracionPedidoService configuracionPedidoService,
+            MonedaVistaService monedaVistaService) {
         this.solicitudRepository = solicitudRepository;
         this.servicioRepository = servicioRepository;
         this.presupuestoRepository = presupuestoRepository;
@@ -71,6 +79,9 @@ public class PresupuestoService {
         this.listaEsperaService = listaEsperaService;
         this.notificacionService = notificacionService;
         this.configuracionPresupuestoService = configuracionPresupuestoService;
+        this.comisionService = comisionService;
+        this.configuracionPedidoService = configuracionPedidoService;
+        this.monedaVistaService = monedaVistaService;
     }
 
     @Transactional
@@ -172,6 +183,20 @@ public class PresupuestoService {
             throw new ConflictoException("El servicio no tiene una moneda definida.");
         }
 
+        Moneda monedaCobro = monedaVistaService.monedaCobro();
+        if (monedaCobro == null) {
+            throw new ConflictoException(
+                "La moneda de cobro (" + MonedaVistaService.CODIGO_COBRO
+                    + ") no está configurada.");
+        }
+        BigDecimal cotizacionCobro = monedaVistaService.factorCobro(moneda, ahora);
+        if (cotizacionCobro == null || cotizacionCobro.signum() <= 0) {
+            throw new ConflictoException(
+                "No hay cotización de " + moneda.getCodigo() + " a "
+                    + monedaCobro.getCodigo()
+                    + ". No se puede emitir el presupuesto en este momento.");
+        }
+
         long diasEntrega = CalculadoraEntrega.diasNormalizados(
             request.getTiempoEntregaValor(),
             request.getTiempoEntregaUnidad());
@@ -223,6 +248,42 @@ public class PresupuestoService {
 
         presupuesto.setPrecioBaseTotal(totalBase.setScale(2, RoundingMode.HALF_UP));
         presupuesto.setPrecioFinal(totalFinal.setScale(2, RoundingMode.HALF_UP));
+        presupuesto.setMonedaCobro(monedaCobro);
+        presupuesto.setCotizacionCobro(cotizacionCobro);
+        presupuesto.setPrecioBaseTotalCobro(
+            enMoneda(presupuesto.getPrecioBaseTotal(), cotizacionCobro));
+        presupuesto.setPrecioFinalCobro(
+            enMoneda(presupuesto.getPrecioFinal(), cotizacionCobro));
+
+        ConfiguracionComision comision = comisionService.obtener();
+        BigDecimal comisionPorcentaje = comision.getPorcentajeServicio()
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal comisionMonto = comisionService.calcularComision(
+            presupuesto.getPrecioFinal(), comisionPorcentaje);
+        BigDecimal comisionMontoCobro = enMoneda(comisionMonto, cotizacionCobro);
+
+        presupuesto.setComisionPorcentaje(comisionPorcentaje);
+        presupuesto.setComisionMonto(comisionMonto);
+        presupuesto.setComisionMontoCobro(comisionMontoCobro);
+        presupuesto.setMontoNetoArtista(
+            presupuesto.getPrecioFinal().subtract(comisionMonto)
+                .setScale(2, RoundingMode.HALF_UP));
+        presupuesto.setMontoNetoArtistaCobro(
+            presupuesto.getPrecioFinalCobro().subtract(comisionMontoCobro)
+                .setScale(2, RoundingMode.HALF_UP));
+
+        ConfiguracionPedido configuracionPedido = configuracionPedidoService.obtener();
+        HitoCalculadora.construir(
+            request.getHitos(),
+            presupuesto.getPrecioFinal(),
+            presupuesto.getPrecioFinalCobro(),
+            presupuesto.getComisionMonto(),
+            presupuesto.getComisionMontoCobro(),
+            new HitoCalculadora.Limites(
+                configuracionPedido.getMaxHitos(),
+                configuracionPedido.getPorcentajeMaxPrimerHito(),
+                configuracionPedido.getMontoMinimoCuota()))
+            .forEach(presupuesto::agregarHito);
 
         solicitud.setPresupuesto(presupuesto);
         presupuestoRepository.save(presupuesto);
@@ -235,13 +296,24 @@ public class PresupuestoService {
             solicitud.getCliente().getIdUsuario(),
             NOTIFICACION_PRESUPUESTO_RECIBIDO,
             "Recibiste un presupuesto",
-            "El artista envió un presupuesto de "
-                + presupuesto.getPrecioFinal().toPlainString() + " " + moneda.getCodigo()
+            "El artista envió un presupuesto de " + detalleImporte(
+                presupuesto.getPrecioFinal(),
+                moneda.getCodigo(),
+                presupuesto.getPrecioFinalCobro(),
+                monedaCobro.getCodigo())
                 + " para '" + nombreServicio(servicio) + "'.",
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
 
-        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(solicitud);
+        Moneda monedaMostrada = monedaVistaService.preferidaDe(idArtista);
+        BigDecimal factorOrigen = monedaMostrada != null
+            ? monedaVistaService.factorOrigenAMostrada(moneda, monedaMostrada, ahora)
+            : null;
+        BigDecimal factorCobro = monedaMostrada != null
+            ? monedaVistaService.factorCobroAMostrada(monedaMostrada, ahora)
+            : null;
+        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(
+            solicitud, monedaMostrada, factorOrigen, factorCobro, true);
         dto.setPuedePresupuestar(false);
         dto.setMotivoNoPresupuestable(null);
         dto.setPosicionCola(null);
@@ -267,6 +339,9 @@ public class PresupuestoService {
                 .orElse(null);
             if (solicitud == null
                     || solicitud.getEstado() != EstadoSolicitud.PRESUPUESTADA) {
+                continue;
+            }
+            if (solicitud.getPedido() != null) {
                 continue;
             }
             if (presupuesto.getFechaVencimiento() == null
@@ -392,6 +467,22 @@ public class PresupuestoService {
             "El presupuesto de '" + nombre + "' venció y se liberó el cupo.",
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
+    }
+
+    private BigDecimal enMoneda(BigDecimal monto, BigDecimal factor) {
+        return monto.multiply(factor).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private String detalleImporte(
+            BigDecimal nativo,
+            String codigoNativo,
+            BigDecimal cobro,
+            String codigoCobro) {
+        if (codigoNativo != null && codigoNativo.equalsIgnoreCase(codigoCobro)) {
+            return nativo.toPlainString() + " " + codigoNativo;
+        }
+        return nativo.toPlainString() + " " + codigoNativo
+            + " (" + codigoCobro + " " + cobro.toPlainString() + ")";
     }
 
     private String nombreServicio(Servicio servicio) {

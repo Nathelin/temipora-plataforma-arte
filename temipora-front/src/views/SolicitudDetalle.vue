@@ -48,6 +48,9 @@ const fotoContraparte = computed(() => datosPersona.value?.foto || '')
 const inicialContraparte = computed(() => datosPersona.value?.inicial || '?')
 const estadoInfo = computed(() => estadoDe(solicitud.value?.estado))
 const tienePresupuesto = computed(() => Boolean(solicitud.value?.presupuesto))
+const nombreRutaPedido = computed(() => (
+  esArtistaDeLaSolicitud.value ? 'panel-pedido-detalle' : 'pedido-detalle'
+))
 
 const avisoServicio = computed(() => {
   const estado = solicitud.value?.estadoServicio
@@ -216,6 +219,14 @@ function irAPresupuestar() {
   if (!solicitud.value?.idSolicitud) return
   router.push({
     name: 'presupuesto-crear',
+    params: { idSolicitud: solicitud.value.idSolicitud },
+  })
+}
+
+function irAPagar() {
+  if (!solicitud.value?.idSolicitud) return
+  router.push({
+    name: 'pago-presupuesto',
     params: { idSolicitud: solicitud.value.idSolicitud },
   })
 }
@@ -465,7 +476,6 @@ onMounted(cargar)
                 :presupuesto="solicitud.presupuesto"
                 :estado="solicitud.estado"
                 :es-artista="esArtistaDeLaSolicitud"
-                @retirar="abrirModalRetiro"
               />
             </section>
           </template>
@@ -663,7 +673,12 @@ onMounted(cargar)
               <div class="flex items-start justify-between gap-4">
                 <dt class="text-cafe/55">Precio base por dibujo</dt>
                 <dd class="text-right font-medium text-cafe">
-                  {{ solicitud.precioBase != null ? formatearPrecio(solicitud.precioBase, solicitud.moneda) : 'A definir' }}
+                  {{ (solicitud.precioBaseMostrado ?? solicitud.precioBase) != null
+                    ? formatearPrecio(
+                      solicitud.precioBaseMostrado ?? solicitud.precioBase,
+                      solicitud.monedaMostrada ?? solicitud.moneda,
+                    )
+                    : 'A definir' }}
                 </dd>
               </div>
               <div v-if="solicitud.terminosVersion" class="flex items-start justify-between gap-4">
@@ -753,12 +768,21 @@ onMounted(cargar)
 
             <div v-if="esArtistaDeLaSolicitud" class="mt-4 grid gap-2">
               <button
+                v-if="!solicitud.presupuesto"
                 type="button"
                 class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-4 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10 disabled:cursor-not-allowed disabled:border-rosa disabled:text-cafe/40 disabled:hover:bg-transparent"
                 :disabled="!puedeRechazar"
                 @click="abrirModalRechazo"
               >
                 Rechazar
+              </button>
+              <button
+                v-if="solicitud.estado === 'PRESUPUESTADA' && solicitud.presupuesto"
+                type="button"
+                class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-4 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10"
+                @click="abrirModalRetiro"
+              >
+                Retirar presupuesto
               </button>
               <button
                 v-if="puedePresupuestar"
@@ -785,6 +809,28 @@ onMounted(cargar)
                 class="inline-flex text-xs font-semibold text-coral transition hover:text-rojizo"
               >
                 Editar servicio para ampliar cupos →
+              </router-link>
+            </div>
+
+            <div
+              v-if="!esArtistaDeLaSolicitud && solicitud.estado === 'PRESUPUESTADA' && solicitud.presupuesto"
+              class="mt-4 grid gap-2"
+            >
+              <button
+                type="button"
+                class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+                @click="irAPagar"
+              >
+                Aceptar y pagar
+              </button>
+            </div>
+
+            <div v-if="solicitud.idPedido" class="mt-4 grid gap-2">
+              <router-link
+                :to="{ name: nombreRutaPedido, params: { idPedido: solicitud.idPedido } }"
+                class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+              >
+                Ver pedido
               </router-link>
             </div>
 

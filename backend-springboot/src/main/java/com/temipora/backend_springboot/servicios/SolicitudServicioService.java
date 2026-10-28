@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.servicios;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -24,6 +25,7 @@ import com.temipora.backend_springboot.modelo.ItemSolicitud;
 import com.temipora.backend_springboot.modelo.ItemSolicitudRequest;
 import com.temipora.backend_springboot.modelo.ListaEspera;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
+import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Pregunta;
 import com.temipora.backend_springboot.modelo.PreguntaDTO;
 import com.temipora.backend_springboot.modelo.Respuesta;
@@ -98,6 +100,7 @@ public class SolicitudServicioService {
     private final ListaEsperaService listaEsperaService;
     private final NotificacionService notificacionService;
     private final ColaSolicitudesService colaSolicitudesService;
+    private final MonedaVistaService monedaVistaService;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -111,7 +114,8 @@ public class SolicitudServicioService {
             TerminosService terminosService,
             ListaEsperaService listaEsperaService,
             NotificacionService notificacionService,
-            ColaSolicitudesService colaSolicitudesService) {
+            ColaSolicitudesService colaSolicitudesService,
+            MonedaVistaService monedaVistaService) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -124,6 +128,7 @@ public class SolicitudServicioService {
         this.listaEsperaService = listaEsperaService;
         this.notificacionService = notificacionService;
         this.colaSolicitudesService = colaSolicitudesService;
+        this.monedaVistaService = monedaVistaService;
     }
 
     @Transactional(readOnly = true)
@@ -334,7 +339,7 @@ public class SolicitudServicioService {
                 TIPO_REFERENCIA_SOLICITUD);
         }
 
-        return SolicitudDTO.desdeSolicitud(solicitud);
+        return aDTO(solicitud, idCliente);
     }
 
     @Transactional(readOnly = true)
@@ -349,7 +354,7 @@ public class SolicitudServicioService {
         if (!esCliente && !esArtista) {
             throw new AccesoDenegadoException("No podés ver esta solicitud.");
         }
-        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(solicitud);
+        SolicitudDTO dto = aDTO(solicitud, idUsuario);
         accionSolicitudRepository
             .findFirstBySolicitudIdSolicitudAndTipoAccionOrderByFechaDesc(
                 idSolicitud, TipoAccionSolicitud.RECHAZO)
@@ -399,7 +404,7 @@ public class SolicitudServicioService {
         String motivoLimpio = limpiarMotivo(motivo);
         LocalDateTime ahora = registrarRechazo(solicitud, motivoLimpio, ORIGEN_ARTISTA);
 
-        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(solicitud);
+        SolicitudDTO dto = aDTO(solicitud, idArtista);
         dto.setMotivoRechazo(motivoLimpio);
         dto.setFechaRechazo(ahora);
         return dto;
@@ -445,7 +450,7 @@ public class SolicitudServicioService {
 
         notificarCancelacion(solicitud, motivoLimpio, estadoAnterior);
 
-        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(solicitud);
+        SolicitudDTO dto = aDTO(solicitud, idCliente);
         dto.setMotivoCancelacion(motivoLimpio);
         dto.setFechaCancelacion(ahora);
         dto.setPuedeCancelar(false);
@@ -489,7 +494,7 @@ public class SolicitudServicioService {
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
 
-        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(solicitud);
+        SolicitudDTO dto = aDTO(solicitud, idArtista);
         dto.setFechaRechazo(ahora);
         return dto;
     }
@@ -576,7 +581,7 @@ public class SolicitudServicioService {
             : solicitudRepository.findByArtistaIdUsuarioAndEstadoOrderByFechaCreacionDesc(
                 idArtista, estado);
         return solicitudes.stream()
-            .map(SolicitudResumenDTO::desdeSolicitud)
+            .map(solicitud -> aResumen(solicitud, idArtista))
             .toList();
     }
 
@@ -587,16 +592,52 @@ public class SolicitudServicioService {
             : solicitudRepository.findByClienteIdUsuarioAndEstadoOrderByFechaCreacionDesc(
                 idCliente, estado);
         return solicitudes.stream()
-            .map(SolicitudResumenDTO::desdeSolicitud)
+            .map(solicitud -> aResumen(solicitud, idCliente))
             .toList();
     }
 
     @Transactional(readOnly = true)
     public List<SolicitudResumenDTO> listarPorServicio(Long idServicio) {
+        return listarPorServicio(idServicio, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SolicitudResumenDTO> listarPorServicio(Long idServicio, Long idVista) {
         return solicitudRepository.findByServicioIdServicioOrderByFechaCreacionDesc(idServicio)
             .stream()
-            .map(SolicitudResumenDTO::desdeSolicitud)
+            .map(solicitud -> aResumen(solicitud, idVista))
             .toList();
+    }
+
+    private SolicitudDTO aDTO(Solicitud solicitud, Long idVista) {
+        LocalDateTime ahora = LocalDateTime.now();
+        Moneda mostrada = monedaVistaService.preferidaDe(idVista);
+        BigDecimal factorOrigen = mostrada != null
+            ? monedaVistaService.factorOrigenAMostrada(
+                solicitud.getMoneda(), mostrada, ahora)
+            : null;
+        BigDecimal factorCobro = mostrada != null
+            ? monedaVistaService.factorCobroAMostrada(mostrada, ahora)
+            : null;
+        boolean incluirComision = idVista != null
+            && solicitud.getArtista() != null
+            && idVista.equals(solicitud.getArtista().getIdUsuario());
+        return SolicitudDTO.desdeSolicitud(
+            solicitud, mostrada, factorOrigen, factorCobro, incluirComision);
+    }
+
+    private SolicitudResumenDTO aResumen(Solicitud solicitud, Long idVista) {
+        LocalDateTime ahora = LocalDateTime.now();
+        Moneda mostrada = monedaVistaService.preferidaDe(idVista);
+        BigDecimal factorOrigen = mostrada != null
+            ? monedaVistaService.factorOrigenAMostrada(
+                solicitud.getMoneda(), mostrada, ahora)
+            : null;
+        BigDecimal factorCobro = mostrada != null
+            ? monedaVistaService.factorCobroAMostrada(mostrada, ahora)
+            : null;
+        return SolicitudResumenDTO.desdeSolicitud(
+            solicitud, mostrada, factorOrigen, factorCobro);
     }
 
     private int calcularOcupados(Long idServicio) {

@@ -26,6 +26,10 @@ public class SolicitudResumenDTO {
     private Integer cantidadDibujos;
     private BigDecimal precioBase;
     private String moneda;
+    // Importes listos para mostrar según la preferencia del usuario.
+    private BigDecimal precioBaseMostrado;
+    private BigDecimal precioFinalMostrado;
+    private String monedaMostrada;
     private boolean prioridadDefinidaPorCliente;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaActualizacion;
@@ -33,6 +37,34 @@ public class SolicitudResumenDTO {
     private LocalDateTime fechaVencimiento;
 
     public static SolicitudResumenDTO desdeSolicitud(Solicitud solicitud) {
+        return desdeSolicitud(solicitud, null, null, null);
+    }
+
+    public static SolicitudResumenDTO desdeSolicitud(
+            Solicitud solicitud,
+            Moneda monedaDestino,
+            BigDecimal factorOrigenDestino,
+            BigDecimal factorCobroDestino) {
+        Moneda origen = solicitud.getMoneda();
+        Moneda destino = monedaDestino != null ? monedaDestino : origen;
+        boolean muestraOrigen = PresupuestoDTO.mismaMoneda(destino, origen);
+
+        BigDecimal precioBaseMostrado = solicitud.getPrecioBase();
+        String codigoMostrado = origen != null ? origen.getCodigo() : null;
+        if (!muestraOrigen && destino != null && factorOrigenDestino != null) {
+            precioBaseMostrado = PresupuestoDTO.convertir(
+                solicitud.getPrecioBase(), factorOrigenDestino);
+            codigoMostrado = destino.getCodigo();
+        }
+
+        PresupuestoDTO presupuesto = solicitud.getPresupuesto() != null
+            ? PresupuestoDTO.desdePresupuesto(
+                solicitud.getPresupuesto(),
+                monedaDestino,
+                factorOrigenDestino,
+                factorCobroDestino)
+            : null;
+
         return SolicitudResumenDTO.builder()
             .idSolicitud(solicitud.getIdSolicitud())
             .idServicio(solicitud.getServicio() != null
@@ -49,7 +81,14 @@ public class SolicitudResumenDTO {
             .estado(solicitud.getEstado())
             .cantidadDibujos(solicitud.getCantidadDibujos())
             .precioBase(solicitud.getPrecioBase())
-            .moneda(solicitud.getMoneda() != null ? solicitud.getMoneda().getCodigo() : null)
+            .moneda(origen != null ? origen.getCodigo() : null)
+            .precioBaseMostrado(precioBaseMostrado)
+            .precioFinalMostrado(presupuesto != null
+                ? presupuesto.getPrecioFinalMostrado()
+                : null)
+            .monedaMostrada(presupuesto != null
+                ? presupuesto.getMonedaMostrada()
+                : codigoMostrado)
             .prioridadDefinidaPorCliente(solicitud.isPrioridadDefinidaPorCliente())
             .fechaCreacion(solicitud.getFechaCreacion())
             .fechaActualizacion(solicitud.getFechaActualizacion())

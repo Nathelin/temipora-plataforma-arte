@@ -232,6 +232,7 @@ class AuthControllerTest {
         return "{\"nombreUsuario\":\"cosmiq\",\"correo\":\"cosmiq@mail.com\","
                 + "\"contrasenia\":\"" + contrasenia + "\","
                 + "\"confirmarContrasenia\":\"" + confirmarContrasenia + "\","
+                + "\"fechaNacimiento\":\"1995-05-20\","
                 + "\"acceptaTOS\":true,\"rol\":\"CLIENTE\"}";
     }
 }
