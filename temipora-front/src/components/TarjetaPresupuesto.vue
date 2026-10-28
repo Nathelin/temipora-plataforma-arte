@@ -52,6 +52,7 @@ const retirado = computed(() => props.estado === 'RECHAZADA')
 const cancelado = computed(() => props.estado === 'CANCELADA')
 const vigente = computed(() => props.estado === 'PRESUPUESTADA')
 const items = computed(() => props.presupuesto?.items || [])
+const hitos = computed(() => props.presupuesto?.hitos || [])
 const monedaMostrada = computed(
   () => props.presupuesto?.monedaMostrada || props.presupuesto?.moneda,
 )
@@ -177,6 +178,43 @@ function formatearRecargo(recargo) {
         {{ esArtista
           ? 'La comisión se descuenta de tu precio. El cliente paga el total sin cambios.'
           : 'La comisión está incluida en el precio: no se suma al total.' }}
+      </p>
+    </div>
+
+    <div v-if="hitos.length" class="mt-4 rounded-xl border border-rosa/40 p-4">
+      <h3 class="text-sm font-semibold text-granate">Plan de pagos</h3>
+      <ol class="mt-3 space-y-2">
+        <li
+          v-for="hito in hitos"
+          :key="hito.idHitoPresupuesto || hito.orden"
+          class="flex items-start justify-between gap-3 rounded-lg bg-rosa/10 px-3 py-2"
+        >
+          <div class="min-w-0">
+            <p class="text-sm font-medium text-cafe">
+              {{ hito.nombre }}
+              <span class="text-xs text-cafe/45">
+                ({{ formatearMonto(hito.porcentaje) }}%)
+              </span>
+            </p>
+            <p class="text-xs text-cafe/50">
+              {{ hito.tipo === 'SENA'
+                ? 'Se paga al aceptar el presupuesto'
+                : 'Se habilita al aprobar el entregable anterior' }}
+            </p>
+          </div>
+          <div class="shrink-0 text-right">
+            <p class="text-sm font-semibold text-granate">
+              {{ formatearMoneda(hito.montoMostrado ?? hito.monto) }}
+            </p>
+            <p v-if="esArtista" class="text-xs text-cafe/50">
+              Recibís {{ formatearMoneda(hito.montoNetoMostrado ?? hito.montoNeto) }}
+            </p>
+          </div>
+        </li>
+      </ol>
+      <p class="mt-3 text-xs leading-relaxed text-cafe/50">
+        La primera cuota se paga al aceptar el presupuesto. Cada cuota siguiente se habilita
+        cuando el cliente aprueba el entregable anterior.
       </p>
     </div>
 

@@ -113,8 +113,17 @@ public class Presupuesto {
     @OrderBy("orden ASC")
     private List<ItemPresupuesto> items = new ArrayList<>();
 
+    @OneToMany(mappedBy = "presupuesto", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("orden ASC")
+    private List<HitoPresupuesto> hitos = new ArrayList<>();
+
     public void agregarItem(ItemPresupuesto item) {
         item.setPresupuesto(this);
         this.items.add(item);
+    }
+
+    public void agregarHito(HitoPresupuesto hito) {
+        hito.setPresupuesto(this);
+        this.hitos.add(hito);
     }
 }

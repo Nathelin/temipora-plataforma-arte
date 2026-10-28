@@ -32,4 +32,8 @@ public class PresupuestoRequest {
     @NotEmpty(message = "Tenés que incluir todos los dibujos de la solicitud.")
     @Size(max = 50, message = "Una solicitud puede tener como máximo 50 dibujos.")
     private List<@Valid ItemPresupuestoRequest> items;
+
+    @Valid
+    @Size(max = 10, message = "Un presupuesto puede tener como máximo 10 hitos.")
+    private List<HitoPresupuestoRequest> hitos;
 }

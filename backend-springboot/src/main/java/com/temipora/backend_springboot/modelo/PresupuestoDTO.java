@@ -53,6 +53,7 @@ public class PresupuestoDTO {
     private LocalDateTime fechaEmision;
     private LocalDateTime fechaVencimiento;
     private List<ItemPresupuestoDTO> items;
+    private List<HitoPresupuestoDTO> hitos;
 
     public static PresupuestoDTO desdePresupuesto(Presupuesto presupuesto) {
         return desdePresupuesto(presupuesto, null, null, null);
@@ -147,10 +148,18 @@ public class PresupuestoDTO {
             .items(presupuesto.getItems().stream()
                 .map(item -> ItemPresupuestoDTO.desdeItem(item, factorItem))
                 .toList())
+            .hitos(presupuesto.getHitos().stream()
+                .map(hito -> HitoPresupuestoDTO.desdeHito(
+                    hito,
+                    muestraOrigen,
+                    muestraCobro,
+                    factorCobroDestino,
+                    factorOrigenDestino))
+                .toList())
             .build();
     }
 
-    private static BigDecimal totalMostrado(
+    static BigDecimal totalMostrado(
             BigDecimal nativo,
             BigDecimal cobro,
             boolean muestraOrigen,

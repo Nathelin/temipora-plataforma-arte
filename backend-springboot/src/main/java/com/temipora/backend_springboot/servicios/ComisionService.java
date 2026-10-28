@@ -36,7 +36,7 @@ public class ComisionService {
             });
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ComisionConfigDTO obtenerEstado() {
         return ComisionConfigDTO.desdeConfiguracion(obtener());
     }

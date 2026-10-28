@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.ConfiguracionPresupuesto;
 import com.temipora.backend_springboot.modelo.ConfiguracionComision;
+import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.ItemPresupuesto;
@@ -57,6 +58,7 @@ public class PresupuestoService {
     private final NotificacionService notificacionService;
     private final ConfiguracionPresupuestoService configuracionPresupuestoService;
     private final ComisionService comisionService;
+    private final ConfiguracionPedidoService configuracionPedidoService;
     private final MonedaVistaService monedaVistaService;
 
     public PresupuestoService(
@@ -68,6 +70,7 @@ public class PresupuestoService {
             NotificacionService notificacionService,
             ConfiguracionPresupuestoService configuracionPresupuestoService,
             ComisionService comisionService,
+            ConfiguracionPedidoService configuracionPedidoService,
             MonedaVistaService monedaVistaService) {
         this.solicitudRepository = solicitudRepository;
         this.servicioRepository = servicioRepository;
@@ -77,6 +80,7 @@ public class PresupuestoService {
         this.notificacionService = notificacionService;
         this.configuracionPresupuestoService = configuracionPresupuestoService;
         this.comisionService = comisionService;
+        this.configuracionPedidoService = configuracionPedidoService;
         this.monedaVistaService = monedaVistaService;
     }
 
@@ -267,6 +271,19 @@ public class PresupuestoService {
         presupuesto.setMontoNetoArtistaCobro(
             presupuesto.getPrecioFinalCobro().subtract(comisionMontoCobro)
                 .setScale(2, RoundingMode.HALF_UP));
+
+        ConfiguracionPedido configuracionPedido = configuracionPedidoService.obtener();
+        HitoCalculadora.construir(
+            request.getHitos(),
+            presupuesto.getPrecioFinal(),
+            presupuesto.getPrecioFinalCobro(),
+            presupuesto.getComisionMonto(),
+            presupuesto.getComisionMontoCobro(),
+            new HitoCalculadora.Limites(
+                configuracionPedido.getMaxHitos(),
+                configuracionPedido.getPorcentajeMaxPrimerHito(),
+                configuracionPedido.getMontoMinimoCuota()))
+            .forEach(presupuesto::agregarHito);
 
         solicitud.setPresupuesto(presupuesto);
         presupuestoRepository.save(presupuesto);

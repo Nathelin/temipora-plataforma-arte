@@ -12,6 +12,7 @@ import CotizacionAdmin from '../components/CotizacionAdmin.vue'
 import MonedasAdmin from '../components/MonedasAdmin.vue'
 import PresupuestoAdmin from '../components/PresupuestoAdmin.vue'
 import ComisionAdmin from '../components/ComisionAdmin.vue'
+import PedidoConfigAdmin from '../components/PedidoConfigAdmin.vue'
 import TerminosPlataformaAdmin from '../components/TerminosPlataformaAdmin.vue'
 import Registro from '../components/Registro.vue'
 import TOS from '../components/TOS.vue'
@@ -260,6 +261,12 @@ const routes = [
         name: 'comisiones-admin',
         component: ComisionAdmin,
         meta: { title: 'Comisión de la plataforma' },
+      },
+      {
+        path: 'ajustes/pedidos',
+        name: 'pedidos-admin',
+        component: PedidoConfigAdmin,
+        meta: { title: 'Hitos y pedidos' },
       },
       {
         path: 'ajustes/terminos-plataforma',

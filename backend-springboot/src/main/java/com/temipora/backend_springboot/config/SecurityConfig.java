@@ -72,7 +72,8 @@ public class SecurityConfig {
                     "/api/perfil/**",
                     "/api/portfolio/**",
                     "/api/terminos-plataforma",
-                    "/api/comisiones/**"
+                    "/api/comisiones/**",
+                    "/api/configuracion-pedido"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

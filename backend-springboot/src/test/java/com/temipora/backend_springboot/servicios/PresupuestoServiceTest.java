@@ -27,10 +27,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 
 import com.temipora.backend_springboot.modelo.ConfiguracionComision;
+import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.ConfiguracionPresupuesto;
 import com.temipora.backend_springboot.modelo.ETiempoEntregaUnidad;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
+import com.temipora.backend_springboot.modelo.HitoPresupuestoRequest;
 import com.temipora.backend_springboot.modelo.ItemPresupuestoRequest;
 import com.temipora.backend_springboot.modelo.ItemSolicitud;
 import com.temipora.backend_springboot.modelo.Moneda;
@@ -80,6 +82,9 @@ class PresupuestoServiceTest {
 
     @Mock
     private ComisionService comisionService;
+
+    @Mock
+    private ConfiguracionPedidoService configuracionPedidoService;
 
     @Mock
     private MonedaVistaService monedaVistaService;
@@ -165,6 +170,54 @@ class PresupuestoServiceTest {
         assertThat(presupuesto.getComisionPorcentaje()).isEqualByComparingTo("10.00");
         assertThat(presupuesto.getComisionMonto()).isEqualByComparingTo("20.00");
         assertThat(presupuesto.getMontoNetoArtista()).isEqualByComparingTo("180.00");
+    }
+
+    @Test
+    void crear_sinHitos_creaUnaEntregaUnicaAlCienPorCiento() {
+        prepararCreacion();
+
+        SolicitudDTO resultado = presupuestoService.crear(
+            SOLICITUD, ARTISTA, request());
+
+        assertThat(resultado.getPresupuesto().getHitos()).hasSize(1);
+        assertThat(resultado.getPresupuesto().getHitos().get(0).getTipo())
+            .isEqualTo("ENTREGA");
+        assertThat(resultado.getPresupuesto().getHitos().get(0).getPorcentaje())
+            .isEqualByComparingTo("100.00");
+        assertThat(resultado.getPresupuesto().getHitos().get(0).getMonto())
+            .isEqualByComparingTo("200.00");
+    }
+
+    @Test
+    void crear_conDosHitos_losGuardaConComisionYNeto() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.setHitos(new ArrayList<>(List.of(hito("50"), hito("50"))));
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request);
+
+        assertThat(resultado.getPresupuesto().getHitos()).hasSize(2);
+        var sena = resultado.getPresupuesto().getHitos().get(0);
+        var entrega = resultado.getPresupuesto().getHitos().get(1);
+        assertThat(sena.getTipo()).isEqualTo("SENA");
+        assertThat(sena.getMonto()).isEqualByComparingTo("100.00");
+        assertThat(sena.getComisionMonto()).isEqualByComparingTo("10.00");
+        assertThat(sena.getMontoNeto()).isEqualByComparingTo("90.00");
+        assertThat(entrega.getTipo()).isEqualTo("ENTREGA");
+        assertThat(entrega.getMonto()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void crear_conHitosQueNoSumanCien_lanzaError() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        request.setHitos(new ArrayList<>(List.of(hito("50"), hito("40"))));
+
+        assertThatThrownBy(() -> presupuestoService.crear(SOLICITUD, ARTISTA, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("sumar 100");
+
+        verify(presupuestoRepository, never()).save(any());
     }
 
     @Test
@@ -585,6 +638,12 @@ class PresupuestoServiceTest {
                 return monto.multiply(porcentaje)
                     .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
             });
+        ConfiguracionPedido configuracionPedido = new ConfiguracionPedido();
+        configuracionPedido.setMaxHitos(4);
+        configuracionPedido.setPorcentajeMaxPrimerHito(new BigDecimal("50.00"));
+        configuracionPedido.setMontoMinimoCuota(BigDecimal.ZERO);
+        lenient().when(configuracionPedidoService.obtener())
+            .thenReturn(configuracionPedido);
         lenient().when(monedaVistaService.monedaCobro()).thenReturn(moneda);
         lenient().when(monedaVistaService.factorCobro(
                 eq(moneda), any(LocalDateTime.class)))
@@ -653,5 +712,11 @@ class PresupuestoServiceTest {
         recargo.setTipo(tipo);
         recargo.setValor(new BigDecimal(valor));
         return recargo;
+    }
+
+    private HitoPresupuestoRequest hito(String porcentaje) {
+        HitoPresupuestoRequest hito = new HitoPresupuestoRequest();
+        hito.setPorcentaje(new BigDecimal(porcentaje));
+        return hito;
     }
 }
