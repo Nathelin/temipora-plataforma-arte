@@ -206,6 +206,9 @@ function formatearRecargo(recargo) {
                 ({{ formatearMonto(hito.porcentaje) }}%)
               </span>
             </p>
+            <p v-if="hito.descripcion" class="text-xs leading-relaxed text-cafe/65">
+              {{ hito.descripcion }}
+            </p>
             <p class="text-xs text-cafe/50">
               {{ descripcionHito(hito) }}
             </p>

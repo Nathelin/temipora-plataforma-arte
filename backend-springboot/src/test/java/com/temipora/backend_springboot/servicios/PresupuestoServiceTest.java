@@ -209,6 +209,20 @@ class PresupuestoServiceTest {
     }
 
     @Test
+    void crear_conAlcance_loExponeEnElHitoDelPresupuesto() {
+        prepararCreacion();
+        PresupuestoRequest request = request();
+        HitoPresupuestoRequest sena = hito("50");
+        sena.setDescripcion("Bocetos de los 2 dibujos");
+        request.setHitos(new ArrayList<>(List.of(sena, hito("50"))));
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request);
+
+        assertThat(resultado.getPresupuesto().getHitos().get(0).getDescripcion())
+            .isEqualTo("Bocetos de los 2 dibujos");
+    }
+
+    @Test
     void crear_conDosHitos_losGuardaConComisionYNeto() {
         prepararCreacion();
         PresupuestoRequest request = request();

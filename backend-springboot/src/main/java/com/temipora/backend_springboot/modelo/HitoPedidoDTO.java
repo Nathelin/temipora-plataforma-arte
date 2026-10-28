@@ -22,6 +22,8 @@ public class HitoPedidoDTO {
     private Long idHitoPedido;
     private Integer orden;
     private String nombre;
+    private String descripcion;
+    private BigDecimal porcentaje;
     private String tipo;
     private boolean requiereEntrega;
     private BigDecimal monto;
@@ -48,6 +50,7 @@ public class HitoPedidoDTO {
     private LocalDateTime fechaAprobacion;
     private String entregaDescripcion;
     private String entregaImagen;
+    private List<EntregaHitoDTO> entregas;
     private boolean puedePagar;
     private boolean puedeEntregar;
     private boolean puedeAprobar;
@@ -59,6 +62,7 @@ public class HitoPedidoDTO {
             List<PagoDTO> pagos,
             boolean incluirComision,
             boolean incluirEntrega,
+            List<EntregaHitoDTO> entregas,
             boolean puedePagar,
             boolean puedeEntregar,
             boolean puedeAprobar,
@@ -97,6 +101,8 @@ public class HitoPedidoDTO {
             .idHitoPedido(hito.getIdHitoPedido())
             .orden(hito.getOrden())
             .nombre(hito.getNombre())
+            .descripcion(hito.getDescripcion())
+            .porcentaje(hito.getPorcentaje())
             .tipo(hito.getTipo() != null ? hito.getTipo().name() : null)
             .requiereEntrega(hito.isRequiereEntrega())
             .monto(hito.getMonto())
@@ -122,6 +128,7 @@ public class HitoPedidoDTO {
             .fechaAprobacion(hito.getFechaAprobacion())
             .entregaDescripcion(hito.getEntregaDescripcion())
             .entregaImagen(incluirEntrega ? hito.getEntregaImagen() : null)
+            .entregas(entregas)
             .puedePagar(puedePagar)
             .puedeEntregar(puedeEntregar)
             .puedeAprobar(puedeAprobar)

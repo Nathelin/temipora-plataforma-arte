@@ -43,6 +43,12 @@ public class HitoPedido {
     @Column(nullable = false, length = 60)
     private String nombre;
 
+    @Column(length = 250)
+    private String descripcion;
+
+    @Column(precision = 5, scale = 2)
+    private BigDecimal porcentaje;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     private TipoHito tipo;

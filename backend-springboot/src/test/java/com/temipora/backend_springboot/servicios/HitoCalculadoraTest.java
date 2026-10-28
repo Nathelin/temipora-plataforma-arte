@@ -204,6 +204,32 @@ class HitoCalculadoraTest {
         assertThat(hitos.get(2).getNombre()).isEqualTo("Entrega final");
     }
 
+    @Test
+    void conservaElAlcanceIndicadoEnCadaHito() {
+        HitoPresupuestoRequest sena = hito("50");
+        sena.setDescripcion("  Bocetos de los 3 dibujos  ");
+        HitoPresupuestoRequest entrega = hito("50");
+        entrega.setDescripcion("Dibujos 1 a 3 finales");
+
+        List<HitoPresupuesto> hitos = construir(
+            List.of(sena, entrega),
+            "200.00", "200.00", "20.00", "20.00");
+
+        assertThat(hitos.get(0).getDescripcion()).isEqualTo("Bocetos de los 3 dibujos");
+        assertThat(hitos.get(1).getDescripcion()).isEqualTo("Dibujos 1 a 3 finales");
+    }
+
+    @Test
+    void alcanceDemasiadoLargo_lanzaError() {
+        HitoPresupuestoRequest unico = hito("100");
+        unico.setDescripcion("x".repeat(251));
+
+        assertThatThrownBy(() -> construir(
+            List.of(unico), "100.00", "100.00", "10.00", "10.00"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("descripción");
+    }
+
     private List<HitoPresupuesto> construir(
             List<HitoPresupuestoRequest> requests,
             String precioFinal,

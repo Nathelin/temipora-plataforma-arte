@@ -3,6 +3,9 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
+import EntregasHito from '../components/EntregasHito.vue'
+import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+import SubirEntregable from '../components/SubirEntregable.vue'
 import {
   descripcionHito,
   estadoPedidoDe,
@@ -24,12 +27,16 @@ const error = ref('')
 const errorAccion = ref('')
 const aviso = ref('')
 const procesando = ref(false)
-const subiendo = ref(false)
 const revisionHitoId = ref(null)
 const motivoRevision = ref('')
-const archivoEntrega = ref('')
-const entrega = reactive({ descripcion: '', imagen: '' })
 const visor = reactive({ abierto: false, imagen: '' })
+const confirmacion = reactive({
+  abierto: false,
+  titulo: '',
+  mensaje: '',
+  textoConfirmar: 'Confirmar',
+  accion: null,
+})
 
 const esArtista = computed(() => pedido.value?.rolVista === 'ARTISTA')
 const esCliente = computed(() => pedido.value?.rolVista === 'CLIENTE')
@@ -111,11 +118,36 @@ function confirmarPago(pago) {
   )
 }
 
+function pedirConfirmacion({ titulo, mensaje, textoConfirmar }, accion) {
+  Object.assign(confirmacion, {
+    abierto: true,
+    titulo,
+    mensaje,
+    textoConfirmar,
+    accion,
+  })
+}
+
+function cerrarConfirmacion() {
+  confirmacion.abierto = false
+  confirmacion.accion = null
+}
+
+function confirmarAccion() {
+  const accion = confirmacion.accion
+  cerrarConfirmacion()
+  if (accion) accion()
+}
+
 function aprobar(hito) {
-  ejecutar(
+  pedirConfirmacion({
+    titulo: '¿Aprobar el entregable?',
+    mensaje: 'Confirmás que estás satisfecho con esta entrega y querés que el artista siga trabajando. Se habilita la siguiente cuota del plan de pagos.',
+    textoConfirmar: 'Sí, aprobar',
+  }, () => ejecutar(
     () => api.post(`/pedidos/${idPedido.value}/hitos/${hito.idHitoPedido}/aprobar`),
     'Aprobaste el entregable.',
-  )
+  ))
 }
 
 function abrirRevision(hito) {
@@ -153,52 +185,10 @@ function cancelar() {
   )
 }
 
-async function subirImagen(event) {
-  const file = event.target.files?.[0]
-  if (!file) return
-  if (!String(file.type).startsWith('image/')) {
-    errorAccion.value = 'El archivo debe ser una imagen.'
-    return
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    errorAccion.value = 'La imagen no puede superar los 5 MB.'
-    return
-  }
-  subiendo.value = true
+function alEntregar(data) {
+  if (data) pedido.value = data
   errorAccion.value = ''
-  try {
-    const formData = new FormData()
-    formData.append('archivo', file)
-    const res = await api.post('/upload', formData)
-    entrega.imagen = res.data?.url || ''
-    archivoEntrega.value = file.name
-  } catch (e) {
-    errorAccion.value = e.response?.data?.message || 'No se pudo subir la imagen.'
-  } finally {
-    subiendo.value = false
-  }
-}
-
-async function entregar(hito) {
-  if (!entrega.imagen) {
-    errorAccion.value = 'Subí una imagen del entregable.'
-    return
-  }
-  const ok = await ejecutar(
-    () => api.post(
-      `/pedidos/${idPedido.value}/hitos/${hito.idHitoPedido}/entregar`,
-      {
-        descripcion: entrega.descripcion?.trim() || null,
-        imagen: entrega.imagen,
-      },
-    ),
-    'Entregable subido. El cliente fue notificado.',
-  )
-  if (ok) {
-    entrega.descripcion = ''
-    entrega.imagen = ''
-    archivoEntrega.value = ''
-  }
+  aviso.value = 'Entregable subido. El cliente fue notificado.'
 }
 
 function abrirVisor(imagen) {
@@ -211,6 +201,10 @@ function cerrarVisor() {
 }
 
 function volver() {
+  if (route.path.startsWith('/admin')) {
+    router.push({ name: 'pedidos-admin' })
+    return
+  }
   const enPanel = route.path.startsWith('/panel')
   router.push({ name: enPanel ? 'panel-pedidos' : 'pedidos' })
 }
@@ -244,17 +238,30 @@ onMounted(cargar)
           <h1 class="mt-1 font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">
             {{ pedido.nombreServicio || 'Servicio' }}
           </h1>
-          <p class="mt-2 text-sm text-cafe/65">
+          <p v-if="pedido.rolVista === 'ADMIN'" class="mt-2 text-sm text-cafe/65">
+            Cliente: @{{ pedido.cliente?.nombreUsuario || '—' }}
+            <span aria-hidden="true"> · </span>
+            Artista: @{{ pedido.artista?.nombreUsuario || '—' }}
+          </p>
+          <p v-else class="mt-2 text-sm text-cafe/65">
             {{ esArtista ? 'Cliente' : 'Artista' }}:
             @{{ (esArtista ? pedido.cliente : pedido.artista)?.nombreUsuario || '—' }}
           </p>
         </div>
-        <span
-          class="rounded-full border px-3 py-1.5 text-xs font-semibold"
-          :class="estadoInfo.clase"
-        >
-          {{ estadoInfo.etiqueta }}
-        </span>
+        <div class="flex flex-wrap items-center gap-2">
+          <span
+            v-if="pedido.rolVista === 'ADMIN'"
+            class="rounded-full border border-coral/30 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral"
+          >
+            Vista de administración
+          </span>
+          <span
+            class="rounded-full border px-3 py-1.5 text-xs font-semibold"
+            :class="estadoInfo.clase"
+          >
+            {{ estadoInfo.etiqueta }}
+          </span>
+        </div>
       </header>
 
       <section class="mt-6 rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
@@ -281,7 +288,7 @@ onMounted(cargar)
         </dl>
 
         <div
-          v-if="esArtista && pedido.comisionMonto != null"
+          v-if="(esArtista || pedido.rolVista === 'ADMIN') && pedido.comisionMonto != null"
           class="mt-4 rounded-xl border border-cafe/15 bg-cafe/5 p-4"
         >
           <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/50">
@@ -335,6 +342,9 @@ onMounted(cargar)
                 {{ etiquetaTipoHito(hito.tipo) }}
               </p>
               <h3 class="mt-1 text-lg font-semibold text-granate">{{ hito.nombre }}</h3>
+              <p v-if="hito.descripcion" class="mt-1 text-sm leading-relaxed text-cafe/70">
+                {{ hito.descripcion }}
+              </p>
               <p class="mt-1 text-xs text-cafe/55">{{ descripcionHito(hito) }}</p>
             </div>
             <div class="text-right">
@@ -365,8 +375,15 @@ onMounted(cargar)
             </div>
           </dl>
 
+          <EntregasHito
+            v-if="hito.entregas?.length"
+            :id-pedido="idPedido"
+            :entregas="hito.entregas"
+            :ver-original="esArtista || pedido.rolVista === 'ADMIN'"
+          />
+
           <div
-            v-if="hito.entregaDescripcion || hito.entregaImagen"
+            v-if="!hito.entregas?.length && (hito.entregaDescripcion || hito.entregaImagen)"
             class="mt-4 rounded-xl border border-rosa/40 bg-rosa/5 p-4"
           >
             <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/50">
@@ -392,14 +409,14 @@ onMounted(cargar)
             </button>
           </div>
           <p
-            v-else-if="hito.tipo === 'ENTREGA' && hito.estadoEntrega === 'ENTREGADO'"
+            v-else-if="!hito.entregas?.length && hito.tipo === 'ENTREGA' && hito.estadoEntrega === 'ENTREGADO'"
             class="mt-4 rounded-xl border border-coral/25 bg-coral/5 px-4 py-3 text-sm text-cafe/70"
           >
             El artista subió la entrega final. Pagá esta cuota para desbloquear el archivo.
           </p>
 
           <div
-            v-if="esArtista && hito.comisionMonto != null"
+            v-if="(esArtista || pedido.rolVista === 'ADMIN') && hito.comisionMonto != null"
             class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-cafe/5 px-3 py-2 text-xs text-cafe/65"
           >
             <span>Comisión: − {{ formatearPrecio(hito.comisionMontoMostrado ?? hito.comisionMonto, moneda) }}</span>
@@ -493,58 +510,13 @@ onMounted(cargar)
             </div>
           </div>
 
-          <div
+          <SubirEntregable
             v-if="esArtista && hito.puedeEntregar"
-            class="mt-4 rounded-xl border border-rosa/50 bg-rosa/5 p-4"
-          >
-            <h4 class="text-sm font-semibold text-granate">
-              {{ hito.tipo === 'ENTREGA' ? 'Subir entrega final' : 'Subir entregable' }}
-            </h4>
-            <p
-              v-if="hito.tipo === 'ENTREGA'"
-              class="mt-1 text-xs leading-relaxed text-cafe/55"
-            >
-              El cliente verá la entrega recién cuando pague la última cuota.
-            </p>
-            <label :for="`archivo-${hito.idHitoPedido}`" class="mt-3 block text-xs text-cafe/60">
-              Imagen <span class="text-rojizo">*</span>
-            </label>
-            <input
-              :id="`archivo-${hito.idHitoPedido}`"
-              type="file"
-              accept="image/*"
-              class="mt-1 block w-full text-sm text-cafe file:mr-3 file:rounded-full file:border-0 file:bg-coral/10 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-coral hover:file:bg-coral/20"
-              @change="subirImagen"
-            />
-            <p v-if="subiendo" class="mt-1 text-xs text-cafe/50">Subiendo imagen...</p>
-            <p v-else-if="archivoEntrega" class="mt-1 text-xs text-green-700">
-              {{ archivoEntrega }} subida correctamente.
-            </p>
-            <img
-              v-if="entrega.imagen"
-              :src="entrega.imagen"
-              alt="Previsualización del entregable"
-              class="mt-3 max-h-48 rounded-xl border border-rosa/50 object-contain"
-            />
-            <label :for="`descripcion-${hito.idHitoPedido}`" class="mt-3 block text-xs text-cafe/60">
-              Descripción <span class="text-cafe/40">(opcional)</span>
-            </label>
-            <textarea
-              :id="`descripcion-${hito.idHitoPedido}`"
-              v-model="entrega.descripcion"
-              rows="2"
-              maxlength="500"
-              class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-            ></textarea>
-            <button
-              type="button"
-              :disabled="procesando || subiendo || !entrega.imagen"
-              class="mt-3 inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition hover:bg-rojizo disabled:cursor-not-allowed disabled:bg-coral/40"
-              @click="entregar(hito)"
-            >
-              {{ procesando ? 'Enviando...' : 'Entregar' }}
-            </button>
-          </div>
+            :id-pedido="idPedido"
+            :hito="hito"
+            :dibujos="pedido.dibujos || []"
+            @entregado="alEntregar"
+          />
         </article>
       </section>
 
@@ -579,5 +551,14 @@ onMounted(cargar)
         <img :src="visor.imagen" alt="Entregable ampliado" class="max-h-[80vh] w-auto" />
       </div>
     </div>
+
+    <ModalConfirmacion
+      :abierto="confirmacion.abierto"
+      :titulo="confirmacion.titulo"
+      :mensaje="confirmacion.mensaje"
+      :texto-confirmar="confirmacion.textoConfirmar"
+      @confirmar="confirmarAccion"
+      @cerrar="cerrarConfirmacion"
+    />
   </div>
 </template>

@@ -252,13 +252,24 @@ function etiquetaTipoHito(tipo, cantidad) {
 
 function hitosPorDefecto() {
   if (maxHitos.value < 2) {
-    return [{ nombre: 'Pago único', porcentaje: 100, requiereEntrega: true }]
+    return [{
+      nombre: 'Pago único',
+      descripcion: '',
+      porcentaje: 100,
+      requiereEntrega: true,
+    }]
   }
   const primera = Math.min(50, porcentajeMaxPrimerHito.value)
   return [
-    { nombre: 'Seña', porcentaje: primera, requiereEntrega: true },
+    {
+      nombre: 'Seña',
+      descripcion: '',
+      porcentaje: primera,
+      requiereEntrega: true,
+    },
     {
       nombre: 'Entrega final',
+      descripcion: '',
       porcentaje: Math.round((100 - primera) * 100) / 100,
       requiereEntrega: true,
     },
@@ -267,7 +278,12 @@ function hitosPorDefecto() {
 
 function usarPagoUnico() {
   form.value.hitos = [
-    { nombre: 'Pago único', porcentaje: 100, requiereEntrega: true },
+    {
+      nombre: 'Pago único',
+      descripcion: '',
+      porcentaje: 100,
+      requiereEntrega: true,
+    },
   ]
 }
 
@@ -278,9 +294,15 @@ function usarSenaEntrega() {
 function usarSkeb() {
   const primera = Math.min(50, porcentajeMaxPrimerHito.value)
   form.value.hitos = [
-    { nombre: 'Seña', porcentaje: primera, requiereEntrega: false },
+    {
+      nombre: 'Seña',
+      descripcion: '',
+      porcentaje: primera,
+      requiereEntrega: false,
+    },
     {
       nombre: 'Entrega final',
+      descripcion: '',
       porcentaje: Math.round((100 - primera) * 100) / 100,
       requiereEntrega: true,
     },
@@ -296,10 +318,21 @@ function usarTresEtapas() {
   const resto = Math.round((100 - primera) * 100) / 100
   const cuota = Math.round((resto / 2) * 100) / 100
   form.value.hitos = [
-    { nombre: 'Seña', porcentaje: primera, requiereEntrega: true },
-    { nombre: 'Cuota 2', porcentaje: cuota, requiereEntrega: true },
+    {
+      nombre: 'Seña',
+      descripcion: '',
+      porcentaje: primera,
+      requiereEntrega: true,
+    },
+    {
+      nombre: 'Cuota 2',
+      descripcion: '',
+      porcentaje: cuota,
+      requiereEntrega: true,
+    },
     {
       nombre: 'Entrega final',
+      descripcion: '',
       porcentaje: Math.round((resto - cuota) * 100) / 100,
       requiereEntrega: true,
     },
@@ -310,6 +343,7 @@ function agregarHito() {
   if (form.value.hitos.length >= maxHitos.value) return
   form.value.hitos.push({
     nombre: `Cuota ${form.value.hitos.length + 1}`,
+    descripcion: '',
     porcentaje: 0,
     requiereEntrega: true,
   })
@@ -465,6 +499,10 @@ function validarPasoHitos() {
     return false
   }
   for (const hito of hitos) {
+    if ((hito.descripcion || '').length > 250) {
+      errorEnvio.value = 'El alcance de un hito no puede superar los 250 caracteres.'
+      return false
+    }
     const porcentaje = Number(hito.porcentaje)
     if (!Number.isFinite(porcentaje) || porcentaje <= 0 || porcentaje > 100) {
       errorEnvio.value = 'Cada hito debe tener un porcentaje mayor a 0 y hasta 100%.'
@@ -541,6 +579,7 @@ async function enviar() {
       })),
       hitos: form.value.hitos.map((hito) => ({
         nombre: hito.nombre?.trim() || null,
+        descripcion: hito.descripcion?.trim() || null,
         porcentaje: Number(hito.porcentaje),
         requiereEntrega: hito.requiereEntrega !== false,
       })),
@@ -1014,6 +1053,23 @@ onMounted(cargar)
               </div>
             </div>
 
+            <div class="mt-3">
+              <label :for="`hito-alcance-${indice}`" class="block text-xs text-cafe/60">
+                Alcance <span class="text-cafe/40">(opcional)</span>
+              </label>
+              <textarea
+                :id="`hito-alcance-${indice}`"
+                v-model="form.hitos[indice].descripcion"
+                rows="2"
+                maxlength="250"
+                placeholder="Ej. Bocetos de los 3 dibujos, o los dibujos 1 y 2 terminados."
+                class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              ></textarea>
+              <p class="mt-1 text-right text-[11px] text-cafe/40">
+                {{ (form.hitos[indice].descripcion || '').length }}/250
+              </p>
+            </div>
+
             <p class="mt-2 text-xs text-cafe/50">
               {{ hito.tipo === 'ENTREGA'
                 ? 'Se paga contra entrega, cuando el cliente ve el preview protegido.'
@@ -1154,10 +1210,15 @@ onMounted(cargar)
               <li
                 v-for="(hito, indice) in hitosPreview"
                 :key="indice"
-                class="flex items-center justify-between gap-3 rounded-xl bg-rosa/10 px-3 py-2 text-sm"
+                class="flex items-start justify-between gap-3 rounded-xl bg-rosa/10 px-3 py-2 text-sm"
               >
-                <span class="min-w-0 truncate text-cafe">
-                  {{ hito.nombre || etiquetaTipoHito(hito.tipo, form.hitos.length) }} · {{ hito.porcentaje }}%
+                <span class="min-w-0 text-cafe">
+                  <span class="block truncate">
+                    {{ hito.nombre || etiquetaTipoHito(hito.tipo, form.hitos.length) }} · {{ hito.porcentaje }}%
+                  </span>
+                  <span v-if="hito.descripcion" class="mt-0.5 block text-xs leading-relaxed text-cafe/55">
+                    {{ hito.descripcion }}
+                  </span>
                 </span>
                 <span class="shrink-0 font-semibold text-granate">
                   {{ formatear(hito.monto) }}

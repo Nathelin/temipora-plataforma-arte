@@ -5,4 +5,8 @@ public class FormatoArchivoInvalidoException extends RuntimeException {
     public FormatoArchivoInvalidoException() {
         super("El formato es inválido.");
     }
+
+    public FormatoArchivoInvalidoException(String mensaje) {
+        super(mensaje);
+    }
 }

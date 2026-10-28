@@ -3,9 +3,12 @@ package com.temipora.backend_springboot.servicios;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,8 +16,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
-import com.temipora.backend_springboot.modelo.EntregaHitoRequest;
+import com.temipora.backend_springboot.modelo.DibujoResumenDTO;
+import com.temipora.backend_springboot.modelo.EntregaHitoDTO;
+import com.temipora.backend_springboot.modelo.EntregaHitoMultipartRequest;
 import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
@@ -64,6 +70,7 @@ public class PedidoService {
     private final TerminosPlataformaService terminosPlataformaService;
     private final NotificacionService notificacionService;
     private final MonedaVistaService monedaVistaService;
+    private final EntregaService entregaService;
 
     public PedidoService(
             PedidoRepository pedidoRepository,
@@ -74,7 +81,8 @@ public class PedidoService {
             HitoFlujoService hitoFlujoService,
             TerminosPlataformaService terminosPlataformaService,
             NotificacionService notificacionService,
-            MonedaVistaService monedaVistaService) {
+            MonedaVistaService monedaVistaService,
+            EntregaService entregaService) {
         this.pedidoRepository = pedidoRepository;
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.pagoRepository = pagoRepository;
@@ -84,6 +92,7 @@ public class PedidoService {
         this.terminosPlataformaService = terminosPlataformaService;
         this.notificacionService = notificacionService;
         this.monedaVistaService = monedaVistaService;
+        this.entregaService = entregaService;
     }
 
     @Transactional
@@ -168,6 +177,8 @@ public class PedidoService {
             hito.setHitoPresupuesto(hitoPresupuesto);
             hito.setOrden(hitoPresupuesto.getOrden());
             hito.setNombre(hitoPresupuesto.getNombre());
+            hito.setDescripcion(hitoPresupuesto.getDescripcion());
+            hito.setPorcentaje(hitoPresupuesto.getPorcentaje());
             hito.setTipo(hitoPresupuesto.getTipo());
             hito.setRequiereEntrega(hitoPresupuesto.isRequiereEntrega());
             hito.setMonto(hitoPresupuesto.getMonto());
@@ -215,7 +226,8 @@ public class PedidoService {
     @Transactional
     public PedidoDTO entregar(
             Long idPedido, Long idHito, Long idArtista,
-            EntregaHitoRequest request) {
+            EntregaHitoMultipartRequest request,
+            List<MultipartFile> archivos) {
         Pedido pedido = pedidoRepository.findByIdPedidoForUpdate(idPedido)
             .orElseThrow(() -> new NoSuchElementException(
                 "Pedido no encontrado: " + idPedido));
@@ -253,12 +265,11 @@ public class PedidoService {
             throw new ConflictoException("La cuota todavía no está paga.");
         }
 
+        entregaService.crear(pedido, hito, request, archivos);
+
         LocalDateTime ahora = LocalDateTime.now();
         hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
         hito.setFechaEntrega(ahora);
-        hito.setEntregaDescripcion(
-            limpiarTexto(request.getDescripcion(), 500));
-        hito.setEntregaImagen(request.getImagen().trim());
         hito.setFechaLimiteAprobacion(null);
         if (hito.getTipo() == TipoHito.ENTREGA) {
             hito.setFechaLimitePago(
@@ -337,6 +348,7 @@ public class PedidoService {
         hitoPedidoRepository.save(hito);
         String motivo = limpiarTexto(
             request != null ? request.getMotivo() : null, 500);
+        entregaService.registrarRevision(hito, pedido.getCliente(), motivo);
         notificarRevision(pedido, hito, motivo);
         return construirDTO(pedido, idCliente);
     }
@@ -374,11 +386,16 @@ public class PedidoService {
 
     @Transactional(readOnly = true)
     public PedidoDTO obtener(Long idPedido, Long idUsuario) {
+        return obtener(idPedido, idUsuario, false);
+    }
+
+    @Transactional(readOnly = true)
+    public PedidoDTO obtener(Long idPedido, Long idUsuario, boolean esAdmin) {
         Pedido pedido = pedidoRepository.findById(idPedido)
             .orElseThrow(() -> new NoSuchElementException(
                 "Pedido no encontrado: " + idPedido));
-        validarVista(pedido, idUsuario);
-        return construirDTO(pedido, idUsuario);
+        validarVista(pedido, idUsuario, esAdmin);
+        return construirDTO(pedido, idUsuario, esAdmin);
     }
 
     @Transactional(readOnly = true)
@@ -479,9 +496,14 @@ public class PedidoService {
     }
 
     private PedidoDTO construirDTO(Pedido pedido, Long idVista) {
+        return construirDTO(pedido, idVista, false);
+    }
+
+    private PedidoDTO construirDTO(
+            Pedido pedido, Long idVista, boolean esAdmin) {
         boolean esArtista = pedido.getArtista().getIdUsuario().equals(idVista);
         boolean esCliente = pedido.getCliente().getIdUsuario().equals(idVista);
-        boolean incluirComision = esArtista;
+        boolean incluirComision = esArtista || esAdmin;
         LocalDateTime ahora = LocalDateTime.now();
         Moneda mostrada = monedaVistaService.preferidaDe(idVista);
         boolean muestraOrigen = PresupuestoDTO.mismaMoneda(
@@ -502,6 +524,14 @@ public class PedidoService {
         BigDecimal neto = BigDecimal.ZERO;
         BigDecimal netoCobro = BigDecimal.ZERO;
 
+        Map<Long, List<EntregaService.EntregaConArchivos>> entregasPorHito =
+            entregaService.listarPorPedido(pedido.getIdPedido()).stream()
+                .collect(Collectors.groupingBy(
+                    entrega -> entrega.entrega().getHitoPedido()
+                        .getIdHitoPedido(),
+                    LinkedHashMap::new,
+                    Collectors.toList()));
+
         for (HitoPedido hito : pedido.getHitos()) {
             List<Pago> pagos = pagoRepository
                 .findByHitoPedidoIdHitoPedidoOrderByFechaCreacionDesc(
@@ -511,9 +541,23 @@ public class PedidoService {
             boolean puedeAprobar = esCliente && puedeAprobar(hito);
             boolean puedeSolicitarRevision = esCliente
                 && hito.getEstadoEntrega() == EstadoEntregaHito.ENTREGADO;
-            boolean incluirEntrega = esArtista
+            boolean incluirEntrega = esArtista || esAdmin
                 || hito.getTipo() != TipoHito.ENTREGA
                 || hito.getEstadoPago() == EstadoPagoHito.PAGADO;
+            boolean incluirOriginal = esArtista || esAdmin
+                || hito.getEstadoPago() == EstadoPagoHito.PAGADO;
+            boolean hitoAprobado = esAprobado(hito)
+                || (hito.getTipo() == TipoHito.ENTREGA
+                    && hito.getEstadoPago() == EstadoPagoHito.PAGADO);
+            List<EntregaHitoDTO> entregasDto = entregasPorHito
+                .getOrDefault(hito.getIdHitoPedido(), List.of()).stream()
+                .map(entrega -> EntregaHitoDTO.desdeEntrega(
+                    entrega.entrega(),
+                    entrega.archivos(),
+                    pedido.getIdPedido(),
+                    incluirOriginal,
+                    entrega.entrega().isVigente() && hitoAprobado))
+                .toList();
             List<PagoDTO> pagosDto = pagos.stream()
                 .map(pago -> PagoDTO.desdePago(pago, esCliente))
                 .toList();
@@ -523,6 +567,7 @@ public class PedidoService {
                 pagosDto,
                 incluirComision,
                 incluirEntrega,
+                entregasDto,
                 puedePagar,
                 puedeEntregar,
                 puedeAprobar,
@@ -604,10 +649,15 @@ public class PedidoService {
             .terminosPlataformaAceptadosEn(
                 pedido.getTerminosPlataformaAceptadosEn())
             .hitos(hitosDto)
+            .dibujos(pedido.getSolicitud().getItems().stream()
+                .map(DibujoResumenDTO::desdeItem)
+                .toList())
             .puedeCancelar(esCliente
                 && (pedido.getEstado() == EstadoPedido.PENDIENTE_PAGO
                     || pedido.getEstado() == EstadoPedido.EN_CURSO))
-            .rolVista(esArtista ? "ARTISTA" : "CLIENTE")
+            .rolVista(esAdmin
+                ? "ADMIN"
+                : esArtista ? "ARTISTA" : "CLIENTE")
             .build();
     }
 
@@ -799,12 +849,13 @@ public class PedidoService {
         return null;
     }
 
-    private void validarVista(Pedido pedido, Long idUsuario) {
+    private void validarVista(
+            Pedido pedido, Long idUsuario, boolean esAdmin) {
         boolean esCliente = pedido.getCliente() != null
             && pedido.getCliente().getIdUsuario().equals(idUsuario);
         boolean esArtista = pedido.getArtista() != null
             && pedido.getArtista().getIdUsuario().equals(idUsuario);
-        if (!esCliente && !esArtista) {
+        if (!esAdmin && !esCliente && !esArtista) {
             throw new AccesoDenegadoException("No podés ver este pedido.");
         }
     }

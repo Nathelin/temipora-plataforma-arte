@@ -28,6 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class LocalStorageService implements StorageService {
 
     static final int MAX_LADO = 2048;
+    static final long MAX_BYTES_PUBLICO = 5L * 1024 * 1024;
 
     private static final String PREFIJO_UPLOADS = "/uploads/";
     private static final Pattern NOMBRE_UUID_WEBP = Pattern.compile(
@@ -43,6 +44,10 @@ public class LocalStorageService implements StorageService {
     public String guardar(MultipartFile archivo) {
         if (archivo == null || archivo.isEmpty()) {
             return null;
+        }
+        if (archivo.getSize() > MAX_BYTES_PUBLICO) {
+            throw new FormatoArchivoInvalidoException(
+                "La imagen no puede superar los 5 MB.");
         }
 
         try {

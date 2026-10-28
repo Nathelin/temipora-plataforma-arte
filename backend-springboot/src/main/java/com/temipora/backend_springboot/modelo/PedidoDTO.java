@@ -57,6 +57,7 @@ public class PedidoDTO {
     private Integer terminosPlataformaVersion;
     private LocalDateTime terminosPlataformaAceptadosEn;
     private List<HitoPedidoDTO> hitos;
+    private List<DibujoResumenDTO> dibujos;
     private boolean puedeCancelar;
     private String rolVista;
 }

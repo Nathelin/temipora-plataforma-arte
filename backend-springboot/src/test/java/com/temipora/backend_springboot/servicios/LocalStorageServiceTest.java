@@ -2,6 +2,8 @@ package com.temipora.backend_springboot.servicios;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
@@ -18,6 +20,7 @@ import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
 class LocalStorageServiceTest {
 
@@ -59,6 +62,18 @@ class LocalStorageServiceTest {
         Path guardado = directorio.resolve(ruta.substring("/uploads/".length()));
         assertThat(Files.exists(guardado)).isTrue();
         assertThat(Files.size(guardado)).isPositive();
+    }
+
+    @Test
+    void guardar_archivoMayorA5MB_lanzaError() {
+        MultipartFile grande = mock(MultipartFile.class);
+        when(grande.isEmpty()).thenReturn(false);
+        when(grande.getSize()).thenReturn(
+            LocalStorageService.MAX_BYTES_PUBLICO + 1);
+
+        assertThatThrownBy(() -> servicio().guardar(grande))
+            .isInstanceOf(FormatoArchivoInvalidoException.class)
+            .hasMessageContaining("5 MB");
     }
 
     @Test

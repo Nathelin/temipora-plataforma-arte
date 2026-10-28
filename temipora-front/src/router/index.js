@@ -299,6 +299,12 @@ const routes = [
         meta: { title: 'Hitos y pedidos' },
       },
       {
+        path: 'pedidos/:idPedido',
+        name: 'admin-pedido-detalle',
+        component: PedidoDetalle,
+        meta: { title: (route) => `Pedido #${route.params.idPedido}` },
+      },
+      {
         path: 'ajustes/terminos-plataforma',
         name: 'terminos-plataforma-admin',
         component: TerminosPlataformaAdmin,

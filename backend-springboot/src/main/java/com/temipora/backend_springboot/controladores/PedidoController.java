@@ -1,5 +1,8 @@
 package com.temipora.backend_springboot.controladores;
 
+import java.util.List;
+
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -8,9 +11,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
-import com.temipora.backend_springboot.modelo.EntregaHitoRequest;
+import com.temipora.backend_springboot.modelo.EntregaHitoMultipartRequest;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.PedidoDTO;
@@ -39,7 +44,10 @@ public class PedidoController {
     public PedidoDTO obtener(
             @PathVariable Long idPedido,
             Authentication authentication) {
-        return pedidoService.obtener(idPedido, idAutenticado(authentication));
+        return pedidoService.obtener(
+            idPedido,
+            idAutenticado(authentication),
+            esAdmin(authentication));
     }
 
     @GetMapping("/recibidos")
@@ -95,15 +103,18 @@ public class PedidoController {
             idPedido, idHito, idAutenticado(authentication), request);
     }
 
-    @PostMapping("/{idPedido}/hitos/{idHito}/entregar")
+    @PostMapping(
+        value = "/{idPedido}/hitos/{idHito}/entregas",
+        consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ARTISTA')")
     public PedidoDTO entregar(
             @PathVariable Long idPedido,
             @PathVariable Long idHito,
-            @Valid @RequestBody EntregaHitoRequest request,
+            @RequestPart("datos") @Valid EntregaHitoMultipartRequest datos,
+            @RequestPart("archivos") List<MultipartFile> archivos,
             Authentication authentication) {
         return pedidoService.entregar(
-            idPedido, idHito, idAutenticado(authentication), request);
+            idPedido, idHito, idAutenticado(authentication), datos, archivos);
     }
 
     @PostMapping("/{idPedido}/cancelar")
@@ -118,5 +129,10 @@ public class PedidoController {
     private Long idAutenticado(Authentication authentication) {
         return usuarioService.getByNombreUsuario(authentication.getName())
             .getIdUsuario();
+    }
+
+    private boolean esAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+            .anyMatch(autoridad -> "ROLE_ADMIN".equals(autoridad.getAuthority()));
     }
 }
