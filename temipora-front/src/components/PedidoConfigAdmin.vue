@@ -13,7 +13,7 @@ const diasAprobacionAutomatica = ref('7')
 const diasPagoCuota = ref('7')
 const maxHitos = ref('4')
 const porcentajeMaxPrimerHito = ref('50')
-const montoMinimoCuota = ref('1000')
+const montoMinimoCuota = ref('1')
 
 async function cargar() {
   cargando.value = true
@@ -25,7 +25,7 @@ async function cargar() {
     diasPagoCuota.value = res.data?.diasPagoCuota ?? 7
     maxHitos.value = res.data?.maxHitos ?? 4
     porcentajeMaxPrimerHito.value = res.data?.porcentajeMaxPrimerHito ?? 50
-    montoMinimoCuota.value = res.data?.montoMinimoCuota ?? 1000
+    montoMinimoCuota.value = res.data?.montoMinimoCuota ?? 1
   } catch (e) {
     error.value = e.response?.data?.message
       || 'No se pudo cargar la configuración de pedidos.'

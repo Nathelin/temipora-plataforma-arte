@@ -30,7 +30,7 @@ const comisionPorcentaje = ref(null)
 const configPedido = ref({
   maxHitos: 4,
   porcentajeMaxPrimerHito: 50,
-  montoMinimoCuota: 1000,
+  montoMinimoCuota: 1,
 })
 const cargando = ref(true)
 const errorCarga = ref('')

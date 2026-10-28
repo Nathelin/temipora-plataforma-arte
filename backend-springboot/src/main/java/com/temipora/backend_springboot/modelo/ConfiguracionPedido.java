@@ -25,7 +25,7 @@ public class ConfiguracionPedido {
     public static final BigDecimal PORCENTAJE_MAX_PRIMER_HITO_POR_DEFECTO =
         new BigDecimal("50.00");
     public static final BigDecimal MONTO_MINIMO_CUOTA_POR_DEFECTO =
-        new BigDecimal("1000.00");
+        new BigDecimal("1.00");
 
     @Id
     @Column(name = "id_configuracion", nullable = false)

@@ -156,6 +156,32 @@ class HitoCalculadoraTest {
     }
 
     @Test
+    void pedidoDeCien_sePuedeDividirEnDosCuotasConMinimoDeUnPeso() {
+        HitoCalculadora.Limites limites = new HitoCalculadora.Limites(
+            4, new BigDecimal("50.00"), new BigDecimal("1.00"));
+
+        List<HitoPresupuesto> hitos = construir(
+            List.of(hito("50"), hito("50")),
+            "100.00", "100.00", "10.00", "10.00", limites);
+
+        assertThat(hitos).hasSize(2);
+        assertThat(hitos.get(0).getMonto()).isEqualByComparingTo("50.00");
+        assertThat(hitos.get(1).getMonto()).isEqualByComparingTo("50.00");
+    }
+
+    @Test
+    void cuotaPorDebajoDeUnPeso_lanzaError() {
+        HitoCalculadora.Limites limites = new HitoCalculadora.Limites(
+            4, new BigDecimal("50.00"), new BigDecimal("1.00"));
+
+        assertThatThrownBy(() -> construir(
+            List.of(hito("50"), hito("50")),
+            "1.00", "1.00", "0.10", "0.10", limites))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("al menos");
+    }
+
+    @Test
     void superaElMaximoDeHitos_lanzaError() {
         assertThatThrownBy(() -> construir(
             List.of(hito("25"), hito("25"), hito("25"), hito("20"), hito("5")),
