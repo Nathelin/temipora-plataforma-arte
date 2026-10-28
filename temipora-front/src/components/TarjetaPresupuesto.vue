@@ -324,17 +324,7 @@ function formatearRecargo(recargo) {
 
     <div class="mt-5 flex flex-wrap items-center gap-3">
       <template v-if="!esArtista">
-        <template v-if="vigente">
-          <button
-            type="button"
-            disabled
-            class="inline-flex min-h-10 cursor-not-allowed items-center justify-center rounded-full bg-coral/40 px-5 text-sm font-semibold text-white/70"
-          >
-            Aceptar y pagar
-          </button>
-          <p class="text-xs text-cafe/50">El pago va a estar disponible en el próximo paso.</p>
-        </template>
-        <p v-else-if="vencido" class="text-xs leading-relaxed text-cafe/60">
+        <p v-if="vencido" class="text-xs leading-relaxed text-cafe/60">
           El presupuesto venció y ya no se puede pagar.
         </p>
         <p v-else-if="retirado" class="text-xs leading-relaxed text-cafe/60">

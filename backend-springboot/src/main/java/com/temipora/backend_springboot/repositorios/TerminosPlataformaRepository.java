@@ -12,6 +12,8 @@ public interface TerminosPlataformaRepository
 
     Optional<TerminosPlataforma> findFirstByVigenteTrueOrderByVersionDesc();
 
+    Optional<TerminosPlataforma> findByVersion(Integer version);
+
     Optional<TerminosPlataforma> findFirstByOrderByVersionDesc();
 
     List<TerminosPlataforma> findAllByOrderByVersionDesc();

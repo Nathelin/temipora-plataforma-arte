@@ -193,7 +193,7 @@ public class PresupuestoDTO {
             .build();
     }
 
-    static BigDecimal totalMostrado(
+    public static BigDecimal totalMostrado(
             BigDecimal nativo,
             BigDecimal cobro,
             boolean muestraOrigen,
@@ -244,7 +244,7 @@ public class PresupuestoDTO {
         return monto.multiply(factor).setScale(2, RoundingMode.HALF_UP);
     }
 
-    static boolean mismaMoneda(Moneda a, Moneda b) {
+    public static boolean mismaMoneda(Moneda a, Moneda b) {
         if (a == b) {
             return true;
         }

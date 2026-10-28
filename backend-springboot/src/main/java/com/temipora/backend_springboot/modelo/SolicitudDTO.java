@@ -42,6 +42,8 @@ public class SolicitudDTO {
     private LocalDateTime fechaCancelacion;
     private List<ItemSolicitudDTO> items;
     private PresupuestoDTO presupuesto;
+    private Long idPedido;
+    private EstadoPedido estadoPedido;
     private Integer posicionCola;
     private boolean puedePresupuestar;
     private String motivoNoPresupuestable;
@@ -118,6 +120,12 @@ public class SolicitudDTO {
                     factorOrigenDestino,
                     factorCobroDestino,
                     incluirComision)
+                : null)
+            .idPedido(solicitud.getPedido() != null
+                ? solicitud.getPedido().getIdPedido()
+                : null)
+            .estadoPedido(solicitud.getPedido() != null
+                ? solicitud.getPedido().getEstado()
                 : null)
             .build();
     }

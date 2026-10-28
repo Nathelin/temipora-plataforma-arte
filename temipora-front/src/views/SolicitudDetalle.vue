@@ -48,6 +48,9 @@ const fotoContraparte = computed(() => datosPersona.value?.foto || '')
 const inicialContraparte = computed(() => datosPersona.value?.inicial || '?')
 const estadoInfo = computed(() => estadoDe(solicitud.value?.estado))
 const tienePresupuesto = computed(() => Boolean(solicitud.value?.presupuesto))
+const nombreRutaPedido = computed(() => (
+  esArtistaDeLaSolicitud.value ? 'panel-pedido-detalle' : 'pedido-detalle'
+))
 
 const avisoServicio = computed(() => {
   const estado = solicitud.value?.estadoServicio
@@ -216,6 +219,14 @@ function irAPresupuestar() {
   if (!solicitud.value?.idSolicitud) return
   router.push({
     name: 'presupuesto-crear',
+    params: { idSolicitud: solicitud.value.idSolicitud },
+  })
+}
+
+function irAPagar() {
+  if (!solicitud.value?.idSolicitud) return
+  router.push({
+    name: 'pago-presupuesto',
     params: { idSolicitud: solicitud.value.idSolicitud },
   })
 }
@@ -798,6 +809,28 @@ onMounted(cargar)
                 class="inline-flex text-xs font-semibold text-coral transition hover:text-rojizo"
               >
                 Editar servicio para ampliar cupos →
+              </router-link>
+            </div>
+
+            <div
+              v-if="!esArtistaDeLaSolicitud && solicitud.estado === 'PRESUPUESTADA' && solicitud.presupuesto"
+              class="mt-4 grid gap-2"
+            >
+              <button
+                type="button"
+                class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+                @click="irAPagar"
+              >
+                Aceptar y pagar
+              </button>
+            </div>
+
+            <div v-if="solicitud.idPedido" class="mt-4 grid gap-2">
+              <router-link
+                :to="{ name: nombreRutaPedido, params: { idPedido: solicitud.idPedido } }"
+                class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+              >
+                Ver pedido
               </router-link>
             </div>
 

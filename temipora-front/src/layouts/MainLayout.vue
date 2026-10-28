@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import BrandLogo from '../components/BrandLogo.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
+import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
 
 const router = useRouter()
 
@@ -101,6 +102,13 @@ function irAPerfil() {
               class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
             >
               Solicitudes
+            </router-link>
+            <router-link
+              v-if="estaLogueado && !esAdmin"
+              to="/pedidos"
+              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+            >
+              Pedidos
             </router-link>
             <router-link
               v-if="estaLogueado"
@@ -382,5 +390,7 @@ function irAPerfil() {
         </div>
       </div>
     </footer>
+
+    <AceptacionTerminosModal />
   </div>
 </template>

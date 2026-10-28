@@ -2,7 +2,6 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../servicios/api'
-import { formatearMonto } from '../servicios/moneda'
 
 const router = useRouter()
 const terminos = ref(null)
@@ -63,16 +62,6 @@ onMounted(cargar)
           <p class="mb-4 text-sm text-cafe/50">
             Última actualización: {{ formatearFecha(terminos.fechaPublicacion) }}
           </p>
-
-          <div class="mb-6 rounded-2xl border border-coral/25 bg-coral/5 px-4 py-3 text-sm">
-            <p class="font-semibold text-granate">Comisión vigente de la plataforma</p>
-            <p class="mt-1 text-cafe/75">
-              Servicios: {{ formatearMonto(terminos.comisionServicio) }}% ·
-              Productos: {{ formatearMonto(terminos.comisionProducto) }}%.
-              La comisión se descuenta del precio que recibe el artista; el cliente paga el
-              precio final del presupuesto sin recargos adicionales.
-            </p>
-          </div>
 
           <p class="whitespace-pre-line">{{ terminos.contenido }}</p>
         </template>

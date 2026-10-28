@@ -341,6 +341,9 @@ public class PresupuestoService {
                     || solicitud.getEstado() != EstadoSolicitud.PRESUPUESTADA) {
                 continue;
             }
+            if (solicitud.getPedido() != null) {
+                continue;
+            }
             if (presupuesto.getFechaVencimiento() == null
                     || !presupuesto.getFechaVencimiento().isBefore(ahora)) {
                 continue;

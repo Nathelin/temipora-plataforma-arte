@@ -97,6 +97,9 @@ public class Solicitud {
     @OneToOne(mappedBy = "solicitud", fetch = FetchType.LAZY)
     private Presupuesto presupuesto;
 
+    @OneToOne(mappedBy = "solicitud", fetch = FetchType.LAZY)
+    private Pedido pedido;
+
     public void agregarItem(ItemSolicitud item) {
         item.setSolicitud(this);
         this.items.add(item);

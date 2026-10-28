@@ -32,6 +32,9 @@ import SolicitudServicio from '../views/SolicitudServicio.vue'
 import SolicitudDetalle from '../views/SolicitudDetalle.vue'
 import Solicitudes from '../views/Solicitudes.vue'
 import PresupuestoForm from '../views/PresupuestoForm.vue'
+import PagoPresupuesto from '../views/PagoPresupuesto.vue'
+import Pedidos from '../views/Pedidos.vue'
+import PedidoDetalle from '../views/PedidoDetalle.vue'
 import Notificaciones from '../views/Notificaciones.vue'
 import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
 import ConfiguracionApariencia from '../views/ConfiguracionApariencia.vue'
@@ -125,6 +128,31 @@ const routes = [
         },
       },
       {
+        path: 'solicitudes/:idSolicitud/pagar',
+        name: 'pago-presupuesto',
+        component: PagoPresupuesto,
+        meta: {
+          title: 'Pagar presupuesto',
+          requiresAuth: true,
+          requiresComprador: true,
+        },
+      },
+      {
+        path: 'pedidos',
+        name: 'pedidos',
+        component: Pedidos,
+        meta: { title: 'Pedidos', requiresAuth: true },
+      },
+      {
+        path: 'pedidos/:idPedido',
+        name: 'pedido-detalle',
+        component: PedidoDetalle,
+        meta: {
+          title: (route) => `Pedido #${route.params.idPedido}`,
+          requiresAuth: true,
+        },
+      },
+      {
         path: 'panel',
         component: ArtistLayout,
         meta: { requiresAuth: true, requiresArtist: true },
@@ -136,6 +164,8 @@ const routes = [
           { path: 'servicios/:id/solicitudes', name: 'servicio-solicitudes', component: ServicioSolicitudes, meta: { title: 'Solicitudes del servicio' } },
           { path: 'solicitudes', name: 'panel-solicitudes', component: Solicitudes, meta: { title: 'Solicitudes' } },
           { path: 'solicitudes/:idSolicitud/presupuesto', name: 'presupuesto-crear', component: PresupuestoForm, meta: { title: 'Enviar presupuesto' } },
+          { path: 'pedidos', name: 'panel-pedidos', component: Pedidos, meta: { title: 'Pedidos' } },
+          { path: 'pedidos/:idPedido', name: 'panel-pedido-detalle', component: PedidoDetalle, meta: { title: 'Pedido' } },
           { path: 'formulario-pedidos', name: 'panel-formulario-pedidos', component: ConfiguracionFormularioPedidos, meta: { title: 'Formulario de pedidos' } },
           { path: 'terminos', name: 'panel-terminos', component: ConfiguracionTerminosArtista, meta: { title: 'Términos y condiciones' } },
           { path: 'etiquetas', name: 'panel-etiquetas', component: ConfiguracionEtiquetas, meta: { title: 'Mis etiquetas' } },
