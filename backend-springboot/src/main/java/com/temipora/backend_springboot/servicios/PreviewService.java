@@ -27,7 +27,7 @@ public class PreviewService {
 
     static final int MAX_LADO = 1200;
     private static final int MAX_LADO_LIMPIA = 1600;
-    private static final float OPACIDAD = 0.38f;
+    private static final float OPACIDAD = 0.8f;
 
     public byte[] generar(byte[] original, String marca) {
         BufferedImage fuente = leer(original);
@@ -126,9 +126,11 @@ public class PreviewService {
     }
 
     private BufferedImage desenfocar(BufferedImage imagen) {
-        int radio = Math.max(3,
+        int radioBase = Math.max(3,
             Math.min(imagen.getWidth(), imagen.getHeight()) / 160);
-        radio = Math.min(radio, 10);
+        radioBase = Math.min(radioBase, 10);
+        int radio = Math.min(9,
+            Math.max(4, Math.round(radioBase * 1.3f)));
         int tam = radio * 2 + 1;
         float sigma = Math.max(1f, radio / 2f);
         float[] valores = new float[tam * tam];
