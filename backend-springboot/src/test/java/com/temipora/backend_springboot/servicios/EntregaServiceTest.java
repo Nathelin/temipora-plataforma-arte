@@ -8,15 +8,25 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -167,6 +177,115 @@ class EntregaServiceTest {
 
         hito.setEstadoPago(EstadoPagoHito.PAGADO);
         assertThat(entregaService.puedeVerOriginal(archivo, false, false)).isTrue();
+    }
+
+    @Test
+    void escribirZip_incluyeLosArchivosYElManifiesto() throws Exception {
+        Pedido pedido = pedido();
+        HitoPedido hito = hito(pedido);
+        EntregaHito entrega = new EntregaHito();
+        entrega.setIdEntrega(7L);
+        entrega.setNumero(1);
+        entrega.setHitoPedido(hito);
+        entrega.setFechaEntrega(LocalDateTime.now());
+
+        EntregaArchivo archivo = new EntregaArchivo();
+        archivo.setIdArchivo(9L);
+        archivo.setNombreOriginal("a.png");
+        archivo.setClaveOriginal("clave.png");
+        archivo.setSha256("h".repeat(64));
+        archivo.setRetirado(false);
+
+        when(almacen.abrir("clave.png")).thenReturn(
+            new ByteArrayResource(new byte[] { 1, 2, 3 }));
+
+        ByteArrayOutputStream salida = new ByteArrayOutputStream();
+        entregaService.escribirZip(
+            new EntregaService.EntregaConArchivos(
+                entrega, List.of(archivo)),
+            salida);
+
+        Map<String, String> entradas = new LinkedHashMap<>();
+        try (ZipInputStream zip = new ZipInputStream(
+                new ByteArrayInputStream(salida.toByteArray()))) {
+            ZipEntry entrada;
+            while ((entrada = zip.getNextEntry()) != null) {
+                entradas.put(entrada.getName(),
+                    new String(zip.readAllBytes(), StandardCharsets.UTF_8));
+            }
+        }
+
+        assertThat(entradas).containsKey("General - a.png");
+        assertThat(entradas).containsKey("manifiesto.txt");
+        assertThat(entradas.get("manifiesto.txt"))
+            .contains("Pedido #1")
+            .contains("sha256=");
+    }
+
+    @Test
+    void listarPorPedido_agrupaLosArchivosPorEntrega() {
+        Pedido pedido = pedido();
+        HitoPedido hito = hito(pedido);
+        EntregaHito entrega = new EntregaHito();
+        entrega.setIdEntrega(7L);
+        entrega.setHitoPedido(hito);
+        EntregaArchivo archivo = new EntregaArchivo();
+        archivo.setIdArchivo(9L);
+        archivo.setEntrega(entrega);
+        archivo.setClaveOriginal("clave.png");
+
+        when(entregaRepository.listarPorPedido(1L))
+            .thenReturn(List.of(entrega));
+        when(archivoRepository.listarPorEntregas(List.of(7L)))
+            .thenReturn(List.of(archivo));
+
+        List<EntregaService.EntregaConArchivos> resultado =
+            entregaService.listarPorPedido(1L);
+
+        assertThat(resultado).hasSize(1);
+        assertThat(resultado.get(0).archivos()).containsExactly(archivo);
+    }
+
+    @Test
+    void obtenerEntrega_devuelveLaEntregaConSusArchivos() {
+        Pedido pedido = pedido();
+        HitoPedido hito = hito(pedido);
+        EntregaHito entrega = new EntregaHito();
+        entrega.setIdEntrega(7L);
+        entrega.setHitoPedido(hito);
+        EntregaArchivo archivo = new EntregaArchivo();
+        archivo.setIdArchivo(9L);
+        archivo.setEntrega(entrega);
+
+        when(entregaRepository.buscarDelPedido(7L, 1L))
+            .thenReturn(Optional.of(entrega));
+        when(archivoRepository.listarPorEntregas(List.of(7L)))
+            .thenReturn(List.of(archivo));
+
+        EntregaService.EntregaConArchivos resultado =
+            entregaService.obtenerEntrega(1L, 7L);
+
+        assertThat(resultado.entrega()).isSameAs(entrega);
+        assertThat(resultado.archivos()).containsExactly(archivo);
+    }
+
+    @Test
+    void abrirPreview_conPreview_devuelveElRecurso() {
+        EntregaArchivo archivo = new EntregaArchivo();
+        archivo.setClavePreview("preview.webp");
+        ByteArrayResource recurso =
+            new ByteArrayResource(new byte[] { 1 });
+
+        when(almacen.abrir("preview.webp")).thenReturn(recurso);
+
+        assertThat(entregaService.abrirPreview(archivo)).isSameAs(recurso);
+    }
+
+    @Test
+    void abrirPreview_sinPreview_lanzaError() {
+        assertThatThrownBy(() -> entregaService.abrirPreview(
+            new EntregaArchivo()))
+            .isInstanceOf(NoSuchElementException.class);
     }
 
     private void prepararPreview() {

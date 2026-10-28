@@ -1,0 +1,572 @@
+package com.temipora.backend_springboot.servicios;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.temipora.backend_springboot.modelo.EntregaHitoMultipartRequest;
+import com.temipora.backend_springboot.modelo.ETiempoEntregaUnidad;
+import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
+import com.temipora.backend_springboot.modelo.EstadoPago;
+import com.temipora.backend_springboot.modelo.EstadoPagoHito;
+import com.temipora.backend_springboot.modelo.EstadoPedido;
+import com.temipora.backend_springboot.modelo.EstadoSolicitud;
+import com.temipora.backend_springboot.modelo.HitoPedido;
+import com.temipora.backend_springboot.modelo.HitoPresupuesto;
+import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
+import com.temipora.backend_springboot.modelo.Pago;
+import com.temipora.backend_springboot.modelo.Pedido;
+import com.temipora.backend_springboot.modelo.PedidoDTO;
+import com.temipora.backend_springboot.modelo.PedidoResumenDTO;
+import com.temipora.backend_springboot.modelo.Presupuesto;
+import com.temipora.backend_springboot.modelo.Servicio;
+import com.temipora.backend_springboot.modelo.Solicitud;
+import com.temipora.backend_springboot.modelo.SolicitudRevisionRequest;
+import com.temipora.backend_springboot.modelo.TipoHito;
+import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
+import com.temipora.backend_springboot.repositorios.PagoRepository;
+import com.temipora.backend_springboot.repositorios.PedidoRepository;
+import com.temipora.backend_springboot.repositorios.SolicitudRepository;
+
+@ExtendWith(MockitoExtension.class)
+class PedidoServiceTest {
+
+    private static final Long CLIENTE = 1L;
+    private static final Long ARTISTA = 2L;
+    private static final Long PEDIDO = 10L;
+    private static final Long HITO = 20L;
+
+    @Mock
+    private PedidoRepository pedidoRepository;
+    @Mock
+    private HitoPedidoRepository hitoPedidoRepository;
+    @Mock
+    private PagoRepository pagoRepository;
+    @Mock
+    private SolicitudRepository solicitudRepository;
+    @Mock
+    private PagoService pagoService;
+    @Mock
+    private HitoFlujoService hitoFlujoService;
+    @Mock
+    private TerminosPlataformaService terminosPlataformaService;
+    @Mock
+    private NotificacionService notificacionService;
+    @Mock
+    private MonedaVistaService monedaVistaService;
+    @Mock
+    private EntregaService entregaService;
+    @Mock
+    private PedidoCierreService pedidoCierreService;
+
+    @InjectMocks
+    private PedidoService pedidoService;
+
+    private Usuario cliente;
+    private Usuario artista;
+    private Moneda moneda;
+    private Servicio servicio;
+    private Presupuesto presupuesto;
+    private HitoPresupuesto hitoPresupuesto;
+    private Solicitud solicitud;
+    private Pedido pedido;
+    private HitoPedido hito;
+
+    @BeforeEach
+    void setUp() {
+        cliente = usuario(CLIENTE, "cliente");
+        artista = usuario(ARTISTA, "artista");
+
+        moneda = Moneda.builder()
+            .idMoneda(3L)
+            .codigo("ARS")
+            .nombre("Peso argentino")
+            .build();
+
+        servicio = new Servicio();
+        servicio.setIdServicio(5L);
+        servicio.setNombre("Ilustración");
+
+        presupuesto = new Presupuesto();
+        presupuesto.setIdPresupuesto(7L);
+        presupuesto.setPrecioFinal(new BigDecimal("100.00"));
+        presupuesto.setPrecioFinalCobro(new BigDecimal("100.00"));
+        presupuesto.setPrecioBaseTotal(new BigDecimal("100.00"));
+        presupuesto.setComisionPorcentaje(new BigDecimal("10.00"));
+        presupuesto.setComisionMonto(new BigDecimal("10.00"));
+        presupuesto.setComisionMontoCobro(new BigDecimal("10.00"));
+        presupuesto.setMontoNetoArtista(new BigDecimal("90.00"));
+        presupuesto.setMontoNetoArtistaCobro(new BigDecimal("90.00"));
+        presupuesto.setMoneda(moneda);
+        presupuesto.setMonedaCobro(moneda);
+        presupuesto.setCotizacionCobro(BigDecimal.ONE);
+        presupuesto.setTiempoEntregaValor(2);
+        presupuesto.setTiempoEntregaUnidad(ETiempoEntregaUnidad.SEMANAS);
+        presupuesto.setTiempoEntregaDias(14);
+
+        hitoPresupuesto = new HitoPresupuesto();
+        hitoPresupuesto.setIdHitoPresupuesto(8L);
+        hitoPresupuesto.setPresupuesto(presupuesto);
+        hitoPresupuesto.setOrden(0);
+        hitoPresupuesto.setNombre("Pago único");
+        hitoPresupuesto.setDescripcion("Bocetos");
+        hitoPresupuesto.setTipo(TipoHito.SENA);
+        hitoPresupuesto.setPorcentaje(new BigDecimal("100.00"));
+        hitoPresupuesto.setMonto(new BigDecimal("100.00"));
+        hitoPresupuesto.setMontoCobro(new BigDecimal("100.00"));
+        hitoPresupuesto.setComisionMonto(new BigDecimal("10.00"));
+        hitoPresupuesto.setComisionMontoCobro(new BigDecimal("10.00"));
+        hitoPresupuesto.setMontoNeto(new BigDecimal("90.00"));
+        hitoPresupuesto.setMontoNetoCobro(new BigDecimal("90.00"));
+        hitoPresupuesto.setRequiereEntrega(true);
+        presupuesto.setHitos(new ArrayList<>(List.of(hitoPresupuesto)));
+
+        solicitud = new Solicitud();
+        solicitud.setIdSolicitud(9L);
+        solicitud.setCliente(cliente);
+        solicitud.setArtista(artista);
+        solicitud.setServicio(servicio);
+        solicitud.setPresupuesto(presupuesto);
+        solicitud.setEstado(EstadoSolicitud.PRESUPUESTADA);
+        solicitud.setItems(new ArrayList<>());
+
+        pedido = new Pedido();
+        pedido.setIdPedido(PEDIDO);
+        pedido.setSolicitud(solicitud);
+        pedido.setPresupuesto(presupuesto);
+        pedido.setCliente(cliente);
+        pedido.setArtista(artista);
+        pedido.setServicio(servicio);
+        pedido.setEstado(EstadoPedido.PENDIENTE_PAGO);
+        pedido.setPrecioFinal(new BigDecimal("100.00"));
+        pedido.setPrecioFinalCobro(new BigDecimal("100.00"));
+        pedido.setMoneda(moneda);
+        pedido.setMonedaCobro(moneda);
+        pedido.setCotizacionCobro(BigDecimal.ONE);
+        pedido.setComisionPorcentaje(new BigDecimal("10.00"));
+
+        hito = new HitoPedido();
+        hito.setIdHitoPedido(HITO);
+        hito.setPedido(pedido);
+        hito.setHitoPresupuesto(hitoPresupuesto);
+        hito.setOrden(0);
+        hito.setNombre("Pago único");
+        hito.setDescripcion("Bocetos");
+        hito.setPorcentaje(new BigDecimal("100.00"));
+        hito.setTipo(TipoHito.SENA);
+        hito.setRequiereEntrega(true);
+        hito.setMonto(new BigDecimal("100.00"));
+        hito.setMontoCobro(new BigDecimal("100.00"));
+        hito.setComisionMonto(new BigDecimal("10.00"));
+        hito.setComisionMontoCobro(new BigDecimal("10.00"));
+        hito.setMontoNeto(new BigDecimal("90.00"));
+        hito.setMontoNetoCobro(new BigDecimal("90.00"));
+        hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
+        hito.setEstadoEntrega(EstadoEntregaHito.NO_INICIADO);
+        pedido.agregarHito(hito);
+
+        lenient().when(monedaVistaService.preferidaDe(anyLong()))
+            .thenReturn(moneda);
+        lenient().when(monedaVistaService.factorOrigenAMostrada(
+            any(), any(), any())).thenReturn(BigDecimal.ONE);
+        lenient().when(monedaVistaService.factorCobroAMostrada(
+            any(), any())).thenReturn(BigDecimal.ONE);
+        lenient().when(entregaService.listarPorPedido(anyLong()))
+            .thenReturn(List.of());
+        lenient().when(pagoRepository
+            .findByHitoPedidoIdHitoPedidoOrderByFechaCreacionDesc(anyLong()))
+            .thenReturn(List.of());
+        lenient().when(pedidoRepository.save(any()))
+            .thenAnswer(invocacion -> invocacion.getArgument(0));
+        lenient().when(hitoPedidoRepository.save(any()))
+            .thenAnswer(invocacion -> invocacion.getArgument(0));
+        lenient().when(solicitudRepository.save(any()))
+            .thenAnswer(invocacion -> invocacion.getArgument(0));
+    }
+
+    @Test
+    void crearDesdePresupuesto_conSena_creaElPagoInicial() {
+        prepararCreacion();
+
+        PedidoDTO dto = pedidoService.crearDesdePresupuesto(
+            solicitud.getIdSolicitud(), CLIENTE);
+
+        assertThat(dto.getEstado()).isEqualTo("PENDIENTE_PAGO");
+        assertThat(dto.getHitos()).hasSize(1);
+        verify(pagoService).iniciarPago(any(HitoPedido.class), any(Pedido.class));
+        verify(pagoService, never()).cancelarPendientes(any());
+    }
+
+    @Test
+    void crearDesdePresupuesto_conEntrega_iniciaSinPago() {
+        hitoPresupuesto.setTipo(TipoHito.ENTREGA);
+        hitoPresupuesto.setNombre("Entrega final");
+        prepararCreacion();
+
+        PedidoDTO dto = pedidoService.crearDesdePresupuesto(
+            solicitud.getIdSolicitud(), CLIENTE);
+
+        assertThat(dto.getEstado()).isEqualTo("EN_CURSO");
+        assertThat(dto.getFechaInicio()).isNotNull();
+        assertThat(dto.getLimiteEntrega()).isNotNull();
+        verify(pagoService).cancelarPendientes(any(HitoPedido.class));
+        verify(pagoService, never()).iniciarPago(any(), any());
+    }
+
+    @Test
+    void crearDesdePresupuesto_pedidoExistenteSena_iniciaElPago() {
+        pedido.setEstado(EstadoPedido.PENDIENTE_PAGO);
+        when(solicitudRepository.findByIdSolicitudForUpdate(
+            solicitud.getIdSolicitud())).thenReturn(Optional.of(solicitud));
+        when(pedidoRepository.findBySolicitudIdSolicitud(
+            solicitud.getIdSolicitud())).thenReturn(Optional.of(pedido));
+        when(pagoRepository.findFirstByHitoPedidoIdHitoPedidoAndEstado(
+            HITO, EstadoPago.PENDIENTE)).thenReturn(Optional.empty());
+
+        PedidoDTO dto = pedidoService.crearDesdePresupuesto(
+            solicitud.getIdSolicitud(), CLIENTE);
+
+        assertThat(dto.getEstado()).isEqualTo("PENDIENTE_PAGO");
+        verify(pagoService).iniciarPago(hito, pedido);
+    }
+
+    @Test
+    void crearDesdePresupuesto_pedidoExistenteEntrega_iniciaSinPago() {
+        hito.setTipo(TipoHito.ENTREGA);
+        hito.setNombre("Entrega final");
+        when(solicitudRepository.findByIdSolicitudForUpdate(
+            solicitud.getIdSolicitud())).thenReturn(Optional.of(solicitud));
+        when(pedidoRepository.findBySolicitudIdSolicitud(
+            solicitud.getIdSolicitud())).thenReturn(Optional.of(pedido));
+
+        PedidoDTO dto = pedidoService.crearDesdePresupuesto(
+            solicitud.getIdSolicitud(), CLIENTE);
+
+        assertThat(dto.getEstado()).isEqualTo("EN_CURSO");
+        verify(pagoService).cancelarPendientes(hito);
+        verify(pagoService, never()).iniciarPago(any(), any());
+    }
+
+    @Test
+    void pagarHito_sena_creaElPago() {
+        pedido.setEstado(EstadoPedido.PENDIENTE_PAGO);
+        bloquearPedidoYHito();
+        when(pagoRepository
+            .findByHitoPedidoIdHitoPedidoOrderByFechaCreacionDesc(HITO))
+            .thenReturn(List.of());
+
+        PedidoDTO dto = pedidoService.pagarHito(PEDIDO, HITO, CLIENTE);
+
+        assertThat(dto).isNotNull();
+        verify(pagoService).iniciarPago(hito, pedido);
+    }
+
+    @Test
+    void entregar_sena_marcaEntregadoYNotifica() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PAGADO);
+        bloquearPedidoYHito();
+
+        PedidoDTO dto = pedidoService.entregar(
+            PEDIDO, HITO, ARTISTA,
+            new EntregaHitoMultipartRequest(), List.<MultipartFile>of());
+
+        assertThat(dto).isNotNull();
+        assertThat(hito.getEstadoEntrega())
+            .isEqualTo(EstadoEntregaHito.ENTREGADO);
+        assertThat(hito.getFechaEntrega()).isNotNull();
+        assertThat(hito.getFechaLimiteAprobacion()).isNotNull();
+        verify(entregaService).crear(eq(pedido), eq(hito), any(), any());
+    }
+
+    @Test
+    void entregar_entregaUnica_permiteSinEtapaAnterior() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setTipo(TipoHito.ENTREGA);
+        hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
+        bloquearPedidoYHito();
+
+        PedidoDTO dto = pedidoService.entregar(
+            PEDIDO, HITO, ARTISTA,
+            new EntregaHitoMultipartRequest(), List.<MultipartFile>of());
+
+        assertThat(dto).isNotNull();
+        assertThat(hito.getEstadoEntrega())
+            .isEqualTo(EstadoEntregaHito.ENTREGADO);
+        assertThat(hito.getFechaLimitePago()).isNotNull();
+    }
+
+    @Test
+    void aprobar_senaUnica_finalizaElPedido() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PAGADO);
+        hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
+        bloquearPedidoYHito();
+        when(hitoFlujoService.habilitarSiguiente(any(), any(), any()))
+            .thenReturn(null);
+
+        PedidoDTO dto = pedidoService.aprobar(PEDIDO, HITO, CLIENTE);
+
+        assertThat(dto).isNotNull();
+        assertThat(hito.getEstadoEntrega())
+            .isEqualTo(EstadoEntregaHito.APROBADO);
+        verify(pedidoCierreService).finalizar(eq(pedido), any());
+    }
+
+    @Test
+    void aprobar_conSiguienteHito_noFinaliza() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PAGADO);
+        hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
+        bloquearPedidoYHito();
+        HitoPedido siguiente = new HitoPedido();
+        siguiente.setIdHitoPedido(21L);
+        siguiente.setOrden(1);
+        siguiente.setTipo(TipoHito.ENTREGA);
+        when(hitoFlujoService.habilitarSiguiente(any(), any(), any()))
+            .thenReturn(siguiente);
+
+        pedidoService.aprobar(PEDIDO, HITO, CLIENTE);
+
+        verify(pedidoCierreService, never()).finalizar(any(), any());
+    }
+
+    @Test
+    void solicitarRevision_marcaElHitoYRegistraElMotivo() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PAGADO);
+        hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
+        bloquearPedidoYHito();
+        SolicitudRevisionRequest request = new SolicitudRevisionRequest();
+        request.setMotivo("Cambiar la pose");
+
+        PedidoDTO dto = pedidoService.solicitarRevision(
+            PEDIDO, HITO, CLIENTE, request);
+
+        assertThat(dto).isNotNull();
+        assertThat(hito.getEstadoEntrega())
+            .isEqualTo(EstadoEntregaHito.CON_REVISION);
+        verify(entregaService).registrarRevision(
+            hito, cliente, "Cambiar la pose");
+    }
+
+    @Test
+    void cancelar_pedidoEnCurso_cancelaHitosPendientes() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
+        when(pedidoRepository.findByIdPedidoForUpdate(PEDIDO))
+            .thenReturn(Optional.of(pedido));
+
+        PedidoDTO dto = pedidoService.cancelar(PEDIDO, CLIENTE);
+
+        assertThat(dto).isNotNull();
+        assertThat(pedido.getEstado()).isEqualTo(EstadoPedido.CANCELADO);
+        assertThat(hito.getEstadoPago()).isEqualTo(EstadoPagoHito.CANCELADO);
+        verify(pagoService).cancelarPendientes(hito);
+    }
+
+    @Test
+    void pagarHito_conPagoPendiente_lanzaConflicto() {
+        pedido.setEstado(EstadoPedido.PENDIENTE_PAGO);
+        bloquearPedidoYHito();
+        Pago pago = new Pago();
+        pago.setEstado(EstadoPago.PENDIENTE);
+        when(pagoRepository
+            .findByHitoPedidoIdHitoPedidoOrderByFechaCreacionDesc(HITO))
+            .thenReturn(List.of(pago));
+
+        assertThatThrownBy(() -> pedidoService.pagarHito(PEDIDO, HITO, CLIENTE))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("pago pendiente");
+    }
+
+    @Test
+    void solicitarRevision_sinEntregar_lanzaConflicto() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PAGADO);
+        hito.setEstadoEntrega(EstadoEntregaHito.NO_INICIADO);
+        bloquearPedidoYHito();
+
+        assertThatThrownBy(() -> pedidoService.solicitarRevision(
+            PEDIDO, HITO, CLIENTE, new SolicitudRevisionRequest()))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("revisión");
+    }
+
+    @Test
+    void cancelar_pedidoFinalizado_lanzaConflicto() {
+        pedido.setEstado(EstadoPedido.FINALIZADO);
+        when(pedidoRepository.findByIdPedidoForUpdate(PEDIDO))
+            .thenReturn(Optional.of(pedido));
+
+        assertThatThrownBy(() -> pedidoService.cancelar(PEDIDO, CLIENTE))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("cerrado");
+    }
+
+    @Test
+    void entregar_otroArtista_lanzaAccesoDenegado() {
+        when(pedidoRepository.findByIdPedidoForUpdate(PEDIDO))
+            .thenReturn(Optional.of(pedido));
+
+        assertThatThrownBy(() -> pedidoService.entregar(
+            PEDIDO, HITO, 99L,
+            new EntregaHitoMultipartRequest(), List.<MultipartFile>of()))
+            .isInstanceOf(AccesoDenegadoException.class);
+    }
+
+    @Test
+    void aprobarAutomaticamente_ignoraEntregasFinales() {
+        hito.setTipo(TipoHito.ENTREGA);
+        hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
+        hito.setFechaLimiteAprobacion(LocalDateTime.now().minusDays(1));
+        when(hitoPedidoRepository
+            .findByEstadoEntregaAndFechaLimiteAprobacionBefore(
+                eq(EstadoEntregaHito.ENTREGADO), any()))
+            .thenReturn(List.of(hito));
+        when(hitoPedidoRepository.findByIdHitoPedidoForUpdate(HITO))
+            .thenReturn(Optional.of(hito));
+
+        int aprobados = pedidoService.aprobarAutomaticamente();
+
+        assertThat(aprobados).isZero();
+        verify(pedidoCierreService, never()).finalizar(any(), any());
+    }
+
+    @Test
+    void aprobarAutomaticamente_apruebaYFinaliza() {
+        hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
+        hito.setFechaLimiteAprobacion(LocalDateTime.now().minusDays(1));
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        when(hitoPedidoRepository
+            .findByEstadoEntregaAndFechaLimiteAprobacionBefore(
+                eq(EstadoEntregaHito.ENTREGADO), any()))
+            .thenReturn(List.of(hito));
+        when(hitoPedidoRepository.findByIdHitoPedidoForUpdate(HITO))
+            .thenReturn(Optional.of(hito));
+        when(pedidoRepository.findByIdPedidoForUpdate(PEDIDO))
+            .thenReturn(Optional.of(pedido));
+        when(hitoFlujoService.habilitarSiguiente(any(), any(), any()))
+            .thenReturn(null);
+
+        int aprobados = pedidoService.aprobarAutomaticamente();
+
+        assertThat(aprobados).isEqualTo(1);
+        assertThat(hito.getEstadoEntrega())
+            .isEqualTo(EstadoEntregaHito.APROBADO_AUTOMATICAMENTE);
+        verify(pedidoCierreService).finalizar(eq(pedido), any());
+    }
+
+    @Test
+    void expirarHitos_marcaElPedidoImpago() {
+        hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
+        hito.setFechaLimitePago(LocalDateTime.now().minusDays(1));
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        when(hitoPedidoRepository
+            .findByEstadoPagoAndFechaLimitePagoBefore(
+                eq(EstadoPagoHito.PENDIENTE), any()))
+            .thenReturn(List.of(hito));
+        when(hitoPedidoRepository.findByIdHitoPedidoForUpdate(HITO))
+            .thenReturn(Optional.of(hito));
+        when(pedidoRepository.findByIdPedidoForUpdate(PEDIDO))
+            .thenReturn(Optional.of(pedido));
+
+        int expirados = pedidoService.expirarHitos();
+
+        assertThat(expirados).isEqualTo(1);
+        assertThat(hito.getEstadoPago()).isEqualTo(EstadoPagoHito.VENCIDO);
+        assertThat(pedido.getEstado()).isEqualTo(EstadoPedido.IMPAGO);
+        assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.CANCELADA);
+        verify(pagoService).cancelarPendientes(hito);
+    }
+
+    @Test
+    void listarEnviados_devuelveElResumen() {
+        when(pedidoRepository.findByClienteIdUsuario(
+            eq(CLIENTE), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(pedido)));
+
+        PaginaDTO<PedidoResumenDTO> pagina = pedidoService.listarEnviados(
+            CLIENTE, null, 0, 20);
+
+        assertThat(pagina.getContenido()).hasSize(1);
+        assertThat(pagina.getContenido().get(0).getIdPedido())
+            .isEqualTo(PEDIDO);
+    }
+
+    @Test
+    void listarRecibidos_devuelveElResumen() {
+        when(pedidoRepository.findByArtistaIdUsuario(
+            eq(ARTISTA), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(pedido)));
+
+        PaginaDTO<PedidoResumenDTO> pagina = pedidoService.listarRecibidos(
+            ARTISTA, null, 0, 20);
+
+        assertThat(pagina.getContenido()).hasSize(1);
+    }
+
+    @Test
+    void obtener_comoAdmin_permiteVerYPermiteLaComision() {
+        when(pedidoRepository.findById(PEDIDO)).thenReturn(Optional.of(pedido));
+
+        PedidoDTO dto = pedidoService.obtener(PEDIDO, 99L, true);
+
+        assertThat(dto.getRolVista()).isEqualTo("ADMIN");
+        assertThat(dto.getComisionMonto()).isNotNull();
+    }
+
+    @Test
+    void obtener_otroUsuario_lanzaAccesoDenegado() {
+        when(pedidoRepository.findById(PEDIDO)).thenReturn(Optional.of(pedido));
+
+        assertThatThrownBy(() -> pedidoService.obtener(PEDIDO, 99L))
+            .isInstanceOf(AccesoDenegadoException.class);
+    }
+
+    private void prepararCreacion() {
+        when(solicitudRepository.findByIdSolicitudForUpdate(
+            solicitud.getIdSolicitud())).thenReturn(Optional.of(solicitud));
+        when(pedidoRepository.findBySolicitudIdSolicitud(
+            solicitud.getIdSolicitud())).thenReturn(Optional.empty());
+    }
+
+    private void bloquearPedidoYHito() {
+        when(pedidoRepository.findByIdPedidoForUpdate(PEDIDO))
+            .thenReturn(Optional.of(pedido));
+        when(hitoPedidoRepository.findByIdHitoPedidoForUpdate(HITO))
+            .thenReturn(Optional.of(hito));
+    }
+
+    private Usuario usuario(Long id, String nombre) {
+        Usuario usuario = new Usuario();
+        usuario.setIdUsuario(id);
+        usuario.setNombreUsuario(nombre);
+        usuario.setNombreDisplay(nombre);
+        return usuario;
+    }
+}
