@@ -71,6 +71,7 @@ public class SecurityConfig {
                     "/api/servicios/**",
                     "/api/perfil/**",
                     "/api/portfolio/**",
+                    "/api/galeria/**",
                     "/api/terminos-plataforma",
                     "/api/comisiones/**",
                     "/api/configuracion-pedido"

@@ -193,6 +193,30 @@ function alEntregar(data) {
   aviso.value = 'Entregable subido. El cliente fue notificado.'
 }
 
+async function autorizarPublicacion(autoriza) {
+  await ejecutar(
+    () => api.put(
+      `/pedidos/${idPedido.value}/publicacion/artista`,
+      { autoriza },
+    ),
+    autoriza
+      ? 'Autorizaste la publicación en la galería del cliente.'
+      : 'Retiraste la autorización de publicación.',
+  )
+}
+
+async function ocultarPublicacion(ocultar) {
+  await ejecutar(
+    () => api.put(
+      `/pedidos/${idPedido.value}/publicacion/cliente`,
+      { ocultar },
+    ),
+    ocultar
+      ? 'Ocultaste este pedido de tu galería.'
+      : 'Este pedido vuelve a mostrarse en tu galería.',
+  )
+}
+
 function abrirVisor(imagen) {
   visor.imagen = imagen
   visor.abierto = true
@@ -371,6 +395,176 @@ onMounted(cargar)
       >
         {{ aviso }}
       </p>
+
+      <section
+        v-if="esArtista || esCliente"
+        class="mt-4 rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h2 class="text-lg font-semibold text-granate">
+              {{ esArtista ? 'Galería del cliente' : 'Mi galería de pedidos' }}
+            </h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-cafe/65">
+              <template v-if="esArtista">
+                Si autorizás, la entrega final de este pedido puede aparecer en la galería pública del cliente con tu nombre y el servicio. No se muestran montos ni datos del pedido. Podés retirar la autorización cuando quieras.
+              </template>
+              <template v-else>
+                Solo se muestra si el artista autoriza y el pedido está completo. Se ve la imagen, el servicio, el artista y la fecha; nunca montos ni datos del pedido.
+              </template>
+            </p>
+          </div>
+          <span
+            v-if="esArtista"
+            class="rounded-full border px-3 py-1 text-xs font-semibold"
+            :class="pedido.publicacionVisible
+              ? 'border-green-700/30 bg-green-700/10 text-green-700'
+              : pedido.publicacionAutorizada
+                ? 'border-coral/30 bg-coral/10 text-coral'
+                : 'border-rosa bg-blanco text-cafe/60'"
+          >
+            {{ pedido.publicacionVisible
+              ? 'Visible en su galería'
+              : pedido.publicacionAutorizada
+                ? 'Autorizado'
+                : 'Sin autorizar' }}
+          </span>
+        </div>
+
+        <div v-if="esArtista" class="mt-4">
+          <div class="flex items-start gap-3 rounded-xl border border-rosa/40 bg-rosa/5 p-4">
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="pedido.publicacionAutorizada"
+              :disabled="procesando
+                || (!pedido.puedeAutorizarPublicacion && !pedido.publicacionAutorizada)"
+              class="relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema disabled:cursor-not-allowed disabled:opacity-50"
+              :class="pedido.publicacionAutorizada ? 'bg-coral' : 'bg-rosa/70'"
+              @click="autorizarPublicacion(!pedido.publicacionAutorizada)"
+            >
+              <span
+                class="inline-block h-4 w-4 rounded-full bg-white shadow transition"
+                :class="pedido.publicacionAutorizada ? 'translate-x-6' : 'translate-x-1'"
+              ></span>
+            </button>
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-granate">
+                Permitir que esta entrega se muestre en la galería del cliente
+              </p>
+              <p
+                v-if="!pedido.puedeAutorizarPublicacion && !pedido.publicacionAutorizada"
+                class="mt-1 text-sm text-cafe/60"
+              >
+                Se habilita cuando subas la entrega final.
+              </p>
+              <p
+                v-else-if="pedido.publicacionAutorizada && !pedido.galeriaClientePublica"
+                class="mt-1 text-sm text-cafe/60"
+              >
+                El cliente tiene la galería privada. La pieza no se muestra públicamente hasta que la active.
+              </p>
+              <p
+                v-else-if="pedido.publicacionVisible"
+                class="mt-1 text-sm text-green-700"
+              >
+                La entrega final se está mostrando en la galería del cliente.
+              </p>
+              <p
+                v-else-if="pedido.publicacionAutorizada && pedido.estado !== 'FINALIZADO'"
+                class="mt-1 text-sm text-cafe/60"
+              >
+                Se mostrará cuando el pedido se complete.
+              </p>
+              <p
+                v-if="pedido.publicacionAutorizada && pedido.publicacionAutorizadaEn"
+                class="mt-1 text-xs text-cafe/50"
+              >
+                Autorizado el {{ formatearFechaHora(pedido.publicacionAutorizadaEn) }}.
+              </p>
+              <p
+                v-if="pedido.publicacionOcultadaCliente"
+                class="mt-1 text-sm text-cafe/60"
+              >
+                El cliente decidió ocultar este pedido de su galería.
+              </p>
+            </div>
+          </div>
+          <router-link
+            v-if="pedido.cliente?.nombreUsuario"
+            :to="{ name: 'perfil', params: { nombreUsuario: pedido.cliente.nombreUsuario } }"
+            class="mt-3 inline-flex text-sm font-semibold text-coral transition hover:text-rojizo"
+          >
+            Ver la galería del cliente →
+          </router-link>
+        </div>
+
+        <div v-else class="mt-4">
+          <p
+            v-if="pedido.estado !== 'FINALIZADO'"
+            class="rounded-xl border border-rosa/40 bg-rosa/5 px-4 py-3 text-sm text-cafe/65"
+          >
+            Cuando el pedido se complete, vas a poder decidir si mostrarlo en tu galería.
+          </p>
+          <p
+            v-else-if="!pedido.publicacionAutorizada"
+            class="rounded-xl border border-rosa/40 bg-rosa/5 px-4 py-3 text-sm text-cafe/65"
+          >
+            El artista todavía no autorizó mostrar este pedido en tu galería.
+          </p>
+          <div v-else class="rounded-xl border border-rosa/40 bg-rosa/5 p-4">
+            <div class="flex items-start gap-3">
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="!pedido.publicacionOcultadaCliente"
+                :disabled="procesando || !pedido.puedeOcultarPublicacion"
+                class="relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema disabled:cursor-not-allowed disabled:opacity-50"
+                :class="!pedido.publicacionOcultadaCliente ? 'bg-coral' : 'bg-rosa/70'"
+                @click="ocultarPublicacion(!pedido.publicacionOcultadaCliente)"
+              >
+                <span
+                  class="inline-block h-4 w-4 rounded-full bg-white shadow transition"
+                  :class="!pedido.publicacionOcultadaCliente ? 'translate-x-6' : 'translate-x-1'"
+                ></span>
+              </button>
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-granate">
+                  Mostrar este pedido en mi galería
+                </p>
+                <p
+                  v-if="!pedido.galeriaClientePublica"
+                  class="mt-1 text-sm text-cafe/60"
+                >
+                  Tu galería está privada.
+                  <router-link
+                    :to="{ name: 'configuracion-privacidad' }"
+                    class="font-semibold text-coral transition hover:text-rojizo"
+                  >
+                    Activala en Privacidad
+                  </router-link>
+                  para que se vea.
+                </p>
+                <p
+                  v-else-if="pedido.publicacionVisible"
+                  class="mt-1 text-sm text-green-700"
+                >
+                  Visible en tu galería pública.
+                </p>
+                <p v-else class="mt-1 text-sm text-cafe/60">
+                  Oculto en tu galería.
+                </p>
+              </div>
+            </div>
+            <router-link
+              :to="{ name: 'perfil', params: { nombreUsuario: pedido.cliente?.nombreUsuario } }"
+              class="mt-3 inline-flex text-sm font-semibold text-coral transition hover:text-rojizo"
+            >
+              Ver mi galería →
+            </router-link>
+          </div>
+        </div>
+      </section>
 
       <section class="mt-6 space-y-4">
         <h2 class="text-xl font-semibold text-granate">Plan de pagos</h2>

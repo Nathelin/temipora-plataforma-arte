@@ -25,5 +25,7 @@ public class ActualizarPerfilDTO {
 
     private EPreferenciaContenidoSensible preferenciaSensible;
 
+    private Boolean pedidosPublicos;
+
     private Long idMonedaPreferida;
 }

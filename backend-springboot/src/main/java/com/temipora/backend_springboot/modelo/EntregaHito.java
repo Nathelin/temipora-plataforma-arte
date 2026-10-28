@@ -51,6 +51,9 @@ public class EntregaHito {
     @Column(nullable = false)
     private boolean vigente = true;
 
+    @Column(name = "es_final", nullable = false)
+    private boolean esFinal = false;
+
     @Column(name = "revision_motivo", length = 500)
     private String revisionMotivo;
 

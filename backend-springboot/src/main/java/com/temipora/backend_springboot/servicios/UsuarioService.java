@@ -141,6 +141,9 @@ public class UsuarioService {
         if (dto.getPreferenciaSensible() != null) {
             usuario.setPreferenciaSensible(dto.getPreferenciaSensible());
         }
+        if (dto.getPedidosPublicos() != null) {
+            usuario.setPedidosPublicos(dto.getPedidosPublicos());
+        }
         if (dto.getIdMonedaPreferida() != null) {
             usuario.setMonedaPreferida(monedaService.obtener(dto.getIdMonedaPreferida()));
         }

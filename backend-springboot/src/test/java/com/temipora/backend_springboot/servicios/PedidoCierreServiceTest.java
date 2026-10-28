@@ -22,6 +22,7 @@ import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.EntregaHitoRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
 
@@ -34,6 +35,8 @@ class PedidoCierreServiceTest {
     private SolicitudRepository solicitudRepository;
     @Mock
     private NotificacionService notificacionService;
+    @Mock
+    private EntregaHitoRepository entregaHitoRepository;
 
     @InjectMocks
     private PedidoCierreService pedidoCierreService;
@@ -67,7 +70,7 @@ class PedidoCierreServiceTest {
         pedidoCierreService.finalizar(pedido, LocalDateTime.now());
 
         verifyNoInteractions(pedidoRepository, solicitudRepository,
-            notificacionService);
+            notificacionService, entregaHitoRepository);
     }
 
     private Pedido pedido() {

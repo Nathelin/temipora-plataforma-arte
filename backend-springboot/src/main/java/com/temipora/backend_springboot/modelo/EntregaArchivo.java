@@ -43,6 +43,9 @@ public class EntregaArchivo {
     @Column(name = "clave_preview", length = 255)
     private String clavePreview;
 
+    @Column(name = "clave_limpia", length = 255)
+    private String claveLimpia;
+
     @Column(nullable = false, length = 64)
     private String sha256;
 

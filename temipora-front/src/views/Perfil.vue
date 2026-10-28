@@ -1,10 +1,13 @@
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useNotificaciones } from '../composables/useNotificaciones'
+import { cargarGaleria as cargarGaleriaApi, ocultarPublicacionPedido } from '../servicios/galeria'
+import { formatearFecha } from '../servicios/pedidos'
 import TarjetaServicio from '../components/TarjetaServicio.vue'
+import ImagenGaleria from '../components/ImagenGaleria.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,7 +25,6 @@ const perfil = ref({
   portfolio: [],
   servicios: [],
   productos: [],
-  pedidos: [],
 })
 
 const cargandoPerfil = ref(true)
@@ -32,6 +34,18 @@ const { exito, error: notificarError } = useNotificaciones()
 const esFavorito = ref(false)
 const cargandoEstadoFavorito = ref(false)
 const actualizandoFavorito = ref(false)
+
+const galeria = ref(null)
+const cargandoGaleria = ref(false)
+const cargandoMasGaleria = ref(false)
+const errorGaleria = ref('')
+const actualizandoGaleria = ref(false)
+const filtrosGaleria = reactive({ idServicio: '', idArtista: '' })
+const paginaGaleria = ref(0)
+const TAMANIO_GALERIA = 12
+const visorGaleria = reactive({ abierto: false, indice: 0 })
+const archivoGaleriaIndice = ref(0)
+const imagenGaleriaVisible = ref(false)
 
 async function cargarPerfil() {
   cargandoPerfil.value = true
@@ -49,7 +63,6 @@ async function cargarPerfil() {
       portfolio: [],
       servicios: [],
       productos: [],
-      pedidos: [],
     }
 
     if (data.rol === 'ARTISTA') {
@@ -58,11 +71,153 @@ async function cargarPerfil() {
     } else {
       totalPortfolio.value = 0
       etiquetasPortfolio.value = []
+      await cargarGaleria(true)
     }
   } catch (e) {
     errorCarga.value = 'No se pudo cargar el perfil.'
   } finally {
     cargandoPerfil.value = false
+  }
+}
+
+// ---------------------------------------------------------------
+// Galería pública de pedidos
+// ---------------------------------------------------------------
+
+const piezasGaleria = computed(() => galeria.value?.piezas?.contenido || [])
+const totalGaleria = computed(() => Number(galeria.value?.piezas?.totalElementos || 0))
+const hayFiltrosGaleria = computed(
+  () => Boolean(filtrosGaleria.idServicio || filtrosGaleria.idArtista),
+)
+const piezaGaleriaActual = computed(
+  () => piezasGaleria.value[visorGaleria.indice] || null,
+)
+const archivoGaleriaActual = computed(
+  () => piezaGaleriaActual.value?.archivos?.[archivoGaleriaIndice.value] || null,
+)
+
+function tituloGaleria(pieza) {
+  return pieza?.nombreDibujo || pieza?.nombreServicio || 'Dibujo'
+}
+
+async function cargarGaleria(reset = true) {
+  if (!perfil.value.nombreUsuario) return
+  if (reset) {
+    paginaGaleria.value = 0
+    cargandoGaleria.value = true
+    errorGaleria.value = ''
+  } else {
+    cargandoMasGaleria.value = true
+  }
+
+  try {
+    const params = { pagina: paginaGaleria.value, tamanio: TAMANIO_GALERIA }
+    if (filtrosGaleria.idServicio !== '') params.idServicio = filtrosGaleria.idServicio
+    if (filtrosGaleria.idArtista !== '') params.idArtista = filtrosGaleria.idArtista
+
+    const res = await cargarGaleriaApi(perfil.value.nombreUsuario, params)
+    const pagina = res.data?.piezas || {}
+    const nuevas = pagina.contenido || []
+    if (reset) {
+      galeria.value = { ...res.data, piezas: { ...pagina, contenido: nuevas } }
+    } else {
+      const actuales = galeria.value?.piezas?.contenido || []
+      galeria.value = {
+        ...res.data,
+        piezas: { ...pagina, contenido: [...actuales, ...nuevas] },
+      }
+    }
+  } catch (e) {
+    if (reset) {
+      galeria.value = null
+      errorGaleria.value = e.response?.data?.message || 'No se pudo cargar la galería.'
+    }
+  } finally {
+    cargandoGaleria.value = false
+    cargandoMasGaleria.value = false
+  }
+}
+
+function cargarMasGaleria() {
+  if (cargandoMasGaleria.value || !galeria.value?.piezas?.hayMas) return
+  paginaGaleria.value += 1
+  cargarGaleria(false)
+}
+
+function cambiarFiltroGaleria() {
+  cerrarGaleria()
+  cargarGaleria(true)
+}
+
+function limpiarFiltrosGaleria() {
+  filtrosGaleria.idServicio = ''
+  filtrosGaleria.idArtista = ''
+  cambiarFiltroGaleria()
+}
+
+function abrirGaleria(pieza, indice) {
+  if (!pieza) return
+  visorGaleria.indice = indice
+  visorGaleria.abierto = true
+  archivoGaleriaIndice.value = 0
+  imagenGaleriaVisible.value = false
+}
+
+function cerrarGaleria() {
+  visorGaleria.abierto = false
+  archivoGaleriaIndice.value = 0
+  imagenGaleriaVisible.value = false
+}
+
+function seleccionarPiezaGaleria(indice) {
+  if (indice < 0 || indice >= piezasGaleria.value.length) return
+  visorGaleria.indice = indice
+  archivoGaleriaIndice.value = 0
+  imagenGaleriaVisible.value = false
+}
+
+function irAnteriorGaleria() {
+  seleccionarPiezaGaleria(visorGaleria.indice - 1)
+}
+
+function irSiguienteGaleria() {
+  seleccionarPiezaGaleria(visorGaleria.indice + 1)
+}
+
+function revelarGaleria() {
+  imagenGaleriaVisible.value = true
+}
+
+function ocultarGaleria() {
+  imagenGaleriaVisible.value = false
+}
+
+function manejarTeclaGaleria(event) {
+  if (!visorGaleria.abierto) return
+  if (event.key === 'Escape') {
+    cerrarGaleria()
+    return
+  }
+  if (event.key === 'ArrowLeft') irAnteriorGaleria()
+  if (event.key === 'ArrowRight') irSiguienteGaleria()
+}
+
+async function alternarVisibilidadPedido(pieza) {
+  if (!pieza?.idPedido || actualizandoGaleria.value) return
+  const ocultar = !pieza.ocultoPorCliente
+  actualizandoGaleria.value = true
+  try {
+    await ocultarPublicacionPedido(pieza.idPedido, ocultar)
+    exito(ocultar
+      ? 'Ocultaste este pedido de tu galería.'
+      : 'Este pedido vuelve a mostrarse en tu galería.')
+    cerrarGaleria()
+    await cargarGaleria(true)
+  } catch (e) {
+    notificarError(e.response?.data?.message
+      || 'No se pudo cambiar la visibilidad del pedido.')
+  } finally {
+    actualizandoGaleria.value = false
   }
 }
 
@@ -207,6 +362,17 @@ watch(() => route.params.nombreUsuario, () => {
   esFavorito.value = false
   cargandoEstadoFavorito.value = false
   actualizandoFavorito.value = false
+  galeria.value = null
+  cargandoGaleria.value = false
+  cargandoMasGaleria.value = false
+  errorGaleria.value = ''
+  actualizandoGaleria.value = false
+  filtrosGaleria.idServicio = ''
+  filtrosGaleria.idArtista = ''
+  paginaGaleria.value = 0
+  visorGaleria.abierto = false
+  archivoGaleriaIndice.value = 0
+  imagenGaleriaVisible.value = false
 })
 
 watch(() => route.params.nombreUsuario, cargarPerfil, { immediate: true })
@@ -381,6 +547,8 @@ function manejarTeclaDetalle(event) {
 
 onMounted(() => window.addEventListener('keydown', manejarTeclaDetalle))
 onBeforeUnmount(() => window.removeEventListener('keydown', manejarTeclaDetalle))
+onMounted(() => window.addEventListener('keydown', manejarTeclaGaleria))
+onBeforeUnmount(() => window.removeEventListener('keydown', manejarTeclaGaleria))
 
 const errorDetalle = ref('')
 
@@ -733,27 +901,409 @@ function irASubirImagen(imagen = null) {
         </template>
 
         <template v-else>
-          <div class="flex flex-wrap items-center gap-2 border-b border-borde/50 pb-1.5 pt-1.5">
-            <button class="rounded-full bg-coral px-5 py-2.5 text-sm font-semibold text-white shadow-sm">
-              Pedidos
-            </button>
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-borde/50 pb-1.5 pt-1.5">
+            <div class="flex flex-wrap items-center gap-2">
+              <button class="rounded-full bg-coral px-5 py-2.5 text-sm font-semibold text-white shadow-sm">
+                Galería de pedidos
+              </button>
+            </div>
+            <router-link
+              v-if="esDuenio"
+              :to="{ name: 'configuracion-privacidad' }"
+              class="text-sm font-semibold text-coral transition hover:text-rojizo"
+            >
+              Privacidad de la galería
+            </router-link>
           </div>
 
-          <p v-if="!perfil.pedidos.length" class="mt-6 rounded-3xl border border-dashed border-borde bg-superficie px-6 py-14 text-center text-sm text-cafe/60">
-            Todavía no hay pedidos para mostrar.
-          </p>
-          <div v-else class="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            <div v-for="pedido in perfil.pedidos" :key="pedido.id" class="rounded-xl overflow-hidden bg-rosa/20 aspect-square flex flex-col">
-              <div class="flex-1 bg-coral/20">
-                <img v-if="pedido.url" :src="pedido.url" alt="" class="w-full h-full object-cover" />
-              </div>
-              <div class="p-3">
-                <div class="text-sm text-cafe">{{ pedido.titulo }}</div>
-                <div class="text-xs text-cafe/50">{{ pedido.fecha }}</div>
-              </div>
+          <div class="mt-6">
+            <div
+              v-if="esDuenio && galeria && !galeria.visible"
+              class="rounded-2xl border border-durazno bg-durazno/20 p-4 sm:p-5"
+            >
+              <p class="text-sm font-semibold text-granate">Tu galería está privada</p>
+              <p class="mt-1 text-sm leading-relaxed text-cafe/70">
+                Solo vos podés ver estas piezas. Podés activar la visibilidad pública.
+              </p>
+              <router-link
+                :to="{ name: 'configuracion-privacidad' }"
+                class="mt-3 inline-flex min-h-9 items-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+              >
+                Activar galería
+              </router-link>
+            </div>
+
+            <div
+              v-if="galeria && (galeria.servicios?.length || galeria.artistas?.length)"
+              class="mt-4 flex flex-wrap items-end gap-3 rounded-2xl border border-borde/60 bg-superficie p-4"
+            >
+              <label class="flex min-w-44 flex-col gap-1 text-xs font-medium text-cafe/60">
+                Servicio
+                <select
+                  v-model="filtrosGaleria.idServicio"
+                  class="rounded-xl border-0 bg-crema px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-borde/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                  @change="cambiarFiltroGaleria"
+                >
+                  <option value="">Todos</option>
+                  <option
+                    v-for="servicio in galeria.servicios"
+                    :key="servicio.id"
+                    :value="servicio.id"
+                  >
+                    {{ servicio.nombre }}
+                  </option>
+                </select>
+              </label>
+              <label class="flex min-w-44 flex-col gap-1 text-xs font-medium text-cafe/60">
+                Artista
+                <select
+                  v-model="filtrosGaleria.idArtista"
+                  class="rounded-xl border-0 bg-crema px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-borde/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                  @change="cambiarFiltroGaleria"
+                >
+                  <option value="">Todos</option>
+                  <option
+                    v-for="artista in galeria.artistas"
+                    :key="artista.id"
+                    :value="artista.id"
+                  >
+                    {{ artista.nombre }} (@{{ artista.nombreUsuario }})
+                  </option>
+                </select>
+              </label>
+              <button
+                v-if="hayFiltrosGaleria"
+                type="button"
+                class="inline-flex min-h-10 items-center rounded-full border border-borde/60 bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+                @click="limpiarFiltrosGaleria"
+              >
+                Limpiar
+              </button>
+              <p v-if="totalGaleria" class="ml-auto text-sm text-cafe/60">
+                Mostrando {{ piezasGaleria.length }} de {{ totalGaleria }} piezas
+              </p>
+            </div>
+
+            <div v-if="cargandoGaleria" class="mt-6 space-y-3" role="status" aria-live="polite">
+              <span class="sr-only">Cargando galería...</span>
+              <div
+                v-for="n in 3"
+                :key="n"
+                class="h-40 animate-pulse rounded-2xl border border-rosa/40 bg-blanco"
+              ></div>
+            </div>
+
+            <p
+              v-else-if="errorGaleria"
+              class="mt-6 rounded-2xl border border-rojizo/25 bg-rojizo/5 px-4 py-6 text-center text-sm text-rojizo"
+            >
+              {{ errorGaleria }}
+            </p>
+
+            <p
+              v-else-if="galeria && !galeria.visible && !galeria.esDuenio"
+              class="mt-6 rounded-3xl border border-dashed border-borde bg-superficie px-6 py-14 text-center text-sm text-cafe/60"
+            >
+              Galería privada. @{{ perfil.nombreUsuario }} decidió no compartir sus pedidos.
+            </p>
+
+            <p
+              v-else-if="!piezasGaleria.length"
+              class="mt-6 rounded-3xl border border-dashed border-borde bg-superficie px-6 py-14 text-center text-sm text-cafe/60"
+            >
+              <template v-if="hayFiltrosGaleria">
+                No hay piezas que coincidan con los filtros.
+                <button
+                  type="button"
+                  class="ml-1 font-semibold text-coral underline transition hover:text-rojizo"
+                  @click="limpiarFiltrosGaleria"
+                >
+                  Limpiar filtros
+                </button>
+              </template>
+              <template v-else-if="galeria?.esDuenio">
+                Todavía no hay pedidos autorizados para mostrar. Cuando un artista autorice una entrega final, va a aparecer acá.
+              </template>
+              <template v-else>
+                Todavía no hay pedidos para mostrar.
+              </template>
+            </p>
+
+            <div v-else class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <article
+                v-for="(pieza, indice) in piezasGaleria"
+                :key="pieza.idPieza"
+                class="overflow-hidden rounded-[22px] border border-borde/60 bg-superficie shadow-[0_10px_26px_rgba(74,29,46,0.07)] transition hover:border-coral/40"
+              >
+                <button
+                  type="button"
+                  class="group block w-full text-left"
+                  @click="abrirGaleria(pieza, indice)"
+                >
+                  <div class="relative aspect-4/3 overflow-hidden bg-rosa/20">
+                    <ImagenGaleria
+                      v-if="pieza.archivos?.length"
+                      :url="pieza.archivos[0].urlPreview"
+                      :alt="tituloGaleria(pieza)"
+                      class="transition duration-500 group-hover:scale-[1.03]"
+                      :class="pieza.requiereAdvertencia ? 'blur-[18px] scale-105' : ''"
+                    />
+                    <span
+                      v-if="pieza.requiereAdvertencia"
+                      class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-granate/25 px-4 text-center text-white"
+                    >
+                      <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                      </svg>
+                      <span class="text-xs font-semibold drop-shadow">Contenido sensible</span>
+                    </span>
+                    <span
+                      v-if="pieza.ocultoPorCliente"
+                      class="absolute left-3 top-3 rounded-full bg-granate/80 px-2.5 py-1 text-[11px] font-semibold text-white"
+                    >
+                      Oculto
+                    </span>
+                  </div>
+                </button>
+                <div class="p-4">
+                  <h3 class="truncate text-base font-semibold text-granate">{{ tituloGaleria(pieza) }}</h3>
+                  <p class="mt-0.5 truncate text-sm text-cafe/65">{{ pieza.nombreServicio }}</p>
+                  <div class="mt-3 flex items-center gap-2">
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-rosa text-xs font-bold text-granate">
+                      <img
+                        v-if="pieza.artista?.urlFotoPerfil"
+                        :src="pieza.artista.urlFotoPerfil"
+                        alt=""
+                        class="h-full w-full object-cover"
+                      />
+                      <template v-else>
+                        {{ (pieza.artista?.nombreUsuario || '?').charAt(0).toUpperCase() }}
+                      </template>
+                    </span>
+                    <router-link
+                      :to="{ name: 'perfil', params: { nombreUsuario: pieza.artista?.nombreUsuario } }"
+                      class="truncate text-sm font-semibold text-coral transition hover:text-rojizo"
+                    >
+                      @{{ pieza.artista?.nombreUsuario }}
+                    </router-link>
+                  </div>
+                  <p class="mt-2 text-xs text-cafe/50">
+                    Entregado el {{ formatearFecha(pieza.fechaEntrega) }}
+                  </p>
+
+                  <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-borde/50 pt-3">
+                    <router-link
+                      :to="{ name: 'perfil', params: { nombreUsuario: pieza.artista?.nombreUsuario } }"
+                      class="text-xs font-semibold text-coral transition hover:text-rojizo"
+                    >
+                      Ver perfil del artista →
+                    </router-link>
+                    <div v-if="galeria.esDuenio" class="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        :disabled="actualizandoGaleria"
+                        class="inline-flex min-h-8 items-center rounded-full border border-borde/60 bg-blanco px-3 text-xs font-semibold text-granate transition hover:bg-rosa/20 disabled:opacity-50"
+                        @click="alternarVisibilidadPedido(pieza)"
+                      >
+                        {{ pieza.ocultoPorCliente ? 'Mostrar' : 'Ocultar' }}
+                      </button>
+                      <router-link
+                        v-if="pieza.idPedido"
+                        :to="{ name: 'pedido-detalle', params: { idPedido: pieza.idPedido } }"
+                        class="text-xs font-semibold text-cafe/60 transition hover:text-granate"
+                      >
+                        Ver pedido
+                      </router-link>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <div v-if="galeria?.piezas?.hayMas" class="mt-6 text-center">
+              <button
+                type="button"
+                :disabled="cargandoMasGaleria"
+                class="inline-flex min-h-10 items-center justify-center rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition hover:bg-rosa/20 disabled:opacity-50"
+                @click="cargarMasGaleria"
+              >
+                {{ cargandoMasGaleria ? 'Cargando...' : 'Cargar más' }}
+              </button>
             </div>
           </div>
         </template>
+      </div>
+    </div>
+
+    <!-- Visor de la galería de pedidos -->
+    <div
+      v-if="visorGaleria.abierto && piezaGaleriaActual"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-granate/40 px-4 py-6"
+      @click.self="cerrarGaleria"
+    >
+      <div class="relative max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-blanco shadow-xl lg:h-[85vh] lg:overflow-hidden">
+        <button
+          type="button"
+          class="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-blanco/90 text-xl leading-none text-cafe shadow ring-1 ring-rosa transition hover:bg-rosa/20"
+          aria-label="Cerrar"
+          @click="cerrarGaleria"
+        >
+          ×
+        </button>
+
+        <div class="grid grid-cols-1 lg:h-full lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div class="relative flex min-h-[42vh] items-center justify-center overflow-hidden bg-cafe/5 p-4 lg:h-full lg:min-h-0">
+            <ImagenGaleria
+              v-if="archivoGaleriaActual"
+              :url="archivoGaleriaActual.urlPreview"
+              :alt="tituloGaleria(piezaGaleriaActual)"
+              ajuste="contain"
+              class="max-h-[45vh] w-full lg:max-h-full"
+              :class="piezaGaleriaActual.requiereAdvertencia && !imagenGaleriaVisible ? 'blur-[18px] scale-105' : ''"
+            />
+
+            <div
+              v-if="piezaGaleriaActual.requiereAdvertencia && !imagenGaleriaVisible"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-granate/30 px-6 text-center"
+              role="note"
+              aria-live="polite"
+            >
+              <span class="flex h-12 w-12 items-center justify-center rounded-full bg-blanco/90 text-granate" aria-hidden="true">
+                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                </svg>
+              </span>
+              <p class="text-sm font-medium text-white drop-shadow">Contenido sensible</p>
+              <button
+                type="button"
+                class="mt-1 rounded-md bg-coral px-4 py-2 text-sm text-white shadow-sm transition hover:bg-rojizo"
+                @click.stop="revelarGaleria"
+              >
+                Ver de todos modos
+              </button>
+            </div>
+
+            <div
+              v-if="piezaGaleriaActual.requiereAdvertencia && imagenGaleriaVisible"
+              class="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-granate/70 px-3 py-1 text-xs text-inverso-contraste"
+            >
+              <span>Mostrando contenido sensible</span>
+              <button type="button" class="ml-1 underline hover:text-white" @click.stop="ocultarGaleria">
+                Ocultar
+              </button>
+            </div>
+
+            <button
+              v-if="visorGaleria.indice > 0"
+              type="button"
+              class="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-blanco/90 text-2xl leading-none text-granate shadow ring-1 ring-rosa transition hover:bg-rosa/20"
+              aria-label="Dibujo anterior"
+              @click.stop="irAnteriorGaleria"
+            >
+              ‹
+            </button>
+            <button
+              v-if="visorGaleria.indice < piezasGaleria.length - 1"
+              type="button"
+              class="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-blanco/90 text-2xl leading-none text-granate shadow ring-1 ring-rosa transition hover:bg-rosa/20"
+              aria-label="Dibujo siguiente"
+              @click.stop="irSiguienteGaleria"
+            >
+              ›
+            </button>
+            <span class="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-granate/60 px-2.5 py-0.5 text-xs text-inverso-contraste">
+              Dibujo {{ visorGaleria.indice + 1 }} / {{ piezasGaleria.length }}
+              <span v-if="piezaGaleriaActual.archivos?.length > 1">
+                · imagen {{ archivoGaleriaIndice + 1 }}/{{ piezaGaleriaActual.archivos.length }}
+              </span>
+            </span>
+          </div>
+
+          <aside class="flex flex-col border-t border-rosa/60 p-6 lg:h-full lg:overflow-y-auto lg:border-t-0 lg:border-l">
+            <div class="flex-1">
+              <h2 class="pr-8 text-2xl text-granate">{{ tituloGaleria(piezaGaleriaActual) }}</h2>
+              <p class="mt-1 text-sm text-cafe/60">{{ piezaGaleriaActual.nombreServicio }}</p>
+
+              <router-link
+                :to="{ name: 'perfil', params: { nombreUsuario: piezaGaleriaActual.artista?.nombreUsuario } }"
+                class="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-coral transition hover:text-rojizo"
+              >
+                <span class="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-rosa text-xs font-bold text-granate">
+                  <img
+                    v-if="piezaGaleriaActual.artista?.urlFotoPerfil"
+                    :src="piezaGaleriaActual.artista.urlFotoPerfil"
+                    alt=""
+                    class="h-full w-full object-cover"
+                  />
+                  <template v-else>
+                    {{ (piezaGaleriaActual.artista?.nombreUsuario || '?').charAt(0).toUpperCase() }}
+                  </template>
+                </span>
+                @{{ piezaGaleriaActual.artista?.nombreUsuario }}
+                <span class="font-normal text-cafe/50">· Ver perfil</span>
+              </router-link>
+
+              <p class="mt-4 text-sm text-cafe/60">
+                Entregado el {{ formatearFecha(piezaGaleriaActual.fechaEntrega) }}
+              </p>
+
+              <div v-if="piezaGaleriaActual.contenidoSensible" class="mt-4">
+                <p class="text-xs text-cafe/50">Contenido sensible</p>
+                <div class="mt-1 flex flex-wrap gap-1.5">
+                  <span
+                    v-for="c in piezaGaleriaActual.contenidosSensibles"
+                    :key="c"
+                    class="rounded-full bg-durazno/40 px-2.5 py-0.5 text-xs text-cafe"
+                  >
+                    {{ textoSensible(c) }}
+                  </span>
+                  <span
+                    v-if="!piezaGaleriaActual.contenidosSensibles?.length"
+                    class="rounded-full bg-durazno/40 px-2.5 py-0.5 text-xs text-cafe"
+                  >
+                    Contenido sensible
+                  </span>
+                </div>
+              </div>
+
+              <div v-if="piezaGaleriaActual.archivos?.length > 1" class="mt-6">
+                <p class="text-xs text-cafe/50">Imágenes de este dibujo</p>
+                <div class="mt-2 grid grid-cols-4 gap-2">
+                  <button
+                    v-for="(archivo, i) in piezaGaleriaActual.archivos"
+                    :key="archivo.idArchivo"
+                    type="button"
+                    class="relative aspect-square overflow-hidden rounded-lg border-2 transition"
+                    :class="i === archivoGaleriaIndice ? 'border-coral' : 'border-transparent hover:border-rosa'"
+                    :aria-label="`Ver imagen ${i + 1}`"
+                    @click="archivoGaleriaIndice = i; imagenGaleriaVisible = false"
+                  >
+                    <ImagenGaleria :url="archivo.urlPreview" alt="" class="h-full w-full" />
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="galeria?.esDuenio" class="mt-8 border-t border-rosa/60 pt-4">
+                <p class="text-xs font-semibold uppercase tracking-[0.12em] text-cafe/45">Visibilidad</p>
+                <button
+                  type="button"
+                  :disabled="actualizandoGaleria"
+                  class="mt-2 inline-flex min-h-9 items-center rounded-full border border-borde/60 bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20 disabled:opacity-50"
+                  @click="alternarVisibilidadPedido(piezaGaleriaActual)"
+                >
+                  {{ piezaGaleriaActual.ocultoPorCliente ? 'Mostrar en mi galería' : 'Ocultar de mi galería' }}
+                </button>
+                <router-link
+                  v-if="piezaGaleriaActual.idPedido"
+                  :to="{ name: 'pedido-detalle', params: { idPedido: piezaGaleriaActual.idPedido } }"
+                  class="mt-3 block text-sm font-semibold text-coral transition hover:text-rojizo"
+                >
+                  Ver pedido →
+                </router-link>
+              </div>
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
 

@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -25,6 +26,7 @@ import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.PedidoDTO;
 import com.temipora.backend_springboot.modelo.PedidoResumenDTO;
+import com.temipora.backend_springboot.modelo.PublicacionPedidoRequest;
 import com.temipora.backend_springboot.modelo.SolicitudRevisionRequest;
 import com.temipora.backend_springboot.modelo.TipoDescarga;
 import com.temipora.backend_springboot.servicios.ConstanciaService;
@@ -172,6 +174,30 @@ public class PedidoController {
             Authentication authentication) {
         return pedidoService.cancelar(
             idPedido, idAutenticado(authentication));
+    }
+
+    @PutMapping("/{idPedido}/publicacion/artista")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public PedidoDTO autorizarPublicacion(
+            @PathVariable Long idPedido,
+            @RequestBody PublicacionPedidoRequest request,
+            Authentication authentication) {
+        return pedidoService.autorizarPublicacion(
+            idPedido,
+            idAutenticado(authentication),
+            request.isAutoriza());
+    }
+
+    @PutMapping("/{idPedido}/publicacion/cliente")
+    @PreAuthorize("hasAnyRole('CLIENTE', 'ARTISTA')")
+    public PedidoDTO ocultarPublicacion(
+            @PathVariable Long idPedido,
+            @RequestBody PublicacionPedidoRequest request,
+            Authentication authentication) {
+        return pedidoService.ocultarPublicacion(
+            idPedido,
+            idAutenticado(authentication),
+            request.isOcultar());
     }
 
     private Long idAutenticado(Authentication authentication) {

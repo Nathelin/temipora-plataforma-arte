@@ -60,4 +60,13 @@ public class PedidoDTO {
     private List<DibujoResumenDTO> dibujos;
     private boolean puedeCancelar;
     private String rolVista;
+
+    private boolean publicacionAutorizada;
+    private LocalDateTime publicacionAutorizadaEn;
+    private boolean publicacionOcultadaCliente;
+    private LocalDateTime publicacionOcultadaEn;
+    private boolean galeriaClientePublica;
+    private boolean publicacionVisible;
+    private boolean puedeAutorizarPublicacion;
+    private boolean puedeOcultarPublicacion;
 }
