@@ -33,6 +33,7 @@ const configPedido = ref({
   porcentajeMaxPrimerHito: 50,
   montoMinimoCuota: 1,
 })
+const vigenciaHoras = ref(72)
 const cargando = ref(true)
 const errorCarga = ref('')
 const enviando = ref(false)
@@ -129,6 +130,25 @@ const entregaSiPagaHoyTexto = computed(
 const entregaAlVencerTexto = computed(
   () => formatearFechaDDMMAAAA(entregaAlVencer.value),
 )
+
+const vigenciaTexto = computed(() => {
+  const horas = Number(vigenciaHoras.value) || 72
+  if (horas % 24 === 0) {
+    const dias = horas / 24
+    return `${horas} horas (${dias} ${dias === 1 ? 'día' : 'días'})`
+  }
+  return `${horas} horas`
+})
+
+const vencimientoPorDefectoTexto = computed(() => {
+  const horas = Number(vigenciaHoras.value) || 72
+  const fecha = new Date(Date.now() + horas * 60 * 60 * 1000)
+  const hora = fecha.toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  return `${formatearFechaDDMMAAAA(fecha)} a las ${hora}`
+})
 
 function formatear(valor) {
   return formatearPrecio(valor, moneda.value)
@@ -380,10 +400,11 @@ async function cargar() {
   cargando.value = true
   errorCarga.value = ''
   try {
-    const [res, resComision, resConfig] = await Promise.all([
+    const [res, resComision, resConfig, resConfigPresupuesto] = await Promise.all([
       api.get(`/solicitudes-servicio/${idSolicitud.value}`),
       api.get('/comisiones/vigentes').catch(() => null),
       api.get('/configuracion-pedido').catch(() => null),
+      api.get('/presupuestos/configuracion-vencimiento').catch(() => null),
     ])
     solicitud.value = res.data
     const porcentaje = Number(resComision?.data?.porcentajeServicio)
@@ -397,6 +418,10 @@ async function cargar() {
           Number(resConfig.data.porcentajeMaxPrimerHito) || 50,
         montoMinimoCuota: Number(resConfig.data.montoMinimoCuota) || 0,
       }
+    }
+    const horas = Number(resConfigPresupuesto?.data?.vigenciaHoras)
+    if (Number.isFinite(horas) && horas > 0) {
+      vigenciaHoras.value = horas
     }
 
     if (!puedePresupuestar.value) return
@@ -805,7 +830,12 @@ onMounted(cargar)
               @input="actualizarFechaFormulario('fechaVencimiento', $event)"
             />
             <p class="mt-2 text-xs leading-relaxed text-cafe/50">
-              Si no elegís una fecha, se usa el vencimiento por defecto configurado por el sistema.
+              Si no elegís una fecha, se usa la vigencia por defecto del sistema:
+              <span class="font-medium text-cafe">{{ vigenciaTexto }}</span>.
+              <span v-if="!form.fechaVencimiento" class="mt-0.5 block">
+                La oferta vencería el
+                <span class="font-medium text-cafe">{{ vencimientoPorDefectoTexto }}</span>.
+              </span>
             </p>
           </div>
 
@@ -1168,7 +1198,7 @@ onMounted(cargar)
                 <dd class="text-right font-medium text-cafe">
                   {{ form.fechaVencimiento
                     ? formatearFechaDDMMAAAA(form.fechaVencimiento)
-                    : 'Según la configuración del sistema' }}
+                    : `Por defecto: ${vencimientoPorDefectoTexto}` }}
                 </dd>
               </div>
               <div class="flex items-start justify-between gap-4 border-t border-coral/15 pt-3">
