@@ -317,7 +317,7 @@ onMounted(cargar)
                 class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border"
                 :class="atencion.tono === 'alerta'
                   ? 'border-coral/25 bg-coral/10 text-coral'
-                  : 'border-mantequilla bg-mantequilla/40 text-tinta'"
+                  : 'border-mantequilla bg-mantequilla/40 text-granate'"
               >
                 <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" :d="atencion.icono" />

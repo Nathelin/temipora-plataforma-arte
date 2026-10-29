@@ -124,14 +124,17 @@ function claseOpcion(opcion) {
       {{ resenia.descripcion }}
     </p>
 
-    <dl v-if="resenia.valores?.length" class="mt-3 grid gap-1.5 sm:grid-cols-2">
+    <dl v-if="resenia.valores?.length" class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
       <div
         v-for="valor in resenia.valores"
         :key="valor.idCriterio"
-        class="flex items-center justify-between gap-2 rounded-lg bg-rosa/10 px-3 py-1.5 text-xs"
+        class="rounded-lg bg-rosa/10 px-3 py-2 text-xs"
       >
         <dt class="text-cafe/65">{{ valor.nombreCriterio }}</dt>
-        <dd class="font-semibold text-granate">{{ valor.valor }}</dd>
+        <dd class="mt-1 flex items-center gap-1 font-semibold text-granate">
+          <span class="text-coral" aria-hidden="true">★</span>
+          {{ valor.valor }}
+        </dd>
       </div>
     </dl>
 

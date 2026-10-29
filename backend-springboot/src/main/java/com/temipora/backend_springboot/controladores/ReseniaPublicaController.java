@@ -28,12 +28,13 @@ public class ReseniaPublicaController {
     @GetMapping("/servicios/{idServicio}/resenias")
     public PaginaReseniasDTO listarServicio(
             @PathVariable Long idServicio,
+            @RequestParam(required = false) Long idOpcion,
             @RequestParam(required = false) Integer calificacion,
             @RequestParam(defaultValue = "RECIENTES") String orden,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "10") int tamanio) {
         return reseniaPublicaService.listarServicio(
-            idServicio, calificacion, orden, pagina, tamanio);
+            idServicio, idOpcion, calificacion, orden, pagina, tamanio);
     }
 
     @GetMapping("/perfil/{nombreUsuario}/resenias")

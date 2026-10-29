@@ -7,7 +7,12 @@ import VistaPreviaTerminos from '../components/VistaPreviaTerminos.vue'
 import ResumenResenias from '../components/ResumenResenias.vue'
 import TarjetaReseniaPublica from '../components/TarjetaReseniaPublica.vue'
 import ModalResenias from '../components/ModalResenias.vue'
-import { cargarReseniasServicio } from '../servicios/resenias'
+import VisorImagenes from '../components/VisorImagenes.vue'
+import {
+  cargarReseniasServicio,
+  cargarResumenReseniasArtista,
+  formatearPromedio,
+} from '../servicios/resenias'
 import { esImagenVerificada } from '../servicios/imagenes'
 import { useNotificaciones } from '../composables/useNotificaciones'
 
@@ -27,16 +32,23 @@ const esFavorito = ref(false)
 const cargandoEstadoFavorito = ref(false)
 const actualizandoFavorito = ref(false)
 
+const artista = ref(null)
+const resumenArtista = ref(null)
+
 const resumenResenias = ref(null)
-const reseniasDestacadas = ref([])
+const reseniasPreview = ref([])
+const cargandoPreview = ref(true)
+const errorPreview = ref('')
 const reseniasLista = ref([])
 const paginaResenias = ref(null)
-const cargandoResenias = ref(false)
-const errorResenias = ref('')
-const modalReseniasAbierto = ref(false)
 const cargandoListaResenias = ref(false)
 const errorListaResenias = ref('')
-const filtrosResenias = reactive({ calificacion: '', orden: 'RECIENTES' })
+const modalReseniasAbierto = ref(false)
+const filtroOpcion = ref('')
+const filtrosResenias = reactive({ calificacion: '', orden: 'RECIENTES', idOpcion: null })
+
+const seccionResenias = ref(null)
+const seccionTerminos = ref(null)
 
 const CAMPOS_TERMINOS = [
   'informacionGeneral',
@@ -75,6 +87,8 @@ const hayTerminos = computed(() => {
 
 const mostrarSensible = ref(false)
 const indiceImagen = ref(0)
+const visorAbierto = ref(false)
+const indiceVisor = ref(0)
 
 const ETIQUETAS_SENSIBLE = {
   VIOLENCIA: 'Violencia',
@@ -89,6 +103,7 @@ const tiposSensibles = computed(() => {
   return tipos.map((t) => ETIQUETAS_SENSIBLE[t] || t)
 })
 const textoSensible = computed(() => tiposSensibles.value.join(' · ') || 'Contenido sensible')
+
 const esDuenio = computed(() => {
   const actual = localStorage.getItem('nombreUsuario') || ''
   return actual.toLowerCase() === (servicio.value?.nombreArtista || '').toLowerCase()
@@ -129,6 +144,30 @@ const precioConvertido = computed(
     servicio.value.monedaMostrada !== servicio.value.moneda,
 )
 
+const cuposDisponibles = computed(() => {
+  if (disponibilidad.value?.cuposDisponibles != null) {
+    return disponibilidad.value.cuposDisponibles
+  }
+  if (servicio.value?.cuposDisponibles != null) return servicio.value.cuposDisponibles
+  return servicio.value?.cupos ?? 0
+})
+const cuposTotales = computed(
+  () => disponibilidad.value?.cuposTotales ?? servicio.value?.cupos ?? 0,
+)
+const maxDibujos = computed(
+  () =>
+    disponibilidad.value?.maxDibujosPorSolicitud ??
+    servicio.value?.maxDibujosPorSolicitud ??
+    null,
+)
+const modoRecepcionTexto = computed(() => {
+  const modo = disponibilidad.value?.modoRecepcion
+  if (modo === 'SOLO_ESPERA') return 'Solo lista de espera'
+  if (modo === 'CERRADA') return 'Recepción cerrada'
+  if (modo) return 'Recepción abierta'
+  return ''
+})
+
 const galeria = computed(() => {
   const s = servicio.value
   if (!s) return []
@@ -145,13 +184,72 @@ const activaEsVerificada = computed(() => esImagenVerificada(imagenActiva.value?
 const mostrarBlur = computed(
   () => requiereAdvertencia.value && activaEsPortada.value && !mostrarSensible.value,
 )
+const imagenesVisor = computed(() => galeria.value.map((img) => img.url))
+
+const etiquetasVisibles = computed(() => servicio.value?.etiquetas || [])
+const hayChips = computed(() =>
+  Boolean(
+    servicio.value?.nombreTipoServicio ||
+    servicio.value?.nombreMedio ||
+    etiquetasVisibles.value.length,
+  ),
+)
+
+const nombreArtistaMostrado = computed(
+  () => artista.value?.nombreDisplay || servicio.value?.nombreArtista || '',
+)
+const fotoArtista = computed(
+  () => artista.value?.urlFotoPerfilMiniatura || artista.value?.urlFotoPerfil || '',
+)
+const inicialArtista = computed(() =>
+  (nombreArtistaMostrado.value || '?').charAt(0).toUpperCase(),
+)
+const hayReseniasArtista = computed(
+  () =>
+    Boolean(resumenArtista.value?.hayDatos) &&
+    Number(resumenArtista.value?.cantidad || 0) > 0,
+)
+const promedioArtista = computed(() => resumenArtista.value?.promedio ?? null)
+const cantidadReseniasArtista = computed(() =>
+  Number(resumenArtista.value?.cantidad || 0),
+)
+
+const hayReseniasServicio = computed(
+  () =>
+    Boolean(resumenResenias.value?.hayDatos) &&
+    Number(resumenResenias.value?.cantidad || 0) > 0,
+)
+const promedioServicio = computed(() => resumenResenias.value?.promedio ?? null)
+const cantidadReseniasServicio = computed(() =>
+  Number(resumenResenias.value?.cantidad || 0),
+)
 
 function textoEntrega(s) {
-  return `${s.tiempoEntregaValor} ${(s.tiempoEntregaUnidad || '').toLowerCase()}`
+  if (!s || s.tiempoEntregaValor == null) return ''
+  return `${s.tiempoEntregaValor} ${(s.tiempoEntregaUnidad || '').toLowerCase()}`.trim()
+}
+
+function moverImagen(paso) {
+  const total = galeria.value.length
+  if (total < 2) return
+  indiceImagen.value = (indiceImagen.value + paso + total) % total
+  if (visorAbierto.value) indiceVisor.value = indiceImagen.value
 }
 
 function seleccionarImagen(i) {
   indiceImagen.value = i
+  if (visorAbierto.value) indiceVisor.value = i
+}
+
+function abrirVisor(indice = indiceImagen.value) {
+  if (!galeria.value.length || mostrarBlur.value) return
+  indiceVisor.value = Math.min(Math.max(indice, 0), galeria.value.length - 1)
+  visorAbierto.value = true
+}
+
+function actualizarIndiceVisor(indice) {
+  indiceVisor.value = indice
+  indiceImagen.value = indice
 }
 
 function irAlArtista() {
@@ -168,6 +266,14 @@ function irASolicitar() {
     return
   }
   router.push({ name: 'solicitud-servicio', params: { id: servicio.value.idServicio } })
+}
+
+function irAResenias() {
+  seccionResenias.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function irATerminos() {
+  seccionTerminos.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 function aplicarSolicitudPublica(data) {
@@ -229,6 +335,17 @@ async function alternarFavoritoServicio() {
   }
 }
 
+async function cargarArtista() {
+  const nombre = servicio.value?.nombreArtista
+  if (!nombre) return
+  const [perfilRes, resumenRes] = await Promise.allSettled([
+    api.get(`/perfil/${encodeURIComponent(nombre)}`),
+    cargarResumenReseniasArtista(nombre),
+  ])
+  artista.value = perfilRes.status === 'fulfilled' ? perfilRes.value.data : null
+  resumenArtista.value = resumenRes.status === 'fulfilled' ? resumenRes.value.data : null
+}
+
 async function cargar() {
   cargando.value = true
   error.value = ''
@@ -254,25 +371,24 @@ async function cargar() {
   } finally {
     cargando.value = false
   }
-  if (servicio.value) {
-    void cargarReseniasResumen()
-  }
 }
 
-async function cargarReseniasResumen() {
-  cargandoResenias.value = true
-  errorResenias.value = ''
+async function cargarReseniasPreview() {
+  cargandoPreview.value = true
+  errorPreview.value = ''
   try {
     const { data } = await cargarReseniasServicio(route.params.id, {
       pagina: 0,
-      tamanio: 3,
+      tamanio: 2,
+      orden: 'RECIENTES',
     })
+    reseniasPreview.value = data.pagina?.contenido || []
     resumenResenias.value = data.resumen || null
-    reseniasDestacadas.value = data.pagina?.contenido || []
-  } catch {
-    errorResenias.value = 'No se pudieron cargar las reseñas.'
+  } catch (e) {
+    errorPreview.value = e.response?.data?.message
+      || 'No se pudieron cargar las reseñas.'
   } finally {
-    cargandoResenias.value = false
+    cargandoPreview.value = false
   }
 }
 
@@ -284,6 +400,9 @@ function parametrosResenias(pagina) {
   }
   if (filtrosResenias.calificacion) {
     params.calificacion = Number(filtrosResenias.calificacion)
+  }
+  if (filtrosResenias.idOpcion) {
+    params.idOpcion = Number(filtrosResenias.idOpcion)
   }
   return params
 }
@@ -307,7 +426,11 @@ async function cargarListaResenias(pagina = 0) {
   }
 }
 
-function abrirResenias() {
+function abrirResenias(opcion = null) {
+  filtrosResenias.calificacion = ''
+  filtrosResenias.orden = 'RECIENTES'
+  filtrosResenias.idOpcion = opcion?.idOpcion ?? null
+  filtroOpcion.value = opcion?.etiqueta || ''
   modalReseniasAbierto.value = true
   void cargarListaResenias(0)
 }
@@ -316,9 +439,16 @@ function cerrarResenias() {
   modalReseniasAbierto.value = false
 }
 
+function quitarFiltroOpcion() {
+  filtrosResenias.idOpcion = null
+  filtroOpcion.value = ''
+  void cargarListaResenias(0)
+}
+
 function cambiarFiltrosResenias(filtros) {
   filtrosResenias.calificacion = filtros.calificacion ?? ''
   filtrosResenias.orden = filtros.orden || 'RECIENTES'
+  filtrosResenias.idOpcion = filtros.idOpcion ?? null
   void cargarListaResenias(0)
 }
 
@@ -333,6 +463,10 @@ function manejarTecla(event) {
 
 onMounted(async () => {
   await cargar()
+  if (servicio.value) {
+    void cargarArtista()
+    await cargarReseniasPreview()
+  }
   void cargarEstadoFavorito()
   window.addEventListener('keydown', manejarTecla)
 })
@@ -341,29 +475,56 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
 </script>
 
 <template>
-  <div class="mx-auto px-4 sm:px-8 py-8">
-    <button type="button" class="text-sm text-granate hover:text-coral transition" @click="irAServicios">
-      ← Volver a servicios
-    </button>
-
-    <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando servicio...</p>
-    <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
+  <div class="mx-auto max-w-screen-2xl px-4 py-8 sm:px-8 sm:py-10">
+    <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando servicio...</p>
+    <p v-else-if="error" class="py-16 text-center text-rojizo">{{ error }}</p>
 
     <template v-else-if="servicio">
-      <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] gap-8 mt-4">
-        <!-- Galería -->
-        <div>
-          <div class="relative rounded-2xl overflow-hidden bg-rosa/20 aspect-video">
-            <img
-              v-if="imagenActiva"
-              :src="imagenActiva.url"
-              :alt="servicio.nombre"
-              class="w-full h-full object-cover transition duration-200"
-              :class="mostrarBlur ? 'blur-[18px] scale-105' : ''"
-            />
+      <nav
+        aria-label="Migas de pan"
+        class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-cafe/60"
+      >
+        <button type="button" class="transition hover:text-coral" @click="irAServicios">
+          Explorar
+        </button>
+        <span aria-hidden="true">›</span>
+        <button type="button" class="transition hover:text-coral" @click="irAlArtista">
+          Servicios de {{ nombreArtistaMostrado || `@${servicio.nombreArtista}` }}
+        </button>
+        <span aria-hidden="true">›</span>
+        <span class="font-semibold text-granate">{{ servicio.nombre }}</span>
+      </nav>
+
+      <div class="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] lg:items-start">
+        <section aria-label="Galería del servicio" class="order-1 min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
+          <div class="relative overflow-hidden rounded-[32px] bg-rosa/20 shadow-[0_14px_34px_rgba(194,24,91,0.14)]">
+            <button
+              type="button"
+              class="block w-full text-left"
+              aria-label="Ampliar imagen del servicio"
+              @click="abrirVisor()"
+            >
+              <img
+                v-if="imagenActiva"
+                :src="imagenActiva.url"
+                :alt="servicio.nombre"
+                class="aspect-[3/2] w-full object-cover transition duration-200"
+                :class="mostrarBlur ? 'scale-105 blur-[18px]' : ''"
+              />
+              <span
+                v-else
+                class="flex aspect-[3/2] w-full items-center justify-center bg-superficie-alt"
+              >
+                <span class="font-display text-6xl font-extrabold text-cafe/40">
+                  {{ (servicio.nombre || '?').charAt(0).toUpperCase() }}
+                </span>
+              </span>
+            </button>
+
             <div
               v-if="mostrarBlur"
-              class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-granate/30 text-center px-6"
+              class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-granate/30 px-6 text-center"
+              @click.stop
             >
               <svg class="h-10 w-10 text-white drop-shadow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
@@ -372,43 +533,76 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
               <span class="rounded-full bg-blanco/90 px-3 py-0.5 text-xs text-cafe">{{ textoSensible }}</span>
               <button
                 type="button"
-                class="mt-1 rounded-md bg-coral px-4 py-2 text-sm text-white hover:bg-rojizo transition shadow-sm"
+                class="mt-1 rounded-full bg-coral px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-rojizo"
                 @click="mostrarSensible = true"
               >
                 Ver de todos modos
               </button>
             </div>
-            <div
-              v-if="requiereAdvertencia && activaEsPortada && mostrarSensible"
-              class="absolute left-3 top-3 rounded-full bg-granate/70 px-3 py-1 text-xs text-inverso-contraste"
+
+            <button
+              v-if="galeria.length > 1 && !mostrarBlur"
+              type="button"
+              class="absolute left-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-tinta shadow-lg transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+              aria-label="Imagen anterior"
+              @click.stop="moverImagen(-1)"
             >
-              Mostrando contenido sensible
-              <button type="button" class="ml-2 underline hover:text-white" @click="mostrarSensible = false">
-                Ocultar
-              </button>
-            </div>
+              <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              v-if="galeria.length > 1 && !mostrarBlur"
+              type="button"
+              class="absolute right-4 top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-tinta shadow-lg transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+              aria-label="Imagen siguiente"
+              @click.stop="moverImagen(1)"
+            >
+              <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+
+            <span
+              v-if="galeria.length"
+              class="absolute bottom-4 left-4 z-10 rounded-full bg-granate/90 px-3.5 py-1.5 text-[13px] font-bold text-white"
+            >
+              {{ indiceImagen + 1 }} / {{ galeria.length }}
+            </span>
+
             <span
               v-if="activaEsVerificada"
-              class="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-blanco/90 px-2 py-1 text-[11px] font-semibold text-green-700 shadow ring-1 ring-green-700/20"
+              class="absolute right-4 top-4 z-10 inline-flex items-center gap-1 rounded-full bg-blanco/95 px-2.5 py-1 text-[11px] font-semibold text-green-700 shadow ring-1 ring-green-700/20"
             >
               <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 0 1 0 1.414l-7.25 7.25a1 1 0 0 1-1.414 0l-3.25-3.25a1 1 0 1 1 1.414-1.414l2.543 2.543 6.543-6.543a1 1 0 0 1 1.414 0Z" clip-rule="evenodd" />
               </svg>
               Verificado
             </span>
+
+            <div
+              v-if="requiereAdvertencia && activaEsPortada && mostrarSensible"
+              class="absolute left-4 top-4 z-10 rounded-full bg-granate/80 px-3 py-1 text-xs text-white"
+            >
+              Mostrando contenido sensible
+              <button type="button" class="ml-2 underline hover:text-white" @click="mostrarSensible = false">
+                Ocultar
+              </button>
+            </div>
           </div>
 
-          <div v-if="galeria.length > 1" class="mt-3 grid grid-cols-5 sm:grid-cols-8 gap-2">
+          <div v-if="galeria.length > 1" class="flex gap-3 overflow-x-auto pb-1">
             <button
               v-for="(img, i) in galeria"
               :key="i"
               type="button"
-              class="relative aspect-square rounded-lg overflow-hidden bg-rosa/20 border-2 transition"
+              class="relative h-16 w-20 shrink-0 overflow-hidden rounded-2xl border-[3px] transition"
               :class="indiceImagen === i ? 'border-coral' : 'border-transparent hover:border-rosa'"
               :aria-label="img.portada ? 'Ver portada' : `Ver imagen de ejemplo ${i}`"
+              :aria-pressed="indiceImagen === i"
               @click="seleccionarImagen(i)"
             >
-              <img :src="img.url" alt="" class="w-full h-full object-cover" />
+              <img :src="img.url" alt="" class="h-full w-full object-cover" />
               <span
                 v-if="esImagenVerificada(img.url)"
                 class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-700 text-[10px] font-bold text-white shadow"
@@ -420,197 +614,315 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
               </span>
               <span
                 v-if="img.portada"
-                class="absolute bottom-0 inset-x-0 bg-granate/60 text-white text-[10px] px-1 py-0.5 text-center"
+                class="absolute inset-x-0 bottom-0 bg-granate/60 px-1 py-0.5 text-center text-[10px] text-white"
               >
                 Portada
               </span>
             </button>
           </div>
 
-          <div class="mt-6">
-            <h2 class="text-xl text-granate">{{ servicio.nombre }}</h2>
+          <p class="text-sm text-cafe/60">Ejemplos de trabajos hechos con este servicio.</p>
+        </section>
+
+        <aside class="order-2 h-fit rounded-[32px] border border-rosa/40 bg-superficie p-6 shadow-[0_10px_28px_rgba(194,24,91,0.10)] sm:p-8 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <h1 class="min-w-0 font-display text-4xl font-extrabold leading-[0.95] tracking-[-0.02em] text-granate sm:text-5xl">
+              {{ servicio.nombre }}
+            </h1>
             <button
+              v-if="hayReseniasServicio"
               type="button"
-              class="mt-1 text-sm text-cafe/60 hover:text-coral transition"
-              @click="irAlArtista"
+              class="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-mantequilla/70 px-3.5 py-2 text-sm font-bold text-granate transition hover:bg-mantequilla"
+              aria-label="Ver las reseñas de este servicio"
+              @click="irAResenias"
             >
-              Por @{{ servicio.nombreArtista }}
+              <span aria-hidden="true">★</span>
+              {{ formatearPromedio(promedioServicio) }}
+              <span class="text-xs font-normal text-cafe/90">({{ cantidadReseniasServicio }})</span>
             </button>
-            <p class="mt-4 text-sm text-cafe leading-relaxed whitespace-pre-wrap">{{ servicio.descripcion }}</p>
+            <span
+              v-else-if="!cargandoPreview"
+              class="mt-1 inline-flex shrink-0 items-center rounded-full border border-rosa/40 px-3.5 py-2 text-xs font-semibold text-cafe/60"
+            >
+              Sin reseñas
+            </span>
           </div>
+
+          <p class="mt-5 whitespace-pre-wrap text-[15px] leading-relaxed text-cafe/85">
+            {{ servicio.descripcion }}
+          </p>
+
+          <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div class="rounded-[22px] bg-mantequilla/70 px-4 py-4">
+              <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/90">Precio base</p>
+              <p class="mt-1 font-display text-3xl font-extrabold text-granate">{{ precioMostrado }}</p>
+              <p v-if="precioConvertido" class="mt-1 text-xs leading-snug text-cafe/85">
+                El artista lo cargó como {{ formatearPrecio(servicio.precioBase, servicio.moneda) }}
+              </p>
+            </div>
+            <div class="rounded-[22px] bg-durazno/60 px-4 py-4">
+              <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/90">Cupos disponibles</p>
+              <p class="mt-1 font-display text-3xl font-extrabold text-coral">{{ cuposDisponibles }}</p>
+              <p v-if="cuposTotales" class="mt-1 text-xs text-cafe/85">de {{ cuposTotales }} en total</p>
+            </div>
+          </div>
+
+          <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-cafe">
+            <span v-if="textoEntrega(servicio)" class="inline-flex items-center gap-2">
+              <svg class="h-5 w-5 text-coral" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+              Entrega estimada: <strong class="font-semibold text-granate">{{ textoEntrega(servicio) }}</strong>
+            </span>
+            <span
+              v-if="modoRecepcionTexto"
+              class="rounded-full px-3 py-1 text-xs font-semibold"
+              :class="disponibilidad?.modoRecepcion === 'CERRADA'
+                ? 'bg-rojizo/10 text-rojizo'
+                : 'bg-rosa/30 text-cafe'"
+            >
+              {{ modoRecepcionTexto }}
+            </span>
+          </div>
+
+          <details class="group mt-5 rounded-2xl border border-rosa/40 bg-fondo/60 px-4 py-3">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-bold text-granate">
+              Detalles del servicio
+              <svg class="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
+              </svg>
+            </summary>
+            <dl class="mt-3 space-y-2 text-sm">
+              <div v-if="servicio.nombreTipoServicio" class="flex justify-between gap-4">
+                <dt class="text-cafe/70">Tipo</dt>
+                <dd class="text-right text-cafe">
+                  {{ servicio.nombreTipoServicio }}
+                  <span v-if="servicio.descripcionTipoServicio" class="mt-1 block text-xs leading-relaxed text-cafe/70">
+                    {{ servicio.descripcionTipoServicio }}
+                  </span>
+                </dd>
+              </div>
+              <div v-if="servicio.nombreMedio" class="flex justify-between gap-4">
+                <dt class="text-cafe/70">Medio</dt>
+                <dd class="text-cafe">{{ servicio.nombreMedio }}</dd>
+              </div>
+              <div v-if="maxDibujos" class="flex justify-between gap-4">
+                <dt class="text-cafe/70">Máximo por solicitud</dt>
+                <dd class="text-cafe">{{ maxDibujos }} dibujo(s)</dd>
+              </div>
+              <div v-if="disponibilidad?.permiteListaEspera" class="flex justify-between gap-4">
+                <dt class="text-cafe/70">Lista de espera</dt>
+                <dd class="text-cafe">Disponible</dd>
+              </div>
+              <div class="flex justify-between gap-4">
+                <dt class="text-cafe/70">Contenido sensible</dt>
+                <dd class="text-right" :class="esSensible ? 'text-coral' : 'text-cafe'">
+                  {{ esSensible ? `Sí · ${textoSensible}` : 'No admite' }}
+                </dd>
+              </div>
+            </dl>
+          </details>
+
+          <div class="mt-6 space-y-3 border-t border-rosa/40 pt-5">
+            <div class="flex items-stretch gap-3">
+              <template v-if="!esDuenio">
+                <button
+                  v-if="!autenticado"
+                  type="button"
+                  class="min-h-14 flex-1 rounded-full bg-coral px-5 text-base font-bold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2"
+                  @click="irASolicitar"
+                >
+                  Iniciá sesión para solicitar
+                </button>
+                <button
+                  v-else
+                  type="button"
+                  class="min-h-14 flex-1 rounded-full bg-coral px-5 text-base font-bold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="!puedeSolicitar"
+                  @click="irASolicitar"
+                >
+                  Solicitar servicio
+                </button>
+              </template>
+              <router-link
+                v-else
+                :to="`/panel/servicios/${servicio.idServicio}/editar`"
+                class="flex min-h-14 flex-1 items-center justify-center rounded-full border-2 border-coral px-5 text-base font-bold text-coral transition hover:bg-coral hover:text-white"
+              >
+                Editar servicio
+              </router-link>
+
+              <button
+                v-if="puedeMarcarFavorito"
+                type="button"
+                class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
+                :class="esFavorito
+                  ? 'border-coral bg-coral text-white hover:bg-rojizo'
+                  : 'border-coral bg-superficie text-coral hover:bg-rosa/20'"
+                :disabled="actualizandoFavorito || cargandoEstadoFavorito"
+                :aria-pressed="esFavorito"
+                :aria-label="esFavorito
+                  ? `Quitar ${servicio.nombre} de tus favoritos`
+                  : `Agregar ${servicio.nombre} a tus favoritos`"
+                @click="alternarFavoritoServicio"
+              >
+                <svg
+                  class="h-6 w-6"
+                  viewBox="0 0 24 24"
+                  :fill="esFavorito ? 'currentColor' : 'none'"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  aria-hidden="true"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z" />
+                </svg>
+              </button>
+            </div>
+
+            <button
+              v-if="hayTerminos && !esDuenio"
+              type="button"
+              class="text-sm font-semibold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
+              @click="irATerminos"
+            >
+              Ver los términos del artista
+            </button>
+
+            <p v-if="!esDuenio" class="text-xs leading-relaxed text-cafe/75">
+              {{ mensajeSolicitud || 'Revisá los términos y condiciones antes de enviar tu solicitud.' }}
+            </p>
+          </div>
+        </aside>
+
+        <section class="order-3 space-y-4 lg:col-start-1 lg:row-start-2">
+          <div v-if="hayChips" class="rounded-[24px] border border-rosa/40 bg-superficie p-4">
+            <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/60">
+              Categorías y etiquetas
+            </p>
+            <div class="mt-2.5 flex flex-wrap gap-2">
+              <span
+                v-if="servicio.nombreTipoServicio"
+                class="rounded-full bg-rosa/40 px-3 py-1 text-xs font-bold text-granate"
+              >
+                {{ servicio.nombreTipoServicio }}
+              </span>
+              <span
+                v-if="servicio.nombreMedio"
+                class="rounded-full bg-mantequilla/70 px-3 py-1 text-xs font-bold text-granate"
+              >
+                {{ servicio.nombreMedio }}
+              </span>
+              <span
+                v-for="etiqueta in etiquetasVisibles"
+                :key="etiqueta.idEtiqueta"
+                class="rounded-full bg-durazno/50 px-3 py-1 text-xs font-bold text-granate"
+              >
+                {{ etiqueta.nombre }}
+              </span>
+            </div>
+          </div>
+
+          <div class="rounded-[24px] border border-rosa/40 bg-superficie p-4">
+            <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/60">Artista</p>
+            <div class="mt-3 flex items-center gap-3">
+              <img
+                v-if="fotoArtista"
+                :src="fotoArtista"
+                alt=""
+                class="h-12 w-12 shrink-0 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-rosa/50"
+              />
+              <span
+                v-else
+                class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-rosa/40 text-lg font-bold text-granate"
+              >
+                {{ inicialArtista }}
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-base font-bold text-granate">{{ nombreArtistaMostrado }}</p>
+                <p class="text-[13px] text-cafe/70">
+                  @{{ servicio.nombreArtista }}
+                  <span v-if="hayReseniasArtista">
+                    · ★ {{ formatearPromedio(promedioArtista) }} ({{ cantidadReseniasArtista }})
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border-2 border-coral/50 px-4 text-sm font-bold text-granate transition hover:border-coral hover:bg-coral hover:text-white"
+                :aria-label="`Ver perfil de ${nombreArtistaMostrado}`"
+                @click="irAlArtista"
+              >
+                Ver perfil
+              </button>
+            </div>
+            <p v-if="artista?.biografia" class="mt-3 line-clamp-3 text-sm leading-relaxed text-cafe/75">
+              {{ artista.biografia }}
+            </p>
+          </div>
+        </section>
+      </div>
+
+      <section ref="seccionResenias" class="mt-12 scroll-mt-24">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 class="font-display text-3xl font-extrabold text-granate sm:text-4xl">
+              Lo que dicen los clientes
+            </h2>
+            <p class="mt-1 text-sm text-cafe/60">Reseñas verificadas de este servicio.</p>
+          </div>
+          <button
+            v-if="hayReseniasServicio"
+            type="button"
+            class="text-sm font-bold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
+            @click="abrirResenias()"
+          >
+            Ver todas las reseñas →
+          </button>
         </div>
 
-        <!-- Datos del servicio -->
-        <aside class="lg:sticky lg:top-16 h-fit rounded-2xl border border-rosa/50 bg-blanco p-6">
-          <p class="text-2xl text-granate">{{ precioMostrado }}</p>
-          <p class="mt-1 text-xs text-cafe/50">
-            Precio base por dibujo
-            <span v-if="precioConvertido"> · equivalente</span>
-          </p>
-          <p v-if="precioConvertido" class="mt-1 text-xs text-cafe/50">
-            El artista lo cargó como {{ formatearPrecio(servicio.precioBase, servicio.moneda) }}
-          </p>
-
-          <dl class="mt-6 space-y-4 text-sm border-t border-rosa/60 pt-6">
-            <div class="flex justify-between gap-3">
-              <dt class="text-xs text-cafe/50">Tipo</dt>
-              <dd class="text-right text-cafe">
-                <span class="block">{{ servicio.nombreTipoServicio }}</span>
-                <span v-if="servicio.descripcionTipoServicio" class="mt-1 block text-xs leading-relaxed text-cafe/60">
-                  {{ servicio.descripcionTipoServicio }}
-                </span>
-              </dd>
-            </div>
-            <div class="flex justify-between gap-3">
-              <dt class="text-xs text-cafe/50">Medio</dt>
-              <dd class="text-cafe">{{ servicio.nombreMedio }}</dd>
-            </div>
-            <div class="flex justify-between gap-3">
-              <dt class="text-xs text-cafe/50">Entrega estimada</dt>
-              <dd class="text-cafe">{{ textoEntrega(servicio) }}</dd>
-            </div>
-            <div class="flex justify-between gap-3">
-              <dt class="text-xs text-cafe/50">Cupos disponibles</dt>
-              <dd class="text-cafe">
-                {{ disponibilidad ? `${disponibilidad.cuposDisponibles} de ${disponibilidad.cuposTotales}` : servicio.cupos }}
-              </dd>
-            </div>
-            <div v-if="disponibilidad?.maxDibujosPorSolicitud" class="flex justify-between gap-3">
-              <dt class="text-xs text-cafe/50">Máximo por solicitud</dt>
-              <dd class="text-cafe">{{ disponibilidad.maxDibujosPorSolicitud }} dibujo(s)</dd>
-            </div>
-            <div v-if="disponibilidad?.modoRecepcion" class="flex justify-between gap-3">
-              <dt class="text-xs text-cafe/50">Recepción</dt>
-              <dd class="text-cafe">
-                {{ disponibilidad.modoRecepcion === 'SOLO_ESPERA'
-                  ? 'Solo lista de espera'
-                  : (disponibilidad.modoRecepcion === 'CERRADA' ? 'Cerrada' : 'Abierta') }}
-              </dd>
-            </div>
-            <div v-if="disponibilidad?.permiteListaEspera" class="flex justify-between gap-3">
-              <dt class="text-xs text-cafe/50">Lista de espera</dt>
-              <dd class="text-cafe">Disponible</dd>
-            </div>
-            <div v-if="esSensible" class="flex justify-between gap-3">
-              <dt class="text-xs text-cafe/50">Contenido sensible</dt>
-              <dd class="text-coral text-right">{{ textoSensible }}</dd>
-            </div>
-          </dl>
-
-          <div v-if="resumenResenias" class="mt-4 border-t border-rosa/60 pt-4">
+        <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:items-start">
+          <div class="rounded-[32px] border border-rosa/40 bg-superficie p-6 shadow-[0_10px_28px_rgba(194,24,91,0.10)] lg:sticky lg:top-24">
+            <p v-if="cargandoPreview && !resumenResenias" class="py-6 text-center text-sm text-cafe/50">
+              Cargando resumen...
+            </p>
             <ResumenResenias
+              v-else
               :resumen="resumenResenias"
-              compacto
-              clickable
-              @ver-todas="abrirResenias"
+              filtrable
+              @filtrar-opcion="abrirResenias($event)"
             />
           </div>
 
-          <div class="mt-6 space-y-3 border-t border-rosa/60 pt-6">
-            <button
-              v-if="!esDuenio && !autenticado"
-              type="button"
-              class="w-full rounded-md bg-coral px-4 py-2 text-sm text-white hover:bg-rojizo transition shadow-sm"
-              @click="irASolicitar"
+          <div class="min-w-0">
+            <p v-if="cargandoPreview" class="py-6 text-center text-sm text-cafe/55">
+              Cargando reseñas...
+            </p>
+            <p v-else-if="errorPreview" role="alert" class="py-6 text-center text-sm text-rojizo">
+              {{ errorPreview }}
+            </p>
+            <p
+              v-else-if="!reseniasPreview.length"
+              class="rounded-2xl border border-dashed border-rosa/50 px-4 py-10 text-center text-sm text-cafe/55"
             >
-              Iniciá sesión para solicitar
-            </button>
-            <button
-              v-else-if="!esDuenio"
-              type="button"
-              class="w-full rounded-md bg-coral px-4 py-2 text-sm text-white hover:bg-rojizo transition shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="!puedeSolicitar"
-              @click="irASolicitar"
-            >
-              Solicitar servicio
-            </button>
-            <button
-              v-if="puedeMarcarFavorito"
-              type="button"
-              class="flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60"
-              :class="esFavorito
-                ? 'border-coral bg-coral text-white hover:bg-rojizo'
-                : 'border-coral/50 bg-superficie text-granate hover:bg-rosa/25'"
-              :disabled="actualizandoFavorito || cargandoEstadoFavorito"
-              :aria-pressed="esFavorito"
-              @click="alternarFavoritoServicio"
-            >
-              <svg
-                class="h-4 w-4"
-                viewBox="0 0 24 24"
-                :fill="esFavorito ? 'currentColor' : 'none'"
-                stroke="currentColor"
-                stroke-width="1.8"
-                aria-hidden="true"
+              Todavía no hay reseñas de este servicio.
+            </p>
+            <div v-else class="space-y-3">
+              <TarjetaReseniaPublica
+                v-for="resenia in reseniasPreview"
+                :key="resenia.idResenia"
+                :resenia="resenia"
+              />
+              <button
+                v-if="cantidadReseniasServicio > reseniasPreview.length"
+                type="button"
+                class="w-full rounded-full border border-rosa/50 px-4 py-3 text-sm font-bold text-granate transition hover:border-coral hover:bg-rosa/10"
+                @click="abrirResenias()"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z" />
-              </svg>
-              {{ actualizandoFavorito ? 'Guardando...' : esFavorito ? 'En favoritos' : 'Guardar en favoritos' }}
-            </button>
-            <button
-              type="button"
-              class="w-full rounded-md border border-rosa px-4 py-2 text-sm text-granate hover:bg-rosa/20 transition"
-              @click="irAlArtista"
-            >
-              Ver perfil del artista
-            </button>
-            <router-link
-              v-if="esDuenio"
-              :to="`/panel/servicios/${servicio.idServicio}/editar`"
-              class="block w-full rounded-md border border-rosa px-4 py-2 text-sm text-granate text-center hover:bg-rosa/20 transition"
-            >
-              Editar servicio
-            </router-link>
+                Ver todas las reseñas
+              </button>
+            </div>
           </div>
-
-          <p v-if="!esDuenio" class="mt-6 text-xs text-cafe/50 leading-relaxed border-t border-rosa/60 pt-4">
-            {{ mensajeSolicitud || 'Revisá los términos y condiciones antes de enviar tu solicitud.' }}
-          </p>
-        </aside>
-      </div>
-
-      <section class="mt-10 rounded-2xl border border-rosa/50 bg-blanco p-6 sm:p-8">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 class="text-xl text-granate">Reseñas</h2>
-          <p class="text-xs text-cafe/50">Lo que dicen los clientes de este servicio</p>
-        </div>
-
-        <div class="mt-4">
-          <ResumenResenias
-            :resumen="resumenResenias"
-            clickable
-            @ver-todas="abrirResenias"
-          />
-        </div>
-
-        <p v-if="cargandoResenias" class="mt-4 text-sm text-cafe/55">Cargando reseñas...</p>
-        <p v-else-if="errorResenias" class="mt-4 text-sm text-rojizo">{{ errorResenias }}</p>
-        <div v-else-if="reseniasDestacadas.length" class="mt-5 space-y-3">
-          <TarjetaReseniaPublica
-            v-for="resenia in reseniasDestacadas"
-            :key="resenia.idResenia"
-            :resenia="resenia"
-          />
-        </div>
-      </section>
-
-      <section v-if="hayTerminos" class="mt-10 rounded-2xl border border-rosa/50 bg-blanco p-6 sm:p-8">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 class="text-xl text-granate">Términos y condiciones</h2>
-          <span
-            class="rounded-full px-3 py-1 text-xs"
-            :class="terminos.propio ? 'bg-coral/10 text-granate' : 'bg-rosa/30 text-cafe/70'"
-          >
-            {{ terminos.propio ? 'De este servicio' : 'Generales del artista' }}
-          </span>
-        </div>
-        <div class="mt-6">
-          <VistaPreviaTerminos
-            :terminos="terminosParaMostrar"
-            :derechos-catalogo="derechosTerminos"
-            :mostrar-aviso="false"
-            :ocultar-vacios="true"
-          />
         </div>
       </section>
 
@@ -623,9 +935,50 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
         :cargando="cargandoListaResenias"
         :error="errorListaResenias"
         :filtros="filtrosResenias"
+        :filtro-opcion="filtroOpcion"
         @cerrar="cerrarResenias"
         @cambiar-filtros="cambiarFiltrosResenias"
         @cambiar-pagina="cambiarPaginaResenias"
+        @quitar-filtro-opcion="quitarFiltroOpcion"
+      />
+
+      <section
+        v-if="hayTerminos"
+        ref="seccionTerminos"
+        class="mt-12 scroll-mt-24 rounded-[32px] bg-durazno/40 p-6 sm:p-10"
+      >
+        <div class="grid gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+          <div>
+            <h2 class="font-display text-3xl font-extrabold text-granate">Términos y condiciones</h2>
+            <p class="mt-2 text-sm leading-relaxed text-cafe/70">
+              Las reglas del artista para este servicio. Leelas antes de enviar tu solicitud.
+            </p>
+            <span
+              class="mt-3 inline-block rounded-full px-3 py-1 text-xs"
+              :class="terminos.propio ? 'bg-coral/10 text-granate' : 'bg-blanco/80 text-cafe/70'"
+            >
+              {{ terminos.propio ? 'De este servicio' : 'Generales del artista' }}
+            </span>
+          </div>
+          <div class="rounded-[24px] bg-superficie p-5 sm:p-6">
+            <VistaPreviaTerminos
+              :terminos="terminosParaMostrar"
+              :derechos-catalogo="derechosTerminos"
+              :mostrar-aviso="false"
+              :ocultar-vacios="true"
+            />
+          </div>
+        </div>
+      </section>
+
+      <VisorImagenes
+        :abierto="visorAbierto"
+        :imagenes="imagenesVisor"
+        :indice="indiceVisor"
+        etiqueta="Ejemplos del servicio"
+        :descripcion="servicio.nombre"
+        @cerrar="visorAbierto = false"
+        @actualizar:indice="actualizarIndiceVisor"
       />
     </template>
   </div>
