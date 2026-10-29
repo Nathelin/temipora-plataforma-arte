@@ -16,6 +16,8 @@ import PedidoConfigAdmin from '../components/PedidoConfigAdmin.vue'
 import TerminosPlataformaAdmin from '../components/TerminosPlataformaAdmin.vue'
 import CriteriosReseniaAdmin from '../components/CriteriosReseniaAdmin.vue'
 import ConfiguracionReseniaAdmin from '../components/ConfiguracionReseniaAdmin.vue'
+import ReseniasReportadasAdmin from '../components/ReseniasReportadasAdmin.vue'
+import HistorialReportesAdmin from '../components/HistorialReportesAdmin.vue'
 import Registro from '../components/Registro.vue'
 import TOS from '../components/TOS.vue'
 import MainLayout from '../layouts/MainLayout.vue'
@@ -245,6 +247,18 @@ const routes = [
         name: 'categorias-admin',
         component: CategoriasEtiquetaAdmin,
         meta: { title: 'Categorías' },
+      },
+      {
+        path: 'resenas/reportadas',
+        name: 'admin-resenias-reportadas',
+        component: ReseniasReportadasAdmin,
+        meta: { title: 'Moderación de reseñas' },
+      },
+      {
+        path: 'resenas/historial',
+        name: 'admin-resenias-historial',
+        component: HistorialReportesAdmin,
+        meta: { title: 'Historial de reportes' },
       },
       {
         path: 'resenas/criterios',

@@ -1,13 +1,20 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { formatearFechaHora } from '../servicios/pedidos'
 import ImagenGaleria from './ImagenGaleria.vue'
 import ValoracionEstrellas from './ValoracionEstrellas.vue'
+import ModalReporteResenia from './ModalReporteResenia.vue'
+import { useMisReportesResenia } from '../composables/useMisReportesResenia'
 
 const props = defineProps({
   resenia: { type: Object, required: true },
   mostrarServicio: { type: Boolean, default: false },
 })
+
+const modalAbierto = ref(false)
+const idUsuario = Number(localStorage.getItem('idUsuario'))
+const sesionIniciada = Boolean(localStorage.getItem('token'))
+const { asegurarCarga, marcarReportada, estaReportada } = useMisReportesResenia()
 
 const autor = computed(() => (
   props.resenia.autor?.nombreDisplay
@@ -22,6 +29,21 @@ const foto = computed(() => (
 const inicial = computed(() => (
   autor.value || props.resenia.autorMostrado || 'C'
 ).charAt(0).toUpperCase())
+
+const esPropia = computed(() => (
+  sesionIniciada
+  && Number(props.resenia.autor?.idUsuario) === idUsuario
+))
+const reportada = computed(() => estaReportada(props.resenia.idResenia))
+const puedeReportar = computed(() => sesionIniciada && !esPropia.value)
+
+onMounted(() => {
+  if (puedeReportar.value) asegurarCarga()
+})
+
+function alReportar(idResenia) {
+  marcarReportada(idResenia)
+}
 
 function claseOpcion(opcion) {
   return opcion.polaridad === 'NEGATIVA'
@@ -75,6 +97,24 @@ function claseOpcion(opcion) {
         >
           Editada
         </span>
+        <button
+          v-if="puedeReportar && !reportada"
+          type="button"
+          class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold text-cafe/45 transition hover:bg-rojizo/5 hover:text-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/50"
+          :aria-label="`Reportar reseña de ${resenia.nombreServicio || 'este servicio'}`"
+          @click="modalAbierto = true"
+        >
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 21V4m0 0h11l-2.5 4L16 12H5" />
+          </svg>
+          Reportar
+        </button>
+        <span
+          v-else-if="puedeReportar && reportada"
+          class="text-[11px] font-semibold text-cafe/40"
+        >
+          Reportada
+        </span>
       </div>
     </div>
 
@@ -119,5 +159,12 @@ function claseOpcion(opcion) {
         <ImagenGaleria :url="imagen.urlPreview" alt="" class="h-full w-full" />
       </div>
     </div>
+
+    <ModalReporteResenia
+      :abierto="modalAbierto"
+      :resenia="resenia"
+      @cerrar="modalAbierto = false"
+      @reportado="alReportar"
+    />
   </article>
 </template>

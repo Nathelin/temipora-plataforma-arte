@@ -104,3 +104,66 @@ export function formatearPromedio(valor) {
     maximumFractionDigits: 2,
   }).format(Number(valor))
 }
+
+export const MOTIVOS_REPORTE = [
+  { valor: 'OFENSIVA', etiqueta: 'Contenido ofensivo' },
+  { valor: 'SPAM', etiqueta: 'Spam o publicidad' },
+  { valor: 'DATOS_PERSONALES', etiqueta: 'Datos personales' },
+  { valor: 'FALSA', etiqueta: 'Información falsa' },
+  { valor: 'OTRO', etiqueta: 'Otro motivo' },
+]
+
+export const ESTADOS_REPORTE = [
+  { valor: 'PENDIENTE', etiqueta: 'Pendiente' },
+  { valor: 'RESUELTO', etiqueta: 'Resuelto' },
+  { valor: 'DESCARTADO', etiqueta: 'Descartado' },
+]
+
+export const ACCIONES_REPORTE = [
+  { valor: 'OCULTAR', etiqueta: 'Reseña ocultada' },
+  { valor: 'DESCARTAR', etiqueta: 'Reporte descartado' },
+]
+
+export function etiquetaMotivoReporte(codigo) {
+  return MOTIVOS_REPORTE.find((item) => item.valor === codigo)?.etiqueta || codigo
+}
+
+export function etiquetaEstadoReporte(codigo) {
+  return ESTADOS_REPORTE.find((item) => item.valor === codigo)?.etiqueta || codigo
+}
+
+export function etiquetaAccionReporte(codigo) {
+  return ACCIONES_REPORTE.find((item) => item.valor === codigo)?.etiqueta || codigo
+}
+
+export function reportarResenia(idResenia, payload) {
+  return api.post(`/resenias/${idResenia}/reportes`, payload)
+}
+
+export function cargarMisReportes() {
+  return api.get('/resenias/reportes/mios')
+}
+
+export function cargarReseniasReportadas(params = {}) {
+  return api.get('/admin/resenias/reportadas', { params })
+}
+
+export function cargarReseniasOcultas(params = {}) {
+  return api.get('/admin/resenias/ocultas', { params })
+}
+
+export function cargarHistorialReportes(params = {}) {
+  return api.get('/admin/resenias/historial', { params })
+}
+
+export function ocultarResenia(idResenia, payload = {}) {
+  return api.post(`/admin/resenias/${idResenia}/ocultar`, payload)
+}
+
+export function descartarReportesResenia(idResenia) {
+  return api.post(`/admin/resenias/${idResenia}/descartar-reportes`)
+}
+
+export function restaurarResenia(idResenia) {
+  return api.post(`/admin/resenias/${idResenia}/restaurar`)
+}

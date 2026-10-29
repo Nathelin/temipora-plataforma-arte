@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.EstadoPedido;
+import com.temipora.backend_springboot.modelo.EstadoReporteResenia;
 import com.temipora.backend_springboot.modelo.EstadoResenia;
 import com.temipora.backend_springboot.modelo.Resenia;
 
@@ -35,6 +36,53 @@ public interface ReseniaRepository extends JpaRepository<Resenia, Long> {
     Optional<Resenia> findForUpdateByPedidoAndAutor(
         @Param("idPedido") Long idPedido,
         @Param("idAutor") Long idAutor);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM Resenia r WHERE r.idResenia = :idResenia")
+    Optional<Resenia> findForUpdateById(
+        @Param("idResenia") Long idResenia);
+
+    // -----------------------------------------------------------------
+    // Moderación
+    // -----------------------------------------------------------------
+
+    @Query(value = """
+        SELECT r FROM Resenia r
+        JOIN FETCH r.pedido p
+        LEFT JOIN FETCH p.servicio s
+        JOIN FETCH r.autor a
+        WHERE EXISTS (
+            SELECT 1 FROM ReporteResenia rr
+            WHERE rr.resenia = r AND rr.estado = :estadoReporte
+        )
+        ORDER BY r.fechaCreacion DESC
+        """,
+        countQuery = """
+        SELECT COUNT(r) FROM Resenia r
+        WHERE EXISTS (
+            SELECT 1 FROM ReporteResenia rr
+            WHERE rr.resenia = r AND rr.estado = :estadoReporte
+        )
+        """)
+    Page<Resenia> findConReportesPendientes(
+        @Param("estadoReporte") EstadoReporteResenia estadoReporte,
+        Pageable pageable);
+
+    @Query(value = """
+        SELECT r FROM Resenia r
+        JOIN FETCH r.pedido p
+        LEFT JOIN FETCH p.servicio s
+        JOIN FETCH r.autor a
+        WHERE r.estado = :estado
+        ORDER BY COALESCE(r.moderadaEn, r.fechaCreacion) DESC
+        """,
+        countQuery = """
+        SELECT COUNT(r) FROM Resenia r
+        WHERE r.estado = :estado
+        """)
+    Page<Resenia> findPorEstado(
+        @Param("estado") EstadoResenia estado,
+        Pageable pageable);
 
     @Query("""
         SELECT COUNT(r) FROM Resenia r

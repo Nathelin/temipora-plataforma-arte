@@ -62,7 +62,14 @@ const secciones = [
       { nombre: 'Términos de la plataforma', to: '/admin/ajustes/terminos-plataforma' },
     ],
   },
-  { nombre: 'Moderación', to: null, activa: false },
+  {
+    nombre: 'Moderación',
+    base: '/admin/resenas',
+    subsecciones: [
+      { nombre: 'Reseñas reportadas', to: '/admin/resenas/reportadas' },
+      { nombre: 'Historial de reportes', to: '/admin/resenas/historial' },
+    ],
+  },
   { nombre: 'Sanciones', to: null, activa: false },
   { nombre: 'Notificaciones', to: '/admin/notificaciones', activa: true },
   { nombre: 'Auditoría', to: null, activa: false },
