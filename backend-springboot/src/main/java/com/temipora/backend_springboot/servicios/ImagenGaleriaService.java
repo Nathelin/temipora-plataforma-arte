@@ -26,10 +26,11 @@ public class ImagenGaleriaService {
     }
 
     @Transactional
-    public Resource abrirLimpia(EntregaArchivo archivo) {
+    public String asegurarLimpia(EntregaArchivo archivo) {
         if (archivo.getClaveLimpia() != null) {
             try {
-                return almacen.abrir(archivo.getClaveLimpia());
+                almacen.abrir(archivo.getClaveLimpia());
+                return archivo.getClaveLimpia();
             } catch (NoSuchElementException e) {
                 archivo.setClaveLimpia(null);
             }
@@ -40,6 +41,11 @@ public class ImagenGaleriaService {
         String clave = almacen.guardarPreview(limpia, "galeria");
         archivo.setClaveLimpia(clave);
         archivoRepository.save(archivo);
-        return almacen.abrir(clave);
+        return clave;
+    }
+
+    @Transactional
+    public Resource abrirLimpia(EntregaArchivo archivo) {
+        return almacen.abrir(asegurarLimpia(archivo));
     }
 }

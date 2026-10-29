@@ -21,6 +21,12 @@ public class ImagenPortfolioDTO {
     private ContenidoSensible contenidoSensible;
     private boolean requiereAdvertencia;
 
+    @Setter
+    private boolean verificada;
+
+    @Setter
+    private String servicioNombre;
+
     @Builder.Default
     @Setter
     private List<EtiquetaDTO> etiquetas = List.of();
@@ -44,6 +50,7 @@ public class ImagenPortfolioDTO {
             .tipoArte(TipoArteDTO.desdeTipoArte(imagen.getTipoArte()))
             .contenidoSensible(imagen.getContenidoSensible())
             .requiereAdvertencia(requiereAdvertencia)
+            .verificada(false)
             .build();
     }
 }

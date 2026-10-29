@@ -837,6 +837,15 @@ function irASubirImagen(imagen = null) {
                       :class="obra.requiereAdvertencia ? 'blur-[18px] scale-105' : ''"
                     />
                     <span
+                      v-if="obra.verificada"
+                      class="absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-blanco/90 px-2 py-1 text-[11px] font-semibold text-green-700 shadow ring-1 ring-green-700/20"
+                    >
+                      <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 0 1 0 1.414l-7.25 7.25a1 1 0 0 1-1.414 0l-3.25-3.25a1 1 0 1 1 1.414-1.414l2.543 2.543 6.543-6.543a1 1 0 0 1 1.414 0Z" clip-rule="evenodd" />
+                      </svg>
+                      Verificado
+                    </span>
+                    <span
                       v-if="obra.requiereAdvertencia"
                       class="absolute inset-0 flex items-center justify-center bg-granate/20 text-white drop-shadow"
                       :title="`Contenido sensible: ${textoSensible(obra.contenidoSensible)}`"
@@ -1410,6 +1419,19 @@ function irASubirImagen(imagen = null) {
             <div class="flex-1">
               <h2 class="text-2xl text-granate pr-8">{{ imagenSeleccionada.titulo }}</h2>
               <p v-if="!esDuenio" class="mt-2 text-sm text-cafe/60">Por {{ nombreParaMostrar }}</p>
+
+              <div
+                v-if="imagenSeleccionada.verificada"
+                class="mt-3 inline-flex flex-wrap items-center gap-1.5 rounded-full bg-green-700/10 px-2.5 py-1 text-xs font-semibold text-green-700"
+              >
+                <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 0 1 0 1.414l-7.25 7.25a1 1 0 0 1-1.414 0l-3.25-3.25a1 1 0 1 1 1.414-1.414l2.543 2.543 6.543-6.543a1 1 0 0 1 1.414 0Z" clip-rule="evenodd" />
+                </svg>
+                Entrega verificada
+                <span v-if="imagenSeleccionada.servicioNombre" class="font-normal text-cafe/60">
+                  · {{ imagenSeleccionada.servicioNombre }}
+                </span>
+              </div>
 
               <p v-if="imagenSeleccionada.descripcion" class="mt-4 text-sm text-cafe leading-relaxed whitespace-pre-wrap">{{ imagenSeleccionada.descripcion }}</p>
 

@@ -7,6 +7,7 @@ import EntregasHito from '../components/EntregasHito.vue'
 import IconoDescarga from '../components/IconoDescarga.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import SubirEntregable from '../components/SubirEntregable.vue'
+import { useSubirImagen } from '../composables/useSubirImagen'
 import {
   descripcionHito,
   estadoPedidoDe,
@@ -32,6 +33,8 @@ const descargandoConstancia = ref(false)
 const revisionHitoId = ref(null)
 const motivoRevision = ref('')
 const visor = reactive({ abierto: false, imagen: '' })
+const { abrirVerificada } = useSubirImagen()
+const idsEnPortfolio = ref([])
 const confirmacion = reactive({
   abierto: false,
   titulo: '',
@@ -70,6 +73,9 @@ async function cargar() {
   try {
     const res = await api.get(`/pedidos/${idPedido.value}`)
     pedido.value = res.data
+    if (res.data?.rolVista === 'ARTISTA') {
+      void cargarPortfolioVerificado(res.data)
+    }
   } catch (e) {
     if (e.response?.status === 401) {
       router.push({ name: 'login' })
@@ -81,6 +87,28 @@ async function cargar() {
   } finally {
     cargando.value = false
   }
+}
+
+async function cargarPortfolioVerificado(data = pedido.value) {
+  const nombre = data?.artista?.nombreUsuario
+  if (!nombre) {
+    idsEnPortfolio.value = []
+    return
+  }
+  try {
+    const res = await api.get(`/portfolio/${nombre}/verificadas`)
+    idsEnPortfolio.value = (res.data || []).map(
+      (verificacion) => verificacion.idArchivo,
+    )
+  } catch {
+    idsEnPortfolio.value = []
+  }
+}
+
+function agregarAlPortfolio({ archivo, entrega }) {
+  if (!archivo) return
+  abrirVerificada(archivo, entrega?.descripcion || '')
+  router.push({ name: 'portfolio-subir' })
 }
 
 async function ejecutar(accion, mensaje) {
@@ -618,6 +646,9 @@ onMounted(cargar)
             :id-pedido="idPedido"
             :id-hito="hito.idHitoPedido"
             :entregas="hito.entregas"
+            :puede-agregar-al-portfolio="esArtista"
+            :ids-en-portfolio="idsEnPortfolio"
+            @agregar-al-portfolio="agregarAlPortfolio"
           />
 
           <div

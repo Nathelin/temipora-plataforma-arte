@@ -12,6 +12,7 @@ import {
 } from '../servicios/archivos'
 import SelectorEtiquetas from '../components/SelectorEtiquetas.vue'
 import SelectorMateriales from '../components/SelectorMateriales.vue'
+import ImagenGaleria from '../components/ImagenGaleria.vue'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useAvisoActualizacion } from '../composables/useAvisoActualizacion'
 
@@ -34,6 +35,10 @@ const {
 } = useAvisoActualizacion()
 
 const esEdicion = computed(() => estado.modo === 'editar')
+const esVerificada = computed(() => estado.modo === 'verificar')
+const edicionVerificada = computed(
+  () => esEdicion.value && Boolean(imagenEditando.value?.verificada),
+)
 
 // ---------------------------------------------------------------
 // Selección / lote
@@ -159,6 +164,7 @@ function cancelar() {
 // ---------------------------------------------------------------
 
 const tituloPagina = computed(() => {
+  if (esVerificada.value) return 'Agregar entrega final al portfolio'
   if (esEdicion.value) return 'Editar imagen del portfolio'
   if (vista.value === 'seleccion') return 'Sube tus obras al portfolio'
   if (vista.value === 'subiendo') return 'Subiendo tus imágenes…'
@@ -166,6 +172,12 @@ const tituloPagina = computed(() => {
 })
 
 const subtituloPagina = computed(() => {
+  if (esVerificada.value) {
+    return 'Completa los datos de la pieza. La imagen se toma de la entrega final y queda marcada como verificada.'
+  }
+  if (edicionVerificada.value) {
+    return 'Actualiza los datos de la pieza verificada. La imagen de la entrega final no se puede reemplazar.'
+  }
   if (esEdicion.value) {
     return 'Actualiza los datos de la imagen. La URL se conserva si no seleccionas un archivo nuevo.'
   }
@@ -365,6 +377,10 @@ async function accionPrincipal() {
     navegarASiguientePendiente()
     return
   }
+  if (esVerificada.value) {
+    await guardarVerificada()
+    return
+  }
   if (esEdicion.value) {
     await guardarEdicion()
   } else {
@@ -434,6 +450,50 @@ async function guardarEdicion() {
     itemEnGuardado.value = null
     fase.value = ''
     progreso.value = 0
+  }
+}
+
+async function guardarVerificada() {
+  const item = actual.value
+  if (!item) return
+  const problemaDatos = validarDatos(item.datos)
+  if (problemaDatos) {
+    error.value = problemaDatos
+    return
+  }
+  const idArchivo = estado.archivoEntrega?.idArchivo
+  if (!idArchivo) {
+    error.value = 'No se encontró la entrega final.'
+    return
+  }
+
+  guardando.value = true
+  error.value = ''
+  try {
+    const idUsuario = localStorage.getItem('idUsuario')
+    const res = await api.post(
+      `/portfolio/usuarios/${idUsuario}/imagenes/verificadas`,
+      {
+        idArchivoEntrega: idArchivo,
+        titulo: item.datos.titulo,
+        descripcion: item.datos.descripcion,
+        idTipoArte: Number(item.datos.idTipoArte),
+        contenidoSensible: item.datos.contenidoSensible || null,
+        idsEtiqueta: item.datos.etiquetas.map(e => e.idEtiqueta),
+        idsMaterial: item.datos.materiales.map(m => m.idMaterial),
+      },
+    )
+    window.dispatchEvent(new CustomEvent('portfolio-actualizado', {
+      detail: { accion: 'crear', imagen: res.data },
+    }))
+    cerrar()
+    avisoExito('La entrega final se agregó a tu portfolio como pieza verificada.')
+    irAlPortfolio()
+  } catch (e) {
+    error.value = mensajeDeError(e)
+    avisoFallo(error.value)
+  } finally {
+    guardando.value = false
   }
 }
 
@@ -523,6 +583,23 @@ onMounted(() => {
   vista.value = 'seleccion'
   cargarTiposArte()
 
+  if (estado.modo === 'verificar' && estado.archivoEntrega) {
+    const archivo = estado.archivoEntrega
+    lote.value = [crearItem({
+      preview: archivo.urlOriginal || archivo.urlPreview || '',
+      url: '',
+      datos: {
+        titulo: archivo.dibujo?.nombre || 'Entrega final',
+        descripcion: estado.descripcionEntrega || '',
+        idTipoArte: '',
+        contenidoSensible: '',
+        etiquetas: [],
+        materiales: [],
+      },
+    })]
+    vista.value = 'datos'
+  }
+
   if (estado.modo === 'editar' && estado.imagen) {
     const img = estado.imagen
     imagenEditando.value = img
@@ -560,6 +637,7 @@ onBeforeUnmount(() => {
 
 const etiquetaBoton = computed(() => {
   if (guardando.value) return 'Guardando…'
+  if (esVerificada.value) return 'Agregar al portfolio'
   if (esEdicion.value) {
     if (fase.value === 'procesando') return 'Procesando imagen…'
     if (fase.value === 'subiendo') return `Subiendo… ${progreso.value}%`
@@ -893,8 +971,15 @@ function urlsSinPublicar() {
           <div class="flex flex-col min-w-0">
             <label class="block text-sm text-cafe mb-2">Imagen</label>
             <div class="flex-1 min-h-80 rounded-xl border border-dashed border-rosa bg-rosa/10 flex items-center justify-center overflow-hidden">
+              <ImagenGaleria
+                v-if="esVerificada && actual.preview"
+                :url="actual.preview"
+                alt="Vista previa"
+                ajuste="contain"
+                class="h-full w-full max-h-128"
+              />
               <img
-                v-if="actual.preview"
+                v-else-if="actual.preview"
                 :src="actual.preview"
                 alt="Vista previa"
                 class="w-full h-full max-h-128 object-contain"
@@ -902,7 +987,7 @@ function urlsSinPublicar() {
               <p v-else class="px-6 text-center text-sm text-cafe/50">Selecciona una imagen para ver la vista previa.</p>
             </div>
 
-            <template v-if="esEdicion">
+            <template v-if="esEdicion && !edicionVerificada">
               <input
                 id="portfolio-imagen"
                 type="file"
@@ -917,6 +1002,9 @@ function urlsSinPublicar() {
                 {{ actual.archivo ? 'Cambiar imagen' : 'Cambiar imagen (opcional)' }}
               </label>
             </template>
+            <p v-else-if="esVerificada || edicionVerificada" class="mt-3 text-xs text-cafe/50">
+              La imagen se toma de la entrega final y no se puede reemplazar. Si querés otra versión, creá una pieza nueva.
+            </p>
             <p v-else class="mt-3 text-xs text-cafe/50">
               Imagen optimizada y lista para publicar.
             </p>

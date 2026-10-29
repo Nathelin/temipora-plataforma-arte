@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.repositorios.EntregaArchivoRepository;
 import com.temipora.backend_springboot.repositorios.GaleriaRepository;
+import com.temipora.backend_springboot.repositorios.PortfolioEntregaVerificadaRepository;
 
 @SpringBootTest
 class GaleriaQueriesTest {
@@ -22,6 +23,9 @@ class GaleriaQueriesTest {
 
     @Autowired
     private EntregaArchivoRepository archivoRepository;
+
+    @Autowired
+    private PortfolioEntregaVerificadaRepository verificacionRepository;
 
     @Test
     void findPaginaGaleria_sinDatos_devuelvePaginaVacia() {
@@ -56,5 +60,19 @@ class GaleriaQueriesTest {
     @Test
     void archivoParaGaleriaInexistente_devuelveVacio() {
         assertThat(archivoRepository.buscarParaGaleria(999_999L)).isEmpty();
+    }
+
+    @Test
+    void verificacionesSinDatos_devuelvenVacio() {
+        assertThat(verificacionRepository
+            .findByImagenIdImagenAndVigenteTrue(999_999L)).isEmpty();
+        assertThat(verificacionRepository
+            .existsByArchivoEntregaIdArchivoAndVigenteTrue(999_999L)).isFalse();
+        assertThat(verificacionRepository
+            .listarActivasPorImagenes(List.of(999_999L))).isEmpty();
+        assertThat(verificacionRepository
+            .listarActivasPorUsuario(999_999L)).isEmpty();
+        assertThat(verificacionRepository
+            .buscarActivaPorArchivo(999_999L)).isEmpty();
     }
 }
