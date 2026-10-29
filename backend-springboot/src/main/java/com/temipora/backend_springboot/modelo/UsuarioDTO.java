@@ -38,6 +38,7 @@ public class UsuarioDTO {
     private String urlFotoPerfilMiniatura;
     private String urlBanner;
     private EPreferenciaContenidoSensible preferenciaSensible;
+    private boolean pedidosPublicos;
     private Long idMonedaPreferida;
     private String monedaPreferida;
     private String rol;
@@ -66,6 +67,7 @@ public class UsuarioDTO {
             .urlFotoPerfilMiniatura(usuario.getUrlFotoPerfilMiniatura())
             .urlBanner(usuario.getUrlBanner())
             .preferenciaSensible(usuario.getPreferenciaSensible())
+            .pedidosPublicos(usuario.isPedidosPublicos())
             .idMonedaPreferida(usuario.getMonedaPreferida() != null
                 ? usuario.getMonedaPreferida().getIdMoneda() : null)
             .monedaPreferida(usuario.getMonedaPreferida() != null

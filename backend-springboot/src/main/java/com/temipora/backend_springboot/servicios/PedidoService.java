@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +62,10 @@ public class PedidoService {
     private static final String NOTIF_HITO_CON_REVISION = "HITO_CON_REVISION";
     private static final String NOTIF_PEDIDO_CANCELADO = "PEDIDO_CANCELADO";
     private static final String NOTIF_PEDIDO_IMPAGO = "PEDIDO_IMPAGO";
+    private static final String NOTIF_PUBLICACION_AUTORIZADA =
+        "PEDIDO_PUBLICACION_AUTORIZADA";
+    private static final String NOTIF_PUBLICACION_RETIRADA =
+        "PEDIDO_PUBLICACION_RETIRADA";
 
     private final PedidoRepository pedidoRepository;
     private final HitoPedidoRepository hitoPedidoRepository;
@@ -418,6 +423,100 @@ public class PedidoService {
         return construirDTO(pedido, idCliente);
     }
 
+    @Transactional
+    public PedidoDTO autorizarPublicacion(
+            Long idPedido, Long idArtista, boolean autoriza) {
+        Pedido pedido = pedidoRepository.findByIdPedidoForUpdate(idPedido)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Pedido no encontrado: " + idPedido));
+        if (!pedido.getArtista().getIdUsuario().equals(idArtista)) {
+            throw new AccesoDenegadoException(
+                "No podés autorizar la publicación de este pedido.");
+        }
+        if (pedido.getEstado() == EstadoPedido.CANCELADO
+                || pedido.getEstado() == EstadoPedido.IMPAGO) {
+            throw new ConflictoException(
+                "El pedido está cerrado y no admite publicación.");
+        }
+        if (autoriza && pedido.getEstado() != EstadoPedido.FINALIZADO
+                && !tieneEntregaFinal(pedido)) {
+            throw new ConflictoException(
+                "Todavía no hay una entrega final para autorizar.");
+        }
+        if (pedido.isPublicacionAutorizada() != autoriza) {
+            pedido.setPublicacionAutorizada(autoriza);
+            if (autoriza) {
+                pedido.setPublicacionAutorizadaEn(LocalDateTime.now());
+            }
+            pedidoRepository.save(pedido);
+            notificarPublicacion(pedido, autoriza);
+        }
+        return construirDTO(pedido, idArtista);
+    }
+
+    @Transactional
+    public PedidoDTO ocultarPublicacion(
+            Long idPedido, Long idCliente, boolean ocultar) {
+        Pedido pedido = pedidoRepository.findByIdPedidoForUpdate(idPedido)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Pedido no encontrado: " + idPedido));
+        if (!pedido.getCliente().getIdUsuario().equals(idCliente)) {
+            throw new AccesoDenegadoException(
+                "No podés cambiar la visibilidad de este pedido.");
+        }
+        if (pedido.getEstado() != EstadoPedido.FINALIZADO) {
+            throw new ConflictoException(
+                "El pedido todavía no está completo.");
+        }
+        if (!pedido.isPublicacionAutorizada()) {
+            throw new ConflictoException(
+                "El artista todavía no autorizó la publicación.");
+        }
+        if (pedido.isPublicacionOcultadaCliente() != ocultar) {
+            pedido.setPublicacionOcultadaCliente(ocultar);
+            pedido.setPublicacionOcultadaEn(
+                ocultar ? LocalDateTime.now() : null);
+            pedidoRepository.save(pedido);
+        }
+        return construirDTO(pedido, idCliente);
+    }
+
+    private boolean tieneEntregaFinal(Pedido pedido) {
+        HitoPedido hitoFinal = pedido.getHitos().stream()
+            .max(Comparator.comparingInt(
+                hito -> hito.getOrden() != null ? hito.getOrden() : 0))
+            .orElse(null);
+        if (hitoFinal == null || hitoFinal.getIdHitoPedido() == null) {
+            return false;
+        }
+        return entregaService.listarPorPedido(pedido.getIdPedido()).stream()
+            .anyMatch(entrega -> entrega.entrega().getHitoPedido()
+                .getIdHitoPedido().equals(hitoFinal.getIdHitoPedido())
+                && entrega.entrega().isVigente()
+                && !entrega.entrega().isRetirada());
+    }
+
+    private void notificarPublicacion(Pedido pedido, boolean autoriza) {
+        String tipo = autoriza
+            ? NOTIF_PUBLICACION_AUTORIZADA
+            : NOTIF_PUBLICACION_RETIRADA;
+        String titulo = autoriza
+            ? "Pedido autorizado para tu galería"
+            : "Publicación retirada de tu galería";
+        String descripcion = autoriza
+            ? "El artista autorizó que el pedido de '"
+                + nombreServicio(pedido) + "' se muestre en tu galería."
+            : "El artista retiró la autorización para mostrar el pedido de '"
+                + nombreServicio(pedido) + "' en tu galería.";
+        notificacionService.crearParaUsuario(
+            pedido.getCliente().getIdUsuario(),
+            tipo,
+            titulo,
+            descripcion,
+            pedido.getIdPedido(),
+            TIPO_REFERENCIA);
+    }
+
     @Transactional(readOnly = true)
     public PedidoDTO obtener(Long idPedido, Long idUsuario) {
         return obtener(idPedido, idUsuario, false);
@@ -570,6 +669,27 @@ public class PedidoService {
                     LinkedHashMap::new,
                     Collectors.toList()));
 
+        HitoPedido hitoFinal = pedido.getHitos().stream()
+            .max(Comparator.comparingInt(
+                hito -> hito.getOrden() != null ? hito.getOrden() : 0))
+            .orElse(null);
+        boolean tieneEntregaFinal = hitoFinal != null
+            && entregasPorHito.getOrDefault(
+                hitoFinal.getIdHitoPedido(), List.of()).stream()
+                .anyMatch(entrega -> entrega.entrega().isVigente()
+                    && !entrega.entrega().isRetirada());
+        boolean galeriaClientePublica = pedido.getCliente().isPedidosPublicos();
+        boolean publicacionVisible = pedido.getEstado() == EstadoPedido.FINALIZADO
+            && pedido.isPublicacionAutorizada()
+            && !pedido.isPublicacionOcultadaCliente()
+            && galeriaClientePublica;
+        boolean puedeAutorizarPublicacion = esArtista
+            && (pedido.getEstado() == EstadoPedido.FINALIZADO
+                || tieneEntregaFinal);
+        boolean puedeOcultarPublicacion = esCliente
+            && pedido.getEstado() == EstadoPedido.FINALIZADO
+            && pedido.isPublicacionAutorizada();
+
         for (HitoPedido hito : pedido.getHitos()) {
             List<Pago> pagos = pagoRepository
                 .findByHitoPedidoIdHitoPedidoOrderByFechaCreacionDesc(
@@ -696,6 +816,14 @@ public class PedidoService {
             .rolVista(esAdmin
                 ? "ADMIN"
                 : esArtista ? "ARTISTA" : "CLIENTE")
+            .publicacionAutorizada(pedido.isPublicacionAutorizada())
+            .publicacionAutorizadaEn(pedido.getPublicacionAutorizadaEn())
+            .publicacionOcultadaCliente(pedido.isPublicacionOcultadaCliente())
+            .publicacionOcultadaEn(pedido.getPublicacionOcultadaEn())
+            .galeriaClientePublica(galeriaClientePublica)
+            .publicacionVisible(publicacionVisible)
+            .puedeAutorizarPublicacion(puedeAutorizarPublicacion)
+            .puedeOcultarPublicacion(puedeOcultarPublicacion)
             .build();
     }
 

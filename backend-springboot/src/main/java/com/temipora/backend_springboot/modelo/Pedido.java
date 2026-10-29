@@ -101,6 +101,18 @@ public class Pedido {
     @Column(name = "terminos_plataforma_aceptados_en")
     private LocalDateTime terminosPlataformaAceptadosEn;
 
+    @Column(name = "publicacion_autorizada", nullable = false)
+    private boolean publicacionAutorizada = false;
+
+    @Column(name = "publicacion_autorizada_en")
+    private LocalDateTime publicacionAutorizadaEn;
+
+    @Column(name = "publicacion_ocultada_cliente", nullable = false)
+    private boolean publicacionOcultadaCliente = false;
+
+    @Column(name = "publicacion_ocultada_en")
+    private LocalDateTime publicacionOcultadaEn;
+
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orden ASC")
     private List<HitoPedido> hitos = new ArrayList<>();

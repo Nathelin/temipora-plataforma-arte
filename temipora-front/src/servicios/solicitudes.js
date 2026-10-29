@@ -106,13 +106,33 @@ export function formatearFechaDDMMAAAA(valor) {
   return `${dia}/${mes}/${fecha.getFullYear()}`
 }
 
+const GRUPO_TODAS = { clave: 'todas', texto: 'Todas', estados: [] }
+const GRUPO_POR_RESPONDER = {
+  clave: 'por-responder',
+  texto: 'Por responder',
+  estados: ['PENDIENTE', 'EN_LISTA_ESPERA'],
+}
+const GRUPO_PENDIENTES = { clave: 'pendientes', texto: 'Pendientes', estados: ['PENDIENTE'] }
+const GRUPO_ESPERA = { clave: 'espera', texto: 'En espera', estados: ['EN_LISTA_ESPERA'] }
+const GRUPO_PRESUPUESTADAS = { clave: 'presupuestadas', texto: 'Presupuestadas', estados: ['PRESUPUESTADA'] }
+const GRUPO_PAGADAS = { clave: 'pagadas', texto: 'Pagadas', estados: ['PAGADA'] }
+const GRUPO_HISTORIAL = { clave: 'historial', texto: 'Historial', estados: ['RECHAZADA', 'CANCELADA', 'VENCIDA'] }
+
 export const GRUPOS_ESTADO = [
-  { clave: 'todas', texto: 'Todas', estados: [] },
-  { clave: 'pendientes', texto: 'Pendientes', estados: ['PENDIENTE'] },
-  { clave: 'espera', texto: 'En espera', estados: ['EN_LISTA_ESPERA'] },
-  { clave: 'presupuestadas', texto: 'Presupuestadas', estados: ['PRESUPUESTADA'] },
-  { clave: 'pagadas', texto: 'Pagadas', estados: ['PAGADA'] },
-  { clave: 'historial', texto: 'Historial', estados: ['RECHAZADA', 'CANCELADA', 'VENCIDA'] },
+  GRUPO_TODAS,
+  GRUPO_PENDIENTES,
+  GRUPO_ESPERA,
+  GRUPO_PRESUPUESTADAS,
+  GRUPO_PAGADAS,
+  GRUPO_HISTORIAL,
+]
+
+export const GRUPOS_RECIBIDAS = [
+  GRUPO_TODAS,
+  GRUPO_POR_RESPONDER,
+  GRUPO_PRESUPUESTADAS,
+  GRUPO_PAGADAS,
+  GRUPO_HISTORIAL,
 ]
 
 export function estadoDe(codigo) {

@@ -74,6 +74,10 @@ public class Usuario {
     @Builder.Default
     private EPreferenciaContenidoSensible preferenciaSensible = EPreferenciaContenidoSensible.ADVERTIR;
 
+    @Column(name = "pedidos_publicos", nullable = false)
+    @Builder.Default
+    private boolean pedidosPublicos = false;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "id_moneda_preferida")
     private Moneda monedaPreferida;

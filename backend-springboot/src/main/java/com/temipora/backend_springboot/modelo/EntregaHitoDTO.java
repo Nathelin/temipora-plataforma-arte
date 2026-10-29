@@ -22,6 +22,7 @@ public class EntregaHitoDTO {
     private UsuarioResumenDTO autor;
     private String descripcion;
     private boolean vigente;
+    private boolean esFinal;
     private boolean aprobada;
     private String revisionMotivo;
     private LocalDateTime revisionFecha;
@@ -47,6 +48,7 @@ public class EntregaHitoDTO {
             .autor(UsuarioResumenDTO.desdeUsuario(entrega.getAutor()))
             .descripcion(entrega.getDescripcion())
             .vigente(entrega.isVigente())
+            .esFinal(entrega.isEsFinal())
             .aprobada(aprobada)
             .revisionMotivo(entrega.getRevisionMotivo())
             .revisionFecha(entrega.getRevisionFecha())

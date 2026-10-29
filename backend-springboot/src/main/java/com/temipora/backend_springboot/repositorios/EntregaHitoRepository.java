@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.repositorios;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -8,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.EntregaHito;
+import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 
 public interface EntregaHitoRepository extends JpaRepository<EntregaHito, Long> {
 
@@ -38,4 +40,17 @@ public interface EntregaHitoRepository extends JpaRepository<EntregaHito, Long> 
     Optional<EntregaHito> buscarDelPedido(
         @Param("idEntrega") Long idEntrega,
         @Param("idPedido") Long idPedido);
+
+    @Query("""
+        select e from EntregaHito e
+        join e.hitoPedido h
+        where h.pedido.idPedido = :idPedido
+          and e.vigente = true
+          and e.retirada = false
+          and h.estadoEntrega in :estados
+        order by h.orden desc, e.numero desc
+        """)
+    List<EntregaHito> listarVigentesAprobadasDelPedido(
+        @Param("idPedido") Long idPedido,
+        @Param("estados") Collection<EstadoEntregaHito> estados);
 }

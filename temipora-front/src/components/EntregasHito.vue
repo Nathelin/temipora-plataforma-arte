@@ -10,7 +10,11 @@ const props = defineProps({
   idPedido: { type: Number, required: true },
   idHito: { type: Number, required: true },
   entregas: { type: Array, default: () => [] },
+  puedeAgregarAlPortfolio: { type: Boolean, default: false },
+  idsEnPortfolio: { type: Array, default: () => [] },
 })
+
+const emit = defineEmits(['agregar-al-portfolio'])
 
 const descargaError = ref('')
 const descargandoZip = ref(null)
@@ -268,6 +272,29 @@ function descargarBlob(blob, nombre) {
                   : 'Descargar original'
               }}
             </button>
+
+            <div
+              v-if="puedeAgregarAlPortfolio
+                && entrega.esFinal
+                && entrega.vigente
+                && archivo.mime?.startsWith('image/')"
+              class="mt-2"
+            >
+              <span
+                v-if="idsEnPortfolio.includes(archivo.idArchivo)"
+                class="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-full border border-green-700/30 bg-green-700/10 px-3 text-xs font-semibold text-green-700"
+              >
+                ✓ En tu portfolio
+              </span>
+              <button
+                v-else
+                type="button"
+                class="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-full border border-coral/40 bg-coral/5 px-3 text-xs font-semibold text-coral transition hover:bg-coral/10"
+                @click="emit('agregar-al-portfolio', { archivo, entrega })"
+              >
+                Agregar al portfolio
+              </button>
+            </div>
           </div>
         </div>
       </div>

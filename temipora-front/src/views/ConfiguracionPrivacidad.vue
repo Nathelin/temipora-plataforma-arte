@@ -15,14 +15,17 @@ const mensaje = ref('')
 const errorEdicion = ref('')
 
 const form = ref({
-  preferenciaSensible: 'ADVERTIR'
+  preferenciaSensible: 'ADVERTIR',
+  pedidosPublicos: false,
 })
 
 const idUsuario = ref(null)
 const estadoGuardado = ref(null)
 
 const hayCambios = computed(
-  () => estadoGuardado.value !== null && estadoGuardado.value !== form.value.preferenciaSensible,
+  () => estadoGuardado.value !== null
+    && (estadoGuardado.value.preferenciaSensible !== form.value.preferenciaSensible
+      || estadoGuardado.value.pedidosPublicos !== form.value.pedidosPublicos),
 )
 
 const { actualizar: marcarCambios, limpiar: limpiarCambios } = useCambiosSinGuardar()
@@ -45,7 +48,8 @@ async function cargar() {
     const d = res.data
     idUsuario.value = d.idUsuario
     form.value.preferenciaSensible = d.preferenciaSensible || 'ADVERTIR'
-    estadoGuardado.value = form.value.preferenciaSensible
+    form.value.pedidosPublicos = Boolean(d.pedidosPublicos)
+    estadoGuardado.value = { ...form.value }
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo cargar la configuración.'
   } finally {
@@ -59,13 +63,15 @@ async function guardar() {
   errorEdicion.value = ''
   try {
     const payload = {
-      preferenciaSensible: form.value.preferenciaSensible
+      preferenciaSensible: form.value.preferenciaSensible,
+      pedidosPublicos: form.value.pedidosPublicos,
     }
 
     const r = await api.put(`/usuarios/${idUsuario.value}/perfil`, payload)
 
     form.value.preferenciaSensible = r.data.preferenciaSensible
-    estadoGuardado.value = form.value.preferenciaSensible
+    form.value.pedidosPublicos = Boolean(r.data.pedidosPublicos)
+    estadoGuardado.value = { ...form.value }
     mensaje.value = 'Cambios guardados correctamente.'
   } catch (e) {
     errorEdicion.value = e.response?.data?.message || 'No se pudo guardar.'
@@ -87,6 +93,51 @@ onBeforeUnmount(limpiarCambios)
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
 
     <div v-else class="space-y-6">
+      <div>
+        <h3 class="text-base text-granate pt-2">Galería de pedidos</h3>
+        <p class="text-sm text-cafe/70">
+          Elegí si querés que otras personas puedan ver el arte que recibiste.
+        </p>
+
+        <div
+          class="mt-3 rounded-xl border-2 p-4 transition"
+          :class="form.pedidosPublicos ? 'border-coral bg-coral/10' : 'border-rosa/30'"
+        >
+          <div class="flex items-start gap-3">
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="form.pedidosPublicos"
+              class="relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema"
+              :class="form.pedidosPublicos ? 'bg-coral' : 'bg-rosa/70'"
+              @click="form.pedidosPublicos = !form.pedidosPublicos"
+            >
+              <span
+                class="inline-block h-4 w-4 rounded-full bg-white shadow transition"
+                :class="form.pedidosPublicos ? 'translate-x-6' : 'translate-x-1'"
+              ></span>
+            </button>
+            <div class="min-w-0">
+              <p class="text-base font-medium text-granate">
+                {{ form.pedidosPublicos ? 'Galería pública' : 'Galería privada' }}
+              </p>
+              <p class="mt-1 text-sm leading-relaxed text-cafe/70">
+                Solo se muestran las entregas finales de pedidos completos que el artista autorizó. Se ve la imagen, el servicio, el artista y la fecha. Nunca montos, estados ni datos del pedido.
+              </p>
+              <p class="mt-1 text-sm leading-relaxed text-cafe/70">
+                Podés ocultar pedidos puntuales desde tu galería o desde el detalle del pedido.
+              </p>
+              <router-link
+                :to="{ name: 'perfil', params: { nombreUsuario } }"
+                class="mt-2 inline-flex text-sm font-semibold text-coral transition hover:text-rojizo"
+              >
+                Ver mi galería →
+              </router-link>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div>
         <h3 class="text-base text-granate pt-2">Visualización de contenido sensible</h3>
         <p class="text-sm text-cafe/70">

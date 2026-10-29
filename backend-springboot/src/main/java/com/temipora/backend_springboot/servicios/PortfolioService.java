@@ -11,12 +11,16 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.EntregaArchivo;
+import com.temipora.backend_springboot.modelo.EstadoPedido;
+import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaDTO;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
@@ -26,17 +30,27 @@ import com.temipora.backend_springboot.modelo.ImagenEtiqueta;
 import com.temipora.backend_springboot.modelo.ImagenMaterial;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioDTO;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioRequest;
+import com.temipora.backend_springboot.modelo.ImagenPortfolioVerificadaRequest;
 import com.temipora.backend_springboot.modelo.Material;
 import com.temipora.backend_springboot.modelo.MaterialDTO;
+import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
+import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Portfolio;
+import com.temipora.backend_springboot.modelo.PortfolioEntregaVerificada;
+import com.temipora.backend_springboot.modelo.Servicio;
+import com.temipora.backend_springboot.modelo.ServicioImagen;
 import com.temipora.backend_springboot.modelo.TipoArte;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.modelo.VerificacionPortfolioDTO;
+import com.temipora.backend_springboot.repositorios.EntregaArchivoRepository;
 import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.ImagenEtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.ImagenMaterialRepository;
 import com.temipora.backend_springboot.repositorios.ImagenRepository;
 import com.temipora.backend_springboot.repositorios.MaterialRepository;
+import com.temipora.backend_springboot.repositorios.PortfolioEntregaVerificadaRepository;
 import com.temipora.backend_springboot.repositorios.PortfolioRepository;
+import com.temipora.backend_springboot.repositorios.ServicioImagenRepository;
 import com.temipora.backend_springboot.repositorios.TipoArteRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -54,6 +68,10 @@ public class PortfolioService {
     private final TipoArteRepository tipoArteRepository;
     private final MaterialRepository materialRepository;
     private final ImagenMaterialRepository imagenMaterialRepository;
+    private final PortfolioEntregaVerificadaRepository verificacionRepository;
+    private final EntregaArchivoRepository archivoRepository;
+    private final ServicioImagenRepository servicioImagenRepository;
+    private final ImagenGaleriaService imagenGaleriaService;
 
     public PortfolioService(
             UsuarioRepository usuarioRepository,
@@ -63,7 +81,11 @@ public class PortfolioService {
             ImagenEtiquetaRepository imagenEtiquetaRepository,
             TipoArteRepository tipoArteRepository,
             MaterialRepository materialRepository,
-            ImagenMaterialRepository imagenMaterialRepository) {
+            ImagenMaterialRepository imagenMaterialRepository,
+            PortfolioEntregaVerificadaRepository verificacionRepository,
+            EntregaArchivoRepository archivoRepository,
+            ServicioImagenRepository servicioImagenRepository,
+            ImagenGaleriaService imagenGaleriaService) {
         this.usuarioRepository = usuarioRepository;
         this.portfolioRepository = portfolioRepository;
         this.imagenRepository = imagenRepository;
@@ -72,6 +94,10 @@ public class PortfolioService {
         this.tipoArteRepository = tipoArteRepository;
         this.materialRepository = materialRepository;
         this.imagenMaterialRepository = imagenMaterialRepository;
+        this.verificacionRepository = verificacionRepository;
+        this.archivoRepository = archivoRepository;
+        this.servicioImagenRepository = servicioImagenRepository;
+        this.imagenGaleriaService = imagenGaleriaService;
     }
 
     @Transactional(readOnly = true)
@@ -83,7 +109,7 @@ public class PortfolioService {
                     .findByPortfolioAndEstadoTrueOrderByFechaSubidaDesc(portfolio);
                 Map<Long, List<EtiquetaDTO>> porImagen = etiquetasPorImagen(idsDe(imagenes));
                 Map<Long, List<MaterialDTO>> matsPorImagen = materialesPorImagen(idsDe(imagenes));
-                return imagenes.stream()
+                List<ImagenPortfolioDTO> dtos = imagenes.stream()
                     .map(img -> {
                         ImagenPortfolioDTO dto = ImagenPortfolioDTO.desdeImagen(img);
                         dto.setEtiquetas(porImagen.getOrDefault(img.getIdImagen(), List.of()));
@@ -91,6 +117,8 @@ public class PortfolioService {
                         return dto;
                     })
                     .toList();
+                aplicarVerificaciones(dtos);
+                return dtos;
             })
             .orElseGet(List::of);
     }
@@ -122,15 +150,19 @@ public class PortfolioService {
         // 3. Mapear a DTO con campo calculado requiereAdvertencia
         Map<Long, List<EtiquetaDTO>> porImagen = etiquetasPorImagen(idsDe(page.getContent()));
         Map<Long, List<MaterialDTO>> matsPorImagen = materialesPorImagen(idsDe(page.getContent()));
-        return page.map(img -> {
-            boolean requiereAdvertencia = img.getContenidoSensible() != null
-                && pref == EPreferenciaContenidoSensible.ADVERTIR
-                && (viewerId == null || !img.getUsuario().getIdUsuario().equals(viewerId));
-            ImagenPortfolioDTO dto = ImagenPortfolioDTO.desdeImagen(img, requiereAdvertencia);
-            dto.setEtiquetas(porImagen.getOrDefault(img.getIdImagen(), List.of()));
-            dto.setMateriales(matsPorImagen.getOrDefault(img.getIdImagen(), List.of()));
-            return dto;
-        });
+        List<ImagenPortfolioDTO> dtos = page.getContent().stream()
+            .map(img -> {
+                boolean requiereAdvertencia = img.getContenidoSensible() != null
+                    && pref == EPreferenciaContenidoSensible.ADVERTIR
+                    && (viewerId == null || !img.getUsuario().getIdUsuario().equals(viewerId));
+                ImagenPortfolioDTO dto = ImagenPortfolioDTO.desdeImagen(img, requiereAdvertencia);
+                dto.setEtiquetas(porImagen.getOrDefault(img.getIdImagen(), List.of()));
+                dto.setMateriales(matsPorImagen.getOrDefault(img.getIdImagen(), List.of()));
+                return dto;
+            })
+            .toList();
+        aplicarVerificaciones(dtos);
+        return new PageImpl<>(dtos, pageable, page.getTotalElements());
     }
 
     @Transactional(readOnly = true)
@@ -211,6 +243,158 @@ public class PortfolioService {
     }
 
     @Transactional
+    public ImagenPortfolioDTO crearDesdeEntrega(
+            Long idUsuario, ImagenPortfolioVerificadaRequest request) {
+        Usuario artista = usuarioRepository.findByIdUsuario(idUsuario)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Artista no encontrado: " + idUsuario));
+        validarArtista(artista);
+
+        EntregaArchivo archivo = archivoRepository
+            .buscarParaGaleria(request.getIdArchivoEntrega())
+            .orElseThrow(() -> new NoSuchElementException(
+                "Entrega no encontrada: " + request.getIdArchivoEntrega()));
+        Pedido pedido = archivo.getEntrega().getHitoPedido().getPedido();
+        validarEntregaVerificable(archivo, pedido, idUsuario);
+
+        List<Long> idsEtiquetas = normalizarPedido(
+            request.getIdsEtiqueta(), MAXIMO_ETIQUETAS, "etiquetas");
+        List<Etiqueta> etiquetas = cargarEtiquetasAsignables(artista, idsEtiquetas);
+        TipoArte tipoArte = cargarTipoArteActivo(request.getIdTipoArte());
+        List<Long> idsMateriales = normalizarPedido(
+            request.getIdsMaterial(), MAXIMO_MATERIALES, "materiales");
+        List<Material> materiales = cargarMaterialesAsignables(
+            idsMateriales, tipoArte);
+
+        Portfolio portfolio = portfolioRepository.findByArtista(artista)
+            .orElseGet(() -> {
+                Portfolio nuevo = new Portfolio();
+                nuevo.setArtista(artista);
+                return portfolioRepository.save(nuevo);
+            });
+
+        String titulo = request.getTitulo().trim();
+        if (imagenRepository
+                .existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                    portfolio, titulo, tipoArte)) {
+            throw new IllegalArgumentException(
+                "Ya existe una imagen con ese título y tipo de arte en el portfolio.");
+        }
+
+        imagenGaleriaService.asegurarLimpia(archivo);
+
+        Imagen imagen = new Imagen();
+        imagen.setUrl(urlPortfolioVerificado(archivo.getIdArchivo()));
+        imagen.setTitulo(titulo);
+        imagen.setDescripcion(request.getDescripcion().trim());
+        imagen.setFechaSubida(LocalDateTime.now());
+        imagen.setTipoArte(tipoArte);
+        imagen.setContenidoSensible(request.getContenidoSensible());
+        imagen.setEstado(true);
+        imagen.setPortfolio(portfolio);
+        imagen.setUsuario(artista);
+        Imagen guardada = imagenRepository.save(imagen);
+
+        PortfolioEntregaVerificada verificacion =
+            new PortfolioEntregaVerificada();
+        verificacion.setImagen(guardada);
+        verificacion.setArchivoEntrega(archivo);
+        verificacion.setFechaVinculacion(LocalDateTime.now());
+        verificacion.setVigente(true);
+        verificacionRepository.save(verificacion);
+
+        if (request.isAgregarComoEjemplo()) {
+            agregarEjemploDeServicio(pedido.getServicio(), guardada.getUrl());
+        }
+
+        for (Etiqueta etiqueta : etiquetas) {
+            imagenEtiquetaRepository.save(ImagenEtiqueta.builder()
+                .imagen(guardada)
+                .etiqueta(etiqueta)
+                .build());
+        }
+        for (Material material : materiales) {
+            imagenMaterialRepository.save(ImagenMaterial.builder()
+                .imagen(guardada)
+                .material(material)
+                .build());
+        }
+        return dtoCompleta(guardada, false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<VerificacionPortfolioDTO> listarVerificadas(
+            String nombreUsuario) {
+        Usuario artista = obtenerArtista(nombreUsuario);
+        return verificacionRepository
+            .listarActivasPorUsuario(artista.getIdUsuario()).stream()
+            .map(verificacion -> VerificacionPortfolioDTO.builder()
+                .idImagen(verificacion.getImagen().getIdImagen())
+                .idArchivo(verificacion.getArchivoEntrega().getIdArchivo())
+                .titulo(verificacion.getImagen().getTitulo())
+                .servicioNombre(verificacion.getArchivoEntrega()
+                    .getEntrega().getHitoPedido().getPedido()
+                    .getServicio().getNombre())
+                .build())
+            .toList();
+    }
+
+    private void validarEntregaVerificable(
+            EntregaArchivo archivo, Pedido pedido, Long idArtista) {
+        if (!pedido.getArtista().getIdUsuario().equals(idArtista)) {
+            throw new AccesoDenegadoException(
+                "No podés agregar esta entrega a tu portfolio.");
+        }
+        if (pedido.getEstado() != EstadoPedido.FINALIZADO) {
+            throw new IllegalArgumentException(
+                "El pedido todavía no está completo.");
+        }
+        if (!archivo.getEntrega().isEsFinal()
+                || !archivo.getEntrega().isVigente()
+                || archivo.getEntrega().isRetirada()
+                || archivo.isRetirado()) {
+            throw new IllegalArgumentException(
+                "Solo podés agregar la entrega final vigente.");
+        }
+        if (archivo.getMime() == null
+                || !archivo.getMime().startsWith("image/")) {
+            throw new IllegalArgumentException(
+                "Solo podés agregar imágenes al portfolio.");
+        }
+        if (verificacionRepository
+                .existsByArchivoEntregaIdArchivoAndVigenteTrue(
+                    archivo.getIdArchivo())) {
+            throw new IllegalArgumentException(
+                "Esta entrega ya está en tu portfolio.");
+        }
+    }
+
+    private String urlPortfolioVerificado(Long idArchivo) {
+        return "/api/portfolio/verificadas/archivos/"
+            + idArchivo + "/preview";
+    }
+
+    private void agregarEjemploDeServicio(Servicio servicio, String url) {
+        if (servicio == null || url == null
+                || servicio.getIdServicio() == null
+                || servicioImagenRepository.existsByServicioIdServicioAndUrl(
+                    servicio.getIdServicio(), url)) {
+            return;
+        }
+        int orden = servicio.getImagenes().stream()
+            .map(ServicioImagen::getOrden)
+            .filter(Objects::nonNull)
+            .max(Integer::compareTo)
+            .map(ultimo -> ultimo + 1)
+            .orElse(0);
+        ServicioImagen ejemplo = new ServicioImagen();
+        ejemplo.setServicio(servicio);
+        ejemplo.setUrl(url);
+        ejemplo.setOrden(orden);
+        servicioImagenRepository.save(ejemplo);
+    }
+
+    @Transactional
     public ImagenPortfolioDTO modificar(Long idUsuario, Long idImagen, ImagenPortfolioRequest request) {
         Usuario artista = usuarioRepository.findByIdUsuario(idUsuario)
             .orElseThrow(() -> new NoSuchElementException("Artista no encontrado: " + idUsuario));
@@ -257,9 +441,18 @@ public class PortfolioService {
                 "Ya existe una imagen con ese título y tipo de arte en el portfolio.");
         }
 
+        String nuevaUrl = request.getUrl().trim();
+        boolean esVerificada = verificacionRepository
+            .findByImagenIdImagenAndVigenteTrue(idImagen).isPresent();
+        if (esVerificada && !nuevaUrl.equals(imagen.getUrl())) {
+            throw new IllegalArgumentException(
+                "No podés reemplazar la imagen de una pieza verificada. "
+                    + "Eliminá la pieza y creá una nueva.");
+        }
+
         imagen.setTitulo(titulo);
         imagen.setDescripcion(request.getDescripcion().trim());
-        imagen.setUrl(request.getUrl().trim());
+        imagen.setUrl(nuevaUrl);
         imagen.setTipoArte(tipoArte);
         imagen.setContenidoSensible(request.getContenidoSensible());
         Imagen guardada = imagenRepository.save(imagen);
@@ -307,6 +500,12 @@ public class PortfolioService {
 
         imagen.setEstado(false);
         Imagen guardada = imagenRepository.save(imagen);
+        verificacionRepository.findByImagenIdImagenAndVigenteTrue(idImagen)
+            .ifPresent(verificacion -> {
+                verificacion.setVigente(false);
+                verificacionRepository.save(verificacion);
+                servicioImagenRepository.deleteByUrl(imagen.getUrl());
+            });
         imagenEtiquetaRepository.deleteByImagenIdImagen(idImagen);
         imagenMaterialRepository.deleteByImagenIdImagen(idImagen);
         return dtoCompleta(guardada, false);
@@ -457,7 +656,49 @@ public class PortfolioService {
         dto.setMateriales(imagenMaterialRepository.findByImagenIdImagen(imagen.getIdImagen()).stream()
             .map(im -> MaterialDTO.desdeMaterial(im.getMaterial()))
             .toList());
+        PortfolioEntregaVerificada verificacion = verificacionRepository
+            .listarActivasPorImagenes(List.of(imagen.getIdImagen()))
+            .stream()
+            .findFirst()
+            .orElse(null);
+        aplicarVerificacion(dto, verificacion);
         return dto;
+    }
+
+    private void aplicarVerificaciones(List<ImagenPortfolioDTO> dtos) {
+        if (dtos.isEmpty()) {
+            return;
+        }
+        List<Long> ids = dtos.stream()
+            .map(ImagenPortfolioDTO::getIdImagen)
+            .toList();
+        Map<Long, PortfolioEntregaVerificada> porImagen = verificacionesPorImagen(ids);
+        dtos.forEach(dto -> aplicarVerificacion(dto, porImagen.get(dto.getIdImagen())));
+    }
+
+    private Map<Long, PortfolioEntregaVerificada> verificacionesPorImagen(
+            Collection<Long> idsImagen) {
+        if (idsImagen.isEmpty()) {
+            return Map.of();
+        }
+        return verificacionRepository.listarActivasPorImagenes(idsImagen).stream()
+            .collect(Collectors.toMap(
+                verificacion -> verificacion.getImagen().getIdImagen(),
+                verificacion -> verificacion));
+    }
+
+    private void aplicarVerificacion(
+            ImagenPortfolioDTO dto, PortfolioEntregaVerificada verificacion) {
+        if (dto == null || verificacion == null) {
+            return;
+        }
+        Servicio servicio = verificacion.getArchivoEntrega()
+            .getEntrega().getHitoPedido().getPedido().getServicio();
+        dto.setVerificada(true);
+        dto.setServicioNombre(servicio.getNombre());
+        dto.setIdServicio(servicio.getIdServicio());
+        dto.setServicioDisponible(servicio.getEstado() == EstadoServicio.PUBLICADO
+            && servicio.getModoRecepcion() != ModoRecepcionSolicitud.CERRADA);
     }
 
     private Map<Long, List<EtiquetaDTO>> etiquetasPorImagen(Collection<Long> idsImagen) {

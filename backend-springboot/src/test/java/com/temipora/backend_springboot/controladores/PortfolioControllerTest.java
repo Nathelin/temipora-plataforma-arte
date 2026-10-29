@@ -40,7 +40,9 @@ import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 import com.temipora.backend_springboot.modelo.FiltroPortfolioRequest;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.PortfolioEntregaVerificadaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
+import com.temipora.backend_springboot.servicios.ImagenGaleriaService;
 import com.temipora.backend_springboot.servicios.PortfolioService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -67,6 +69,12 @@ class PortfolioControllerTest {
 
     @MockitoBean
     private UsuarioRepository usuarioRepository;
+
+    @MockitoBean
+    private PortfolioEntregaVerificadaRepository verificacionRepository;
+
+    @MockitoBean
+    private ImagenGaleriaService imagenGaleriaService;
 
     @MockitoBean
     private UserDetailsService userDetailsService;
@@ -280,6 +288,24 @@ class PortfolioControllerTest {
                 .andExpect(jsonPath("$.message").exists());
 
         verify(portfolioService, never()).crear(any(), any());
+    }
+
+    @Test
+    void crear_verificada_artistaCoincide_devuelve201() throws Exception {
+        stubUsuarioConRol("artista777", ERol.ARTISTA);
+        when(portfolioService.nombreUsuario(7L)).thenReturn("artista777");
+        when(portfolioService.crearDesdeEntrega(eq(7L), any()))
+                .thenReturn(imagenDe("Mi obra verificada"));
+
+        mockMvc.perform(post("/api/portfolio/usuarios/7/imagenes/verificadas")
+                .header("Authorization", "Bearer " + token("artista777", ERol.ARTISTA))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"idArchivoEntrega\":23,\"titulo\":\"Mi obra\","
+                        + "\"descripcion\":\"Una obra\",\"idTipoArte\":1}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.titulo").value("Mi obra verificada"));
+
+        verify(portfolioService).crearDesdeEntrega(eq(7L), any());
     }
 
     // ---------------------------------------------------------------

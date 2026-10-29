@@ -1,14 +1,17 @@
 package com.temipora.backend_springboot.servicios;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Solicitud;
+import com.temipora.backend_springboot.repositorios.EntregaHitoRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
 
@@ -26,14 +29,17 @@ public class PedidoCierreService {
     private final PedidoRepository pedidoRepository;
     private final SolicitudRepository solicitudRepository;
     private final NotificacionService notificacionService;
+    private final EntregaHitoRepository entregaHitoRepository;
 
     public PedidoCierreService(
             PedidoRepository pedidoRepository,
             SolicitudRepository solicitudRepository,
-            NotificacionService notificacionService) {
+            NotificacionService notificacionService,
+            EntregaHitoRepository entregaHitoRepository) {
         this.pedidoRepository = pedidoRepository;
         this.solicitudRepository = solicitudRepository;
         this.notificacionService = notificacionService;
+        this.entregaHitoRepository = entregaHitoRepository;
     }
 
     @Transactional
@@ -45,6 +51,7 @@ public class PedidoCierreService {
         pedido.setEstado(EstadoPedido.FINALIZADO);
         pedido.setFinalizadoEn(ahora);
         pedidoRepository.save(pedido);
+        marcarEntregaFinal(pedido);
 
         Solicitud solicitud = pedido.getSolicitud();
         if (solicitud != null) {
@@ -54,6 +61,20 @@ public class PedidoCierreService {
         }
 
         notificarFinalizado(pedido);
+    }
+
+    private void marcarEntregaFinal(Pedido pedido) {
+        entregaHitoRepository.listarVigentesAprobadasDelPedido(
+                pedido.getIdPedido(),
+                List.of(
+                    EstadoEntregaHito.APROBADO,
+                    EstadoEntregaHito.APROBADO_AUTOMATICAMENTE))
+            .stream()
+            .findFirst()
+            .ifPresent(entrega -> {
+                entrega.setEsFinal(true);
+                entregaHitoRepository.save(entrega);
+            });
     }
 
     private void notificarFinalizado(Pedido pedido) {

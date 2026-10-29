@@ -84,14 +84,14 @@ const metricas = computed(() => [
     etiqueta: 'Por responder',
     valor: solicitudesPorResponder.value.length,
     detalle: 'Pendientes o en lista de espera',
-    to: '/panel/solicitudes',
+    to: { name: 'panel-solicitudes', query: { grupo: 'por-responder' } },
     icono: ICONOS.solicitudes,
   },
   {
     etiqueta: 'Presupuestadas',
     valor: solicitudesPresupuestadas.value.length,
     detalle: 'Pedidos en curso',
-    to: '/panel/solicitudes',
+    to: { name: 'panel-solicitudes', query: { grupo: 'presupuestadas' } },
     icono: ICONOS.presupuesto,
   },
   {
@@ -125,7 +125,7 @@ const atenciones = computed(() => {
         ? 'Una solicitud espera tu respuesta'
         : `${pendientes} solicitudes esperan tu respuesta`,
       detalle: 'Revisalas para presupuestar o rechazar.',
-      to: '/panel/solicitudes',
+      to: { name: 'panel-solicitudes', query: { grupo: 'por-responder' } },
       icono: ICONOS.solicitudes,
       tono: 'alerta',
     })

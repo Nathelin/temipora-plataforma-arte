@@ -17,8 +17,13 @@ const contenedorMenu = ref(null)
 const secciones = [
   { nombre: 'Usuarios', to: '/admin/usuarios', activa: true },
   { nombre: 'Productos', to: '/admin/tipos/producto', activa: true },
-  { nombre: 'Servicios', to: '/admin/tipos/servicio', activa: true },
-  { nombre: 'Servicios archivados', to: '/admin/servicios/archivados', activa: true },
+  {
+    nombre: 'Servicios',
+    subsecciones: [
+      { nombre: 'Servicios', to: '/admin/tipos/servicio' },
+      { nombre: 'Servicios archivados', to: '/admin/servicios/archivados' },
+    ],
+  },
   {
     nombre: 'Etiquetas y categorías',
     base: '/admin/etiquetas',
@@ -61,7 +66,7 @@ const submenusAbiertos = ref(
   Object.fromEntries(
     secciones
       .filter((s) => s.subsecciones)
-      .map((s) => [s.nombre, route.path.startsWith(s.base)]),
+      .map((s) => [s.nombre, s.subsecciones.some((sub) => route.path === sub.to)]),
   ),
 )
 
@@ -72,7 +77,7 @@ watch(
   (ruta) => {
     menuAdminAbierto.value = false
     for (const s of secciones) {
-      if (s.subsecciones && ruta.startsWith(s.base)) {
+      if (s.subsecciones && s.subsecciones.some((sub) => ruta === sub.to)) {
         submenusAbiertos.value[s.nombre] = true
       }
     }

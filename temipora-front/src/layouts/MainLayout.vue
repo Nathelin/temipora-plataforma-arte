@@ -1,11 +1,12 @@
 ﻿<script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import BrandLogo from '../components/BrandLogo.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
 
+const route = useRoute()
 const router = useRouter()
 
 const token = ref(localStorage.getItem('token') || '')
@@ -23,6 +24,7 @@ const esAdmin = computed(() => rol.value === 'ADMIN')
 const esArtista = computed(() => rol.value === 'ARTISTA')
 const esCliente = computed(() => rol.value === 'CLIENTE')
 const puedeVerSolicitudes = computed(() => estaLogueado.value && esCliente.value)
+const enPanel = computed(() => route.path.startsWith('/panel'))
 
 function alternarMenu() {
   menuAbierto.value = !menuAbierto.value
@@ -118,13 +120,6 @@ function irAPerfil() {
               Favoritos
             </router-link>
             <router-link
-              v-if="estaLogueado && esArtista"
-              to="/panel"
-              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
-            >
-              Mi panel
-            </router-link>
-            <router-link
               v-if="estaLogueado && esAdmin"
               :to="{ name: 'usuarios' }"
               class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
@@ -132,6 +127,20 @@ function irAPerfil() {
               Panel
             </router-link>
           </nav>
+
+          <router-link
+            v-if="estaLogueado && esArtista"
+            to="/panel"
+            class="group hidden min-h-10 items-center gap-2 rounded-full bg-coral px-4 text-sm font-bold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:-translate-y-0.5 hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema lg:inline-flex"
+            :class="enPanel ? 'ring-2 ring-granate/30 ring-offset-2 ring-offset-crema' : ''"
+            aria-label="Ir a mi panel de artista"
+          >
+            <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+            </svg>
+            <span>Panel de artista</span>
+            <span class="transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true">→</span>
+          </router-link>
         </div>
 
         <!-- Acciones -->
@@ -211,11 +220,11 @@ function irAPerfil() {
                 </button>
                 <button
                   v-if="esArtista"
-                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold text-coral transition hover:bg-coral/10"
                   role="menuitem"
                   @click="menuAbierto = false; router.push({ name: 'panel-resumen' })"
                 >
-                  Mi panel
+                  Panel de artista
                 </button>
                 <button
                   v-if="esAdmin"
@@ -265,6 +274,21 @@ function irAPerfil() {
               class="absolute right-0 z-50 mt-3 w-68 origin-top-right rounded-3xl border border-rosa/50 bg-blanco p-2 shadow-[0_18px_40px_rgba(74,29,46,0.18)]"
             >
               <router-link
+                v-if="estaLogueado && esArtista"
+                to="/panel"
+                class="mb-1 flex w-full items-center justify-between gap-2 rounded-2xl bg-coral px-4 py-3 text-sm font-bold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo"
+                aria-label="Ir a mi panel de artista"
+                @click="menuMovilAbierto = false"
+              >
+                <span class="flex items-center gap-2.5">
+                  <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+                  </svg>
+                  <span>Panel de artista</span>
+                </span>
+                <span aria-hidden="true">→</span>
+              </router-link>
+              <router-link
                 to="/servicios"
                 class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
                 @click="menuMovilAbierto = false"
@@ -286,14 +310,6 @@ function irAPerfil() {
                 @click="menuMovilAbierto = false"
               >
                 Solicitudes
-              </router-link>
-              <router-link
-                v-if="estaLogueado && esArtista"
-                to="/panel"
-                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                @click="menuMovilAbierto = false"
-              >
-                Mi panel
               </router-link>
               <router-link
                 v-if="estaLogueado && esAdmin"

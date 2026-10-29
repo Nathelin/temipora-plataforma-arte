@@ -1,10 +1,11 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
 import {
   GRUPOS_ESTADO,
+  GRUPOS_RECIBIDAS,
   contraparteDe,
   datosContraparte,
   estadoDe,
@@ -13,6 +14,7 @@ import {
 } from '../servicios/solicitudes'
 import { estadoServicioDe } from '../servicios/servicios'
 
+const route = useRoute()
 const router = useRouter()
 
 const esArtista = localStorage.getItem('rol') === 'ARTISTA'
@@ -43,14 +45,24 @@ function cambiarBandeja(clave) {
 }
 
 const grupos = computed(() =>
-  GRUPOS_ESTADO.map((grupo) => ({
+  (esBandejaRecibidas.value ? GRUPOS_RECIBIDAS : GRUPOS_ESTADO).map((grupo) => ({
     ...grupo,
     cantidad: solicitudesEnGrupo(solicitudes.value, grupo).length,
   })),
 )
 
+watch(
+  () => route.query.grupo,
+  (clave) => {
+    grupoActivo.value = grupos.value.some((grupo) => grupo.clave === clave)
+      ? clave
+      : 'todas'
+  },
+  { immediate: true },
+)
+
 const solicitudesFiltradas = computed(() => {
-  const grupo = GRUPOS_ESTADO.find((item) => item.clave === grupoActivo.value)
+  const grupo = grupos.value.find((item) => item.clave === grupoActivo.value)
   return solicitudesEnGrupo(solicitudes.value, grupo)
 })
 

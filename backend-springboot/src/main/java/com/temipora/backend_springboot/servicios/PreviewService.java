@@ -26,9 +26,22 @@ import org.springframework.stereotype.Service;
 public class PreviewService {
 
     static final int MAX_LADO = 1200;
-    private static final float OPACIDAD = 0.38f;
+    private static final int MAX_LADO_LIMPIA = 1600;
+    private static final float OPACIDAD = 0.8f;
 
     public byte[] generar(byte[] original, String marca) {
+        BufferedImage fuente = leer(original);
+        BufferedImage preview = desenfocar(escalar(fuente));
+        dibujarMarca(preview, marca);
+        return aWebp(preview);
+    }
+
+    public byte[] generarLimpia(byte[] original) {
+        BufferedImage fuente = leer(original);
+        return aWebp(escalar(fuente, MAX_LADO_LIMPIA));
+    }
+
+    private BufferedImage leer(byte[] original) {
         if (original == null || original.length == 0) {
             throw new IllegalArgumentException("La imagen está vacía.");
         }
@@ -44,12 +57,12 @@ public class PreviewService {
             throw new IllegalArgumentException(
                 "No se pudo leer la imagen para generar la preview.");
         }
+        return fuente;
+    }
 
-        BufferedImage preview = desenfocar(escalar(fuente));
-        dibujarMarca(preview, marca);
-
+    private byte[] aWebp(BufferedImage imagen) {
         try (ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
-            if (!ImageIO.write(preview, "webp", salida)) {
+            if (!ImageIO.write(imagen, "webp", salida)) {
                 throw new IllegalStateException(
                     "No hay un codificador WebP disponible.");
             }
@@ -61,14 +74,18 @@ public class PreviewService {
     }
 
     private BufferedImage escalar(BufferedImage fuente) {
+        return escalar(fuente, MAX_LADO);
+    }
+
+    private BufferedImage escalar(BufferedImage fuente, int maxLado) {
         int ancho = fuente.getWidth();
         int alto = fuente.getHeight();
         int ladoMayor = Math.max(ancho, alto);
-        if (ladoMayor <= MAX_LADO) {
+        if (ladoMayor <= maxLado) {
             return copiar(fuente, ancho, alto);
         }
 
-        double escala = (double) MAX_LADO / ladoMayor;
+        double escala = (double) maxLado / ladoMayor;
         int nuevoAncho = Math.max(1, (int) Math.round(ancho * escala));
         int nuevoAlto = Math.max(1, (int) Math.round(alto * escala));
         BufferedImage reducida = nuevaImagen(
@@ -109,9 +126,11 @@ public class PreviewService {
     }
 
     private BufferedImage desenfocar(BufferedImage imagen) {
-        int radio = Math.max(3,
+        int radioBase = Math.max(3,
             Math.min(imagen.getWidth(), imagen.getHeight()) / 160);
-        radio = Math.min(radio, 10);
+        radioBase = Math.min(radioBase, 10);
+        int radio = Math.min(9,
+            Math.max(4, Math.round(radioBase * 1.3f)));
         int tam = radio * 2 + 1;
         float sigma = Math.max(1f, radio / 2f);
         float[] valores = new float[tam * tam];
