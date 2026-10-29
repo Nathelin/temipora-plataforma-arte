@@ -42,6 +42,14 @@ const secciones = [
     ],
   },
   {
+    nombre: 'Reseñas',
+    base: '/admin/resenas',
+    subsecciones: [
+      { nombre: 'Criterios de evaluación', to: '/admin/resenas/criterios' },
+      { nombre: 'Configuración', to: '/admin/resenas/configuracion' },
+    ],
+  },
+  {
     nombre: 'Ajustes generales',
     base: '/admin/ajustes',
     subsecciones: [
