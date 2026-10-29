@@ -19,7 +19,6 @@ public class ConfiguracionReseniaDTO {
     private Integer diasVentanaCreacion;
     private Integer diasEdicion;
     private Integer minimoReseniasEtiqueta;
-    private Integer maxImagenesResenia;
     private BigDecimal umbralExcelente;
     private BigDecimal umbralBuena;
     private LocalDateTime fechaActualizacion;
@@ -30,7 +29,6 @@ public class ConfiguracionReseniaDTO {
             .diasVentanaCreacion(config.getDiasVentanaCreacion())
             .diasEdicion(config.getDiasEdicion())
             .minimoReseniasEtiqueta(config.getMinimoReseniasEtiqueta())
-            .maxImagenesResenia(config.getMaxImagenesResenia())
             .umbralExcelente(config.getUmbralExcelente())
             .umbralBuena(config.getUmbralBuena())
             .fechaActualizacion(config.getFechaActualizacion())

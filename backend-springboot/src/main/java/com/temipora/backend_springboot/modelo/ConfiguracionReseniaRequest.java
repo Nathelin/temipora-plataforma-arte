@@ -30,11 +30,6 @@ public class ConfiguracionReseniaRequest {
     @Max(value = 50, message = "El mínimo de reseñas no puede superar 50.")
     private Integer minimoReseniasEtiqueta;
 
-    @NotNull(message = "El máximo de imágenes por reseña es obligatorio.")
-    @Min(value = 0, message = "El máximo de imágenes no puede ser negativo.")
-    @Max(value = 10, message = "El máximo de imágenes no puede superar 10.")
-    private Integer maxImagenesResenia;
-
     @NotNull(message = "El umbral de excelencia es obligatorio.")
     @DecimalMin(value = "1.00", message = "El umbral de excelencia debe ser al menos 1.00.")
     @DecimalMax(value = "5.00", message = "El umbral de excelencia no puede superar 5.00.")

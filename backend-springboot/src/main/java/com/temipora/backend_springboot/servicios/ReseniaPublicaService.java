@@ -6,7 +6,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
@@ -22,7 +21,6 @@ import com.temipora.backend_springboot.modelo.DistribucionEstrellasDTO;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.EstadoResenia;
 import com.temipora.backend_springboot.modelo.EtiquetaReputacion;
-import com.temipora.backend_springboot.modelo.EntregaArchivo;
 import com.temipora.backend_springboot.modelo.FiltroReseniaServicioDTO;
 import com.temipora.backend_springboot.modelo.OpcionDestacadaDTO;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
@@ -31,8 +29,6 @@ import com.temipora.backend_springboot.modelo.PolaridadOpcion;
 import com.temipora.backend_springboot.modelo.PromedioReseniasDTO;
 import com.temipora.backend_springboot.modelo.ReputacionClienteDTO;
 import com.temipora.backend_springboot.modelo.Resenia;
-import com.temipora.backend_springboot.modelo.ReseniaImagen;
-import com.temipora.backend_springboot.modelo.ReseniaImagenDTO;
 import com.temipora.backend_springboot.modelo.ReseniaOpcion;
 import com.temipora.backend_springboot.modelo.ReseniaOpcionDTO;
 import com.temipora.backend_springboot.modelo.ReseniaPublicaDTO;
@@ -44,7 +40,6 @@ import com.temipora.backend_springboot.modelo.ResumenReseniasDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioResumenDTO;
 import com.temipora.backend_springboot.repositorios.ReseniaOpcionRepository;
-import com.temipora.backend_springboot.repositorios.ReseniaImagenRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaValorRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaVersionRepository;
@@ -64,7 +59,6 @@ public class ReseniaPublicaService {
     private final ReseniaVersionRepository versionRepository;
     private final ReseniaValorRepository valorRepository;
     private final ReseniaOpcionRepository opcionRepository;
-    private final ReseniaImagenRepository imagenRepository;
     private final ConfiguracionReseniaService configuracionService;
 
     public ReseniaPublicaService(
@@ -72,13 +66,11 @@ public class ReseniaPublicaService {
             ReseniaVersionRepository versionRepository,
             ReseniaValorRepository valorRepository,
             ReseniaOpcionRepository opcionRepository,
-            ReseniaImagenRepository imagenRepository,
             ConfiguracionReseniaService configuracionService) {
         this.reseniaRepository = reseniaRepository;
         this.versionRepository = versionRepository;
         this.valorRepository = valorRepository;
         this.opcionRepository = opcionRepository;
-        this.imagenRepository = imagenRepository;
         this.configuracionService = configuracionService;
     }
 
@@ -231,25 +223,6 @@ public class ReseniaPublicaService {
         return mapa;
     }
 
-    @Transactional(readOnly = true)
-    public EntregaArchivo autorizarImagen(Long idArchivo) {
-        List<ReseniaImagen> imagenes = imagenRepository.buscarPublicasPorArchivo(
-            idArchivo, EstadoResenia.PUBLICADA, EstadoPedido.FINALIZADO);
-        if (imagenes.isEmpty()) {
-            throw new NoSuchElementException("Imagen no disponible.");
-        }
-        EntregaArchivo archivo = imagenes.get(0).getArchivo();
-        if (!archivo.getEntrega().isEsFinal()
-                || !archivo.getEntrega().isVigente()
-                || archivo.getEntrega().isRetirada()
-                || archivo.isRetirado()
-                || archivo.getMime() == null
-                || !archivo.getMime().startsWith("image/")) {
-            throw new NoSuchElementException("Imagen no disponible.");
-        }
-        return archivo;
-    }
-
     // -----------------------------------------------------------------
     // armado del resumen
     // -----------------------------------------------------------------
@@ -351,16 +324,13 @@ public class ReseniaPublicaService {
                 versiones.values());
             Map<Long, List<ReseniaOpcion>> opciones = opcionesPorVersion(
                 versiones.values());
-            Map<Long, List<ReseniaImagen>> imagenes = imagenesPorVersion(
-                versiones.values());
 
             dtos = contenido.stream()
                 .map(resenia -> aPublica(
                     resenia,
                     versiones.get(resenia.getIdResenia()),
                     valores,
-                    opciones,
-                    imagenes))
+                    opciones))
                 .toList();
         }
 
@@ -412,25 +382,11 @@ public class ReseniaPublicaService {
                 opcion -> opcion.getVersion().getIdVersion()));
     }
 
-    private Map<Long, List<ReseniaImagen>> imagenesPorVersion(
-            Collection<ReseniaVersion> versiones) {
-        if (versiones.isEmpty()) {
-            return Map.of();
-        }
-        List<Long> ids = versiones.stream()
-            .map(ReseniaVersion::getIdVersion)
-            .toList();
-        return imagenRepository.findByVersionIdVersionIn(ids).stream()
-            .collect(Collectors.groupingBy(
-                imagen -> imagen.getVersion().getIdVersion()));
-    }
-
     private ReseniaPublicaDTO aPublica(
             Resenia resenia,
             ReseniaVersion version,
             Map<Long, List<ReseniaValor>> valores,
-            Map<Long, List<ReseniaOpcion>> opciones,
-            Map<Long, List<ReseniaImagen>> imagenes) {
+            Map<Long, List<ReseniaOpcion>> opciones) {
         boolean anonima = esAnonima(resenia);
         Long idVersion = version != null ? version.getIdVersion() : null;
 
@@ -455,10 +411,6 @@ public class ReseniaPublicaService {
                 .opciones(idVersion != null
                     ? opciones.getOrDefault(idVersion, List.of()).stream()
                         .map(ReseniaOpcionDTO::desdeOpcion).toList()
-                    : List.of())
-                .imagenes(idVersion != null
-                    ? imagenes.getOrDefault(idVersion, List.of()).stream()
-                        .map(ReseniaImagenDTO::desdeImagen).toList()
                     : List.of());
 
         if (!anonima) {

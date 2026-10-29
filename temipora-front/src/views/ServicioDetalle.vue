@@ -8,6 +8,7 @@ import ResumenResenias from '../components/ResumenResenias.vue'
 import TarjetaReseniaPublica from '../components/TarjetaReseniaPublica.vue'
 import ModalResenias from '../components/ModalResenias.vue'
 import { cargarReseniasServicio } from '../servicios/resenias'
+import { esImagenVerificada } from '../servicios/imagenes'
 import { useNotificaciones } from '../composables/useNotificaciones'
 
 const route = useRoute()
@@ -140,6 +141,7 @@ const galeria = computed(() => {
 
 const imagenActiva = computed(() => galeria.value[indiceImagen.value] || null)
 const activaEsPortada = computed(() => !!imagenActiva.value?.portada)
+const activaEsVerificada = computed(() => esImagenVerificada(imagenActiva.value?.url))
 const mostrarBlur = computed(
   () => requiereAdvertencia.value && activaEsPortada.value && !mostrarSensible.value,
 )
@@ -385,6 +387,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
                 Ocultar
               </button>
             </div>
+            <span
+              v-if="activaEsVerificada"
+              class="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-blanco/90 px-2 py-1 text-[11px] font-semibold text-green-700 shadow ring-1 ring-green-700/20"
+            >
+              <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 0 1 0 1.414l-7.25 7.25a1 1 0 0 1-1.414 0l-3.25-3.25a1 1 0 1 1 1.414-1.414l2.543 2.543 6.543-6.543a1 1 0 0 1 1.414 0Z" clip-rule="evenodd" />
+              </svg>
+              Verificado
+            </span>
           </div>
 
           <div v-if="galeria.length > 1" class="mt-3 grid grid-cols-5 sm:grid-cols-8 gap-2">
@@ -398,6 +409,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
               @click="seleccionarImagen(i)"
             >
               <img :src="img.url" alt="" class="w-full h-full object-cover" />
+              <span
+                v-if="esImagenVerificada(img.url)"
+                class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-700 text-[10px] font-bold text-white shadow"
+                role="img"
+                aria-label="Imagen verificada"
+                title="Imagen verificada"
+              >
+                ✓
+              </span>
               <span
                 v-if="img.portada"
                 class="absolute bottom-0 inset-x-0 bg-granate/60 text-white text-[10px] px-1 py-0.5 text-center"

@@ -1,7 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { formatearFechaHora } from '../servicios/pedidos'
-import ImagenGaleria from './ImagenGaleria.vue'
 import ValoracionEstrellas from './ValoracionEstrellas.vue'
 
 const props = defineProps({
@@ -103,19 +102,6 @@ function claseOpcion(opcion) {
       </span>
     </div>
 
-    <div
-      v-if="resenia.imagenes?.length"
-      class="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4"
-    >
-      <div
-        v-for="imagen in resenia.imagenes"
-        :key="imagen.idArchivo"
-        class="aspect-square overflow-hidden rounded-lg border border-rosa/50 bg-rosa/10"
-      >
-        <ImagenGaleria :url="imagen.urlPreview" alt="" class="h-full w-full" />
-      </div>
-    </div>
-
     <div v-if="versionOriginal" class="mt-4">
       <button
         type="button"
@@ -168,18 +154,6 @@ function claseOpcion(opcion) {
           >
             {{ opcion.etiqueta }}
           </span>
-        </div>
-        <div
-          v-if="versionOriginal.imagenes?.length"
-          class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4"
-        >
-          <div
-            v-for="imagen in versionOriginal.imagenes"
-            :key="imagen.idArchivo"
-            class="aspect-square overflow-hidden rounded-lg border border-rosa/50 bg-blanco"
-          >
-            <ImagenGaleria :url="imagen.urlPreview" alt="" class="h-full w-full" />
-          </div>
         </div>
       </div>
     </div>

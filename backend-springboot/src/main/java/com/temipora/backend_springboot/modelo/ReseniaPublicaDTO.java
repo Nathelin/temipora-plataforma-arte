@@ -30,5 +30,4 @@ public class ReseniaPublicaDTO {
     private boolean anonima;
     private List<ReseniaValorDTO> valores;
     private List<ReseniaOpcionDTO> opciones;
-    private List<ReseniaImagenDTO> imagenes;
 }

@@ -37,7 +37,6 @@ public class ReseniaDTO {
     private String motivoModeracion;
     private List<ReseniaValorDTO> valores;
     private List<ReseniaOpcionDTO> opciones;
-    private List<ReseniaImagenDTO> imagenes;
     private List<ReseniaVersionDTO> historial;
 
     public static ReseniaDTO desde(Resenia resenia, boolean incluirHistorial) {
@@ -71,9 +70,6 @@ public class ReseniaDTO {
                     .toList())
                 .opciones(actual.getOpciones().stream()
                     .map(ReseniaOpcionDTO::desdeOpcion)
-                    .toList())
-                .imagenes(actual.getImagenes().stream()
-                    .map(ReseniaImagenDTO::desdeImagen)
                     .toList());
         }
 

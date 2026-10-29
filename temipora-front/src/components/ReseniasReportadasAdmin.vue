@@ -1,6 +1,5 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import ImagenGaleria from './ImagenGaleria.vue'
 import ModalConfirmacion from './ModalConfirmacion.vue'
 import ValoracionEstrellas from './ValoracionEstrellas.vue'
 import {
@@ -307,16 +306,6 @@ function claseOpcion(opcion) {
           >
             {{ opcion.etiqueta }}
           </span>
-        </div>
-
-        <div v-if="resenia.imagenes?.length" class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5">
-          <div
-            v-for="imagen in resenia.imagenes"
-            :key="imagen.idArchivo"
-            class="aspect-square overflow-hidden rounded-lg border border-rosa/50 bg-rosa/10"
-          >
-            <ImagenGaleria :url="imagen.urlPreview" alt="" class="h-full w-full" />
-          </div>
         </div>
 
         <p

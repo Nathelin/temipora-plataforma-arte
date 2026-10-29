@@ -60,21 +60,6 @@ public interface EntregaArchivoRepository extends JpaRepository<EntregaArchivo, 
         select a from EntregaArchivo a
         join fetch a.entrega e
         join fetch e.hitoPedido h
-        where h.pedido.idPedido = :idPedido
-          and e.esFinal = true
-          and e.vigente = true
-          and e.retirada = false
-          and a.retirado = false
-          and a.mime like 'image/%'
-        order by a.orden asc
-        """)
-    List<EntregaArchivo> listarFinalesDelPedido(
-        @Param("idPedido") Long idPedido);
-
-    @Query("""
-        select a from EntregaArchivo a
-        join fetch a.entrega e
-        join fetch e.hitoPedido h
         join fetch h.pedido p
         join fetch p.cliente
         join fetch p.artista

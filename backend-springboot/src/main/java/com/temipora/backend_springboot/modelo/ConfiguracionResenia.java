@@ -22,7 +22,6 @@ public class ConfiguracionResenia {
     public static final int DIAS_VENTANA_CREACION_POR_DEFECTO = 30;
     public static final int DIAS_EDICION_POR_DEFECTO = 3;
     public static final int MINIMO_RESENIAS_ETIQUETA_POR_DEFECTO = 3;
-    public static final int MAX_IMAGENES_RESENIA_POR_DEFECTO = 4;
     public static final BigDecimal UMBRAL_EXCELENTE_POR_DEFECTO = new BigDecimal("4.50");
     public static final BigDecimal UMBRAL_BUENA_POR_DEFECTO = new BigDecimal("3.50");
 
@@ -38,9 +37,6 @@ public class ConfiguracionResenia {
 
     @Column(name = "minimo_resenias_etiqueta", nullable = false)
     private Integer minimoReseniasEtiqueta = MINIMO_RESENIAS_ETIQUETA_POR_DEFECTO;
-
-    @Column(name = "max_imagenes_resenia", nullable = false)
-    private Integer maxImagenesResenia = MAX_IMAGENES_RESENIA_POR_DEFECTO;
 
     @Column(name = "umbral_excelente", nullable = false, precision = 3, scale = 2)
     private BigDecimal umbralExcelente = UMBRAL_EXCELENTE_POR_DEFECTO;

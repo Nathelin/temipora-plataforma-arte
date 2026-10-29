@@ -31,7 +31,6 @@ public class ReseniaReportadaDTO {
     private String descripcion;
     private List<ReseniaValorDTO> valores;
     private List<ReseniaOpcionDTO> opciones;
-    private List<ReseniaImagenDTO> imagenes;
     private LocalDateTime moderadaEn;
     private String motivoModeracion;
     private long reportesPendientes;

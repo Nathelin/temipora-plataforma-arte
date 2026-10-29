@@ -947,9 +947,6 @@ onMounted(cargar)
               :guardando="guardandoResenia"
               :anonimo-forzado="!esArtista && reseniaEstado.anonimoForzado"
               :permite-anonimato="!esArtista"
-              :imagenes-disponibles="reseniaEstado.imagenesDisponibles || []"
-              :max-imagenes="reseniaEstado.maxImagenes || 0"
-              :permite-imagenes="!esArtista"
               :titulo="esArtista ? 'Tu reseña interna del cliente' : 'Reseñá este pedido'"
               :descripcion-ayuda="esArtista
                 ? 'Solo la vas a ver vos. El resto de artistas ve la reputación agregada y el cliente nunca la ve.'

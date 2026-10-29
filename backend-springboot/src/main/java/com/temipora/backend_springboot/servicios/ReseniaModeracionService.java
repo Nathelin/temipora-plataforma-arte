@@ -28,8 +28,6 @@ import com.temipora.backend_springboot.modelo.ReporteReseniaDTO;
 import com.temipora.backend_springboot.modelo.ReporteReseniaHistorialDTO;
 import com.temipora.backend_springboot.modelo.ReporteReseniaRequest;
 import com.temipora.backend_springboot.modelo.Resenia;
-import com.temipora.backend_springboot.modelo.ReseniaImagen;
-import com.temipora.backend_springboot.modelo.ReseniaImagenDTO;
 import com.temipora.backend_springboot.modelo.ReseniaOpcion;
 import com.temipora.backend_springboot.modelo.ReseniaOpcionDTO;
 import com.temipora.backend_springboot.modelo.ReseniaReportadaDTO;
@@ -39,7 +37,6 @@ import com.temipora.backend_springboot.modelo.ReseniaVersion;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioResumenDTO;
 import com.temipora.backend_springboot.repositorios.ReporteReseniaRepository;
-import com.temipora.backend_springboot.repositorios.ReseniaImagenRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaOpcionRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaValorRepository;
@@ -64,7 +61,6 @@ public class ReseniaModeracionService {
     private final ReseniaVersionRepository versionRepository;
     private final ReseniaValorRepository valorRepository;
     private final ReseniaOpcionRepository opcionRepository;
-    private final ReseniaImagenRepository imagenRepository;
     private final NotificacionService notificacionService;
 
     public ReseniaModeracionService(
@@ -74,7 +70,6 @@ public class ReseniaModeracionService {
             ReseniaVersionRepository versionRepository,
             ReseniaValorRepository valorRepository,
             ReseniaOpcionRepository opcionRepository,
-            ReseniaImagenRepository imagenRepository,
             NotificacionService notificacionService) {
         this.reseniaRepository = reseniaRepository;
         this.reporteRepository = reporteRepository;
@@ -82,7 +77,6 @@ public class ReseniaModeracionService {
         this.versionRepository = versionRepository;
         this.valorRepository = valorRepository;
         this.opcionRepository = opcionRepository;
-        this.imagenRepository = imagenRepository;
         this.notificacionService = notificacionService;
     }
 
@@ -325,8 +319,6 @@ public class ReseniaModeracionService {
             versiones.values());
         Map<Long, List<ReseniaOpcion>> opciones = opcionesPorVersion(
             versiones.values());
-        Map<Long, List<ReseniaImagen>> imagenes = imagenesPorVersion(
-            versiones.values());
         Map<Long, List<ReporteResenia>> reportes = reporteRepository
             .findByReseniaIdReseniaInOrderByFechaCreacionAsc(ids).stream()
             .collect(Collectors.groupingBy(
@@ -338,7 +330,6 @@ public class ReseniaModeracionService {
                 versiones.get(resenia.getIdResenia()),
                 valores,
                 opciones,
-                imagenes,
                 reportes.getOrDefault(resenia.getIdResenia(), List.of())))
             .toList();
     }
@@ -348,7 +339,6 @@ public class ReseniaModeracionService {
             ReseniaVersion version,
             Map<Long, List<ReseniaValor>> valores,
             Map<Long, List<ReseniaOpcion>> opciones,
-            Map<Long, List<ReseniaImagen>> imagenes,
             List<ReporteResenia> reportes) {
         Long idVersion = version != null ? version.getIdVersion() : null;
         List<ReporteResenia> reportesResenia = reportes != null
@@ -380,10 +370,6 @@ public class ReseniaModeracionService {
             .opciones(idVersion != null
                 ? opciones.getOrDefault(idVersion, List.of()).stream()
                     .map(ReseniaOpcionDTO::desdeOpcion).toList()
-                : List.of())
-            .imagenes(idVersion != null
-                ? imagenes.getOrDefault(idVersion, List.of()).stream()
-                    .map(ReseniaImagenDTO::desdeImagen).toList()
                 : List.of())
             .moderadaEn(resenia.getModeradaEn())
             .motivoModeracion(resenia.getMotivoModeracion())
@@ -433,19 +419,6 @@ public class ReseniaModeracionService {
         return opcionRepository.findByVersionIdVersionIn(ids).stream()
             .collect(Collectors.groupingBy(
                 opcion -> opcion.getVersion().getIdVersion()));
-    }
-
-    private Map<Long, List<ReseniaImagen>> imagenesPorVersion(
-            Collection<ReseniaVersion> versiones) {
-        if (versiones.isEmpty()) {
-            return Map.of();
-        }
-        List<Long> ids = versiones.stream()
-            .map(ReseniaVersion::getIdVersion)
-            .toList();
-        return imagenRepository.findByVersionIdVersionIn(ids).stream()
-            .collect(Collectors.groupingBy(
-                imagen -> imagen.getVersion().getIdVersion()));
     }
 
     // -----------------------------------------------------------------

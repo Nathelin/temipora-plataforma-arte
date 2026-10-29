@@ -1,21 +1,13 @@
 package com.temipora.backend_springboot.controladores;
 
-import org.springframework.core.io.Resource;
-import org.springframework.http.CacheControl;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.temipora.backend_springboot.modelo.EntregaArchivo;
 import com.temipora.backend_springboot.modelo.PaginaReseniasDTO;
 import com.temipora.backend_springboot.modelo.ResumenReseniasDTO;
-import com.temipora.backend_springboot.servicios.ImagenGaleriaService;
 import com.temipora.backend_springboot.servicios.ReseniaPublicaService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -25,15 +17,12 @@ public class ReseniaPublicaController {
 
     private final ReseniaPublicaService reseniaPublicaService;
     private final UsuarioService usuarioService;
-    private final ImagenGaleriaService imagenGaleriaService;
 
     public ReseniaPublicaController(
             ReseniaPublicaService reseniaPublicaService,
-            UsuarioService usuarioService,
-            ImagenGaleriaService imagenGaleriaService) {
+            UsuarioService usuarioService) {
         this.reseniaPublicaService = reseniaPublicaService;
         this.usuarioService = usuarioService;
-        this.imagenGaleriaService = imagenGaleriaService;
     }
 
     @GetMapping("/servicios/{idServicio}/resenias")
@@ -69,18 +58,4 @@ public class ReseniaPublicaController {
         return reseniaPublicaService.resumenArtista(idArtista);
     }
 
-    @GetMapping("/resenias/imagenes/{idArchivo}/preview")
-    public ResponseEntity<Resource> previewImagen(
-            @PathVariable Long idArchivo) {
-        EntregaArchivo archivo = reseniaPublicaService.autorizarImagen(idArchivo);
-        ContentDisposition disposition = ContentDisposition.inline()
-            .filename("resenia-" + idArchivo + ".webp")
-            .build();
-        return ResponseEntity.ok()
-            .contentType(MediaType.parseMediaType("image/webp"))
-            .cacheControl(CacheControl.noStore())
-            .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
-            .header("X-Content-Type-Options", "nosniff")
-            .body(imagenGaleriaService.abrirLimpia(archivo));
-    }
 }

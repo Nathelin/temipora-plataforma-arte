@@ -147,10 +147,19 @@ function irASubir() {
             </span>
 
             <span
-              v-if="img.titulo"
-              class="absolute inset-x-0 bottom-0 bg-granate/60 text-white text-[11px] px-2 py-1 truncate"
+              v-if="img.titulo || img.verificada"
+              class="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-granate/60 px-2 py-1 text-[11px] text-white"
             >
-              {{ img.titulo }}
+              <span class="min-w-0 truncate">{{ img.titulo }}</span>
+              <span
+                v-if="img.verificada"
+                class="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-blanco/90 px-1.5 py-0.5 text-[10px] font-semibold text-green-700"
+              >
+                <svg class="h-2.5 w-2.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 0 1 0 1.414l-7.25 7.25a1 1 0 0 1-1.414 0l-3.25-3.25a1 1 0 1 1 1.414-1.414l2.543 2.543 6.543-6.543a1 1 0 0 1 1.414 0Z" clip-rule="evenodd" />
+                </svg>
+                Verificado
+              </span>
             </span>
           </button>
         </div>
