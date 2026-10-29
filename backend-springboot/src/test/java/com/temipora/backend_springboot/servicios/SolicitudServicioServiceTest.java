@@ -109,6 +109,9 @@ class SolicitudServicioServiceTest {
     @Mock
     private MonedaVistaService monedaVistaService;
 
+    @Mock
+    private ReseniaPublicaService reseniaPublicaService;
+
     @InjectMocks
     private SolicitudServicioService solicitudServicioService;
 

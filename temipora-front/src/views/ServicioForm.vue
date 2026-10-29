@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { acceptImagenes, validarImagen, procesarImagen, LIMITES_IMAGEN } from '../servicios/archivos'
 import { formatearPrecio, formatearMonto, formatearMontoEnEdicion, parsearMonto } from '../servicios/moneda'
+import { esImagenVerificada } from '../servicios/imagenes'
 import { hayContenidoTerminos } from '../servicios/terminos'
 import { useMonedas } from '../composables/useMonedas'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
@@ -1109,6 +1110,16 @@ onBeforeUnmount(() => {
                   <span class="absolute left-2 top-2 rounded-full bg-granate/70 px-2 py-0.5 text-[10px] text-white">
                     {{ i + 1 }}
                   </span>
+                  <span
+                    v-if="esImagenVerificada(url)"
+                    class="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-blanco/90 px-1.5 py-0.5 text-[10px] font-semibold text-green-700 shadow ring-1 ring-green-700/20"
+                    title="Imagen verificada"
+                  >
+                    <svg class="h-2.5 w-2.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 0 1 0 1.414l-7.25 7.25a1 1 0 0 1-1.414 0l-3.25-3.25a1 1 0 1 1 1.414-1.414l2.543 2.543 6.543-6.543a1 1 0 0 1 1.414 0Z" clip-rule="evenodd" />
+                    </svg>
+                    Verificado
+                  </span>
                   <button
                     type="button"
                     class="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-blanco/95 text-cafe shadow-sm transition hover:text-rojizo"
@@ -1454,13 +1465,22 @@ onBeforeUnmount(() => {
                 </div>
                 <div class="mt-3 flex gap-2 overflow-x-auto pb-1">
                   <img v-if="form.imagenPortada" :src="form.imagenPortada" alt="" class="h-20 w-28 shrink-0 rounded-lg border border-rosa object-cover" />
-                  <img
+                  <div
                     v-for="(url, i) in form.imagenes.slice(0, 3)"
                     :key="url + i"
-                    :src="url"
-                    alt=""
-                    class="h-20 w-20 shrink-0 rounded-lg border border-rosa object-cover"
-                  />
+                    class="relative h-20 w-20 shrink-0"
+                  >
+                    <img :src="url" alt="" class="h-full w-full rounded-lg border border-rosa object-cover" />
+                    <span
+                      v-if="esImagenVerificada(url)"
+                      class="absolute left-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-700 text-[10px] font-bold text-white shadow"
+                      role="img"
+                      aria-label="Imagen verificada"
+                      title="Imagen verificada"
+                    >
+                      ✓
+                    </span>
+                  </div>
                   <span v-if="form.imagenes.length > 3" class="flex h-20 w-14 shrink-0 items-center justify-center rounded-lg bg-rosa/20 text-xs text-cafe/60">
                     +{{ form.imagenes.length - 3 }}
                   </span>

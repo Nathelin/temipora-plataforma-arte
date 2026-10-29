@@ -16,6 +16,7 @@ import ModalRechazo from '../components/ModalRechazo.vue'
 import ModalCancelacion from '../components/ModalCancelacion.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import TarjetaPresupuesto from '../components/TarjetaPresupuesto.vue'
+import ReputacionCliente from '../components/ReputacionCliente.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -659,6 +660,13 @@ onMounted(cargar)
         </div>
 
         <aside class="space-y-4 lg:sticky lg:top-16 lg:h-fit lg:self-start">
+          <ReputacionCliente
+            v-if="esArtistaDeLaSolicitud && datosPersona?.idUsuario"
+            :id-cliente="datosPersona.idUsuario"
+            :nombre="nombreContraparte"
+            :reputacion="solicitud.reputacionCliente"
+          />
+
           <section class="rounded-2xl border border-rosa/50 bg-blanco p-5">
             <h2 class="text-base font-semibold text-granate">Resumen</h2>
             <dl class="mt-4 space-y-3 text-sm">

@@ -13,6 +13,7 @@ import {
   solicitudesEnGrupo,
 } from '../servicios/solicitudes'
 import { estadoServicioDe } from '../servicios/servicios'
+import ReputacionChip from '../components/ReputacionChip.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -273,6 +274,10 @@ onMounted(cargar)
                   <span v-if="contraparte(solicitud)?.usuario" class="text-xs text-cafe/55">
                     @{{ contraparte(solicitud).usuario }}
                   </span>
+                  <ReputacionChip
+                    v-if="esBandejaRecibidas && solicitud.reputacionCliente"
+                    :reputacion="solicitud.reputacionCliente"
+                  />
                 </p>
                 <p class="mt-1 flex flex-wrap items-center gap-2 text-sm text-cafe/75">
                   <span class="truncate">{{ solicitud.nombreServicio || 'Servicio' }}</span>

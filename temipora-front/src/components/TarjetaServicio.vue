@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { formatearPrecio } from '../servicios/moneda'
+import { formatearPromedio } from '../servicios/resenias'
 
 const props = defineProps({
   servicio: { type: Object, required: true },
@@ -151,6 +152,14 @@ function irAlArtista() {
         </button>
         <span v-if="servicio.nombreMedio" class="rounded-full bg-durazno/50 px-2.5 py-1 text-[11px] font-semibold text-cafe">
           {{ servicio.nombreMedio }}
+        </span>
+        <span
+          v-if="servicio.cantidadResenias > 0"
+          class="inline-flex items-center gap-1 rounded-full bg-mantequilla/50 px-2.5 py-1 text-[11px] font-semibold text-granate"
+          :title="`${servicio.cantidadResenias} reseña(s)`"
+        >
+          ★ {{ formatearPromedio(servicio.calificacionPromedio) }}
+          <span class="font-normal text-cafe/55">({{ servicio.cantidadResenias }})</span>
         </span>
       </div>
 

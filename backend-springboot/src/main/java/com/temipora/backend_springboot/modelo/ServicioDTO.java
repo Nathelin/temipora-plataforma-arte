@@ -54,6 +54,8 @@ public class ServicioDTO {
     private List<EtiquetaDTO> etiquetas;
     private EstadoServicio estado;
     private Long solicitudesActivas;
+    private BigDecimal calificacionPromedio;
+    private Long cantidadResenias;
     private LocalDateTime pausadoEn;
     private LocalDateTime archivadoEn;
 

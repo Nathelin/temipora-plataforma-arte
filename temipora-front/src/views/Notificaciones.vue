@@ -22,10 +22,14 @@ const hayNoLeidas = computed(() => noLeidas.value > 0)
 
 function destinoDe(notificacion) {
   const tipo = notificacion?.tipoReferencia
-  if (tipo !== 'SOLICITUD' && tipo !== 'PEDIDO') return null
+  if (tipo !== 'SOLICITUD' && tipo !== 'PEDIDO' && tipo !== 'RESENIA') return null
 
   const rol = localStorage.getItem('rol')
   if (rol !== 'ARTISTA' && rol !== 'CLIENTE' && rol !== 'ADMIN') return null
+
+  if (tipo === 'RESENIA') {
+    return rol === 'ADMIN' ? { name: 'admin-resenias-reportadas' } : null
+  }
 
   const id = Number(notificacion.idReferencia)
   if (!Number.isInteger(id) || id <= 0) return null
@@ -48,6 +52,7 @@ function destinoDe(notificacion) {
 function textoDestino(notificacion) {
   if (notificacion?.tipoReferencia === 'PEDIDO') return 'Ver pedido →'
   if (notificacion?.tipoReferencia === 'SOLICITUD') return 'Ver solicitud →'
+  if (notificacion?.tipoReferencia === 'RESENIA') return 'Ver reportes →'
   return ''
 }
 

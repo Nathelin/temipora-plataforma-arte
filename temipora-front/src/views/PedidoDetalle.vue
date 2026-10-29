@@ -7,7 +7,16 @@ import EntregasHito from '../components/EntregasHito.vue'
 import IconoDescarga from '../components/IconoDescarga.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import SubirEntregable from '../components/SubirEntregable.vue'
+import FormularioResenia from '../components/FormularioResenia.vue'
+import TarjetaResenia from '../components/TarjetaResenia.vue'
 import { useSubirImagen } from '../composables/useSubirImagen'
+import {
+  cargarCriterios,
+  cargarEstadoResenia,
+  crearResenia,
+  editarResenia,
+  eliminarResenia,
+} from '../servicios/resenias'
 import {
   descripcionHito,
   estadoPedidoDe,
@@ -43,8 +52,19 @@ const confirmacion = reactive({
   accion: null,
 })
 
+const reseniaEstado = ref(null)
+const criteriosResenia = ref([])
+const cargandoResenias = ref(false)
+const guardandoResenia = ref(false)
+const editandoResenia = ref(false)
+const errorResenia = ref('')
+const advertenciaCriterios = ref('')
+
 const esArtista = computed(() => pedido.value?.rolVista === 'ARTISTA')
 const esCliente = computed(() => pedido.value?.rolVista === 'CLIENTE')
+const puedeVerResenias = computed(() => (
+  pedido.value?.estado === 'FINALIZADO' && pedido.value?.rolVista !== 'ADMIN'
+))
 const estadoInfo = computed(() => estadoPedidoDe(pedido.value?.estado))
 const hitos = computed(() => pedido.value?.hitos || [])
 const moneda = computed(
@@ -76,6 +96,9 @@ async function cargar() {
     if (res.data?.rolVista === 'ARTISTA') {
       void cargarPortfolioVerificado(res.data)
     }
+    if (res.data?.estado === 'FINALIZADO' && res.data?.rolVista !== 'ADMIN') {
+      void cargarResenias()
+    }
   } catch (e) {
     if (e.response?.status === 401) {
       router.push({ name: 'login' })
@@ -103,6 +126,84 @@ async function cargarPortfolioVerificado(data = pedido.value) {
   } catch {
     idsEnPortfolio.value = []
   }
+}
+
+async function cargarResenias() {
+  if (!puedeVerResenias.value) return
+  cargandoResenias.value = true
+  errorResenia.value = ''
+  advertenciaCriterios.value = ''
+  try {
+    const res = await cargarEstadoResenia(idPedido.value)
+    reseniaEstado.value = res.data
+    try {
+      const criterios = await cargarCriterios(res.data.direccion)
+      criteriosResenia.value = criterios.data
+    } catch (e) {
+      criteriosResenia.value = []
+      if (e.response?.status === 401) {
+        router.push({ name: 'login' })
+        return
+      }
+      advertenciaCriterios.value =
+        'No se pudieron cargar los criterios de evaluación.'
+    }
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    errorResenia.value = e.response?.data?.message
+      || 'No se pudieron cargar las reseñas del pedido.'
+  } finally {
+    cargandoResenias.value = false
+  }
+}
+
+async function guardarResenia(payload) {
+  if (guardandoResenia.value) return
+  const eraEdicion = editandoResenia.value
+  guardandoResenia.value = true
+  errorResenia.value = ''
+  try {
+    if (eraEdicion) {
+      await editarResenia(idPedido.value, payload)
+    } else {
+      await crearResenia(idPedido.value, payload)
+    }
+    editandoResenia.value = false
+    aviso.value = eraEdicion ? 'Reseña actualizada.' : 'Reseña publicada.'
+    await cargarResenias()
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    errorResenia.value = e.response?.data?.message
+      || 'No se pudo guardar la reseña.'
+  } finally {
+    guardandoResenia.value = false
+  }
+}
+
+function eliminarMiResenia() {
+  pedirConfirmacion({
+    titulo: '¿Eliminar tu reseña?',
+    mensaje: 'La reseña dejará de ser visible para el artista y no contará para su reputación. '
+      + 'El historial se conserva, pero no vas a poder volver a reseñar este pedido.',
+    textoConfirmar: 'Eliminar reseña',
+  }, async () => {
+    errorResenia.value = ''
+    try {
+      await eliminarResenia(idPedido.value)
+      editandoResenia.value = false
+      aviso.value = 'Eliminaste tu reseña.'
+      await cargarResenias()
+    } catch (e) {
+      errorResenia.value = e.response?.data?.message
+        || 'No se pudo eliminar la reseña.'
+    }
+  })
 }
 
 function agregarAlPortfolio({ archivo, entrega }) {
@@ -787,6 +888,86 @@ onMounted(cargar)
             @entregado="alEntregar"
           />
         </article>
+      </section>
+
+      <section v-if="puedeVerResenias" class="mt-6 space-y-4">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 class="text-xl font-semibold text-granate">Reseñas</h2>
+          <p v-if="reseniaEstado" class="text-xs text-cafe/50">
+            {{ esArtista
+              ? 'Información interna: la reseña del cliente solo la ven los artistas.'
+              : 'Tu reseña se publica en el servicio.' }}
+          </p>
+        </div>
+
+        <p v-if="cargandoResenias" class="text-sm text-cafe/60">Cargando reseñas...</p>
+        <p v-else-if="errorResenia" role="alert" class="text-sm text-rojizo">
+          {{ errorResenia }}
+        </p>
+
+        <template v-else-if="reseniaEstado">
+          <p
+            v-if="advertenciaCriterios"
+            class="rounded-xl border border-durazno bg-durazno/20 px-3 py-2 text-xs text-cafe/70"
+          >
+            {{ advertenciaCriterios }} Podés ver las reseñas, pero el formulario
+            puede quedar incompleto.
+          </p>
+
+          <TarjetaResenia
+            v-if="esArtista && reseniaEstado.reseniaRecibida"
+            :resenia="reseniaEstado.reseniaRecibida"
+            titulo="Reseña del servicio (del cliente)"
+          />
+
+          <template v-if="reseniaEstado.miResenia && !editandoResenia">
+            <TarjetaResenia
+              :resenia="reseniaEstado.miResenia"
+              :titulo="esArtista ? 'Tu reseña interna del cliente' : 'Tu reseña del servicio'"
+              :puede-editar="reseniaEstado.puedeEditar"
+              :puede-eliminar="reseniaEstado.puedeEliminar"
+              :fecha-limite-edicion="reseniaEstado.fechaLimiteEdicion"
+              @editar="editandoResenia = true"
+              @eliminar="eliminarMiResenia"
+            />
+            <p v-if="reseniaEstado.motivoNoDisponible" class="text-xs text-cafe/50">
+              {{ reseniaEstado.motivoNoDisponible }}
+            </p>
+            <p v-if="!esArtista" class="text-xs leading-relaxed text-cafe/50">
+              {{ reseniaEstado.anonimoForzado || !reseniaEstado.miResenia.mostrarNombre
+                ? 'Se publica en el servicio como “Cliente verificado”. No aparece debajo de las piezas de tu galería.'
+                : 'Se publica en el servicio con tu nombre. También aparece debajo de las piezas de tu galería.' }}
+            </p>
+          </template>
+
+          <template v-else-if="reseniaEstado.puedeCrear || editandoResenia">
+            <FormularioResenia
+              :criterios="criteriosResenia"
+              :resenia="editandoResenia ? reseniaEstado.miResenia : null"
+              :guardando="guardandoResenia"
+              :anonimo-forzado="!esArtista && reseniaEstado.anonimoForzado"
+              :permite-anonimato="!esArtista"
+              :titulo="esArtista ? 'Tu reseña interna del cliente' : 'Reseñá este pedido'"
+              :descripcion-ayuda="esArtista
+                ? 'Solo la vas a ver vos. El resto de artistas ve la reputación agregada y el cliente nunca la ve.'
+                : 'Se publica en el servicio. Podés elegir si mostrás tu nombre.'"
+              :texto-guardar="editandoResenia ? 'Guardar la única edición' : 'Publicar reseña'"
+              @guardar="guardarResenia"
+              @cancelar="editandoResenia = false"
+            />
+          </template>
+
+          <div v-else class="rounded-2xl border border-rosa/40 bg-blanco p-5">
+            <p class="text-sm text-cafe/60">
+              {{ reseniaEstado.motivoNoDisponible
+                || 'No hay acciones disponibles para reseñar este pedido.' }}
+            </p>
+            <p v-if="reseniaEstado.fechaLimiteCreacion" class="mt-2 text-xs text-cafe/50">
+              El plazo para dejar la reseña vencía el
+              {{ formatearFechaHora(reseniaEstado.fechaLimiteCreacion) }}.
+            </p>
+          </div>
+        </template>
       </section>
 
       <div v-if="pedido.puedeCancelar" class="mt-6">

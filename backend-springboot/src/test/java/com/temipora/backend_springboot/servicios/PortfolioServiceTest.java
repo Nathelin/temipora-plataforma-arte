@@ -110,6 +110,9 @@ class PortfolioServiceTest {
     @Mock
     private ImagenGaleriaService imagenGaleriaService;
 
+    @Mock
+    private ReseniaPublicaService reseniaPublicaService;
+
     @InjectMocks
     private PortfolioService portfolioService;
 

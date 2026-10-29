@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -48,6 +50,9 @@ public class SolicitudDTO {
     private boolean puedePresupuestar;
     private String motivoNoPresupuestable;
     private boolean puedeCancelar;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private ReputacionClienteDTO reputacionCliente;
 
     public static SolicitudDTO desdeSolicitud(Solicitud solicitud) {
         return desdeSolicitud(solicitud, null, null, null, false);

@@ -8,6 +8,13 @@ import { cargarGaleria as cargarGaleriaApi, ocultarPublicacionPedido } from '../
 import { formatearFecha } from '../servicios/pedidos'
 import TarjetaServicio from '../components/TarjetaServicio.vue'
 import ImagenGaleria from '../components/ImagenGaleria.vue'
+import ResumenResenias from '../components/ResumenResenias.vue'
+import ListaResenias from '../components/ListaResenias.vue'
+import ValoracionEstrellas from '../components/ValoracionEstrellas.vue'
+import {
+  cargarReseniasArtista as cargarReseniasArtistaApi,
+  cargarResumenReseniasArtista as cargarResumenReseniasArtistaApi,
+} from '../servicios/resenias'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,12 +54,27 @@ const visorGaleria = reactive({ abierto: false, indice: 0 })
 const archivoGaleriaIndice = ref(0)
 const imagenGaleriaVisible = ref(false)
 
+const resumenReseniasArtista = ref(null)
+const reseniasArtista = ref([])
+const paginaReseniasArtista = ref(null)
+const cargandoReseniasArtista = ref(false)
+const errorReseniasArtista = ref('')
+const serviciosResenias = ref([])
+const filtrosReseniasArtista = reactive({
+  idServicio: '',
+  calificacion: '',
+  orden: 'RECIENTES',
+})
+
 async function cargarPerfil() {
   cargandoPerfil.value = true
   errorCarga.value = ''
   esFavorito.value = false
   cargandoEstadoFavorito.value = false
   actualizandoFavorito.value = false
+  resumenReseniasArtista.value = null
+  reseniasArtista.value = []
+  paginaReseniasArtista.value = null
   try {
     const nombreUsuario = route.params.nombreUsuario
     const res = await api.get(`/perfil/${nombreUsuario}`)
@@ -66,7 +88,16 @@ async function cargarPerfil() {
     }
 
     if (data.rol === 'ARTISTA') {
-      await Promise.all([cargarPortfolio(true), cargarEtiquetasPortfolio(), cargarTiposArte(), cargarServicios()])
+      await Promise.all([
+        cargarPortfolio(true),
+        cargarEtiquetasPortfolio(),
+        cargarTiposArte(),
+        cargarServicios(),
+        cargarResumenResenias(),
+      ])
+      if (route.query.tab === 'resenas') {
+        void cargarReseniasDeArtista(0)
+      }
       void cargarEstadoFavorito()
     } else {
       totalPortfolio.value = 0
@@ -381,8 +412,74 @@ const esArtista = computed(() => perfil.value.rol === 'ARTISTA')
 const tabActiva = ref('portfolio')
 
 watch(() => route.query.tab, (tab) => {
-  tabActiva.value = tab === 'servicios' ? 'servicios' : 'portfolio'
+  tabActiva.value = ['portfolio', 'servicios', 'productos', 'resenas'].includes(tab)
+    ? tab
+    : 'portfolio'
+  if (tabActiva.value === 'resenas') {
+    void cargarReseniasDeArtista(0)
+  }
 }, { immediate: true })
+
+async function cargarResumenResenias() {
+  if (!perfil.value.nombreUsuario) return
+  try {
+    const { data } = await cargarResumenReseniasArtistaApi(perfil.value.nombreUsuario)
+    resumenReseniasArtista.value = data
+  } catch {
+    resumenReseniasArtista.value = null
+  }
+}
+
+async function cargarReseniasDeArtista(pagina = 0) {
+  if (!perfil.value.nombreUsuario || cargandoReseniasArtista.value) return
+  cargandoReseniasArtista.value = true
+  errorReseniasArtista.value = ''
+  try {
+    const params = {
+      pagina,
+      tamanio: 10,
+      orden: filtrosReseniasArtista.orden || 'RECIENTES',
+    }
+    if (filtrosReseniasArtista.idServicio) {
+      params.idServicio = Number(filtrosReseniasArtista.idServicio)
+    }
+    if (filtrosReseniasArtista.calificacion) {
+      params.calificacion = Number(filtrosReseniasArtista.calificacion)
+    }
+    const { data } = await cargarReseniasArtistaApi(
+      perfil.value.nombreUsuario,
+      params,
+    )
+    reseniasArtista.value = data.pagina?.contenido || []
+    paginaReseniasArtista.value = data.pagina || null
+    resumenReseniasArtista.value = data.resumen || null
+    serviciosResenias.value = data.servicios || []
+  } catch (e) {
+    errorReseniasArtista.value = e.response?.data?.message
+      || 'No se pudieron cargar las reseñas.'
+  } finally {
+    cargandoReseniasArtista.value = false
+  }
+}
+
+function irAResenias() {
+  tabActiva.value = 'resenas'
+  router.replace({ query: { ...route.query, tab: 'resenas' } })
+  if (!reseniasArtista.value.length) {
+    void cargarReseniasDeArtista(0)
+  }
+}
+
+function cambiarFiltrosResenias(filtros) {
+  filtrosReseniasArtista.idServicio = filtros.idServicio ?? ''
+  filtrosReseniasArtista.calificacion = filtros.calificacion ?? ''
+  filtrosReseniasArtista.orden = filtros.orden || 'RECIENTES'
+  void cargarReseniasDeArtista(0)
+}
+
+function cambiarPaginaResenias(pagina) {
+  void cargarReseniasDeArtista(pagina)
+}
 
 function rutaServiciosDe(pieza) {
   return {
@@ -719,6 +816,13 @@ function irASubirImagen(imagen = null) {
             >
               Productos
             </button>
+            <button
+              class="rounded-full px-5 py-2.5 text-sm font-semibold transition"
+              :class="tabActiva === 'resenas' ? 'bg-coral text-white shadow-sm' : 'text-cafe/60 hover:bg-rosa/25 hover:text-granate'"
+              @click="irAResenias"
+            >
+              Reseñas
+            </button>
           </div>
 
             <div v-if="tabActiva === 'portfolio'" class="mt-6">
@@ -864,6 +968,13 @@ function irASubirImagen(imagen = null) {
                       Verificado
                     </span>
                     <span
+                      v-if="obra.resenia"
+                      class="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-blanco/90 px-2 py-1 text-[11px] font-semibold text-granate shadow ring-1 ring-rosa/50"
+                      :title="`${obra.resenia.autorMostrado}: ${obra.resenia.calificacionGeneral}/5`"
+                    >
+                      ★ {{ obra.resenia.calificacionGeneral }}
+                    </span>
+                    <span
                       v-if="obra.requiereAdvertencia"
                       class="absolute inset-0 flex items-center justify-center bg-granate/20 text-white drop-shadow"
                       :title="`Contenido sensible: ${textoSensible(obra.contenidoSensible)}`"
@@ -891,6 +1002,17 @@ function irASubirImagen(imagen = null) {
             </div>
 
             <div v-if="tabActiva === 'servicios'" class="mt-6">
+              <div
+                v-if="resumenReseniasArtista?.hayDatos"
+                class="mb-6 rounded-2xl border border-rosa/50 bg-blanco p-5"
+              >
+                <ResumenResenias
+                  :resumen="resumenReseniasArtista"
+                  compacto
+                  clickable
+                  @ver-todas="irAResenias"
+                />
+              </div>
               <p v-if="cargandoServicios && !perfil.servicios.length" class="text-sm text-cafe/60 py-8 text-center">
                 Cargando servicios...
               </p>
@@ -924,6 +1046,21 @@ function irASubirImagen(imagen = null) {
                 <p class="text-sm text-rojizo mt-3">{{ p.precio }}</p>
               </div>
             </div>
+          </div>
+          <div v-if="tabActiva === 'resenas'" class="mt-6">
+            <ListaResenias
+              :resenias="reseniasArtista"
+              :resumen="resumenReseniasArtista"
+              :pagina="paginaReseniasArtista"
+              :cargando="cargandoReseniasArtista"
+              :error="errorReseniasArtista"
+              :filtros="filtrosReseniasArtista"
+              :servicios="serviciosResenias"
+              mostrar-filtro-servicio
+              mostrar-servicio
+              @cambiar-filtros="cambiarFiltrosResenias"
+              @cambiar-pagina="cambiarPaginaResenias"
+            />
           </div>
         </template>
 
@@ -1115,6 +1252,32 @@ function irASubirImagen(imagen = null) {
                     </router-link>
                   </div>
 
+                  <div
+                    v-if="pieza.resenia"
+                    class="mt-3 rounded-xl border border-rosa/40 bg-rosa/5 px-3 py-2"
+                  >
+                    <div class="flex flex-wrap items-center gap-2">
+                      <ValoracionEstrellas
+                        :model-value="pieza.resenia.calificacionGeneral"
+                        readonly
+                        tamano="sm"
+                        etiqueta="Reseña del pedido"
+                      />
+                      <span class="text-xs font-semibold text-granate">
+                        {{ pieza.resenia.calificacionGeneral }}/5
+                      </span>
+                      <span class="text-xs text-cafe/50">
+                        · {{ pieza.resenia.autorMostrado }}
+                      </span>
+                    </div>
+                    <p
+                      v-if="pieza.resenia.descripcion"
+                      class="mt-1 line-clamp-2 text-xs leading-relaxed text-cafe/70"
+                    >
+                      {{ pieza.resenia.descripcion }}
+                    </p>
+                  </div>
+
                   <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-borde/50 pt-3">
                     <div v-if="galeria.esDuenio" class="flex flex-wrap items-center gap-2">
                       <button
@@ -1279,6 +1442,37 @@ function irASubirImagen(imagen = null) {
               <p class="mt-4 text-sm text-cafe/60">
                 Entregado el {{ formatearFecha(piezaGaleriaActual.fechaEntrega) }}
               </p>
+
+              <div
+                v-if="piezaGaleriaActual.resenia"
+                class="mt-4 rounded-xl border border-rosa/40 bg-rosa/5 p-4"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <p class="text-xs font-semibold uppercase tracking-[0.12em] text-cafe/45">
+                    Reseña del pedido
+                  </p>
+                  <div class="flex items-center gap-1.5">
+                    <ValoracionEstrellas
+                      :model-value="piezaGaleriaActual.resenia.calificacionGeneral"
+                      readonly
+                      tamano="sm"
+                      etiqueta="Reseña del pedido"
+                    />
+                    <span class="text-xs font-semibold text-granate">
+                      {{ piezaGaleriaActual.resenia.calificacionGeneral }}/5
+                    </span>
+                  </div>
+                </div>
+                <p class="mt-1 text-xs text-cafe/50">
+                  {{ piezaGaleriaActual.resenia.autorMostrado }}
+                </p>
+                <p
+                  v-if="piezaGaleriaActual.resenia.descripcion"
+                  class="mt-2 whitespace-pre-line text-sm leading-relaxed text-cafe/75"
+                >
+                  {{ piezaGaleriaActual.resenia.descripcion }}
+                </p>
+              </div>
 
               <div v-if="piezaGaleriaActual.contenidoSensible" class="mt-4">
                 <p class="text-xs text-cafe/50">Contenido sensible</p>
@@ -1455,6 +1649,37 @@ function irASubirImagen(imagen = null) {
                 <span v-if="imagenSeleccionada.servicioNombre" class="font-normal text-cafe/60">
                   · {{ imagenSeleccionada.servicioNombre }}
                 </span>
+              </div>
+
+              <div
+                v-if="imagenSeleccionada.resenia"
+                class="mt-4 rounded-xl border border-rosa/40 bg-rosa/5 p-4"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <p class="text-xs font-semibold uppercase tracking-[0.12em] text-cafe/45">
+                    Reseña del pedido
+                  </p>
+                  <div class="flex items-center gap-1.5">
+                    <ValoracionEstrellas
+                      :model-value="imagenSeleccionada.resenia.calificacionGeneral"
+                      readonly
+                      tamano="sm"
+                      etiqueta="Reseña del pedido"
+                    />
+                    <span class="text-xs font-semibold text-granate">
+                      {{ imagenSeleccionada.resenia.calificacionGeneral }}/5
+                    </span>
+                  </div>
+                </div>
+                <p class="mt-1 text-xs text-cafe/50">
+                  {{ imagenSeleccionada.resenia.autorMostrado }}
+                </p>
+                <p
+                  v-if="imagenSeleccionada.resenia.descripcion"
+                  class="mt-2 whitespace-pre-line text-sm leading-relaxed text-cafe/75"
+                >
+                  {{ imagenSeleccionada.resenia.descripcion }}
+                </p>
               </div>
 
               <router-link

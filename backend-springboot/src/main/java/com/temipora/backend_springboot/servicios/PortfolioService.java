@@ -37,6 +37,7 @@ import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Portfolio;
 import com.temipora.backend_springboot.modelo.PortfolioEntregaVerificada;
+import com.temipora.backend_springboot.modelo.ReseniaPublicaResumenDTO;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.ServicioImagen;
 import com.temipora.backend_springboot.modelo.TipoArte;
@@ -72,6 +73,7 @@ public class PortfolioService {
     private final EntregaArchivoRepository archivoRepository;
     private final ServicioImagenRepository servicioImagenRepository;
     private final ImagenGaleriaService imagenGaleriaService;
+    private final ReseniaPublicaService reseniaPublicaService;
 
     public PortfolioService(
             UsuarioRepository usuarioRepository,
@@ -85,7 +87,8 @@ public class PortfolioService {
             PortfolioEntregaVerificadaRepository verificacionRepository,
             EntregaArchivoRepository archivoRepository,
             ServicioImagenRepository servicioImagenRepository,
-            ImagenGaleriaService imagenGaleriaService) {
+            ImagenGaleriaService imagenGaleriaService,
+            ReseniaPublicaService reseniaPublicaService) {
         this.usuarioRepository = usuarioRepository;
         this.portfolioRepository = portfolioRepository;
         this.imagenRepository = imagenRepository;
@@ -98,6 +101,7 @@ public class PortfolioService {
         this.archivoRepository = archivoRepository;
         this.servicioImagenRepository = servicioImagenRepository;
         this.imagenGaleriaService = imagenGaleriaService;
+        this.reseniaPublicaService = reseniaPublicaService;
     }
 
     @Transactional(readOnly = true)
@@ -673,7 +677,25 @@ public class PortfolioService {
             .map(ImagenPortfolioDTO::getIdImagen)
             .toList();
         Map<Long, PortfolioEntregaVerificada> porImagen = verificacionesPorImagen(ids);
-        dtos.forEach(dto -> aplicarVerificacion(dto, porImagen.get(dto.getIdImagen())));
+        Map<Long, ReseniaPublicaResumenDTO> resenias = reseniasDeVerificaciones(
+            porImagen.values());
+        dtos.forEach(dto -> aplicarVerificacion(
+            dto, porImagen.get(dto.getIdImagen()), resenias));
+    }
+
+    private Map<Long, ReseniaPublicaResumenDTO> reseniasDeVerificaciones(
+            Collection<PortfolioEntregaVerificada> verificaciones) {
+        if (verificaciones.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> idsPedido = verificaciones.stream()
+            .map(verificacion -> verificacion.getArchivoEntrega()
+                .getEntrega().getHitoPedido().getPedido().getIdPedido())
+            .distinct()
+            .toList();
+        Map<Long, ReseniaPublicaResumenDTO> resenias =
+            reseniaPublicaService.resumenPorPedidos(idsPedido);
+        return resenias != null ? resenias : Map.of();
     }
 
     private Map<Long, PortfolioEntregaVerificada> verificacionesPorImagen(
@@ -692,13 +714,51 @@ public class PortfolioService {
         if (dto == null || verificacion == null) {
             return;
         }
-        Servicio servicio = verificacion.getArchivoEntrega()
-            .getEntrega().getHitoPedido().getPedido().getServicio();
+        Pedido pedido = verificacion.getArchivoEntrega()
+            .getEntrega().getHitoPedido().getPedido();
+        ReseniaPublicaResumenDTO resenia = null;
+        if (pedido.isPublicacionAutorizada()
+                && !pedido.isPublicacionOcultadaCliente()) {
+            resenia = reseniaPublicaService.resumenPorPedido(pedido.getIdPedido());
+            if (resenia != null && resenia.isAnonima()) {
+                resenia = null;
+            }
+        }
+        aplicarDatosVerificacion(dto, verificacion, pedido, resenia);
+    }
+
+    private void aplicarVerificacion(
+            ImagenPortfolioDTO dto,
+            PortfolioEntregaVerificada verificacion,
+            Map<Long, ReseniaPublicaResumenDTO> resenias) {
+        if (dto == null || verificacion == null) {
+            return;
+        }
+        Pedido pedido = verificacion.getArchivoEntrega()
+            .getEntrega().getHitoPedido().getPedido();
+        ReseniaPublicaResumenDTO resenia = null;
+        if (pedido.isPublicacionAutorizada()
+                && !pedido.isPublicacionOcultadaCliente()) {
+            resenia = resenias.get(pedido.getIdPedido());
+            if (resenia != null && resenia.isAnonima()) {
+                resenia = null;
+            }
+        }
+        aplicarDatosVerificacion(dto, verificacion, pedido, resenia);
+    }
+
+    private void aplicarDatosVerificacion(
+            ImagenPortfolioDTO dto,
+            PortfolioEntregaVerificada verificacion,
+            Pedido pedido,
+            ReseniaPublicaResumenDTO resenia) {
+        Servicio servicio = pedido.getServicio();
         dto.setVerificada(true);
         dto.setServicioNombre(servicio.getNombre());
         dto.setIdServicio(servicio.getIdServicio());
         dto.setServicioDisponible(servicio.getEstado() == EstadoServicio.PUBLICADO
             && servicio.getModoRecepcion() != ModoRecepcionSolicitud.CERRADA);
+        dto.setResenia(resenia);
     }
 
     private Map<Long, List<EtiquetaDTO>> etiquetasPorImagen(Collection<Long> idsImagen) {

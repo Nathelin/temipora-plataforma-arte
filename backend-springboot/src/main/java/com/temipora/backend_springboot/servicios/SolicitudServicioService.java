@@ -31,6 +31,7 @@ import com.temipora.backend_springboot.modelo.PreguntaDTO;
 import com.temipora.backend_springboot.modelo.Respuesta;
 import com.temipora.backend_springboot.modelo.RespuestaSolicitudRequest;
 import com.temipora.backend_springboot.modelo.Servicio;
+import com.temipora.backend_springboot.modelo.ReputacionClienteDTO;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.SolicitudDTO;
@@ -101,6 +102,7 @@ public class SolicitudServicioService {
     private final NotificacionService notificacionService;
     private final ColaSolicitudesService colaSolicitudesService;
     private final MonedaVistaService monedaVistaService;
+    private final ReseniaPublicaService reseniaPublicaService;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -115,7 +117,8 @@ public class SolicitudServicioService {
             ListaEsperaService listaEsperaService,
             NotificacionService notificacionService,
             ColaSolicitudesService colaSolicitudesService,
-            MonedaVistaService monedaVistaService) {
+            MonedaVistaService monedaVistaService,
+            ReseniaPublicaService reseniaPublicaService) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -129,6 +132,7 @@ public class SolicitudServicioService {
         this.notificacionService = notificacionService;
         this.colaSolicitudesService = colaSolicitudesService;
         this.monedaVistaService = monedaVistaService;
+        this.reseniaPublicaService = reseniaPublicaService;
     }
 
     @Transactional(readOnly = true)
@@ -580,9 +584,25 @@ public class SolicitudServicioService {
             ? solicitudRepository.findByArtistaIdUsuarioOrderByFechaCreacionDesc(idArtista)
             : solicitudRepository.findByArtistaIdUsuarioAndEstadoOrderByFechaCreacionDesc(
                 idArtista, estado);
-        return solicitudes.stream()
+        List<SolicitudResumenDTO> dtos = solicitudes.stream()
             .map(solicitud -> aResumen(solicitud, idArtista))
             .toList();
+
+        List<Long> idsCliente = solicitudes.stream()
+            .map(solicitud -> solicitud.getCliente().getIdUsuario())
+            .distinct()
+            .toList();
+        Map<Long, ReputacionClienteDTO> reputacionesCrudas =
+            reseniaPublicaService.reputacionPorClientes(idsCliente);
+        final Map<Long, ReputacionClienteDTO> reputaciones =
+            reputacionesCrudas != null ? reputacionesCrudas : Map.of();
+        dtos.forEach(dto -> {
+            if (dto.getCliente() != null) {
+                dto.setReputacionCliente(
+                    reputaciones.get(dto.getCliente().getIdUsuario()));
+            }
+        });
+        return dtos;
     }
 
     @Transactional(readOnly = true)
@@ -622,8 +642,19 @@ public class SolicitudServicioService {
         boolean incluirComision = idVista != null
             && solicitud.getArtista() != null
             && idVista.equals(solicitud.getArtista().getIdUsuario());
-        return SolicitudDTO.desdeSolicitud(
+        SolicitudDTO dto = SolicitudDTO.desdeSolicitud(
             solicitud, mostrada, factorOrigen, factorCobro, incluirComision);
+        if (incluirComision && solicitud.getCliente() != null) {
+            dto.setReputacionCliente(reputacionDe(
+                solicitud.getCliente().getIdUsuario()));
+        }
+        return dto;
+    }
+
+    private ReputacionClienteDTO reputacionDe(Long idCliente) {
+        Map<Long, ReputacionClienteDTO> reputaciones =
+            reseniaPublicaService.reputacionPorClientes(List.of(idCliente));
+        return reputaciones != null ? reputaciones.get(idCliente) : null;
     }
 
     private SolicitudResumenDTO aResumen(Solicitud solicitud, Long idVista) {

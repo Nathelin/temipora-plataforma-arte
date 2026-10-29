@@ -82,6 +82,9 @@ class ServicioServiceTest {
     @Mock
     private MonedaService monedaService;
 
+    @Mock
+    private ReseniaPublicaService reseniaPublicaService;
+
     @InjectMocks
     private ServicioService servicioService;
 

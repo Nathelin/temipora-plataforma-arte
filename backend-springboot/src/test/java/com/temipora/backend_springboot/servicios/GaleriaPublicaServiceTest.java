@@ -56,6 +56,8 @@ class GaleriaPublicaServiceTest {
     private UsuarioRepository usuarioRepository;
     @Mock
     private UsuarioService usuarioService;
+    @Mock
+    private ReseniaPublicaService reseniaPublicaService;
 
     private GaleriaPublicaService service;
     private Pedido pedido;
@@ -66,7 +68,8 @@ class GaleriaPublicaServiceTest {
             galeriaRepository,
             archivoRepository,
             usuarioRepository,
-            usuarioService);
+            usuarioService,
+            reseniaPublicaService);
         pedido = pedido();
     }
 

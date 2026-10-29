@@ -33,4 +33,7 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
 
     Page<Pedido> findByArtistaIdUsuarioAndEstado(
         Long idArtista, EstadoPedido estado, Pageable pageable);
+
+    boolean existsByArtistaIdUsuarioAndClienteIdUsuario(
+        Long idArtista, Long idCliente);
 }

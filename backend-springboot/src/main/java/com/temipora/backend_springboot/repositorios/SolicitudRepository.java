@@ -48,6 +48,9 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
     long countByServicioIdServicioAndEstadoIn(
             Long idServicio, Collection<EstadoSolicitud> estados);
 
+    boolean existsByArtistaIdUsuarioAndClienteIdUsuario(
+            Long idArtista, Long idCliente);
+
     @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda", "presupuesto" })
     List<Solicitud> findByServicioIdServicioOrderByFechaCreacionDesc(Long idServicio);
 
