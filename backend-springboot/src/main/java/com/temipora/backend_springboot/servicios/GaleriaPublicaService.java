@@ -25,6 +25,7 @@ import com.temipora.backend_springboot.modelo.ItemSolicitud;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Pedido;
+import com.temipora.backend_springboot.modelo.ReseniaPublicaResumenDTO;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioResumenDTO;
@@ -41,16 +42,19 @@ public class GaleriaPublicaService {
     private final EntregaArchivoRepository archivoRepository;
     private final UsuarioRepository usuarioRepository;
     private final UsuarioService usuarioService;
+    private final ReseniaPublicaService reseniaPublicaService;
 
     public GaleriaPublicaService(
             GaleriaRepository galeriaRepository,
             EntregaArchivoRepository archivoRepository,
             UsuarioRepository usuarioRepository,
-            UsuarioService usuarioService) {
+            UsuarioService usuarioService,
+            ReseniaPublicaService reseniaPublicaService) {
         this.galeriaRepository = galeriaRepository;
         this.archivoRepository = archivoRepository;
         this.usuarioRepository = usuarioRepository;
         this.usuarioService = usuarioService;
+        this.reseniaPublicaService = reseniaPublicaService;
     }
 
     @Transactional(readOnly = true)
@@ -107,13 +111,25 @@ public class GaleriaPublicaService {
                     LinkedHashMap::new,
                     Collectors.toList()));
 
+        List<Long> idsPedido = archivosPorItem.values().stream()
+            .flatMap(List::stream)
+            .map(archivo -> archivo.getEntrega().getHitoPedido()
+                .getPedido().getIdPedido())
+            .distinct()
+            .toList();
+        Map<Long, ReseniaPublicaResumenDTO> reseniasCrudas =
+            reseniaPublicaService.resumenPorPedidos(idsPedido);
+        final Map<Long, ReseniaPublicaResumenDTO> resenias =
+            reseniasCrudas != null ? reseniasCrudas : Map.of();
+
         List<GaleriaPiezaDTO> piezas = items.stream()
             .map(item -> aPieza(
                 item,
                 archivosPorItem.getOrDefault(
                     item.getIdItemSolicitud(), List.of()),
                 esDuenio,
-                advertir))
+                advertir,
+                resenias))
             .filter(Objects::nonNull)
             .toList();
 
@@ -183,7 +199,8 @@ public class GaleriaPublicaService {
             ItemSolicitud item,
             List<EntregaArchivo> archivos,
             boolean esDuenio,
-            boolean advertir) {
+            boolean advertir,
+            Map<Long, ReseniaPublicaResumenDTO> resenias) {
         if (archivos.isEmpty()) {
             return null;
         }
@@ -191,6 +208,11 @@ public class GaleriaPublicaService {
         Pedido pedido = primero.getEntrega().getHitoPedido().getPedido();
         Servicio servicio = pedido.getServicio();
         boolean sensible = servicio.isContenidoSensible();
+        ReseniaPublicaResumenDTO resenia = resenias.get(pedido.getIdPedido());
+        ReseniaPublicaResumenDTO reseniaVisible = resenia != null
+            && (esDuenio || !resenia.isAnonima())
+            ? resenia
+            : null;
 
         return GaleriaPiezaDTO.builder()
             .idPieza(item.getIdItemSolicitud())
@@ -220,6 +242,7 @@ public class GaleriaPublicaService {
             .ocultoPorCliente(esDuenio
                 ? pedido.isPublicacionOcultadaCliente()
                 : null)
+            .resenia(reseniaVisible)
             .build();
     }
 

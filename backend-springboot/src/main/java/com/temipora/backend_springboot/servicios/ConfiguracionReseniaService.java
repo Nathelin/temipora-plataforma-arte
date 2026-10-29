@@ -34,6 +34,8 @@ public class ConfiguracionReseniaService {
                     ConfiguracionResenia.DIAS_EDICION_POR_DEFECTO);
                 config.setMinimoReseniasEtiqueta(
                     ConfiguracionResenia.MINIMO_RESENIAS_ETIQUETA_POR_DEFECTO);
+                config.setMaxImagenesResenia(
+                    ConfiguracionResenia.MAX_IMAGENES_RESENIA_POR_DEFECTO);
                 config.setUmbralExcelente(
                     ConfiguracionResenia.UMBRAL_EXCELENTE_POR_DEFECTO);
                 config.setUmbralBuena(
@@ -59,6 +61,8 @@ public class ConfiguracionReseniaService {
             "La ventana de edición debe estar entre 1 y 30 días.");
         validarRango(request.getMinimoReseniasEtiqueta(), 1, 50,
             "El mínimo de reseñas para mostrar la etiqueta debe estar entre 1 y 50.");
+        validarRango(request.getMaxImagenesResenia(), 0, 10,
+            "El máximo de imágenes por reseña debe estar entre 0 y 10.");
 
         BigDecimal excelente = decimal(request.getUmbralExcelente(),
             "El umbral de excelencia es obligatorio.");
@@ -76,6 +80,7 @@ public class ConfiguracionReseniaService {
         config.setDiasVentanaCreacion(request.getDiasVentanaCreacion());
         config.setDiasEdicion(request.getDiasEdicion());
         config.setMinimoReseniasEtiqueta(request.getMinimoReseniasEtiqueta());
+        config.setMaxImagenesResenia(request.getMaxImagenesResenia());
         config.setUmbralExcelente(excelente.setScale(2, RoundingMode.HALF_UP));
         config.setUmbralBuena(buena.setScale(2, RoundingMode.HALF_UP));
         config.setFechaActualizacion(LocalDateTime.now());

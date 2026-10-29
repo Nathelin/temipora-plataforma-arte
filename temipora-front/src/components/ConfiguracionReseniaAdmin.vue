@@ -13,6 +13,7 @@ const config = ref(null)
 const diasVentanaCreacion = ref('30')
 const diasEdicion = ref('3')
 const minimoReseniasEtiqueta = ref('3')
+const maxImagenesResenia = ref('4')
 const umbralExcelente = ref('4.5')
 const umbralBuena = ref('3.5')
 
@@ -32,6 +33,7 @@ async function cargar() {
     diasVentanaCreacion.value = res.data?.diasVentanaCreacion ?? 30
     diasEdicion.value = res.data?.diasEdicion ?? 3
     minimoReseniasEtiqueta.value = res.data?.minimoReseniasEtiqueta ?? 3
+    maxImagenesResenia.value = res.data?.maxImagenesResenia ?? 4
     umbralExcelente.value = res.data?.umbralExcelente ?? 4.5
     umbralBuena.value = res.data?.umbralBuena ?? 3.5
   } catch (e) {
@@ -80,6 +82,7 @@ async function guardar() {
     entero(diasVentanaCreacion.value, 0, 365, 'La ventana para dejar reseñas'),
     entero(diasEdicion.value, 1, 30, 'La ventana de edición'),
     entero(minimoReseniasEtiqueta.value, 1, 50, 'El mínimo de reseñas'),
+    entero(maxImagenesResenia.value, 0, 10, 'El máximo de imágenes por reseña'),
     decimal(umbralExcelente.value, 1, 5, 'El umbral de excelencia'),
     decimal(umbralBuena.value, 1, 5, 'El umbral de buena reputación'),
   ].filter(Boolean)
@@ -103,6 +106,7 @@ async function guardar() {
       diasVentanaCreacion: Number(diasVentanaCreacion.value),
       diasEdicion: Number(diasEdicion.value),
       minimoReseniasEtiqueta: Number(minimoReseniasEtiqueta.value),
+      maxImagenesResenia: Number(maxImagenesResenia.value),
       umbralExcelente: Number(String(umbralExcelente.value).replace(',', '.')),
       umbralBuena: Number(String(umbralBuena.value).replace(',', '.')),
     })
@@ -165,6 +169,32 @@ onMounted(cargar)
                 La reseña se puede editar una sola vez dentro de este plazo.
               </p>
             </div>
+          </div>
+        </div>
+
+        <div class="border-t border-rosa/40 pt-6">
+          <h2 class="mb-4 text-base text-granate">Imágenes en reseñas</h2>
+          <p class="mb-4 text-xs leading-relaxed text-cafe/55">
+            El cliente puede adjuntar imágenes de la entrega final a su reseña del servicio.
+            Con 0 se desactiva la función.
+          </p>
+          <div class="max-w-xs">
+            <label for="max-imagenes" class="mb-2 block text-sm text-cafe">
+              Máximo de imágenes por reseña <span class="text-rojizo">*</span>
+            </label>
+            <input
+              id="max-imagenes"
+              v-model="maxImagenesResenia"
+              type="number"
+              min="0"
+              max="10"
+              step="1"
+              class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+            />
+            <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+              Entre 0 y 10. Solo se pueden elegir imágenes de la entrega final del pedido
+              y el pedido debe estar autorizado para publicarse.
+            </p>
           </div>
         </div>
 
@@ -256,6 +286,12 @@ onMounted(cargar)
           <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Mínimo de reseñas</dt>
             <dd class="text-cafe">{{ config.minimoReseniasEtiqueta }}</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Máximo de imágenes</dt>
+            <dd class="text-cafe">
+              {{ config.maxImagenesResenia === 0 ? 'Desactivado' : config.maxImagenesResenia }}
+            </dd>
           </div>
           <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Excelente desde</dt>

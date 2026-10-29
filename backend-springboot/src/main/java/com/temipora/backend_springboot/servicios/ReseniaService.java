@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
@@ -21,12 +22,15 @@ import com.temipora.backend_springboot.modelo.EscalaCriterio;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.EstadoResenia;
 import com.temipora.backend_springboot.modelo.EtiquetaReputacion;
+import com.temipora.backend_springboot.modelo.EntregaArchivo;
 import com.temipora.backend_springboot.modelo.OpcionCriterio;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.ReputacionClienteDTO;
 import com.temipora.backend_springboot.modelo.Resenia;
 import com.temipora.backend_springboot.modelo.ReseniaDTO;
 import com.temipora.backend_springboot.modelo.ReseniaEstadoDTO;
+import com.temipora.backend_springboot.modelo.ReseniaImagen;
+import com.temipora.backend_springboot.modelo.ReseniaImagenDisponibleDTO;
 import com.temipora.backend_springboot.modelo.ReseniaOpcion;
 import com.temipora.backend_springboot.modelo.ReseniaRequest;
 import com.temipora.backend_springboot.modelo.ReseniaValor;
@@ -34,6 +38,7 @@ import com.temipora.backend_springboot.modelo.ReseniaValorRequest;
 import com.temipora.backend_springboot.modelo.ReseniaVersion;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.CriterioReseniaRepository;
+import com.temipora.backend_springboot.repositorios.EntregaArchivoRepository;
 import com.temipora.backend_springboot.repositorios.OpcionCriterioRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaRepository;
@@ -56,6 +61,7 @@ public class ReseniaService {
     private final SolicitudRepository solicitudRepository;
     private final ConfiguracionReseniaService configuracionService;
     private final NotificacionService notificacionService;
+    private final EntregaArchivoRepository archivoRepository;
 
     public ReseniaService(
             ReseniaRepository reseniaRepository,
@@ -65,7 +71,8 @@ public class ReseniaService {
             OpcionCriterioRepository opcionRepository,
             SolicitudRepository solicitudRepository,
             ConfiguracionReseniaService configuracionService,
-            NotificacionService notificacionService) {
+            NotificacionService notificacionService,
+            EntregaArchivoRepository archivoRepository) {
         this.reseniaRepository = reseniaRepository;
         this.pedidoRepository = pedidoRepository;
         this.usuarioRepository = usuarioRepository;
@@ -74,6 +81,7 @@ public class ReseniaService {
         this.solicitudRepository = solicitudRepository;
         this.configuracionService = configuracionService;
         this.notificacionService = notificacionService;
+        this.archivoRepository = archivoRepository;
     }
 
     @Transactional
@@ -87,6 +95,8 @@ public class ReseniaService {
             .orElse(null);
         boolean miReseniaEliminada = miResenia != null
             && miResenia.getEstado() == EstadoResenia.ELIMINADA;
+        boolean miReseniaOculta = miResenia != null
+            && miResenia.getEstado() == EstadoResenia.OCULTA;
 
         Resenia recibida = null;
         if (direccion == AmbitoResenia.CLIENTE) {
@@ -118,12 +128,34 @@ public class ReseniaService {
             motivo = "El pedido todavía no está finalizado.";
         } else if (miReseniaEliminada) {
             motivo = "Eliminaste la reseña de este pedido.";
+        } else if (miReseniaOculta) {
+            motivo = "La reseña fue oculta por moderación.";
         } else if (miResenia != null && miResenia.estaEditada()) {
             motivo = "Ya usaste la única edición disponible.";
         } else if (miResenia != null && !dentroDeVentana(limiteEdicion)) {
             motivo = "El plazo para editar la reseña venció.";
         } else if (miResenia == null && !dentroDeVentana(limiteCreacion)) {
             motivo = "El plazo para dejar la reseña venció.";
+        }
+
+        int maxImagenes = config.getMaxImagenesResenia() != null
+            ? config.getMaxImagenesResenia()
+            : 0;
+        List<ReseniaImagenDisponibleDTO> imagenesDisponibles = List.of();
+        if (direccion == AmbitoResenia.SERVICIO
+                && maxImagenes > 0
+                && pedido.isPublicacionAutorizada()
+                && !pedido.isPublicacionOcultadaCliente()) {
+            imagenesDisponibles = archivoRepository
+                .listarFinalesDelPedido(pedido.getIdPedido()).stream()
+                .map(archivo -> ReseniaImagenDisponibleDTO.builder()
+                    .idArchivo(archivo.getIdArchivo())
+                    .urlPreview("/galeria/archivos/"
+                        + archivo.getIdArchivo() + "/preview")
+                    .ancho(archivo.getAncho())
+                    .alto(archivo.getAlto())
+                    .build())
+                .toList();
         }
 
         return ReseniaEstadoDTO.builder()
@@ -137,9 +169,13 @@ public class ReseniaService {
             .puedeCrear(puedeCrear)
             .puedeEditar(puedeEditar)
             .puedeEliminar(puedeEliminar)
+            .anonimoForzado(pedido.getServicio() != null
+                && pedido.getServicio().isContenidoSensible())
             .motivoNoDisponible(motivo)
             .fechaLimiteCreacion(limiteCreacion)
             .fechaLimiteEdicion(limiteEdicion)
+            .maxImagenes(maxImagenes)
+            .imagenesDisponibles(imagenesDisponibles)
             .build();
     }
 
@@ -162,7 +198,7 @@ public class ReseniaService {
                 "Ya dejaste una reseña para este pedido.");
         }
 
-        ReseniaVersion version = construirVersion(1, request, direccion);
+        ReseniaVersion version = construirVersion(1, request, direccion, pedido, config);
 
         Usuario autor = usuarioRepository.findByIdUsuario(idUsuario)
             .orElseThrow(() -> new NoSuchElementException(
@@ -172,6 +208,7 @@ public class ReseniaService {
         resenia.setPedido(pedido);
         resenia.setAutor(autor);
         resenia.setEstado(EstadoResenia.PUBLICADA);
+        resenia.setMostrarNombre(mostrarNombre(pedido, request, true));
         resenia.setFechaCreacion(LocalDateTime.now());
         resenia.agregarVersion(version);
 
@@ -196,6 +233,10 @@ public class ReseniaService {
             .orElseThrow(() -> new NoSuchElementException(
                 "No dejaste una reseña para este pedido."));
 
+        if (resenia.getEstado() == EstadoResenia.OCULTA) {
+            throw new IllegalArgumentException(
+                "La reseña fue oculta por moderación y no se puede editar.");
+        }
         if (resenia.getEstado() != EstadoResenia.PUBLICADA) {
             throw new IllegalArgumentException(
                 "La reseña fue eliminada y no se puede editar.");
@@ -214,7 +255,9 @@ public class ReseniaService {
 
         int siguienteNumero = resenia.getVersiones().size() + 1;
         resenia.agregarVersion(
-            construirVersion(siguienteNumero, request, direccion));
+            construirVersion(siguienteNumero, request, direccion, pedido, config));
+        resenia.setMostrarNombre(
+            mostrarNombre(pedido, request, resenia.isMostrarNombre()));
         resenia.setFechaActualizacion(LocalDateTime.now());
 
         return ReseniaDTO.desde(reseniaRepository.save(resenia), true);
@@ -227,6 +270,10 @@ public class ReseniaService {
             .orElseThrow(() -> new NoSuchElementException(
                 "No dejaste una reseña para este pedido."));
 
+        if (resenia.getEstado() == EstadoResenia.OCULTA) {
+            throw new IllegalArgumentException(
+                "La reseña no está publicada.");
+        }
         if (resenia.getEstado() != EstadoResenia.PUBLICADA) {
             throw new IllegalArgumentException("La reseña ya fue eliminada.");
         }
@@ -265,7 +312,8 @@ public class ReseniaService {
             ? BigDecimal.valueOf(promedioCrudo).setScale(2, RoundingMode.HALF_UP)
             : null;
 
-        EtiquetaReputacion etiqueta = calcularEtiqueta(cantidad, promedio, config);
+        EtiquetaReputacion etiqueta =
+            ReputacionCalculator.calcular(cantidad, promedio, config);
 
         return ReputacionClienteDTO.builder()
             .idCliente(idCliente)
@@ -277,22 +325,12 @@ public class ReseniaService {
             .build();
     }
 
-    private EtiquetaReputacion calcularEtiqueta(
-            long cantidad, BigDecimal promedio, ConfiguracionResenia config) {
-        if (promedio == null || cantidad < config.getMinimoReseniasEtiqueta()) {
-            return EtiquetaReputacion.SIN_DATOS;
-        }
-        if (promedio.compareTo(config.getUmbralExcelente()) >= 0) {
-            return EtiquetaReputacion.EXCELENTE;
-        }
-        if (promedio.compareTo(config.getUmbralBuena()) >= 0) {
-            return EtiquetaReputacion.BUENA;
-        }
-        return EtiquetaReputacion.REGULAR;
-    }
-
     private ReseniaVersion construirVersion(
-            int numero, ReseniaRequest request, AmbitoResenia direccion) {
+            int numero,
+            ReseniaRequest request,
+            AmbitoResenia direccion,
+            Pedido pedido,
+            ConfiguracionResenia config) {
         Map<Long, CriterioResenia> criterios = criteriosDelAmbito(direccion);
 
         ReseniaVersion version = new ReseniaVersion();
@@ -382,7 +420,77 @@ public class ReseniaService {
             }
         }
 
+        agregarImagenes(version, request, pedido, direccion, config);
+
         return version;
+    }
+
+    private void agregarImagenes(
+            ReseniaVersion version,
+            ReseniaRequest request,
+            Pedido pedido,
+            AmbitoResenia direccion,
+            ConfiguracionResenia config) {
+        List<Long> ids = request.getImagenes() == null
+            ? List.of()
+            : request.getImagenes().stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            return;
+        }
+        if (direccion != AmbitoResenia.SERVICIO) {
+            throw new IllegalArgumentException(
+                "Solo el cliente puede adjuntar imágenes a la reseña.");
+        }
+
+        int max = config.getMaxImagenesResenia() != null
+            ? config.getMaxImagenesResenia()
+            : 0;
+        if (max <= 0) {
+            throw new IllegalArgumentException(
+                "La carga de imágenes en reseñas está desactivada.");
+        }
+        if (ids.size() > max) {
+            throw new IllegalArgumentException(
+                "Podés adjuntar hasta " + max + " imágenes.");
+        }
+        if (!pedido.isPublicacionAutorizada()
+                || pedido.isPublicacionOcultadaCliente()) {
+            throw new IllegalArgumentException(
+                "El pedido no está autorizado para publicar imágenes.");
+        }
+
+        int orden = 0;
+        for (Long id : ids) {
+            EntregaArchivo archivo = archivoRepository.buscarParaGaleria(id)
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "La imagen indicada no existe."));
+            Pedido archivoPedido = archivo.getEntrega()
+                .getHitoPedido().getPedido();
+            if (!archivoPedido.getIdPedido().equals(pedido.getIdPedido())) {
+                throw new IllegalArgumentException(
+                    "La imagen no pertenece a este pedido.");
+            }
+            if (!archivo.getEntrega().isEsFinal()
+                    || !archivo.getEntrega().isVigente()
+                    || archivo.getEntrega().isRetirada()
+                    || archivo.isRetirado()) {
+                throw new IllegalArgumentException(
+                    "Solo podés adjuntar imágenes de la entrega final vigente.");
+            }
+            if (archivo.getMime() == null
+                    || !archivo.getMime().startsWith("image/")) {
+                throw new IllegalArgumentException(
+                    "Solo podés adjuntar imágenes.");
+            }
+
+            ReseniaImagen imagen = new ReseniaImagen();
+            imagen.setArchivo(archivo);
+            imagen.setOrden(orden++);
+            version.agregarImagen(imagen);
+        }
     }
 
     private Map<Long, CriterioResenia> criteriosDelAmbito(AmbitoResenia direccion) {
@@ -429,6 +537,17 @@ public class ReseniaService {
             throw new IllegalArgumentException(
                 "Solo podés reseñar un pedido finalizado.");
         }
+    }
+
+    private boolean mostrarNombre(
+            Pedido pedido, ReseniaRequest request, boolean actual) {
+        if (pedido.getServicio() != null
+                && pedido.getServicio().isContenidoSensible()) {
+            return false;
+        }
+        return request.getMostrarNombre() != null
+            ? request.getMostrarNombre()
+            : actual;
     }
 
     private LocalDateTime limiteCreacion(

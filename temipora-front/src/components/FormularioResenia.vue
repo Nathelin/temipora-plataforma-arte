@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import ValoracionEstrellas from './ValoracionEstrellas.vue'
+import SelectorImagenesResenia from './SelectorImagenesResenia.vue'
 
 const props = defineProps({
   criterios: { type: Array, default: () => [] },
@@ -10,6 +11,11 @@ const props = defineProps({
   descripcionAyuda: { type: String, default: '' },
   textoGuardar: { type: String, default: 'Publicar reseña' },
   textoCancelar: { type: String, default: 'Cancelar' },
+  anonimoForzado: { type: Boolean, default: false },
+  permiteAnonimato: { type: Boolean, default: true },
+  imagenesDisponibles: { type: Array, default: () => [] },
+  maxImagenes: { type: Number, default: 0 },
+  permiteImagenes: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['guardar', 'cancelar'])
@@ -18,6 +24,8 @@ const descripcion = ref('')
 const calificacion = ref(0)
 const valores = ref({})
 const opcionesSeleccionadas = ref([])
+const mostrarNombre = ref(true)
+const imagenesSeleccionadas = ref([])
 const errorForm = ref('')
 
 const claseCampo = 'block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral'
@@ -37,6 +45,11 @@ function estadoInicial() {
   valores.value = mapa
   opcionesSeleccionadas.value = (props.resenia?.opciones || [])
     .map((opcion) => opcion.idOpcion)
+  mostrarNombre.value = !props.permiteAnonimato
+    ? true
+    : (props.anonimoForzado ? false : (props.resenia?.mostrarNombre ?? true))
+  imagenesSeleccionadas.value = (props.resenia?.imagenes || [])
+    .map((imagen) => imagen.idArchivo)
   errorForm.value = ''
 }
 
@@ -105,6 +118,7 @@ function guardar() {
   emit('guardar', {
     descripcion: descripcion.value.trim() || null,
     calificacionGeneral: calificacion.value,
+    mostrarNombre: props.anonimoForzado ? false : mostrarNombre.value,
     valores: props.criterios
       .filter((criterio) => criterio.escala === 'ESTRELLAS'
         && valores.value[criterio.idCriterioResenia])
@@ -113,6 +127,7 @@ function guardar() {
         valor: valores.value[criterio.idCriterioResenia],
       })),
     opciones: [...opcionesSeleccionadas.value],
+    imagenes: props.permiteImagenes ? [...imagenesSeleccionadas.value] : [],
   })
 }
 </script>
@@ -204,6 +219,40 @@ function guardar() {
         <p class="mt-1 text-right text-xs text-cafe/50">{{ descripcion.length }}/1000</p>
       </div>
     </div>
+
+    <div
+      v-if="permiteImagenes && maxImagenes > 0 && imagenesDisponibles.length"
+      class="mt-5 border-t border-rosa/40 pt-5"
+    >
+      <SelectorImagenesResenia
+        v-model="imagenesSeleccionadas"
+        :imagenes="imagenesDisponibles"
+        :max="maxImagenes"
+      />
+    </div>
+
+    <label
+      v-if="permiteAnonimato"
+      class="mt-5 flex items-start gap-3 rounded-xl border border-rosa/50 bg-rosa/5 p-4 text-sm text-cafe"
+    >
+      <input
+        v-model="mostrarNombre"
+        type="checkbox"
+        :disabled="anonimoForzado"
+        class="mt-0.5 h-4 w-4 shrink-0 rounded border-rosa text-coral focus:ring-coral disabled:opacity-50"
+      />
+      <span>
+        Mostrar mi nombre junto a la reseña
+        <span v-if="anonimoForzado" class="mt-1 block text-xs leading-relaxed text-cafe/55">
+          Este servicio es de contenido sensible: la reseña se publica como
+          “Cliente verificado” y no aparece debajo de las piezas de tu galería.
+        </span>
+        <span v-else class="mt-1 block text-xs leading-relaxed text-cafe/55">
+          Si lo desactivás, se publica como “Cliente verificado” y no aparece
+          debajo de las piezas de tu galería.
+        </span>
+      </span>
+    </label>
 
     <p v-if="errorForm" role="alert" class="mt-4 text-sm text-rojizo">{{ errorForm }}</p>
 

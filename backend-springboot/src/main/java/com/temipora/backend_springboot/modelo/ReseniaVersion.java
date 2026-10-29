@@ -14,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -60,6 +61,10 @@ public class ReseniaVersion {
     @OneToMany(mappedBy = "version", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ReseniaOpcion> opciones = new ArrayList<>();
 
+    @OneToMany(mappedBy = "version", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("orden ASC")
+    private List<ReseniaImagen> imagenes = new ArrayList<>();
+
     public void agregarValor(ReseniaValor valor) {
         valor.setVersion(this);
         this.valores.add(valor);
@@ -68,5 +73,10 @@ public class ReseniaVersion {
     public void agregarOpcion(ReseniaOpcion opcion) {
         opcion.setVersion(this);
         this.opciones.add(opcion);
+    }
+
+    public void agregarImagen(ReseniaImagen imagen) {
+        imagen.setVersion(this);
+        this.imagenes.add(imagen);
     }
 }

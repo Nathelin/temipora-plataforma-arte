@@ -3,6 +3,8 @@ package com.temipora.backend_springboot.modelo;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -35,6 +37,9 @@ public class SolicitudResumenDTO {
     private LocalDateTime fechaActualizacion;
     private BigDecimal precioFinal;
     private LocalDateTime fechaVencimiento;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private ReputacionClienteDTO reputacionCliente;
 
     public static SolicitudResumenDTO desdeSolicitud(Solicitud solicitud) {
         return desdeSolicitud(solicitud, null, null, null);

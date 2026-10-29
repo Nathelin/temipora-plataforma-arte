@@ -664,6 +664,7 @@ onMounted(cargar)
             v-if="esArtistaDeLaSolicitud && datosPersona?.idUsuario"
             :id-cliente="datosPersona.idUsuario"
             :nombre="nombreContraparte"
+            :reputacion="solicitud.reputacionCliente"
           />
 
           <section class="rounded-2xl border border-rosa/50 bg-blanco p-5">

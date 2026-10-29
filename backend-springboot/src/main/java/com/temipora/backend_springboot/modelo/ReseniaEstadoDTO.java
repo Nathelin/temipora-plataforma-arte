@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.modelo;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -24,7 +25,10 @@ public class ReseniaEstadoDTO {
     private boolean puedeCrear;
     private boolean puedeEditar;
     private boolean puedeEliminar;
+    private boolean anonimoForzado;
     private String motivoNoDisponible;
     private LocalDateTime fechaLimiteCreacion;
     private LocalDateTime fechaLimiteEdicion;
+    private int maxImagenes;
+    private List<ReseniaImagenDisponibleDTO> imagenesDisponibles;
 }

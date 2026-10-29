@@ -25,4 +25,9 @@ public class ReseniaRequest {
     private List<@Valid ReseniaValorRequest> valores;
 
     private List<Long> opciones;
+
+    private Boolean mostrarNombre;
+
+    @Size(max = 10, message = "Podés adjuntar hasta 10 imágenes.")
+    private List<Long> imagenes;
 }

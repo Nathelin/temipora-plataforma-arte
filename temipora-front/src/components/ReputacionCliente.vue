@@ -9,6 +9,7 @@ import {
 const props = defineProps({
   idCliente: { type: Number, default: null },
   nombre: { type: String, default: '' },
+  reputacion: { type: Object, default: null },
 })
 
 const reputacion = ref(null)
@@ -30,6 +31,11 @@ const detalle = computed(() => {
 })
 
 async function cargar() {
+  if (props.reputacion) {
+    reputacion.value = props.reputacion
+    error.value = ''
+    return
+  }
   if (!props.idCliente) {
     reputacion.value = null
     return
@@ -50,6 +56,13 @@ async function cargar() {
 }
 
 watch(() => props.idCliente, cargar, { immediate: true })
+
+watch(() => props.reputacion, (valor) => {
+  if (valor) {
+    reputacion.value = valor
+    error.value = ''
+  }
+}, { immediate: true })
 </script>
 
 <template>

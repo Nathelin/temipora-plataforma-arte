@@ -33,8 +33,11 @@ public class ReseniaDTO {
     private LocalDateTime fechaVersion;
     private String descripcion;
     private int calificacionGeneral;
+    private boolean mostrarNombre;
+    private String motivoModeracion;
     private List<ReseniaValorDTO> valores;
     private List<ReseniaOpcionDTO> opciones;
+    private List<ReseniaImagenDTO> imagenes;
     private List<ReseniaVersionDTO> historial;
 
     public static ReseniaDTO desde(Resenia resenia, boolean incluirHistorial) {
@@ -51,6 +54,8 @@ public class ReseniaDTO {
             .direccion(esCliente ? AmbitoResenia.SERVICIO : AmbitoResenia.CLIENTE)
             .autor(UsuarioResumenDTO.desdeUsuario(resenia.getAutor()))
             .estado(resenia.getEstado())
+            .mostrarNombre(resenia.isMostrarNombre())
+            .motivoModeracion(resenia.getMotivoModeracion())
             .editada(resenia.estaEditada())
             .ediciones(Math.max(0, resenia.getVersiones().size() - 1))
             .fechaCreacion(resenia.getFechaCreacion())
@@ -66,6 +71,9 @@ public class ReseniaDTO {
                     .toList())
                 .opciones(actual.getOpciones().stream()
                     .map(ReseniaOpcionDTO::desdeOpcion)
+                    .toList())
+                .imagenes(actual.getImagenes().stream()
+                    .map(ReseniaImagenDTO::desdeImagen)
                     .toList());
         }
 

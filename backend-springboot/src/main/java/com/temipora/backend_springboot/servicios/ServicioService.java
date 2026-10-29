@@ -27,6 +27,7 @@ import com.temipora.backend_springboot.modelo.FiltroServicioRequest;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.PromedioReseniasDTO;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.ServicioImagen;
@@ -64,6 +65,7 @@ public class ServicioService {
     private final TerminosService terminosService;
     private final ConversionMonedaService conversionMonedaService;
     private final MonedaService monedaService;
+    private final ReseniaPublicaService reseniaPublicaService;
 
     public ServicioService(
             ServicioRepository servicioRepository,
@@ -75,7 +77,8 @@ public class ServicioService {
             FormularioService formularioService,
             TerminosService terminosService,
             ConversionMonedaService conversionMonedaService,
-            MonedaService monedaService) {
+            MonedaService monedaService,
+            ReseniaPublicaService reseniaPublicaService) {
         this.servicioRepository = servicioRepository;
         this.solicitudRepository = solicitudRepository;
         this.usuarioRepository = usuarioRepository;
@@ -86,6 +89,7 @@ public class ServicioService {
         this.terminosService = terminosService;
         this.conversionMonedaService = conversionMonedaService;
         this.monedaService = monedaService;
+        this.reseniaPublicaService = reseniaPublicaService;
     }
 
     @Transactional(readOnly = true)
@@ -96,7 +100,7 @@ public class ServicioService {
                 idArtista, ESTADOS_ACTIVOS)) {
             activas.put((Long) fila[0], (Long) fila[1]);
         }
-        return servicioRepository
+        List<ServicioDTO> dtos = servicioRepository
             .findByArtistaIdUsuarioAndEstadoNotOrderByNombreAsc(idArtista, EstadoServicio.ARCHIVADO)
             .stream()
             .map(s -> {
@@ -105,6 +109,8 @@ public class ServicioService {
                 return dto;
             })
             .toList();
+        aplicarPromedios(dtos);
+        return dtos;
     }
 
     @Transactional(readOnly = true)
@@ -119,10 +125,12 @@ public class ServicioService {
                 cb.notEqual(root.get("artista").get("idUsuario"), viewerId));
         }
         spec = aplicarFiltros(spec, filtro);
-        return servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre")).stream()
+        List<ServicioDTO> dtos = servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre")).stream()
             .filter(this::aceptaSolicitudesYPodriaPresupuestar)
             .map(s -> aDTO(s, requiereAdvertencia(s, pref, viewerId), moneda))
             .toList();
+        aplicarPromedios(dtos);
+        return dtos;
     }
 
     @Transactional(readOnly = true)
@@ -135,9 +143,11 @@ public class ServicioService {
             .and((root, query, cb) ->
                 cb.equal(cb.lower(root.get("artista").get("nombreUsuario")),
                     nombreUsuario.trim().toLowerCase()));
-        return servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre")).stream()
+        List<ServicioDTO> dtos = servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre")).stream()
             .map(s -> aDTO(s, requiereAdvertencia(s, pref, viewerId), moneda))
             .toList();
+        aplicarPromedios(dtos);
+        return dtos;
     }
 
     @Transactional(readOnly = true)
@@ -153,7 +163,32 @@ public class ServicioService {
                 servicio.getIdServicio(),
                 aDTO(servicio, requiereAdvertencia(servicio, pref, viewerId), moneda));
         }
+        aplicarPromedios(resultado.values());
         return resultado;
+    }
+
+    private void aplicarPromedios(Collection<ServicioDTO> dtos) {
+        if (dtos == null || dtos.isEmpty()) {
+            return;
+        }
+        List<Long> ids = dtos.stream()
+            .map(ServicioDTO::getIdServicio)
+            .filter(java.util.Objects::nonNull)
+            .toList();
+        Map<Long, PromedioReseniasDTO> promediosCrudos =
+            reseniaPublicaService.promediosPorServicios(ids);
+        final Map<Long, PromedioReseniasDTO> promedios =
+            promediosCrudos != null ? promediosCrudos : Map.of();
+
+        for (ServicioDTO dto : dtos) {
+            PromedioReseniasDTO promedio = promedios.get(dto.getIdServicio());
+            if (promedio != null && promedio.getCantidad() > 0) {
+                dto.setCalificacionPromedio(promedio.getPromedio());
+                dto.setCantidadResenias(promedio.getCantidad());
+            } else {
+                dto.setCantidadResenias(0L);
+            }
+        }
     }
 
     private Specification<Servicio> activos(boolean ocultarSensibles) {
@@ -285,7 +320,9 @@ public class ServicioService {
         if (!esDuenio && pref == EPreferenciaContenidoSensible.OCULTAR && servicio.isContenidoSensible()) {
             throw new NoSuchElementException("Servicio no encontrado: " + idServicio);
         }
-        return aDTO(servicio, requiereAdvertencia(servicio, pref, viewerId), monedaPreferidaDe(viewerId));
+        ServicioDTO dto = aDTO(servicio, requiereAdvertencia(servicio, pref, viewerId), monedaPreferidaDe(viewerId));
+        aplicarPromedios(List.of(dto));
+        return dto;
     }
 
     @Transactional

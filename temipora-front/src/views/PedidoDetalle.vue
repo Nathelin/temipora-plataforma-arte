@@ -58,6 +58,7 @@ const cargandoResenias = ref(false)
 const guardandoResenia = ref(false)
 const editandoResenia = ref(false)
 const errorResenia = ref('')
+const advertenciaCriterios = ref('')
 
 const esArtista = computed(() => pedido.value?.rolVista === 'ARTISTA')
 const esCliente = computed(() => pedido.value?.rolVista === 'CLIENTE')
@@ -131,11 +132,22 @@ async function cargarResenias() {
   if (!puedeVerResenias.value) return
   cargandoResenias.value = true
   errorResenia.value = ''
+  advertenciaCriterios.value = ''
   try {
     const res = await cargarEstadoResenia(idPedido.value)
     reseniaEstado.value = res.data
-    const criterios = await cargarCriterios(res.data.direccion)
-    criteriosResenia.value = criterios.data
+    try {
+      const criterios = await cargarCriterios(res.data.direccion)
+      criteriosResenia.value = criterios.data
+    } catch (e) {
+      criteriosResenia.value = []
+      if (e.response?.status === 401) {
+        router.push({ name: 'login' })
+        return
+      }
+      advertenciaCriterios.value =
+        'No se pudieron cargar los criterios de evaluación.'
+    }
   } catch (e) {
     if (e.response?.status === 401) {
       router.push({ name: 'login' })
@@ -884,7 +896,7 @@ onMounted(cargar)
           <p v-if="reseniaEstado" class="text-xs text-cafe/50">
             {{ esArtista
               ? 'Información interna: la reseña del cliente solo la ven los artistas.'
-              : 'Tu reseña es interna: la ve el artista del pedido.' }}
+              : 'Tu reseña se publica en el servicio.' }}
           </p>
         </div>
 
@@ -894,6 +906,14 @@ onMounted(cargar)
         </p>
 
         <template v-else-if="reseniaEstado">
+          <p
+            v-if="advertenciaCriterios"
+            class="rounded-xl border border-durazno bg-durazno/20 px-3 py-2 text-xs text-cafe/70"
+          >
+            {{ advertenciaCriterios }} Podés ver las reseñas, pero el formulario
+            puede quedar incompleto.
+          </p>
+
           <TarjetaResenia
             v-if="esArtista && reseniaEstado.reseniaRecibida"
             :resenia="reseniaEstado.reseniaRecibida"
@@ -913,6 +933,11 @@ onMounted(cargar)
             <p v-if="reseniaEstado.motivoNoDisponible" class="text-xs text-cafe/50">
               {{ reseniaEstado.motivoNoDisponible }}
             </p>
+            <p v-if="!esArtista" class="text-xs leading-relaxed text-cafe/50">
+              {{ reseniaEstado.anonimoForzado || !reseniaEstado.miResenia.mostrarNombre
+                ? 'Se publica en el servicio como “Cliente verificado”. No aparece debajo de las piezas de tu galería.'
+                : 'Se publica en el servicio con tu nombre. También aparece debajo de las piezas de tu galería.' }}
+            </p>
           </template>
 
           <template v-else-if="reseniaEstado.puedeCrear || editandoResenia">
@@ -920,10 +945,15 @@ onMounted(cargar)
               :criterios="criteriosResenia"
               :resenia="editandoResenia ? reseniaEstado.miResenia : null"
               :guardando="guardandoResenia"
+              :anonimo-forzado="!esArtista && reseniaEstado.anonimoForzado"
+              :permite-anonimato="!esArtista"
+              :imagenes-disponibles="reseniaEstado.imagenesDisponibles || []"
+              :max-imagenes="reseniaEstado.maxImagenes || 0"
+              :permite-imagenes="!esArtista"
               :titulo="esArtista ? 'Tu reseña interna del cliente' : 'Reseñá este pedido'"
               :descripcion-ayuda="esArtista
                 ? 'Solo la vas a ver vos. El resto de artistas ve la reputación agregada y el cliente nunca la ve.'
-                : 'La reseña es interna: la ve el artista de este pedido.'"
+                : 'Se publica en el servicio. Podés elegir si mostrás tu nombre.'"
               :texto-guardar="editandoResenia ? 'Guardar la única edición' : 'Publicar reseña'"
               @guardar="guardarResenia"
               @cancelar="editandoResenia = false"

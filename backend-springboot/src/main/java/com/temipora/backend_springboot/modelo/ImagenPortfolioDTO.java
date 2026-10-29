@@ -3,6 +3,8 @@ package com.temipora.backend_springboot.modelo;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -32,6 +34,10 @@ public class ImagenPortfolioDTO {
 
     @Setter
     private boolean servicioDisponible;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Setter
+    private ReseniaPublicaResumenDTO resenia;
 
     @Builder.Default
     @Setter

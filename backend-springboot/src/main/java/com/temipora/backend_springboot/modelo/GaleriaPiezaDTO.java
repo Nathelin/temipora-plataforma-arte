@@ -35,4 +35,7 @@ public class GaleriaPiezaDTO {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Boolean ocultoPorCliente;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private ReseniaPublicaResumenDTO resenia;
 }

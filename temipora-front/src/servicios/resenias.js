@@ -24,6 +24,28 @@ export function cargarReputacionCliente(idCliente) {
   return api.get(`/clientes/${idCliente}/reputacion`)
 }
 
+export function cargarReseniasServicio(idServicio, params = {}) {
+  return api.get(`/servicios/${idServicio}/resenias`, { params })
+}
+
+export function cargarReseniasArtista(nombreUsuario, params = {}) {
+  return api.get(`/perfil/${encodeURIComponent(nombreUsuario)}/resenias`, { params })
+}
+
+export function cargarResumenReseniasArtista(nombreUsuario) {
+  return api.get(`/perfil/${encodeURIComponent(nombreUsuario)}/resumen-resenias`)
+}
+
+export const ORDENES_RESENIAS = [
+  { valor: 'RECIENTES', etiqueta: 'Más recientes' },
+  { valor: 'MEJOR', etiqueta: 'Mejor calificadas' },
+  { valor: 'PEOR', etiqueta: 'Peor calificadas' },
+]
+
+export function etiquetaOrden(codigo) {
+  return ORDENES_RESENIAS.find((item) => item.valor === codigo)?.etiqueta || 'Más recientes'
+}
+
 export const AMBITOS_RESENIA = [
   { valor: 'SERVICIO', etiqueta: 'Servicio (cliente → artista)' },
   { valor: 'CLIENTE', etiqueta: 'Cliente (artista → cliente)' },

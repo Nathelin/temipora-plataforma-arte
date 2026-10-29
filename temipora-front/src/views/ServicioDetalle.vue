@@ -1,9 +1,13 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
 import VistaPreviaTerminos from '../components/VistaPreviaTerminos.vue'
+import ResumenResenias from '../components/ResumenResenias.vue'
+import TarjetaReseniaPublica from '../components/TarjetaReseniaPublica.vue'
+import ModalResenias from '../components/ModalResenias.vue'
+import { cargarReseniasServicio } from '../servicios/resenias'
 import { useNotificaciones } from '../composables/useNotificaciones'
 
 const route = useRoute()
@@ -21,6 +25,17 @@ const rol = ref(localStorage.getItem('rol') || '')
 const esFavorito = ref(false)
 const cargandoEstadoFavorito = ref(false)
 const actualizandoFavorito = ref(false)
+
+const resumenResenias = ref(null)
+const reseniasDestacadas = ref([])
+const reseniasLista = ref([])
+const paginaResenias = ref(null)
+const cargandoResenias = ref(false)
+const errorResenias = ref('')
+const modalReseniasAbierto = ref(false)
+const cargandoListaResenias = ref(false)
+const errorListaResenias = ref('')
+const filtrosResenias = reactive({ calificacion: '', orden: 'RECIENTES' })
 
 const CAMPOS_TERMINOS = [
   'informacionGeneral',
@@ -237,6 +252,76 @@ async function cargar() {
   } finally {
     cargando.value = false
   }
+  if (servicio.value) {
+    void cargarReseniasResumen()
+  }
+}
+
+async function cargarReseniasResumen() {
+  cargandoResenias.value = true
+  errorResenias.value = ''
+  try {
+    const { data } = await cargarReseniasServicio(route.params.id, {
+      pagina: 0,
+      tamanio: 3,
+    })
+    resumenResenias.value = data.resumen || null
+    reseniasDestacadas.value = data.pagina?.contenido || []
+  } catch {
+    errorResenias.value = 'No se pudieron cargar las reseñas.'
+  } finally {
+    cargandoResenias.value = false
+  }
+}
+
+function parametrosResenias(pagina) {
+  const params = {
+    pagina,
+    tamanio: 10,
+    orden: filtrosResenias.orden || 'RECIENTES',
+  }
+  if (filtrosResenias.calificacion) {
+    params.calificacion = Number(filtrosResenias.calificacion)
+  }
+  return params
+}
+
+async function cargarListaResenias(pagina = 0) {
+  cargandoListaResenias.value = true
+  errorListaResenias.value = ''
+  try {
+    const { data } = await cargarReseniasServicio(
+      route.params.id,
+      parametrosResenias(pagina),
+    )
+    reseniasLista.value = data.pagina?.contenido || []
+    paginaResenias.value = data.pagina || null
+    if (data.resumen) resumenResenias.value = data.resumen
+  } catch (e) {
+    errorListaResenias.value = e.response?.data?.message
+      || 'No se pudieron cargar las reseñas.'
+  } finally {
+    cargandoListaResenias.value = false
+  }
+}
+
+function abrirResenias() {
+  modalReseniasAbierto.value = true
+  void cargarListaResenias(0)
+}
+
+function cerrarResenias() {
+  modalReseniasAbierto.value = false
+}
+
+function cambiarFiltrosResenias(filtros) {
+  filtrosResenias.calificacion = filtros.calificacion ?? ''
+  filtrosResenias.orden = filtros.orden || 'RECIENTES'
+  void cargarListaResenias(0)
+}
+
+function cambiarPaginaResenias(pagina) {
+  void cargarListaResenias(pagina)
 }
 
 function manejarTecla(event) {
@@ -392,6 +477,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
             </div>
           </dl>
 
+          <div v-if="resumenResenias" class="mt-4 border-t border-rosa/60 pt-4">
+            <ResumenResenias
+              :resumen="resumenResenias"
+              compacto
+              clickable
+              @ver-todas="abrirResenias"
+            />
+          </div>
+
           <div class="mt-6 space-y-3 border-t border-rosa/60 pt-6">
             <button
               v-if="!esDuenio && !autenticado"
@@ -455,6 +549,31 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
         </aside>
       </div>
 
+      <section class="mt-10 rounded-2xl border border-rosa/50 bg-blanco p-6 sm:p-8">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-xl text-granate">Reseñas</h2>
+          <p class="text-xs text-cafe/50">Lo que dicen los clientes de este servicio</p>
+        </div>
+
+        <div class="mt-4">
+          <ResumenResenias
+            :resumen="resumenResenias"
+            clickable
+            @ver-todas="abrirResenias"
+          />
+        </div>
+
+        <p v-if="cargandoResenias" class="mt-4 text-sm text-cafe/55">Cargando reseñas...</p>
+        <p v-else-if="errorResenias" class="mt-4 text-sm text-rojizo">{{ errorResenias }}</p>
+        <div v-else-if="reseniasDestacadas.length" class="mt-5 space-y-3">
+          <TarjetaReseniaPublica
+            v-for="resenia in reseniasDestacadas"
+            :key="resenia.idResenia"
+            :resenia="resenia"
+          />
+        </div>
+      </section>
+
       <section v-if="hayTerminos" class="mt-10 rounded-2xl border border-rosa/50 bg-blanco p-6 sm:p-8">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h2 class="text-xl text-granate">Términos y condiciones</h2>
@@ -474,6 +593,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
           />
         </div>
       </section>
+
+      <ModalResenias
+        :abierto="modalReseniasAbierto"
+        titulo="Reseñas del servicio"
+        :resenias="reseniasLista"
+        :resumen="resumenResenias"
+        :pagina="paginaResenias"
+        :cargando="cargandoListaResenias"
+        :error="errorListaResenias"
+        :filtros="filtrosResenias"
+        @cerrar="cerrarResenias"
+        @cambiar-filtros="cambiarFiltrosResenias"
+        @cambiar-pagina="cambiarPaginaResenias"
+      />
     </template>
   </div>
 </template>

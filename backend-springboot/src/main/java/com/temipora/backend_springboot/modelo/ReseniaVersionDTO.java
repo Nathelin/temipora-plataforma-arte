@@ -23,6 +23,7 @@ public class ReseniaVersionDTO {
     private boolean actual;
     private List<ReseniaValorDTO> valores;
     private List<ReseniaOpcionDTO> opciones;
+    private List<ReseniaImagenDTO> imagenes;
 
     public static ReseniaVersionDTO desdeVersion(ReseniaVersion version, boolean actual) {
         return ReseniaVersionDTO.builder()
@@ -36,6 +37,9 @@ public class ReseniaVersionDTO {
                 .toList())
             .opciones(version.getOpciones().stream()
                 .map(ReseniaOpcionDTO::desdeOpcion)
+                .toList())
+            .imagenes(version.getImagenes().stream()
+                .map(ReseniaImagenDTO::desdeImagen)
                 .toList())
             .build();
     }

@@ -61,6 +61,16 @@ public class Resenia {
     @Column(name = "motivo_baja", length = 500)
     private String motivoBaja;
 
+    @Column(name = "mostrar_nombre", nullable = false)
+    private boolean mostrarNombre = true;
+
+    @Column(name = "moderada_en")
+    private LocalDateTime moderadaEn;
+
+    @Size(max = 500, message = "El motivo de moderación no puede superar los 500 caracteres")
+    @Column(name = "motivo_moderacion", length = 500)
+    private String motivoModeracion;
+
     @OneToMany(mappedBy = "resenia", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("numero ASC")
     private List<ReseniaVersion> versiones = new ArrayList<>();
