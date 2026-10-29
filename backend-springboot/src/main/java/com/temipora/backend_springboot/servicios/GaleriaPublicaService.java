@@ -16,11 +16,13 @@ import org.springframework.transaction.annotation.Transactional;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
 import com.temipora.backend_springboot.modelo.EntregaArchivo;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
+import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.FiltroGaleriaDTO;
 import com.temipora.backend_springboot.modelo.GaleriaArchivoDTO;
 import com.temipora.backend_springboot.modelo.GaleriaPedidosDTO;
 import com.temipora.backend_springboot.modelo.GaleriaPiezaDTO;
 import com.temipora.backend_springboot.modelo.ItemSolicitud;
+import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Servicio;
@@ -195,6 +197,8 @@ public class GaleriaPublicaService {
             .nombreDibujo(item.getNombre())
             .idServicio(servicio.getIdServicio())
             .nombreServicio(servicio.getNombre())
+            .servicioDisponible(servicio.getEstado() == EstadoServicio.PUBLICADO
+                && servicio.getModoRecepcion() != ModoRecepcionSolicitud.CERRADA)
             .artista(UsuarioResumenDTO.desdeUsuario(pedido.getArtista()))
             .fechaEntrega(primero.getEntrega().getFechaEntrega())
             .contenidoSensible(sensible)

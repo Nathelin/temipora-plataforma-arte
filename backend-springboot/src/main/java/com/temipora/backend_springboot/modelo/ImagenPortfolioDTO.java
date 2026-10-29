@@ -27,6 +27,12 @@ public class ImagenPortfolioDTO {
     @Setter
     private String servicioNombre;
 
+    @Setter
+    private Long idServicio;
+
+    @Setter
+    private boolean servicioDisponible;
+
     @Builder.Default
     @Setter
     private List<EtiquetaDTO> etiquetas = List.of();

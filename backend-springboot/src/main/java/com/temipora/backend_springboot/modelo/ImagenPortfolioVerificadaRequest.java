@@ -33,4 +33,6 @@ public class ImagenPortfolioVerificadaRequest {
 
     @Size(max = 5, message = "Una imagen puede tener como máximo 5 materiales.")
     private List<Long> idsMaterial;
+
+    private boolean agregarComoEjemplo;
 }

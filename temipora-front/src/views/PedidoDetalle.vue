@@ -107,7 +107,7 @@ async function cargarPortfolioVerificado(data = pedido.value) {
 
 function agregarAlPortfolio({ archivo, entrega }) {
   if (!archivo) return
-  abrirVerificada(archivo, entrega?.descripcion || '')
+  abrirVerificada(archivo, entrega?.descripcion || '', pedido.value?.nombreServicio || '')
   router.push({ name: 'portfolio-subir' })
 }
 

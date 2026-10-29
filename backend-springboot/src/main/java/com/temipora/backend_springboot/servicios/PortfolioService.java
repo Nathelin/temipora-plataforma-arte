@@ -20,6 +20,7 @@ import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EntregaArchivo;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
+import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaDTO;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
@@ -32,9 +33,12 @@ import com.temipora.backend_springboot.modelo.ImagenPortfolioRequest;
 import com.temipora.backend_springboot.modelo.ImagenPortfolioVerificadaRequest;
 import com.temipora.backend_springboot.modelo.Material;
 import com.temipora.backend_springboot.modelo.MaterialDTO;
+import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Portfolio;
 import com.temipora.backend_springboot.modelo.PortfolioEntregaVerificada;
+import com.temipora.backend_springboot.modelo.Servicio;
+import com.temipora.backend_springboot.modelo.ServicioImagen;
 import com.temipora.backend_springboot.modelo.TipoArte;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.VerificacionPortfolioDTO;
@@ -46,6 +50,7 @@ import com.temipora.backend_springboot.repositorios.ImagenRepository;
 import com.temipora.backend_springboot.repositorios.MaterialRepository;
 import com.temipora.backend_springboot.repositorios.PortfolioEntregaVerificadaRepository;
 import com.temipora.backend_springboot.repositorios.PortfolioRepository;
+import com.temipora.backend_springboot.repositorios.ServicioImagenRepository;
 import com.temipora.backend_springboot.repositorios.TipoArteRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -65,6 +70,7 @@ public class PortfolioService {
     private final ImagenMaterialRepository imagenMaterialRepository;
     private final PortfolioEntregaVerificadaRepository verificacionRepository;
     private final EntregaArchivoRepository archivoRepository;
+    private final ServicioImagenRepository servicioImagenRepository;
     private final ImagenGaleriaService imagenGaleriaService;
 
     public PortfolioService(
@@ -78,6 +84,7 @@ public class PortfolioService {
             ImagenMaterialRepository imagenMaterialRepository,
             PortfolioEntregaVerificadaRepository verificacionRepository,
             EntregaArchivoRepository archivoRepository,
+            ServicioImagenRepository servicioImagenRepository,
             ImagenGaleriaService imagenGaleriaService) {
         this.usuarioRepository = usuarioRepository;
         this.portfolioRepository = portfolioRepository;
@@ -89,6 +96,7 @@ public class PortfolioService {
         this.imagenMaterialRepository = imagenMaterialRepository;
         this.verificacionRepository = verificacionRepository;
         this.archivoRepository = archivoRepository;
+        this.servicioImagenRepository = servicioImagenRepository;
         this.imagenGaleriaService = imagenGaleriaService;
     }
 
@@ -295,6 +303,10 @@ public class PortfolioService {
         verificacion.setVigente(true);
         verificacionRepository.save(verificacion);
 
+        if (request.isAgregarComoEjemplo()) {
+            agregarEjemploDeServicio(pedido.getServicio(), guardada.getUrl());
+        }
+
         for (Etiqueta etiqueta : etiquetas) {
             imagenEtiquetaRepository.save(ImagenEtiqueta.builder()
                 .imagen(guardada)
@@ -360,6 +372,26 @@ public class PortfolioService {
     private String urlPortfolioVerificado(Long idArchivo) {
         return "/api/portfolio/verificadas/archivos/"
             + idArchivo + "/preview";
+    }
+
+    private void agregarEjemploDeServicio(Servicio servicio, String url) {
+        if (servicio == null || url == null
+                || servicio.getIdServicio() == null
+                || servicioImagenRepository.existsByServicioIdServicioAndUrl(
+                    servicio.getIdServicio(), url)) {
+            return;
+        }
+        int orden = servicio.getImagenes().stream()
+            .map(ServicioImagen::getOrden)
+            .filter(Objects::nonNull)
+            .max(Integer::compareTo)
+            .map(ultimo -> ultimo + 1)
+            .orElse(0);
+        ServicioImagen ejemplo = new ServicioImagen();
+        ejemplo.setServicio(servicio);
+        ejemplo.setUrl(url);
+        ejemplo.setOrden(orden);
+        servicioImagenRepository.save(ejemplo);
     }
 
     @Transactional
@@ -472,6 +504,7 @@ public class PortfolioService {
             .ifPresent(verificacion -> {
                 verificacion.setVigente(false);
                 verificacionRepository.save(verificacion);
+                servicioImagenRepository.deleteByUrl(imagen.getUrl());
             });
         imagenEtiquetaRepository.deleteByImagenIdImagen(idImagen);
         imagenMaterialRepository.deleteByImagenIdImagen(idImagen);
@@ -659,10 +692,13 @@ public class PortfolioService {
         if (dto == null || verificacion == null) {
             return;
         }
+        Servicio servicio = verificacion.getArchivoEntrega()
+            .getEntrega().getHitoPedido().getPedido().getServicio();
         dto.setVerificada(true);
-        dto.setServicioNombre(verificacion.getArchivoEntrega()
-            .getEntrega().getHitoPedido().getPedido()
-            .getServicio().getNombre());
+        dto.setServicioNombre(servicio.getNombre());
+        dto.setIdServicio(servicio.getIdServicio());
+        dto.setServicioDisponible(servicio.getEstado() == EstadoServicio.PUBLICADO
+            && servicio.getModoRecepcion() != ModoRecepcionSolicitud.CERRADA);
     }
 
     private Map<Long, List<EtiquetaDTO>> etiquetasPorImagen(Collection<Long> idsImagen) {

@@ -63,6 +63,7 @@ const subidaActual = ref(0)
 const progresoSubida = ref(0)
 const imagenEditando = ref(null)
 const itemEnGuardado = ref(null)
+const agregarComoEjemplo = ref(false)
 
 let siguienteId = 1
 
@@ -481,13 +482,16 @@ async function guardarVerificada() {
         contenidoSensible: item.datos.contenidoSensible || null,
         idsEtiqueta: item.datos.etiquetas.map(e => e.idEtiqueta),
         idsMaterial: item.datos.materiales.map(m => m.idMaterial),
+        agregarComoEjemplo: agregarComoEjemplo.value,
       },
     )
     window.dispatchEvent(new CustomEvent('portfolio-actualizado', {
       detail: { accion: 'crear', imagen: res.data },
     }))
     cerrar()
-    avisoExito('La entrega final se agregó a tu portfolio como pieza verificada.')
+    avisoExito(agregarComoEjemplo.value
+      ? 'La entrega final se agregó a tu portfolio y a los ejemplos del servicio.'
+      : 'La entrega final se agregó a tu portfolio como pieza verificada.')
     irAlPortfolio()
   } catch (e) {
     error.value = mensajeDeError(e)
@@ -578,6 +582,7 @@ onMounted(() => {
   error.value = ''
   errorSeleccion.value = ''
   guardando.value = false
+  agregarComoEjemplo.value = false
   lote.value = []
   indiceActual.value = 0
   vista.value = 'seleccion'
@@ -962,6 +967,26 @@ function urlsSinPublicar() {
               <SelectorMateriales v-model="actual.datos.materiales" :id-medio="idMedioActual" class="pt-3" />
 
               <SelectorEtiquetas v-model="actual.datos.etiquetas" class="pt-3" />
+
+              <label
+                v-if="esVerificada"
+                class="mt-3 flex items-start gap-3 rounded-xl border-2 border-coral/50 bg-coral/10 p-4 text-sm text-cafe transition"
+                :class="agregarComoEjemplo ? 'border-coral bg-coral/20 ring-1 ring-coral/40' : 'hover:border-coral/70 hover:bg-coral/15'"
+              >
+                <input
+                  v-model="agregarComoEjemplo"
+                  type="checkbox"
+                  class="mt-0.5 h-5 w-5 accent-coral"
+                />
+                <span>
+                  <span class="block font-semibold text-granate">
+                    Agregar también a los ejemplos{{ estado.servicioNombre ? ` de «${estado.servicioNombre}»` : ' del servicio' }}
+                  </span>
+                  <span class="mt-0.5 block text-xs text-cafe/60">
+                    La pieza se mostrará junto a las imágenes de ejemplo del servicio original.
+                  </span>
+                </span>
+              </label>
 
               <p v-if="error" class="text-rojizo text-sm">{{ error }}</p>
             </template>

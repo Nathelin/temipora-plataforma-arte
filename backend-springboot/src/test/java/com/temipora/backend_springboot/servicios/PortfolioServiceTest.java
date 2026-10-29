@@ -37,6 +37,7 @@ import com.temipora.backend_springboot.modelo.EntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaDTO;
+import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 import com.temipora.backend_springboot.modelo.FiltroPortfolioRequest;
 import com.temipora.backend_springboot.modelo.HitoPedido;
@@ -49,11 +50,13 @@ import com.temipora.backend_springboot.modelo.ImagenPortfolioVerificadaRequest;
 import com.temipora.backend_springboot.modelo.Material;
 import com.temipora.backend_springboot.modelo.MaterialDTO;
 import com.temipora.backend_springboot.modelo.Medio;
+import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Portfolio;
 import com.temipora.backend_springboot.modelo.PortfolioEntregaVerificada;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Servicio;
+import com.temipora.backend_springboot.modelo.ServicioImagen;
 import com.temipora.backend_springboot.modelo.TipoArte;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
@@ -64,6 +67,7 @@ import com.temipora.backend_springboot.repositorios.ImagenRepository;
 import com.temipora.backend_springboot.repositorios.MaterialRepository;
 import com.temipora.backend_springboot.repositorios.PortfolioEntregaVerificadaRepository;
 import com.temipora.backend_springboot.repositorios.PortfolioRepository;
+import com.temipora.backend_springboot.repositorios.ServicioImagenRepository;
 import com.temipora.backend_springboot.repositorios.TipoArteRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -99,6 +103,9 @@ class PortfolioServiceTest {
 
     @Mock
     private EntregaArchivoRepository archivoRepository;
+
+    @Mock
+    private ServicioImagenRepository servicioImagenRepository;
 
     @Mock
     private ImagenGaleriaService imagenGaleriaService;
@@ -1242,6 +1249,76 @@ class PortfolioServiceTest {
     }
 
     @Test
+    void crearDesdeEntrega_conAgregarComoEjemplo_agregaLaImagenAlServicio() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        EntregaArchivo archivo = entregaFinal(artista, EstadoPedido.FINALIZADO);
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(archivoRepository.buscarParaGaleria(23L)).thenReturn(Optional.of(archivo));
+        when(verificacionRepository
+                .existsByArchivoEntregaIdArchivoAndVigenteTrue(23L))
+                .thenReturn(false);
+        when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(portfolio));
+        stubTipoArte();
+        when(imagenRepository
+                .existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                        eq(portfolio), eq("Mi obra"), eq(tipoArte)))
+                .thenReturn(false);
+        when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> {
+            Imagen imagen = invocation.getArgument(0);
+            imagen.setIdImagen(99L);
+            return imagen;
+        });
+        when(imagenEtiquetaRepository.findByImagenIdImagen(99L)).thenReturn(List.of());
+        when(imagenMaterialRepository.findByImagenIdImagen(99L)).thenReturn(List.of());
+        when(servicioImagenRepository.existsByServicioIdServicioAndUrl(
+                4L, "/api/portfolio/verificadas/archivos/23/preview"))
+                .thenReturn(false);
+        ImagenPortfolioVerificadaRequest request = requestVerificado(23L);
+        request.setAgregarComoEjemplo(true);
+
+        portfolioService.crearDesdeEntrega(7L, request);
+
+        ArgumentCaptor<ServicioImagen> ejemploCaptor =
+                ArgumentCaptor.forClass(ServicioImagen.class);
+        verify(servicioImagenRepository).save(ejemploCaptor.capture());
+        assertThat(ejemploCaptor.getValue().getServicio())
+                .isSameAs(archivo.getEntrega().getHitoPedido().getPedido().getServicio());
+        assertThat(ejemploCaptor.getValue().getUrl())
+                .isEqualTo("/api/portfolio/verificadas/archivos/23/preview");
+        assertThat(ejemploCaptor.getValue().getOrden()).isZero();
+    }
+
+    @Test
+    void crearDesdeEntrega_sinAgregarComoEjemplo_noModificaElServicio() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        EntregaArchivo archivo = entregaFinal(artista, EstadoPedido.FINALIZADO);
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(archivoRepository.buscarParaGaleria(23L)).thenReturn(Optional.of(archivo));
+        when(verificacionRepository
+                .existsByArchivoEntregaIdArchivoAndVigenteTrue(23L))
+                .thenReturn(false);
+        when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(portfolio));
+        stubTipoArte();
+        when(imagenRepository
+                .existsByPortfolioAndTituloIgnoreCaseAndTipoArteAndEstadoTrue(
+                        eq(portfolio), eq("Mi obra"), eq(tipoArte)))
+                .thenReturn(false);
+        when(imagenRepository.save(any(Imagen.class))).thenAnswer(invocation -> {
+            Imagen imagen = invocation.getArgument(0);
+            imagen.setIdImagen(99L);
+            return imagen;
+        });
+        when(imagenEtiquetaRepository.findByImagenIdImagen(99L)).thenReturn(List.of());
+        when(imagenMaterialRepository.findByImagenIdImagen(99L)).thenReturn(List.of());
+
+        portfolioService.crearDesdeEntrega(7L, requestVerificado(23L));
+
+        verify(servicioImagenRepository, never()).save(any(ServicioImagen.class));
+    }
+
+    @Test
     void crearDesdeEntrega_duplicada_lanzaIllegalArgument() {
         Usuario artista = usuarioArtista(7L, "Artista777");
         EntregaArchivo archivo = entregaFinal(artista, EstadoPedido.FINALIZADO);
@@ -1312,6 +1389,88 @@ class PortfolioServiceTest {
 
         assertThat(resultado.get(0).isVerificada()).isTrue();
         assertThat(resultado.get(0).getServicioNombre()).isEqualTo("Ilustración");
+        assertThat(resultado.get(0).getIdServicio()).isEqualTo(4L);
+        assertThat(resultado.get(0).isServicioDisponible()).isTrue();
+    }
+
+    @Test
+    void listar_servicioCerrado_noMarcaServicioDisponible() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        Imagen imagen = imagenDe(portfolio, artista, "Obra 1", null);
+        EntregaArchivo archivo = entregaFinal(artista, EstadoPedido.FINALIZADO);
+        archivo.getEntrega().getHitoPedido().getPedido().getServicio()
+                .setModoRecepcion(ModoRecepcionSolicitud.CERRADA);
+        PortfolioEntregaVerificada verificacion = new PortfolioEntregaVerificada();
+        verificacion.setImagen(imagen);
+        verificacion.setArchivoEntrega(archivo);
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("Artista777"))
+                .thenReturn(Optional.of(artista));
+        when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(portfolio));
+        when(imagenRepository.findByPortfolioAndEstadoTrueOrderByFechaSubidaDesc(portfolio))
+                .thenReturn(List.of(imagen));
+        when(imagenEtiquetaRepository.findByImagenIdImagenIn(List.of(5L)))
+                .thenReturn(List.of());
+        when(imagenMaterialRepository.findByImagenIdImagenIn(List.of(5L)))
+                .thenReturn(List.of());
+        when(verificacionRepository.listarActivasPorImagenes(List.of(5L)))
+                .thenReturn(List.of(verificacion));
+
+        List<ImagenPortfolioDTO> resultado = portfolioService.listar("Artista777");
+
+        assertThat(resultado.get(0).getIdServicio()).isEqualTo(4L);
+        assertThat(resultado.get(0).isServicioDisponible()).isFalse();
+    }
+
+    @Test
+    void listar_servicioArchivado_noMarcaServicioDisponible() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        Imagen imagen = imagenDe(portfolio, artista, "Obra 1", null);
+        EntregaArchivo archivo = entregaFinal(artista, EstadoPedido.FINALIZADO);
+        archivo.getEntrega().getHitoPedido().getPedido().getServicio()
+                .setEstado(EstadoServicio.ARCHIVADO);
+        PortfolioEntregaVerificada verificacion = new PortfolioEntregaVerificada();
+        verificacion.setImagen(imagen);
+        verificacion.setArchivoEntrega(archivo);
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("Artista777"))
+                .thenReturn(Optional.of(artista));
+        when(portfolioRepository.findByArtista(artista)).thenReturn(Optional.of(portfolio));
+        when(imagenRepository.findByPortfolioAndEstadoTrueOrderByFechaSubidaDesc(portfolio))
+                .thenReturn(List.of(imagen));
+        when(imagenEtiquetaRepository.findByImagenIdImagenIn(List.of(5L)))
+                .thenReturn(List.of());
+        when(imagenMaterialRepository.findByImagenIdImagenIn(List.of(5L)))
+                .thenReturn(List.of());
+        when(verificacionRepository.listarActivasPorImagenes(List.of(5L)))
+                .thenReturn(List.of(verificacion));
+
+        List<ImagenPortfolioDTO> resultado = portfolioService.listar("Artista777");
+
+        assertThat(resultado.get(0).isServicioDisponible()).isFalse();
+    }
+
+    @Test
+    void darDeBaja_piezaVerificada_eliminaElEjemploDelServicio() {
+        Usuario artista = usuarioArtista(7L, "Artista777");
+        Portfolio portfolio = portfolioDe(artista);
+        Imagen imagen = imagenDe(portfolio, artista, "Obra 1", null);
+        PortfolioEntregaVerificada verificacion = new PortfolioEntregaVerificada();
+        verificacion.setImagen(imagen);
+        verificacion.setArchivoEntrega(entregaFinal(artista, EstadoPedido.FINALIZADO));
+        when(usuarioRepository.findByIdUsuario(7L)).thenReturn(Optional.of(artista));
+        when(imagenRepository.findById(5L)).thenReturn(Optional.of(imagen));
+        when(imagenRepository.save(any(Imagen.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(verificacionRepository.findByImagenIdImagenAndVigenteTrue(5L))
+                .thenReturn(Optional.of(verificacion));
+        when(imagenEtiquetaRepository.findByImagenIdImagen(5L)).thenReturn(List.of());
+        when(imagenMaterialRepository.findByImagenIdImagen(5L)).thenReturn(List.of());
+
+        portfolioService.darDeBaja(7L, 5L);
+
+        verify(servicioImagenRepository).deleteByUrl("https://x/img.png");
+        assertThat(verificacion.isVigente()).isFalse();
     }
 
     // ---------------------------------------------------------------

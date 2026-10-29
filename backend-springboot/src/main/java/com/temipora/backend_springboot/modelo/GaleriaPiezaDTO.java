@@ -22,6 +22,7 @@ public class GaleriaPiezaDTO {
     private String nombreDibujo;
     private Long idServicio;
     private String nombreServicio;
+    private boolean servicioDisponible;
     private UsuarioResumenDTO artista;
     private LocalDateTime fechaEntrega;
     private boolean contenidoSensible;

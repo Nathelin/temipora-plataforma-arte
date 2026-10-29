@@ -380,6 +380,18 @@ watch(() => route.params.nombreUsuario, cargarPerfil, { immediate: true })
 const esArtista = computed(() => perfil.value.rol === 'ARTISTA')
 const tabActiva = ref('portfolio')
 
+watch(() => route.query.tab, (tab) => {
+  tabActiva.value = tab === 'servicios' ? 'servicios' : 'portfolio'
+}, { immediate: true })
+
+function rutaServiciosDe(pieza) {
+  return {
+    name: 'perfil',
+    params: { nombreUsuario: pieza?.artista?.nombreUsuario },
+    query: { tab: 'servicios' },
+  }
+}
+
 const nombreParaMostrar = computed(() => perfil.value.nombreDisplay || perfil.value.nombreUsuario)
 
 const esDuenio = computed(() => {
@@ -572,6 +584,12 @@ async function eliminarImagenPortfolio() {
   } catch (e) {
     errorDetalle.value = e.response?.data?.message || 'No se pudo eliminar la imagen.'
   }
+}
+
+function irAServiciosDelArtista() {
+  cerrarDetalleImagen()
+  tabActiva.value = 'servicios'
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function irAConfiguracion(seccion = 'perfil') {
@@ -1096,17 +1114,8 @@ function irASubirImagen(imagen = null) {
                       @{{ pieza.artista?.nombreUsuario }}
                     </router-link>
                   </div>
-                  <p class="mt-2 text-xs text-cafe/50">
-                    Entregado el {{ formatearFecha(pieza.fechaEntrega) }}
-                  </p>
 
                   <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-borde/50 pt-3">
-                    <router-link
-                      :to="{ name: 'perfil', params: { nombreUsuario: pieza.artista?.nombreUsuario } }"
-                      class="text-xs font-semibold text-coral transition hover:text-rojizo"
-                    >
-                      Ver perfil del artista →
-                    </router-link>
                     <div v-if="galeria.esDuenio" class="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
@@ -1232,6 +1241,21 @@ function irASubirImagen(imagen = null) {
             <div class="flex-1">
               <h2 class="pr-8 text-2xl text-granate">{{ tituloGaleria(piezaGaleriaActual) }}</h2>
               <p class="mt-1 text-sm text-cafe/60">{{ piezaGaleriaActual.nombreServicio }}</p>
+
+              <router-link
+                v-if="piezaGaleriaActual.servicioDisponible && piezaGaleriaActual.idServicio"
+                :to="{ name: 'servicio-detalle', params: { id: piezaGaleriaActual.idServicio } }"
+                class="mt-2 inline-flex text-sm font-semibold text-coral transition hover:text-rojizo"
+              >
+                Ver servicio original →
+              </router-link>
+              <router-link
+                v-else-if="piezaGaleriaActual.artista?.nombreUsuario"
+                :to="rutaServiciosDe(piezaGaleriaActual)"
+                class="mt-2 inline-flex text-sm font-semibold text-coral transition hover:text-rojizo"
+              >
+                Explorar los servicios del artista →
+              </router-link>
 
               <router-link
                 :to="{ name: 'perfil', params: { nombreUsuario: piezaGaleriaActual.artista?.nombreUsuario } }"
@@ -1431,6 +1455,29 @@ function irASubirImagen(imagen = null) {
                 <span v-if="imagenSeleccionada.servicioNombre" class="font-normal text-cafe/60">
                   · {{ imagenSeleccionada.servicioNombre }}
                 </span>
+              </div>
+
+              <router-link
+                v-if="imagenSeleccionada.servicioDisponible && imagenSeleccionada.idServicio"
+                :to="{ name: 'servicio-detalle', params: { id: imagenSeleccionada.idServicio } }"
+                class="mt-3 flex w-fit text-sm font-semibold text-coral transition hover:text-rojizo"
+              >
+                Ver servicio original →
+              </router-link>
+              <div
+                v-else-if="imagenSeleccionada.verificada"
+                class="mt-3 rounded-xl border border-rosa/60 bg-rosa/10 p-3"
+              >
+                <p class="text-xs leading-relaxed text-cafe/60">
+                  El servicio original ya no está disponible para solicitar.
+                </p>
+                <button
+                  type="button"
+                  class="mt-2 inline-flex min-h-9 items-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+                  @click="irAServiciosDelArtista"
+                >
+                  Explorar los servicios del artista →
+                </button>
               </div>
 
               <p v-if="imagenSeleccionada.descripcion" class="mt-4 text-sm text-cafe leading-relaxed whitespace-pre-wrap">{{ imagenSeleccionada.descripcion }}</p>

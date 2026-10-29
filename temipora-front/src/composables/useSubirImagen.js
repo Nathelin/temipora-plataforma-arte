@@ -6,6 +6,7 @@ const estado = reactive({
   imagen: null,
   archivoEntrega: null,
   descripcionEntrega: '',
+  servicioNombre: '',
 })
 
 const subidaEnCurso = ref(false)
@@ -21,14 +22,16 @@ export function useSubirImagen() {
     estado.imagen = modo === 'editar' ? imagen : null
     estado.archivoEntrega = null
     estado.descripcionEntrega = ''
+    estado.servicioNombre = ''
     estado.abierto = true
   }
 
-  function abrirVerificada(archivoEntrega, descripcionEntrega = '') {
+  function abrirVerificada(archivoEntrega, descripcionEntrega = '', servicioNombre = '') {
     estado.modo = 'verificar'
     estado.imagen = null
     estado.archivoEntrega = archivoEntrega
     estado.descripcionEntrega = descripcionEntrega
+    estado.servicioNombre = servicioNombre
     estado.abierto = true
   }
 
@@ -37,6 +40,7 @@ export function useSubirImagen() {
     estado.imagen = null
     estado.archivoEntrega = null
     estado.descripcionEntrega = ''
+    estado.servicioNombre = ''
     estado.modo = 'crear'
     subidaEnCurso.value = false
     publicacionesPendientes.value = 0
