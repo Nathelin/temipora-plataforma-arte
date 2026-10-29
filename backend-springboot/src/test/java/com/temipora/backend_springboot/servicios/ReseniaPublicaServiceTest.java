@@ -1,7 +1,6 @@
 package com.temipora.backend_springboot.servicios;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -10,7 +9,6 @@ import static org.mockito.Mockito.when;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,24 +21,19 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import com.temipora.backend_springboot.modelo.ConfiguracionResenia;
-import com.temipora.backend_springboot.modelo.EntregaArchivo;
-import com.temipora.backend_springboot.modelo.EntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.EstadoResenia;
 import com.temipora.backend_springboot.modelo.EtiquetaReputacion;
-import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.PaginaReseniasDTO;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.PromedioReseniasDTO;
 import com.temipora.backend_springboot.modelo.ReputacionClienteDTO;
 import com.temipora.backend_springboot.modelo.Resenia;
-import com.temipora.backend_springboot.modelo.ReseniaImagen;
 import com.temipora.backend_springboot.modelo.ReseniaPublicaResumenDTO;
 import com.temipora.backend_springboot.modelo.ReseniaVersion;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.ReseniaOpcionRepository;
-import com.temipora.backend_springboot.repositorios.ReseniaImagenRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaValorRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaVersionRepository;
@@ -56,8 +49,6 @@ class ReseniaPublicaServiceTest {
     private ReseniaValorRepository valorRepository;
     @Mock
     private ReseniaOpcionRepository opcionRepository;
-    @Mock
-    private ReseniaImagenRepository imagenRepository;
     @Mock
     private ConfiguracionReseniaService configuracionService;
 
@@ -128,8 +119,6 @@ class ReseniaPublicaServiceTest {
             .thenReturn(List.of());
         when(opcionRepository.findByVersionIdVersionIn(List.of(100L)))
             .thenReturn(List.of());
-        when(imagenRepository.findByVersionIdVersionIn(List.of(100L)))
-            .thenReturn(List.of());
 
         PaginaReseniasDTO pagina =
             reseniaPublicaService.listarServicio(1L, null, "RECIENTES", 0, 10);
@@ -175,43 +164,6 @@ class ReseniaPublicaServiceTest {
         assertThat(mapa.get(1L).getCantidad()).isEqualTo(2);
         assertThat(mapa.get(1L).getPromedio()).isEqualByComparingTo("4.50");
         assertThat(mapa.get(2L).getPromedio()).isEqualByComparingTo("3.00");
-    }
-
-    @Test
-    void autorizarImagen_publicaYFinal_devuelveElArchivo() {
-        EntregaArchivo archivo = archivo(50L, true, "image/webp");
-        ReseniaImagen imagen = new ReseniaImagen();
-        imagen.setArchivo(archivo);
-        when(imagenRepository.buscarPublicasPorArchivo(
-            50L, EstadoResenia.PUBLICADA, EstadoPedido.FINALIZADO))
-            .thenReturn(List.of(imagen));
-
-        EntregaArchivo resultado = reseniaPublicaService.autorizarImagen(50L);
-
-        assertThat(resultado).isSameAs(archivo);
-    }
-
-    @Test
-    void autorizarImagen_sinReseniaPublica_lanzaNoSuchElement() {
-        when(imagenRepository.buscarPublicasPorArchivo(
-            50L, EstadoResenia.PUBLICADA, EstadoPedido.FINALIZADO))
-            .thenReturn(List.of());
-
-        assertThatThrownBy(() -> reseniaPublicaService.autorizarImagen(50L))
-            .isInstanceOf(NoSuchElementException.class);
-    }
-
-    @Test
-    void autorizarImagen_entregaNoFinal_lanzaNoSuchElement() {
-        EntregaArchivo archivo = archivo(50L, false, "image/webp");
-        ReseniaImagen imagen = new ReseniaImagen();
-        imagen.setArchivo(archivo);
-        when(imagenRepository.buscarPublicasPorArchivo(
-            50L, EstadoResenia.PUBLICADA, EstadoPedido.FINALIZADO))
-            .thenReturn(List.of(imagen));
-
-        assertThatThrownBy(() -> reseniaPublicaService.autorizarImagen(50L))
-            .isInstanceOf(NoSuchElementException.class);
     }
 
     // -----------------------------------------------------------------
@@ -267,25 +219,6 @@ class ReseniaPublicaServiceTest {
         usuario.setNombreUsuario(nombreUsuario);
         usuario.setNombreDisplay("Cliente");
         return usuario;
-    }
-
-    private EntregaArchivo archivo(
-            Long id, boolean finalVigente, String mime) {
-        Pedido pedido = new Pedido();
-        pedido.setIdPedido(10L);
-        HitoPedido hito = new HitoPedido();
-        hito.setPedido(pedido);
-        EntregaHito entrega = new EntregaHito();
-        entrega.setHitoPedido(hito);
-        entrega.setEsFinal(finalVigente);
-        entrega.setVigente(finalVigente);
-        EntregaArchivo archivo = new EntregaArchivo();
-        archivo.setIdArchivo(id);
-        archivo.setEntrega(entrega);
-        archivo.setMime(mime);
-        archivo.setAncho(800);
-        archivo.setAlto(600);
-        return archivo;
     }
 
     private ConfiguracionResenia configuracion() {

@@ -40,7 +40,6 @@ import com.temipora.backend_springboot.modelo.ReseniaVersion;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.ReporteReseniaRepository;
-import com.temipora.backend_springboot.repositorios.ReseniaImagenRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaOpcionRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaValorRepository;
@@ -67,9 +66,6 @@ class ReseniaModeracionServiceTest {
 
     @Mock
     private ReseniaOpcionRepository opcionRepository;
-
-    @Mock
-    private ReseniaImagenRepository imagenRepository;
 
     @Mock
     private NotificacionService notificacionService;
@@ -452,8 +448,6 @@ class ReseniaModeracionServiceTest {
         when(valorRepository.findByVersionIdVersionIn(List.of(50L)))
             .thenReturn(List.of());
         when(opcionRepository.findByVersionIdVersionIn(List.of(50L)))
-            .thenReturn(List.of());
-        when(imagenRepository.findByVersionIdVersionIn(List.of(50L)))
             .thenReturn(List.of());
         when(reporteRepository.findByReseniaIdReseniaInOrderByFechaCreacionAsc(
                 List.of(resenia.getIdResenia())))

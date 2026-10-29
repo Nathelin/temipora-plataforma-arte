@@ -28,9 +28,6 @@ import com.temipora.backend_springboot.modelo.EscalaCriterio;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.EstadoResenia;
 import com.temipora.backend_springboot.modelo.EtiquetaReputacion;
-import com.temipora.backend_springboot.modelo.EntregaArchivo;
-import com.temipora.backend_springboot.modelo.EntregaHito;
-import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.ReputacionClienteDTO;
 import com.temipora.backend_springboot.modelo.Resenia;
@@ -42,7 +39,6 @@ import com.temipora.backend_springboot.modelo.ReseniaVersion;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.CriterioReseniaRepository;
-import com.temipora.backend_springboot.repositorios.EntregaArchivoRepository;
 import com.temipora.backend_springboot.repositorios.OpcionCriterioRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaRepository;
@@ -75,9 +71,6 @@ class ReseniaServiceTest {
 
     @Mock
     private NotificacionService notificacionService;
-
-    @Mock
-    private EntregaArchivoRepository archivoRepository;
 
     @InjectMocks
     private ReseniaService reseniaService;
@@ -235,103 +228,6 @@ class ReseniaServiceTest {
                 request(5, List.of(valor(99L, 5)), List.of())))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("no pertenece");
-    }
-
-    // -----------------------------------------------------------------
-    // imágenes de la reseña
-    // -----------------------------------------------------------------
-
-    @Test
-    void crear_conImagenesDeLaEntregaFinal_lasAdjunta() {
-        Pedido pedido = pedido(EstadoPedido.FINALIZADO, LocalDateTime.now().minusDays(1));
-        pedido.setPublicacionAutorizada(true);
-        stubCrearBase(pedido, config(30, 3, 3));
-        when(usuarioRepository.findByIdUsuario(10L))
-            .thenReturn(Optional.of(pedido.getCliente()));
-        when(reseniaRepository.save(any(Resenia.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
-
-        EntregaArchivo archivo = archivo(50L, pedido, true, "image/webp");
-        when(archivoRepository.buscarParaGaleria(50L))
-            .thenReturn(Optional.of(archivo));
-
-        ReseniaRequest request = request(5, List.of(valor(1L, 5)), List.of());
-        request.setImagenes(List.of(50L));
-
-        ReseniaDTO dto = reseniaService.crear(100L, 10L, request);
-
-        assertThat(dto.getImagenes()).hasSize(1);
-        assertThat(dto.getImagenes().get(0).getIdArchivo()).isEqualTo(50L);
-    }
-
-    @Test
-    void crear_conImagenesSinAutorizacion_lanzaError() {
-        Pedido pedido = pedido(EstadoPedido.FINALIZADO, LocalDateTime.now().minusDays(1));
-        pedido.setPublicacionAutorizada(false);
-        stubCrearBase(pedido, config(30, 3, 3));
-
-        ReseniaRequest request = request(5, List.of(valor(1L, 5)), List.of());
-        request.setImagenes(List.of(50L));
-
-        assertThatThrownBy(() -> reseniaService.crear(100L, 10L, request))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("no está autorizado");
-    }
-
-    @Test
-    void crear_conImagenesDeOtroPedido_lanzaError() {
-        Pedido pedido = pedido(EstadoPedido.FINALIZADO, LocalDateTime.now().minusDays(1));
-        pedido.setPublicacionAutorizada(true);
-        stubCrearBase(pedido, config(30, 3, 3));
-
-        Pedido otro = pedido(EstadoPedido.FINALIZADO, LocalDateTime.now().minusDays(1));
-        otro.setIdPedido(999L);
-        when(archivoRepository.buscarParaGaleria(50L))
-            .thenReturn(Optional.of(archivo(50L, otro, true, "image/webp")));
-
-        ReseniaRequest request = request(5, List.of(valor(1L, 5)), List.of());
-        request.setImagenes(List.of(50L));
-
-        assertThatThrownBy(() -> reseniaService.crear(100L, 10L, request))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("no pertenece");
-    }
-
-    @Test
-    void crear_conMasImagenesQueElMaximo_lanzaError() {
-        Pedido pedido = pedido(EstadoPedido.FINALIZADO, LocalDateTime.now().minusDays(1));
-        pedido.setPublicacionAutorizada(true);
-        ConfiguracionResenia config = config(30, 3, 3);
-        config.setMaxImagenesResenia(2);
-        stubCrearBase(pedido, config);
-
-        ReseniaRequest request = request(5, List.of(valor(1L, 5)), List.of());
-        request.setImagenes(List.of(1L, 2L, 3L));
-
-        assertThatThrownBy(() -> reseniaService.crear(100L, 10L, request))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("hasta 2");
-    }
-
-    @Test
-    void crear_comoArtistaConImagenes_lanzaError() {
-        Pedido pedido = pedido(EstadoPedido.FINALIZADO, LocalDateTime.now().minusDays(1));
-        pedido.setPublicacionAutorizada(true);
-        when(pedidoRepository.findById(100L)).thenReturn(Optional.of(pedido));
-        when(configuracionService.obtener()).thenReturn(config(30, 3, 3));
-        when(reseniaRepository.existsByPedidoIdPedidoAndAutorIdUsuario(100L, 20L))
-            .thenReturn(false);
-        when(criterioRepository
-            .findByActivoTrueAndAmbitoOrderByOrdenAscNombreAsc(AmbitoResenia.CLIENTE))
-            .thenReturn(List.of(criterio(2L, AmbitoResenia.CLIENTE,
-                EscalaCriterio.ESTRELLAS, true)));
-
-        ReseniaRequest request = request(5, List.of(valor(2L, 5)), List.of());
-        request.setImagenes(List.of(50L));
-
-        assertThatThrownBy(() -> reseniaService.crear(100L, 20L, request))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Solo el cliente");
     }
 
     // -----------------------------------------------------------------
@@ -582,23 +478,6 @@ class ReseniaServiceTest {
                 EscalaCriterio.ESTRELLAS, true)));
     }
 
-    private EntregaArchivo archivo(
-            Long id, Pedido pedido, boolean finalVigente, String mime) {
-        HitoPedido hito = new HitoPedido();
-        hito.setPedido(pedido);
-        EntregaHito entrega = new EntregaHito();
-        entrega.setHitoPedido(hito);
-        entrega.setEsFinal(finalVigente);
-        entrega.setVigente(finalVigente);
-        EntregaArchivo archivo = new EntregaArchivo();
-        archivo.setIdArchivo(id);
-        archivo.setEntrega(entrega);
-        archivo.setMime(mime);
-        archivo.setAncho(800);
-        archivo.setAlto(600);
-        return archivo;
-    }
-
     private Pedido pedido(EstadoPedido estado, LocalDateTime finalizadoEn) {
         Pedido pedido = new Pedido();
         pedido.setIdPedido(100L);
@@ -660,7 +539,6 @@ class ReseniaServiceTest {
         config.setDiasVentanaCreacion(ventana);
         config.setDiasEdicion(edicion);
         config.setMinimoReseniasEtiqueta(minimo);
-        config.setMaxImagenesResenia(4);
         config.setUmbralExcelente(new BigDecimal("4.50"));
         config.setUmbralBuena(new BigDecimal("3.50"));
         return config;

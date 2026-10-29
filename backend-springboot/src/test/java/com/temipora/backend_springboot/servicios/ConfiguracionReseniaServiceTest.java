@@ -40,7 +40,6 @@ class ConfiguracionReseniaServiceTest {
         assertThat(config.getDiasVentanaCreacion()).isEqualTo(30);
         assertThat(config.getDiasEdicion()).isEqualTo(3);
         assertThat(config.getMinimoReseniasEtiqueta()).isEqualTo(3);
-        assertThat(config.getMaxImagenesResenia()).isEqualTo(4);
         assertThat(config.getUmbralExcelente()).isEqualByComparingTo("4.50");
         assertThat(config.getUmbralBuena()).isEqualByComparingTo("3.50");
     }
@@ -59,7 +58,6 @@ class ConfiguracionReseniaServiceTest {
         assertThat(resultado.getDiasVentanaCreacion()).isEqualTo(15);
         assertThat(resultado.getDiasEdicion()).isEqualTo(5);
         assertThat(resultado.getMinimoReseniasEtiqueta()).isEqualTo(4);
-        assertThat(resultado.getMaxImagenesResenia()).isEqualTo(4);
         assertThat(resultado.getUmbralExcelente()).isEqualByComparingTo("4.80");
         assertThat(resultado.getUmbralBuena()).isEqualByComparingTo("3.20");
         assertThat(resultado.getFechaActualizacion()).isNotNull();
@@ -79,16 +77,6 @@ class ConfiguracionReseniaServiceTest {
                 .actualizar(request(30, 0, 3, "4.50", "3.50")))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("ventana de edición");
-    }
-
-    @Test
-    void actualizar_maxImagenesFueraDeRango_lanzaError() {
-        ConfiguracionReseniaRequest request = request(30, 3, 3, "4.50", "3.50");
-        request.setMaxImagenesResenia(11);
-
-        assertThatThrownBy(() -> configuracionReseniaService.actualizar(request))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("0 y 10");
     }
 
     @Test
@@ -112,7 +100,6 @@ class ConfiguracionReseniaServiceTest {
         request.setDiasVentanaCreacion(ventana);
         request.setDiasEdicion(edicion);
         request.setMinimoReseniasEtiqueta(minimo);
-        request.setMaxImagenesResenia(4);
         request.setUmbralExcelente(new BigDecimal(excelente));
         request.setUmbralBuena(new BigDecimal(buena));
         return request;
