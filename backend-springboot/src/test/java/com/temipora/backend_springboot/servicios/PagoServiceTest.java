@@ -243,4 +243,55 @@ class PagoServiceTest {
         verify(hitoPedidoRepository, org.mockito.Mockito.never())
             .findByIdHitoPedidoForUpdate(any());
     }
+
+    @Test
+    void aplicarEstadoProveedor_aprobado_activaElPedido() {
+        when(pagoRepository.findByIdPagoForUpdate(PAGO))
+            .thenReturn(Optional.of(pago));
+        when(hitoPedidoRepository.findByIdHitoPedidoForUpdate(HITO))
+            .thenReturn(Optional.of(hito));
+        when(pedidoRepository.findByIdPedidoForUpdate(PEDIDO))
+            .thenReturn(Optional.of(pedido));
+
+        pagoService.aplicarEstadoProveedor(
+            PAGO, EstadoPago.APROBADO, "mp-1", "approved", "accredited");
+
+        assertThat(pago.getEstado()).isEqualTo(EstadoPago.APROBADO);
+        assertThat(pago.getIdPagoExterno()).isEqualTo("mp-1");
+        assertThat(pago.getEstadoExterno()).isEqualTo("approved / accredited");
+        assertThat(hito.getEstadoPago()).isEqualTo(EstadoPagoHito.PAGADO);
+        assertThat(pedido.getEstado()).isEqualTo(EstadoPedido.EN_CURSO);
+    }
+
+    @Test
+    void aplicarEstadoProveedor_rechazado_marcaPagoYNotifica() {
+        when(pagoRepository.findByIdPagoForUpdate(PAGO))
+            .thenReturn(Optional.of(pago));
+        when(pedidoRepository.findById(PEDIDO))
+            .thenReturn(Optional.of(pedido));
+
+        pagoService.aplicarEstadoProveedor(
+            PAGO, EstadoPago.RECHAZADO, "mp-1", "rejected", "cc_rejected");
+
+        assertThat(pago.getEstado()).isEqualTo(EstadoPago.RECHAZADO);
+        assertThat(pago.getEstadoExterno())
+            .isEqualTo("rejected / cc_rejected");
+        verify(notificacionService).crearParaUsuario(
+            eq(CLIENTE), eq("PAGO_RECHAZADO"), eq("Pago rechazado"),
+            any(String.class), eq(PEDIDO), eq("PEDIDO"));
+    }
+
+    @Test
+    void aplicarEstadoProveedor_aprobadoDuplicado_esIdempotente() {
+        pago.setEstado(EstadoPago.APROBADO);
+        when(pagoRepository.findByIdPagoForUpdate(PAGO))
+            .thenReturn(Optional.of(pago));
+
+        pagoService.aplicarEstadoProveedor(
+            PAGO, EstadoPago.APROBADO, "mp-1", "approved", "accredited");
+
+        assertThat(pago.getEstado()).isEqualTo(EstadoPago.APROBADO);
+        verify(hitoPedidoRepository, org.mockito.Mockito.never())
+            .findByIdHitoPedidoForUpdate(any());
+    }
 }

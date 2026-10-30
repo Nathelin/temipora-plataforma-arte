@@ -19,6 +19,11 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: [
+      'exploring-slobbery-shrivel.ngrok-free.dev',
+      '.ngrok-free.dev',
+      '.trycloudflare.com',
+    ],
     proxy: {
       '/api': {
         target: 'http://localhost:8080',

@@ -38,6 +38,8 @@ const error = ref('')
 const errorAccion = ref('')
 const aviso = ref('')
 const procesando = ref(false)
+const avisoPago = ref('')
+const sondeandoPago = ref(false)
 const descargandoConstancia = ref(false)
 const revisionHitoId = ref(null)
 const motivoRevision = ref('')
@@ -93,6 +95,9 @@ async function cargar() {
   try {
     const res = await api.get(`/pedidos/${idPedido.value}`)
     pedido.value = res.data
+    if (res.data?.rolVista === 'CLIENTE') {
+      await sincronizarPagoPendiente()
+    }
     if (res.data?.rolVista === 'ARTISTA') {
       void cargarPortfolioVerificado(res.data)
     }
@@ -235,11 +240,99 @@ async function ejecutar(accion, mensaje) {
   }
 }
 
-function pagarHito(hito) {
-  ejecutar(
-    () => api.post(`/pedidos/${idPedido.value}/hitos/${hito.idHitoPedido}/pagar`),
-    'Pago iniciado. Confirmalo para activar el hito.',
-  )
+async function sincronizarPagoPendiente() {
+  const pendiente = (pedido.value?.hitos || [])
+    .flatMap((hito) => hito.pagos || [])
+    .find((pago) => pago.estado === 'PENDIENTE'
+      && pago.proveedor === 'MERCADOPAGO')
+  if (!pendiente) return
+  try {
+    const res = await api.post(`/pagos/${pendiente.idPago}/sincronizar`)
+    if (res.data) pedido.value = res.data
+  } catch {
+    // Si el proveedor no responde, seguimos con el polling normal.
+  }
+}
+
+function urlCheckoutMercadoPago(data) {
+  const pendiente = (data?.hitos || [])
+    .flatMap((hito) => hito.pagos || [])
+    .find((pago) => pago.estado === 'PENDIENTE')
+  return pendiente?.proveedor === 'MERCADOPAGO'
+    ? pendiente.instruccion
+    : null
+}
+
+async function pagarHito(hito) {
+  if (procesando.value) return
+  procesando.value = true
+  errorAccion.value = ''
+  aviso.value = ''
+  try {
+    await sincronizarPagoPendiente()
+    const actualizado = (pedido.value?.hitos || [])
+      .find((item) => item.idHitoPedido === hito.idHitoPedido)
+    if (actualizado && actualizado.estadoPago !== 'PENDIENTE') {
+      aviso.value = 'El pago ya fue acreditado.'
+      return
+    }
+    const res = await api.post(
+      `/pedidos/${idPedido.value}/hitos/${hito.idHitoPedido}/pagar`,
+    )
+    pedido.value = res.data
+    const url = urlCheckoutMercadoPago(res.data)
+    if (url) {
+      window.location.href = url
+      return
+    }
+    aviso.value = 'Pago iniciado. Confirmalo para activar el hito.'
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    errorAccion.value = e.response?.data?.message
+      || 'No se pudo completar la acción.'
+  } finally {
+    procesando.value = false
+  }
+}
+
+async function refrescarPedido() {
+  const res = await api.get(`/pedidos/${idPedido.value}`)
+  pedido.value = res.data
+}
+
+async function procesarRetornoPago() {
+  const resultado = route.query.pago
+  if (!resultado || !pedido.value) return
+  if (resultado === 'failure') {
+    avisoPago.value = 'El pago no se completó. Podés intentarlo de nuevo.'
+    return
+  }
+  avisoPago.value = resultado === 'pending'
+    ? 'El pago quedó pendiente. Estamos verificando el estado...'
+    : 'Pago recibido. Estamos confirmando con MercadoPago...'
+  sondeandoPago.value = true
+  try {
+    await sincronizarPagoPendiente()
+    for (let intento = 0; intento < 5; intento += 1) {
+      const hayPendiente = (pedido.value?.hitos || [])
+        .flatMap((hito) => hito.pagos || [])
+        .some((pago) => pago.estado === 'PENDIENTE')
+      if (!hayPendiente) {
+        avisoPago.value = 'Pago confirmado.'
+        return
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      await refrescarPedido()
+    }
+    avisoPago.value = 'El pago todavía se está procesando. Actualizá la página en unos minutos.'
+  } catch {
+    avisoPago.value = 'No pudimos verificar el pago todavía. Actualizá la página en unos minutos.'
+  } finally {
+    sondeandoPago.value = false
+  }
 }
 
 function confirmarPago(pago) {
@@ -388,7 +481,10 @@ function volver() {
   router.push({ name: enPanel ? 'panel-pedidos' : 'pedidos' })
 }
 
-onMounted(cargar)
+onMounted(async () => {
+  await cargar()
+  void procesarRetornoPago()
+})
 </script>
 
 <template>
@@ -442,6 +538,15 @@ onMounted(cargar)
           </span>
         </div>
       </header>
+
+      <p
+        v-if="avisoPago"
+        class="mt-4 rounded-xl border border-coral/30 bg-coral/5 px-4 py-3 text-sm text-cafe"
+        role="status"
+      >
+        {{ avisoPago }}
+        <span v-if="sondeandoPago" class="text-cafe/60"> Actualizando...</span>
+      </p>
 
       <section class="mt-6 rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
         <dl class="grid gap-3 text-sm sm:grid-cols-3">
@@ -800,7 +905,12 @@ onMounted(cargar)
             class="mt-4 rounded-xl border border-coral/30 bg-coral/5 px-4 py-3"
           >
             <p class="text-sm text-cafe/75">
-              {{ pagoPendiente(hito).instruccion || 'Pago pendiente de confirmación.' }}
+              <template v-if="pagoPendiente(hito).proveedor === 'MERCADOPAGO'">
+                Pago pendiente en MercadoPago. Completalo para activar el hito.
+              </template>
+              <template v-else>
+                {{ pagoPendiente(hito).instruccion || 'Pago pendiente de confirmación.' }}
+              </template>
             </p>
             <button
               v-if="esCliente && pagoPendiente(hito).proveedor === 'SIMULADO'"
@@ -811,6 +921,13 @@ onMounted(cargar)
             >
               Confirmar pago (simulado)
             </button>
+            <a
+              v-else-if="esCliente && pagoPendiente(hito).proveedor === 'MERCADOPAGO' && pagoPendiente(hito).instruccion"
+              :href="pagoPendiente(hito).instruccion"
+              class="mt-3 inline-flex min-h-9 items-center justify-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+            >
+              Ir a pagar con MercadoPago
+            </a>
           </div>
 
           <div class="mt-4 flex flex-wrap gap-2">

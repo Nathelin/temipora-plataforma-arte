@@ -75,7 +75,8 @@ public class SecurityConfig {
                     "/api/resenias/**",
                     "/api/terminos-plataforma",
                     "/api/comisiones/**",
-                    "/api/configuracion-pedido"
+                    "/api/configuracion-pedido",
+                    "/api/pagos/mercadopago/webhook"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

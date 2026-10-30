@@ -52,7 +52,7 @@ class ReseniaPublicaControllerTest {
     @Test
     void listarServicio_sinToken_devuelve200() throws Exception {
         when(reseniaPublicaService.listarServicio(
-            eq(1L), any(), eq("RECIENTES"), eq(0), eq(10)))
+            eq(1L), any(), any(), eq("RECIENTES"), eq(0), eq(10)))
             .thenReturn(pagina());
 
         mockMvc.perform(get("/api/servicios/1/resenias"))

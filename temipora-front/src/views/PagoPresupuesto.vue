@@ -89,6 +89,9 @@ async function pagar() {
       `/solicitudes-servicio/${idSolicitud.value}/pagar`,
     )
     pedido.value = res.data
+    if (pago.value?.proveedor === 'MERCADOPAGO' && pago.value.instruccion) {
+      window.location.href = pago.value.instruccion
+    }
   } catch (e) {
     errorAccion.value = e.response?.data?.message || 'No se pudo iniciar el pago.'
   } finally {
@@ -237,13 +240,19 @@ onMounted(cargar)
       >
         <h2 class="text-lg font-semibold text-granate">Pago pendiente</h2>
         <p class="mt-1 text-sm text-cafe/70">
-          {{ pago?.instruccion || 'El pago quedó pendiente de confirmación.' }}
+          <template v-if="pago?.proveedor === 'MERCADOPAGO'">
+            Completá el pago en MercadoPago. Al volver, el pedido se activa
+            automáticamente cuando se confirma el pago.
+          </template>
+          <template v-else>
+            {{ pago?.instruccion || 'El pago quedó pendiente de confirmación.' }}
+          </template>
         </p>
         <p class="mt-2 text-xs text-cafe/50">
           El pedido se activa cuando el pago se confirma.
         </p>
         <button
-          v-if="pago"
+          v-if="pago && pago.proveedor === 'SIMULADO'"
           type="button"
           :disabled="confirmando"
           class="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-coral px-6 text-sm font-semibold text-white transition hover:bg-rojizo disabled:opacity-50"
@@ -251,6 +260,13 @@ onMounted(cargar)
         >
           {{ confirmando ? 'Confirmando...' : 'Confirmar pago (simulado)' }}
         </button>
+        <a
+          v-else-if="pago?.proveedor === 'MERCADOPAGO' && pago.instruccion"
+          :href="pago.instruccion"
+          class="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-coral px-6 text-sm font-semibold text-white transition hover:bg-rojizo"
+        >
+          Ir a pagar con MercadoPago
+        </a>
       </section>
     </template>
   </div>

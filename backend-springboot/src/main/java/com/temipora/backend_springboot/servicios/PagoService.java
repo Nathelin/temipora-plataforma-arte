@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
 import com.temipora.backend_springboot.repositorios.PagoRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
+import com.temipora.backend_springboot.servicios.pagos.EstadoCobroProveedor;
 import com.temipora.backend_springboot.servicios.pagos.ProveedorPago;
 import com.temipora.backend_springboot.servicios.pagos.ResultadoCobro;
 
@@ -68,13 +70,52 @@ public class PagoService {
             throw new ConflictoException(
                 "La cuota ya está paga o no admite un pago nuevo.");
         }
-        return pagoRepository
+        if (pagoRepository.findFirstByHitoPedidoIdHitoPedidoAndEstado(
+                hito.getIdHitoPedido(), EstadoPago.APROBADO).isPresent()) {
+            throw new ConflictoException("El pago ya fue acreditado.");
+        }
+        Optional<Pago> existente = pagoRepository
             .findFirstByHitoPedidoIdHitoPedidoAndEstado(
-                hito.getIdHitoPedido(), EstadoPago.PENDIENTE)
-            .orElseGet(() -> crearPago(hito, pedido));
+                hito.getIdHitoPedido(), EstadoPago.PENDIENTE);
+        if (existente.isEmpty()) {
+            return crearCobro(hito, pedido);
+        }
+
+        Pago pago = existente.get();
+        // Reconciliar con el proveedor antes de reutilizar o crear un cobro:
+        // si el webhook se demoró, acá se acredita el pago y se evita el
+        // doble cobro.
+        Optional<EstadoCobroProveedor> estado =
+            proveedorPago.consultarEstado(pago);
+        if (estado.isPresent()) {
+            aplicarEstadoProveedor(
+                pago.getIdPago(),
+                estado.get().estado(),
+                estado.get().idPagoExterno(),
+                estado.get().estadoExterno(),
+                estado.get().detalle());
+            pago = pagoRepository.findById(pago.getIdPago()).orElse(pago);
+            if (pago.getEstado() == EstadoPago.APROBADO
+                    || hito.getEstadoPago() != EstadoPagoHito.PENDIENTE) {
+                return pago;
+            }
+            if (pago.getEstado() != EstadoPago.PENDIENTE) {
+                return crearCobro(hito, pedido);
+            }
+        }
+        if (requiereCobro(pago)) {
+            aplicarCobro(pago);
+        }
+        return pagoRepository.save(pago);
     }
 
-    private Pago crearPago(HitoPedido hito, Pedido pedido) {
+    private Pago crearCobro(HitoPedido hito, Pedido pedido) {
+        Pago pago = nuevoPago(hito, pedido);
+        aplicarCobro(pago);
+        return pagoRepository.save(pago);
+    }
+
+    private Pago nuevoPago(HitoPedido hito, Pedido pedido) {
         Pago pago = new Pago();
         pago.setHitoPedido(hito);
         pago.setUsuarioPagador(pedido.getCliente());
@@ -89,11 +130,25 @@ public class PagoService {
         pago.setProveedor(proveedorPago.nombre());
         pago.setClaveIdempotencia(
             "hito-" + hito.getIdHitoPedido() + "-" + UUID.randomUUID());
+        // Se guarda antes de crear el cobro para que el proveedor externo
+        // pueda referenciar el idPago en su preferencia.
+        return pagoRepository.save(pago);
+    }
 
+    private boolean requiereCobro(Pago pago) {
+        if (pago.getPayload() == null || pago.getPayload().isBlank()) {
+            return true;
+        }
+        return pago.getExpiraEn() != null
+            && !pago.getExpiraEn().isAfter(LocalDateTime.now());
+    }
+
+    private void aplicarCobro(Pago pago) {
         ResultadoCobro resultado = proveedorPago.crearCobro(pago);
         pago.setIdExterno(resultado.idExterno());
         pago.setPayload(resultado.instruccion());
-        return pagoRepository.save(pago);
+        pago.setExpiraEn(resultado.expiraEn());
+        pago.setFechaActualizacionProveedor(LocalDateTime.now());
     }
 
     @Transactional
@@ -102,7 +157,76 @@ public class PagoService {
             .orElseThrow(() -> new NoSuchElementException(
                 "Pago no encontrado: " + idPago));
         validarPagador(pago, idUsuario);
+        return aplicarAprobacion(pago, payload);
+    }
 
+    /**
+     * Reconciliación manual: consulta el estado real en el proveedor y lo
+     * aplica. Se usa cuando el webhook se demora o no llega.
+     */
+    @Transactional
+    public void sincronizar(Long idPago) {
+        Pago pago = pagoRepository.findByIdPagoForUpdate(idPago)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Pago no encontrado: " + idPago));
+        proveedorPago.consultarEstado(pago).ifPresent(estado ->
+            aplicarEstadoProveedor(
+                idPago,
+                estado.estado(),
+                estado.idPagoExterno(),
+                estado.estadoExterno(),
+                estado.detalle()));
+    }
+
+    /**
+     * Aplica el estado que informa un proveedor externo (webhook). No exige
+     * usuario autenticado: la confianza viene de la firma del webhook y de la
+     * consulta server-to-server del pago.
+     */
+    @Transactional
+    public void aplicarEstadoProveedor(
+            Long idPago,
+            EstadoPago estado,
+            String idPagoExterno,
+            String estadoExterno,
+            String detalle) {
+        Pago pago = pagoRepository.findByIdPagoForUpdate(idPago)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Pago no encontrado: " + idPago));
+        pago.setIdPagoExterno(idPagoExterno);
+        pago.setEstadoExterno(detalle != null && !detalle.isBlank()
+            ? estadoExterno + " / " + detalle
+            : estadoExterno);
+        pago.setFechaActualizacionProveedor(LocalDateTime.now());
+
+        if (pago.getEstado() == EstadoPago.APROBADO) {
+            if (estado == EstadoPago.REEMBOLSADO) {
+                pago.setEstado(EstadoPago.REEMBOLSADO);
+            }
+            pagoRepository.save(pago);
+            return;
+        }
+        if (estado == EstadoPago.APROBADO) {
+            // El payload conserva la URL del checkout; el detalle del
+            // proveedor queda en estadoExterno.
+            aplicarAprobacion(pago, null);
+            return;
+        }
+        if (pago.getEstado() == EstadoPago.PENDIENTE) {
+            pago.setEstado(estado);
+            if (estado == EstadoPago.RECHAZADO) {
+                notificarRechazo(
+                    pago,
+                    cargarPedido(pago),
+                    detalle != null && !detalle.isBlank()
+                        ? detalle
+                        : estadoExterno);
+            }
+        }
+        pagoRepository.save(pago);
+    }
+
+    private Pedido aplicarAprobacion(Pago pago, String payload) {
         if (pago.getEstado() == EstadoPago.APROBADO) {
             return cargarPedido(pago);
         }
@@ -118,7 +242,12 @@ public class PagoService {
             .orElseThrow(() -> new NoSuchElementException("Pedido no encontrado."));
 
         if (hito.getEstadoPago() != EstadoPagoHito.PENDIENTE) {
-            throw new ConflictoException("La cuota ya no está pendiente de pago.");
+            // Otro pago ya cubrió la cuota: se registra este como aprobado
+            // sin volver a mover el pedido (idempotencia del webhook).
+            pago.setEstado(EstadoPago.APROBADO);
+            pago.setFechaAcreditacion(LocalDateTime.now());
+            pagoRepository.save(pago);
+            return pedido;
         }
         if (pedido.getEstado() != EstadoPedido.PENDIENTE_PAGO
                 && pedido.getEstado() != EstadoPedido.EN_CURSO) {
@@ -187,17 +316,7 @@ public class PagoService {
         }
         pago.setEstado(EstadoPago.RECHAZADO);
         pagoRepository.save(pago);
-        notificacionService.crearParaUsuario(
-            pago.getUsuarioPagador().getIdUsuario(),
-            NOTIFICACION_PAGO_RECHAZADO,
-            "Pago rechazado",
-            "El pago de '" + pago.getHitoPedido().getNombre()
-                + "' del pedido de '" + nombreServicio(pedido)
-                + "' fue rechazado." + (motivo != null && !motivo.isBlank()
-                    ? " Motivo: " + motivo.trim()
-                    : ""),
-            pedido.getIdPedido(),
-            TIPO_REFERENCIA_PEDIDO);
+        notificarRechazo(pago, pedido, motivo);
         return pedido;
     }
 
@@ -229,6 +348,20 @@ public class PagoService {
         solicitud.setEstado(EstadoSolicitud.PAGADA);
         solicitud.setFechaActualizacion(ahora);
         solicitudRepository.save(solicitud);
+    }
+
+    private void notificarRechazo(Pago pago, Pedido pedido, String motivo) {
+        notificacionService.crearParaUsuario(
+            pago.getUsuarioPagador().getIdUsuario(),
+            NOTIFICACION_PAGO_RECHAZADO,
+            "Pago rechazado",
+            "El pago de '" + pago.getHitoPedido().getNombre()
+                + "' del pedido de '" + nombreServicio(pedido)
+                + "' fue rechazado." + (motivo != null && !motivo.isBlank()
+                    ? " Motivo: " + motivo.trim()
+                    : ""),
+            pedido.getIdPedido(),
+            TIPO_REFERENCIA_PEDIDO);
     }
 
     private void notificarPagoRecibido(Pedido pedido, HitoPedido hito) {
