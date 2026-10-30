@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -23,6 +24,7 @@ import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.Pago;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Servicio;
+import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.servicios.pagos.EstadoCobroProveedor;
 import com.temipora.backend_springboot.servicios.pagos.ResultadoCobro;
 
@@ -34,12 +36,15 @@ class ProveedorPagoMercadoPagoTest {
 
     @Mock
     private MercadoPagoClient cliente;
+    @Mock
+    private MercadoPagoOAuthService oauthService;
 
     @Test
     void crearCobro_armaLaPreferenciaYDevuelveElCheckoutSandbox() {
         ProveedorPagoMercadoPago proveedor =
-            new ProveedorPagoMercadoPago(cliente, WEBHOOK, FRONT, true);
-        when(cliente.crearPreferencia(any(), anyString()))
+            new ProveedorPagoMercadoPago(cliente, oauthService, WEBHOOK, FRONT, true);
+        when(oauthService.tokenVigente(2L)).thenReturn("seller-token");
+        when(cliente.crearPreferencia(any(), anyString(), anyString()))
             .thenReturn(new MercadoPagoPreferencia(
                 "pref-1", "https://prod", "https://sandbox"));
 
@@ -51,7 +56,8 @@ class ProveedorPagoMercadoPagoTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor =
             ArgumentCaptor.forClass(Map.class);
-        verify(cliente).crearPreferencia(captor.capture(), anyString());
+        verify(cliente).crearPreferencia(
+            captor.capture(), anyString(), eq("seller-token"));
         Map<String, Object> cuerpo = captor.getValue();
 
         assertThat(cuerpo.get("external_reference")).isEqualTo("30");
@@ -65,6 +71,8 @@ class ProveedorPagoMercadoPagoTest {
             "idPago", 30L,
             "idPedido", 10L,
             "idHitoPedido", 20L));
+        assertThat(cuerpo.get("marketplace_fee"))
+            .isEqualTo(new BigDecimal("5.00"));
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items =
@@ -79,8 +87,9 @@ class ProveedorPagoMercadoPagoTest {
     @Test
     void crearCobro_enProduccion_usaInitPoint() {
         ProveedorPagoMercadoPago proveedor =
-            new ProveedorPagoMercadoPago(cliente, WEBHOOK, FRONT, false);
-        when(cliente.crearPreferencia(any(), anyString()))
+            new ProveedorPagoMercadoPago(cliente, oauthService, WEBHOOK, FRONT, false);
+        when(oauthService.tokenVigente(2L)).thenReturn("seller-token");
+        when(cliente.crearPreferencia(any(), anyString(), anyString()))
             .thenReturn(new MercadoPagoPreferencia(
                 "pref-1", "https://prod", "https://sandbox"));
 
@@ -93,8 +102,9 @@ class ProveedorPagoMercadoPagoTest {
     void crearCobro_conFrontHttp_omiteAutoReturn() {
         String frontLocal = "http://localhost:5173";
         ProveedorPagoMercadoPago proveedor =
-            new ProveedorPagoMercadoPago(cliente, WEBHOOK, frontLocal, true);
-        when(cliente.crearPreferencia(any(), anyString()))
+            new ProveedorPagoMercadoPago(cliente, oauthService, WEBHOOK, frontLocal, true);
+        when(oauthService.tokenVigente(2L)).thenReturn("seller-token");
+        when(cliente.crearPreferencia(any(), anyString(), anyString()))
             .thenReturn(new MercadoPagoPreferencia(
                 "pref-1", "https://prod", "https://sandbox"));
 
@@ -103,14 +113,15 @@ class ProveedorPagoMercadoPagoTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor =
             ArgumentCaptor.forClass(Map.class);
-        verify(cliente).crearPreferencia(captor.capture(), anyString());
+        verify(cliente).crearPreferencia(
+            captor.capture(), anyString(), eq("seller-token"));
         assertThat(captor.getValue()).doesNotContainKey("auto_return");
     }
 
     @Test
     void crearCobro_sinNotificationUrl_lanza() {
         ProveedorPagoMercadoPago proveedor =
-            new ProveedorPagoMercadoPago(cliente, "", FRONT, true);
+            new ProveedorPagoMercadoPago(cliente, oauthService, "", FRONT, true);
 
         assertThatThrownBy(() -> proveedor.crearCobro(nuevoPago()))
             .isInstanceOf(MercadoPagoException.class)
@@ -120,8 +131,9 @@ class ProveedorPagoMercadoPagoTest {
     @Test
     void consultarEstado_aprobado_devuelveElPagoDeMercadoPago() {
         ProveedorPagoMercadoPago proveedor =
-            new ProveedorPagoMercadoPago(cliente, WEBHOOK, FRONT, true);
-        when(cliente.buscarPagos("30")).thenReturn(List.of(
+            new ProveedorPagoMercadoPago(cliente, oauthService, WEBHOOK, FRONT, true);
+        when(oauthService.tokenVigente(2L)).thenReturn("seller-token");
+        when(cliente.buscarPagos("30", "seller-token")).thenReturn(List.of(
             new MercadoPagoPago(
                 123L, "approved", "accredited",
                 new BigDecimal("50.00"), "ARS", "30", "visa",
@@ -138,7 +150,7 @@ class ProveedorPagoMercadoPagoTest {
     @Test
     void nombre_esMercadoPago() {
         ProveedorPagoMercadoPago proveedor =
-            new ProveedorPagoMercadoPago(cliente, WEBHOOK, FRONT, true);
+            new ProveedorPagoMercadoPago(cliente, oauthService, WEBHOOK, FRONT, true);
 
         assertThat(proveedor.nombre()).isEqualTo("MERCADOPAGO");
     }
@@ -148,20 +160,26 @@ class ProveedorPagoMercadoPagoTest {
         servicio.setIdServicio(5L);
         servicio.setNombre("Ilustración");
 
+        Usuario artista = new Usuario();
+        artista.setIdUsuario(2L);
+
         Pedido pedido = new Pedido();
         pedido.setIdPedido(10L);
+        pedido.setArtista(artista);
         pedido.setServicio(servicio);
 
         HitoPedido hito = new HitoPedido();
         hito.setIdHitoPedido(20L);
         hito.setOrden(0);
         hito.setNombre("Seña");
+        hito.setComisionMontoCobro(new BigDecimal("5.00"));
         pedido.agregarHito(hito);
 
         Pago pago = new Pago();
         pago.setIdPago(30L);
         pago.setHitoPedido(hito);
         pago.setMontoCobro(new BigDecimal("50.00"));
+        pago.setComisionMontoCobro(new BigDecimal("5.00"));
         pago.setClaveIdempotencia("clave-1");
         return pago;
     }

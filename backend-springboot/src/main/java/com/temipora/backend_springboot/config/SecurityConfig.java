@@ -76,7 +76,8 @@ public class SecurityConfig {
                     "/api/terminos-plataforma",
                     "/api/comisiones/**",
                     "/api/configuracion-pedido",
-                    "/api/pagos/mercadopago/webhook"
+                    "/api/pagos/mercadopago/webhook",
+                    "/api/pagos/mercadopago/oauth/callback"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

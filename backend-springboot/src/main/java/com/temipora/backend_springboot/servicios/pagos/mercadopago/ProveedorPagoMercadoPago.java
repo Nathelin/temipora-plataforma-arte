@@ -27,16 +27,19 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
     public static final String NOMBRE = "MERCADOPAGO";
 
     private final MercadoPagoClient cliente;
+    private final MercadoPagoOAuthService oauthService;
     private final String notificationUrl;
     private final String frontendUrl;
     private final boolean sandbox;
 
     public ProveedorPagoMercadoPago(
             MercadoPagoClient cliente,
+            MercadoPagoOAuthService oauthService,
             @Value("${pagos.mercadopago.notification-url:}") String notificationUrl,
             @Value("${app.frontend.url:http://localhost:5173}") String frontendUrl,
             @Value("${pagos.mercadopago.sandbox:true}") boolean sandbox) {
         this.cliente = cliente;
+        this.oauthService = oauthService;
         this.notificationUrl = notificationUrl;
         this.frontendUrl = frontendUrl;
         this.sandbox = sandbox;
@@ -55,6 +58,9 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
         }
         HitoPedido hito = pago.getHitoPedido();
         Pedido pedido = hito.getPedido();
+        // En Marketplace la preferencia se crea con el token del vendedor.
+        String tokenVendedor = oauthService.tokenVigente(
+            pedido.getArtista().getIdUsuario());
         String nombreServicio = pedido.getServicio() != null
             && pedido.getServicio().getNombre() != null
                 ? pedido.getServicio().getNombre()
@@ -82,6 +88,10 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
             "idPago", pago.getIdPago(),
             "idPedido", pedido.getIdPedido(),
             "idHitoPedido", hito.getIdHitoPedido()));
+        if (hito.getComisionMontoCobro() != null
+                && hito.getComisionMontoCobro().signum() > 0) {
+            cuerpo.put("marketplace_fee", hito.getComisionMontoCobro());
+        }
 
         LocalDateTime expira = expiracion(hito);
         cuerpo.put("expiration_date_to", expira
@@ -95,7 +105,7 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
         String clavePreferencia =
             pago.getClaveIdempotencia() + "-" + UUID.randomUUID();
         MercadoPagoPreferencia preferencia = cliente.crearPreferencia(
-            cuerpo, clavePreferencia);
+            cuerpo, clavePreferencia, tokenVendedor);
         String url = sandbox
             && preferencia.sandboxInitPoint() != null
             && !preferencia.sandboxInitPoint().isBlank()
@@ -113,8 +123,10 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
         if (pago.getIdPago() == null) {
             return Optional.empty();
         }
-        List<MercadoPagoPago> pagos = cliente.buscarPagos(
-            String.valueOf(pago.getIdPago()));
+        String token = tokenVendedor(pago);
+        List<MercadoPagoPago> pagos = token != null
+            ? cliente.buscarPagos(String.valueOf(pago.getIdPago()), token)
+            : cliente.buscarPagos(String.valueOf(pago.getIdPago()));
         if (pagos.isEmpty()) {
             return Optional.empty();
         }
@@ -128,6 +140,15 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
             pagoMp.id() != null ? String.valueOf(pagoMp.id()) : null,
             pagoMp.status(),
             pagoMp.statusDetail()));
+    }
+
+    private String tokenVendedor(Pago pago) {
+        try {
+            return oauthService.tokenVigente(
+                pago.getHitoPedido().getPedido().getArtista().getIdUsuario());
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private String urlRetorno(Pedido pedido, String resultado) {

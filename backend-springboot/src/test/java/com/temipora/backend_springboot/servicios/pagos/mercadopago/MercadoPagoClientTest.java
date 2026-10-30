@@ -71,12 +71,63 @@ class MercadoPagoClientTest {
     }
 
     @Test
+    void intercambiarCodigo_enviaElJsonCorrecto() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server =
+            MockRestServiceServer.bindTo(builder).build();
+        MercadoPagoClient cliente = new MercadoPagoClient(
+            builder, "https://api.test", "token", "cid", "csecret");
+
+        server.expect(requestTo("https://api.test/oauth/token"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(jsonPath("$.client_id").value("cid"))
+            .andExpect(jsonPath("$.client_secret").value("csecret"))
+            .andExpect(jsonPath("$.grant_type").value("authorization_code"))
+            .andExpect(jsonPath("$.code").value("abc"))
+            .andExpect(jsonPath("$.redirect_uri").value("https://front/cb"))
+            .andExpect(jsonPath("$.test_token").value(true))
+            .andRespond(withSuccess(
+                "{\"access_token\":\"AT\",\"refresh_token\":\"RT\","
+                    + "\"expires_in\":3600,\"user_id\":123}",
+                MediaType.APPLICATION_JSON));
+
+        MercadoPagoToken token = cliente.intercambiarCodigo(
+            "abc", "https://front/cb", true);
+
+        assertThat(token.accessToken()).isEqualTo("AT");
+        assertThat(token.refreshToken()).isEqualTo("RT");
+        server.verify();
+    }
+
+    @Test
+    void refrescarToken_enviaElGrantType() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server =
+            MockRestServiceServer.bindTo(builder).build();
+        MercadoPagoClient cliente = new MercadoPagoClient(
+            builder, "https://api.test", "token", "cid", "csecret");
+
+        server.expect(requestTo("https://api.test/oauth/token"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(jsonPath("$.grant_type").value("refresh_token"))
+            .andExpect(jsonPath("$.refresh_token").value("RT"))
+            .andRespond(withSuccess(
+                "{\"access_token\":\"AT2\",\"refresh_token\":\"RT2\"}",
+                MediaType.APPLICATION_JSON));
+
+        MercadoPagoToken token = cliente.refrescarToken("RT");
+
+        assertThat(token.accessToken()).isEqualTo("AT2");
+        server.verify();
+    }
+
+    @Test
     void sinAccessToken_lanza() {
         MercadoPagoClient cliente = new MercadoPagoClient(
             RestClient.builder(), "https://api.test", "");
 
         assertThatThrownBy(() -> cliente.consultarPago("123"))
             .isInstanceOf(MercadoPagoException.class)
-            .hasMessageContaining("MP_ACCESS_TK");
+            .hasMessageContaining("access token");
     }
 }
