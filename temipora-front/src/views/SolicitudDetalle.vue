@@ -550,25 +550,43 @@ onMounted(cargar)
                 {{ tituloContraparte }}
               </p>
 
-              <div v-if="contraparte" class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
-                <img
-                  v-if="fotoContraparte"
-                  :src="fotoContraparte"
-                  alt=""
-                  class="h-16 w-16 shrink-0 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-rosa/70"
-                />
-                <span
-                  v-else
-                  class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-rosa text-xl font-bold text-granate shadow-sm ring-1 ring-white/70"
-                  aria-hidden="true"
-                >
-                  {{ inicialContraparte }}
-                </span>
+              <div v-if="contraparte" class="mt-4 grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <div class="flex min-w-0 items-center gap-4">
+                  <img
+                    v-if="fotoContraparte"
+                    :src="fotoContraparte"
+                    alt=""
+                    class="h-16 w-16 shrink-0 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-rosa/70"
+                  />
+                  <span
+                    v-else
+                    class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-rosa text-xl font-bold text-granate shadow-sm ring-1 ring-white/70"
+                    aria-hidden="true"
+                  >
+                    {{ inicialContraparte }}
+                  </span>
 
-                <div class="min-w-0">
-                  <p class="text-lg font-semibold text-granate">{{ nombreContraparte }}</p>
-                  <p v-if="usuarioContraparte" class="text-sm text-cafe/55">@{{ usuarioContraparte }}</p>
-                  <p v-if="contraparte.nombrePais" class="mt-1 text-xs text-cafe/50">{{ contraparte.nombrePais }}</p>
+                  <div class="min-w-0">
+                    <p class="text-lg font-semibold text-granate">{{ nombreContraparte }}</p>
+                    <p v-if="usuarioContraparte" class="text-sm text-cafe/55">@{{ usuarioContraparte }}</p>
+                    <p v-if="contraparte.nombrePais" class="mt-1 text-xs text-cafe/50">{{ contraparte.nombrePais }}</p>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2 md:flex-col md:border-l md:border-rosa/40 md:pl-5">
+                  <router-link
+                    :to="{ name: 'perfil', params: { nombreUsuario: contraparte.nombreUsuario } }"
+                    class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+                  >
+                    Ver perfil
+                  </router-link>
+                  <button
+                    type="button"
+                    class="inline-flex min-h-9 items-center justify-center rounded-full border border-coral/40 bg-coral/5 px-4 text-sm font-semibold text-coral transition hover:bg-coral/10"
+                    @click="irAlChat"
+                  >
+                    Enviar mensaje
+                  </button>
                 </div>
               </div>
 
@@ -604,22 +622,6 @@ onMounted(cargar)
               >
                 El artista todavía no tiene reseñas.
               </p>
-
-              <div v-if="contraparte" class="mt-4 flex flex-wrap gap-2 border-t border-rosa/40 pt-4">
-                <router-link
-                  :to="{ name: 'perfil', params: { nombreUsuario: contraparte.nombreUsuario } }"
-                  class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
-                >
-                  Ver perfil
-                </router-link>
-                <button
-                  type="button"
-                  class="inline-flex min-h-9 items-center justify-center rounded-full border border-coral/40 bg-coral/5 px-4 text-sm font-semibold text-coral transition hover:bg-coral/10"
-                  @click="irAlChat"
-                >
-                  Enviar mensaje
-                </button>
-              </div>
             </section>
 
             <section>
