@@ -6,10 +6,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.eventos.LeidoEvent;
+import com.temipora.backend_springboot.eventos.MensajeEnviadoEvent;
 import com.temipora.backend_springboot.modelo.ConfiguracionMensajeria;
 import com.temipora.backend_springboot.modelo.Conversacion;
 import com.temipora.backend_springboot.modelo.ConversacionParticipante;
@@ -18,6 +21,7 @@ import com.temipora.backend_springboot.modelo.EstadoMensaje;
 import com.temipora.backend_springboot.modelo.HistorialMensajesDTO;
 import com.temipora.backend_springboot.modelo.Mensaje;
 import com.temipora.backend_springboot.modelo.MensajeDTO;
+import com.temipora.backend_springboot.modelo.MensajePushDTO;
 import com.temipora.backend_springboot.modelo.MensajeRequest;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.ConversacionParticipanteRepository;
@@ -37,6 +41,7 @@ public class MensajeService {
     private final UsuarioRepository usuarioRepository;
     private final ConfiguracionMensajeriaService configuracionService;
     private final IndicadorEscritura indicadorEscritura;
+    private final ApplicationEventPublisher eventoPublisher;
 
     public MensajeService(
             MensajeRepository mensajeRepository,
@@ -44,13 +49,15 @@ public class MensajeService {
             ConversacionParticipanteRepository participanteRepository,
             UsuarioRepository usuarioRepository,
             ConfiguracionMensajeriaService configuracionService,
-            IndicadorEscritura indicadorEscritura) {
+            IndicadorEscritura indicadorEscritura,
+            ApplicationEventPublisher eventoPublisher) {
         this.mensajeRepository = mensajeRepository;
         this.conversacionRepository = conversacionRepository;
         this.participanteRepository = participanteRepository;
         this.usuarioRepository = usuarioRepository;
         this.configuracionService = configuracionService;
         this.indicadorEscritura = indicadorEscritura;
+        this.eventoPublisher = eventoPublisher;
     }
 
     @Transactional
@@ -115,6 +122,19 @@ public class MensajeService {
                 idConversacion, contraparte.getIdUsuario())
             .ifPresent(participante -> participante.setArchivada(false));
         indicadorEscritura.limpiar(idConversacion, idRemitente);
+
+        MensajePushDTO paraIniciador = MensajePushDTO.desde(
+            MensajeDTO.desdeMensaje(
+                mensaje, conversacion.getIniciador().getIdUsuario(), null));
+        MensajePushDTO paraDestinatario = MensajePushDTO.desde(
+            MensajeDTO.desdeMensaje(
+                mensaje, conversacion.getDestinatario().getIdUsuario(), null));
+        eventoPublisher.publishEvent(new MensajeEnviadoEvent(
+            idConversacion,
+            conversacion.getIniciador().getNombreUsuario(),
+            conversacion.getDestinatario().getNombreUsuario(),
+            paraIniciador,
+            paraDestinatario));
 
         return MensajeDTO.desdeMensaje(mensaje, idRemitente, null);
     }
@@ -185,6 +205,11 @@ public class MensajeService {
         if (participante.getUltimoLeidoEn() == null
                 || ahora.isAfter(participante.getUltimoLeidoEn())) {
             participante.setUltimoLeidoEn(ahora);
+            Usuario contraparte = conversacion.contraparteDe(idUsuario);
+            if (contraparte != null) {
+                eventoPublisher.publishEvent(new LeidoEvent(
+                    idConversacion, contraparte.getNombreUsuario(), ahora));
+            }
         }
     }
 

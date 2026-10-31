@@ -6,6 +6,7 @@ import ThemeToggle from '../components/ThemeToggle.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
 import { useMensajes } from '../composables/useMensajes'
+import { useMensajeriaSocket } from '../composables/useMensajeriaSocket'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,8 +33,16 @@ const {
   solicitudesPendientes,
   iniciarPolling: iniciarPollingMensajes,
   detenerPolling: detenerPollingMensajes,
+  cargarContador: cargarContadorMensajes,
   limpiar: limpiarMensajes,
 } = useMensajes()
+
+const {
+  conectar: conectarSocket,
+  desconectar: desconectarSocket,
+  suscribir: suscribirSocket,
+} = useMensajeriaSocket()
+let quitarSuscripcionSocket = null
 const totalMensajes = computed(
   () => mensajesNoLeidos.value + solicitudesPendientes.value,
 )
@@ -70,6 +79,20 @@ onMounted(() => {
   document.addEventListener('click', manejarClickExterior)
   document.addEventListener('keydown', manejarTecla)
   iniciarPollingMensajes()
+
+  if (estaLogueado.value && !esAdmin.value) {
+    conectarSocket()
+    quitarSuscripcionSocket = suscribirSocket((evento) => {
+      if (evento?.tipo === 'MENSAJE'
+        && evento.mensaje
+        && !evento.mensaje.esPropio) {
+        cargarContadorMensajes({ silencioso: true })
+      }
+      if (evento?.tipo === 'CONVERSACION') {
+        cargarContadorMensajes({ silencioso: true })
+      }
+    })
+  }
 })
 
 onBeforeUnmount(() => {
@@ -77,6 +100,8 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', manejarClickExterior)
   document.removeEventListener('keydown', manejarTecla)
   detenerPollingMensajes()
+  quitarSuscripcionSocket?.()
+  desconectarSocket()
 })
 
 function cerrarSesion() {
@@ -86,6 +111,7 @@ function cerrarSesion() {
   localStorage.removeItem('idUsuario')
   localStorage.removeItem('urlFotoPerfil')
   limpiarMensajes()
+  desconectarSocket()
   router.push({ name: 'login' })
 }
 

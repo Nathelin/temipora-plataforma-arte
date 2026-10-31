@@ -13,6 +13,7 @@ import MonedasAdmin from '../components/MonedasAdmin.vue'
 import PresupuestoAdmin from '../components/PresupuestoAdmin.vue'
 import ComisionAdmin from '../components/ComisionAdmin.vue'
 import PedidoConfigAdmin from '../components/PedidoConfigAdmin.vue'
+import ConfiguracionMensajeriaAdmin from '../components/ConfiguracionMensajeriaAdmin.vue'
 import TerminosPlataformaAdmin from '../components/TerminosPlataformaAdmin.vue'
 import CriteriosReseniaAdmin from '../components/CriteriosReseniaAdmin.vue'
 import ConfiguracionReseniaAdmin from '../components/ConfiguracionReseniaAdmin.vue'
@@ -347,6 +348,12 @@ const routes = [
         name: 'pedidos-admin',
         component: PedidoConfigAdmin,
         meta: { title: 'Hitos y pedidos' },
+      },
+      {
+        path: 'ajustes/mensajeria',
+        name: 'configuracion-mensajeria-admin',
+        component: ConfiguracionMensajeriaAdmin,
+        meta: { title: 'Configuración de mensajería' },
       },
       {
         path: 'pedidos/:idPedido',

@@ -18,6 +18,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -27,6 +28,8 @@ import org.mockito.quality.Strictness;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
+import com.temipora.backend_springboot.eventos.ConversacionActualizadaEvent;
+import com.temipora.backend_springboot.eventos.EscrituraEvent;
 import com.temipora.backend_springboot.modelo.ConfiguracionMensajeria;
 import com.temipora.backend_springboot.modelo.ContadorMensajesDTO;
 import com.temipora.backend_springboot.modelo.Conversacion;
@@ -78,6 +81,9 @@ class ConversacionServiceTest {
     @Mock
     private IndicadorEscritura indicadorEscritura;
 
+    @Mock
+    private ApplicationEventPublisher eventoPublisher;
+
     @InjectMocks
     private ConversacionService conversacionService;
 
@@ -111,6 +117,7 @@ class ConversacionServiceTest {
             anyString(),
             eq(10L),
             eq(ConversacionService.TIPO_REFERENCIA_CONVERSACION));
+        verify(eventoPublisher).publishEvent(any(ConversacionActualizadaEvent.class));
     }
 
     @Test
@@ -253,6 +260,7 @@ class ConversacionServiceTest {
             anyString(),
             eq(10L),
             eq(ConversacionService.TIPO_REFERENCIA_CONVERSACION));
+        verify(eventoPublisher).publishEvent(any(ConversacionActualizadaEvent.class));
     }
 
     @Test
@@ -418,6 +426,7 @@ class ConversacionServiceTest {
         conversacionService.marcarEscribiendo(10L, 2L);
 
         verify(indicadorEscritura).marcar(10L, 2L);
+        verify(eventoPublisher).publishEvent(any(EscrituraEvent.class));
     }
 
     @Test

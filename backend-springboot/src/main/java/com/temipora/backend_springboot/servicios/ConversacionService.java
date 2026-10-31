@@ -10,11 +10,14 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.eventos.ConversacionActualizadaEvent;
+import com.temipora.backend_springboot.eventos.EscrituraEvent;
 import com.temipora.backend_springboot.modelo.BandejaMensajes;
 import com.temipora.backend_springboot.modelo.ConfiguracionMensajeria;
 import com.temipora.backend_springboot.modelo.ContadorMensajesDTO;
@@ -64,6 +67,7 @@ public class ConversacionService {
     private final ConfiguracionMensajeriaService configuracionService;
     private final NotificacionService notificacionService;
     private final IndicadorEscritura indicadorEscritura;
+    private final ApplicationEventPublisher eventoPublisher;
 
     public ConversacionService(
             ConversacionRepository conversacionRepository,
@@ -73,7 +77,8 @@ public class ConversacionService {
             UsuarioRepository usuarioRepository,
             ConfiguracionMensajeriaService configuracionService,
             NotificacionService notificacionService,
-            IndicadorEscritura indicadorEscritura) {
+            IndicadorEscritura indicadorEscritura,
+            ApplicationEventPublisher eventoPublisher) {
         this.conversacionRepository = conversacionRepository;
         this.participanteRepository = participanteRepository;
         this.accionRepository = accionRepository;
@@ -82,6 +87,7 @@ public class ConversacionService {
         this.configuracionService = configuracionService;
         this.notificacionService = notificacionService;
         this.indicadorEscritura = indicadorEscritura;
+        this.eventoPublisher = eventoPublisher;
     }
 
     @Transactional
@@ -162,6 +168,7 @@ public class ConversacionService {
 
         registrarAccion(conversacion, TipoAccionConversacion.SOLICITUD, remitente, null);
         notificarSolicitud(destinatario, remitente, conversacion, motivo);
+        publicarCambio(conversacion);
 
         return aDTO(conversacion, remitente.getIdUsuario(), config);
     }
@@ -206,6 +213,7 @@ public class ConversacionService {
             "@" + usuario.getNombreUsuario() + " aceptó tu solicitud de mensaje.",
             idConversacion,
             TIPO_REFERENCIA_CONVERSACION);
+        publicarCambio(conversacion);
 
         return aDTO(conversacion, idUsuario, configuracionService.obtener());
     }
@@ -246,6 +254,7 @@ public class ConversacionService {
             "@" + usuario.getNombreUsuario() + " rechazó tu solicitud de mensaje.",
             idConversacion,
             TIPO_REFERENCIA_CONVERSACION);
+        publicarCambio(conversacion);
 
         return aDTO(conversacion, idUsuario, config);
     }
@@ -276,6 +285,7 @@ public class ConversacionService {
             "@" + usuario.getNombreUsuario() + " canceló su solicitud de mensaje.",
             idConversacion,
             TIPO_REFERENCIA_CONVERSACION);
+        publicarCambio(conversacion);
 
         return aDTO(conversacion, idUsuario, configuracionService.obtener());
     }
@@ -486,6 +496,11 @@ public class ConversacionService {
             return;
         }
         indicadorEscritura.marcar(idConversacion, idUsuario);
+        Usuario contraparte = conversacion.contraparteDe(idUsuario);
+        if (contraparte != null) {
+            eventoPublisher.publishEvent(new EscrituraEvent(
+                idConversacion, contraparte.getNombreUsuario()));
+        }
     }
 
     @Transactional(readOnly = true)
@@ -536,6 +551,7 @@ public class ConversacionService {
         registrarAccion(
             conversacion, TipoAccionConversacion.REENVIO, remitente, null);
         notificarSolicitud(destinatario, remitente, conversacion, motivo);
+        publicarCambio(conversacion);
 
         return aDTO(conversacion, remitente.getIdUsuario(), config);
     }
@@ -747,6 +763,14 @@ public class ConversacionService {
         accion.setUsuario(usuario);
         accion.setMotivo(motivo);
         accionRepository.save(accion);
+    }
+
+    private void publicarCambio(Conversacion conversacion) {
+        eventoPublisher.publishEvent(new ConversacionActualizadaEvent(
+            conversacion.getIdConversacion(),
+            conversacion.getEstado(),
+            conversacion.getIniciador().getNombreUsuario(),
+            conversacion.getDestinatario().getNombreUsuario()));
     }
 
     private void notificarSolicitud(

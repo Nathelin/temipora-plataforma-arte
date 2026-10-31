@@ -26,6 +26,7 @@ import {
   rechazarConversacion,
 } from '../servicios/mensajes'
 import { useMensajes } from '../composables/useMensajes'
+import { useMensajeriaSocket } from '../composables/useMensajeriaSocket'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import ModalRechazoConversacion from '../components/ModalRechazoConversacion.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
@@ -33,6 +34,11 @@ import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 const route = useRoute()
 const router = useRouter()
 const { cargarContador } = useMensajes()
+const {
+  conectado: socketConectado,
+  enviarEscribiendo,
+  suscribir: suscribirSocket,
+} = useMensajeriaSocket()
 const { exito } = useNotificaciones()
 
 const INTERVALO_MS = 5000
@@ -65,6 +71,8 @@ let intervalo = null
 let intervaloEscritura = null
 let ultimoLatido = 0
 let consultandoEscritura = false
+let quitarSuscripcionSocket = null
+let temporizadorEscritura = null
 
 const enPanel = computed(() => route.path.startsWith('/panel'))
 const nombreBandeja = computed(() => (enPanel.value ? 'panel-mensajes' : 'mensajes'))
@@ -245,7 +253,7 @@ function reiniciar() {
   errorAccion.value = ''
   modalRechazo.value = false
   modalCancelar.value = false
-  contraparteEscribiendo.value = false
+  detenerTemporizadorEscritura()
   ultimoLatido = 0
   inicializar()
 }
@@ -285,7 +293,10 @@ async function enviar() {
   errorEnvio.value = ''
   try {
     const res = await enviarMensaje(idConversacion.value, contenido)
-    if (res.data) mensajes.value = [...mensajes.value, res.data]
+    if (res.data && !mensajes.value.some(
+      (mensaje) => mensaje.idMensaje === res.data.idMensaje)) {
+      mensajes.value = [...mensajes.value, res.data]
+    }
     texto.value = ''
     await nextTick()
     scrollAlFinal()
@@ -311,7 +322,86 @@ function avisarEscribiendo() {
   const ahora = Date.now()
   if (ahora - ultimoLatido < 2000) return
   ultimoLatido = ahora
+  if (socketConectado.value && enviarEscribiendo(idConversacion.value)) {
+    return
+  }
   marcarEscribiendo(idConversacion.value).catch(() => {})
+}
+
+function detenerTemporizadorEscritura() {
+  if (temporizadorEscritura) {
+    window.clearTimeout(temporizadorEscritura)
+    temporizadorEscritura = null
+  }
+  contraparteEscribiendo.value = false
+}
+
+function manejarEventoSocket(evento) {
+  if (!evento || Number(evento.idConversacion) !== idConversacion.value) {
+    return
+  }
+
+  if (evento.tipo === 'MENSAJE' && evento.mensaje) {
+    const mensaje = evento.mensaje
+    if (mensajes.value.some((m) => m.idMensaje === mensaje.idMensaje)) {
+      return
+    }
+    const estabaCerca = estaCercaDelFinal()
+    mensajes.value = [...mensajes.value, mensaje]
+      .sort((a, b) => a.idMensaje - b.idMensaje)
+    if (!mensaje.esPropio) {
+      detenerTemporizadorEscritura()
+      if (document.visibilityState === 'visible' && esAceptada.value) {
+        void marcarLeida()
+      }
+      void cargarContador({ silencioso: true })
+    }
+    if (estabaCerca) {
+      void nextTick().then(scrollAlFinal)
+    }
+    return
+  }
+
+  if (evento.tipo === 'ESCRITURA') {
+    if (!esAceptada.value) return
+    contraparteEscribiendo.value = true
+    if (temporizadorEscritura) {
+      window.clearTimeout(temporizadorEscritura)
+    }
+    temporizadorEscritura = window.setTimeout(() => {
+      contraparteEscribiendo.value = false
+      temporizadorEscritura = null
+    }, 6000)
+    return
+  }
+
+  if (evento.tipo === 'LEIDO' && evento.fechaLectura) {
+    const fecha = new Date(evento.fechaLectura)
+    if (conversacion.value) {
+      conversacion.value = {
+        ...conversacion.value,
+        contraparteUltimoLeidoEn: evento.fechaLectura,
+      }
+    }
+    mensajes.value = mensajes.value.map((mensaje) => mensaje.esPropio
+      ? { ...mensaje, leido: new Date(mensaje.fechaEnvio) <= fecha }
+      : mensaje)
+    return
+  }
+
+  if (evento.tipo === 'CONVERSACION') {
+    void recargarPorEvento()
+  }
+}
+
+async function recargarPorEvento() {
+  await cargarDetalle({ silencioso: true })
+  if (esAceptada.value) {
+    await cargarHistorial({ reset: true, mostrarCargando: false })
+    await marcarLeida()
+    await nextTick()
+    scrollAlFinal()
+  }
 }
 
 function manejarEnter(event) {
@@ -485,9 +575,12 @@ onMounted(() => {
   inicializar()
   iniciarPolling()
   iniciarPollingEscritura()
+  quitarSuscripcionSocket = suscribirSocket(manejarEventoSocket)
 })
 
 onBeforeUnmount(() => {
+  quitarSuscripcionSocket?.()
+  detenerTemporizadorEscritura()
   detenerPolling()
   detenerPollingEscritura()
 })

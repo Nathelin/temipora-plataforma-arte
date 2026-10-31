@@ -14,12 +14,15 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import com.temipora.backend_springboot.eventos.LeidoEvent;
+import com.temipora.backend_springboot.eventos.MensajeEnviadoEvent;
 import com.temipora.backend_springboot.modelo.ConfiguracionMensajeria;
 import com.temipora.backend_springboot.modelo.Conversacion;
 import com.temipora.backend_springboot.modelo.ConversacionParticipante;
@@ -57,6 +60,9 @@ class MensajeServiceTest {
 
     @Mock
     private IndicadorEscritura indicadorEscritura;
+
+    @Mock
+    private ApplicationEventPublisher eventoPublisher;
 
     @InjectMocks
     private MensajeService mensajeService;
@@ -159,6 +165,7 @@ class MensajeServiceTest {
         assertThat(conversacion.getFechaUltimoMensaje()).isNotNull();
         assertThat(participanteDestinatario.isArchivada()).isFalse();
         verify(indicadorEscritura).limpiar(10L, 1L);
+        verify(eventoPublisher).publishEvent(any(MensajeEnviadoEvent.class));
     }
 
     @Test
@@ -232,6 +239,7 @@ class MensajeServiceTest {
         mensajeService.marcarLeido(10L, 2L);
 
         assertThat(participante.getUltimoLeidoEn()).isNotNull();
+        verify(eventoPublisher).publishEvent(any(LeidoEvent.class));
     }
 
     private void prepararEnvio(
