@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
@@ -9,6 +9,7 @@ import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import SubirEntregable from '../components/SubirEntregable.vue'
 import FormularioResenia from '../components/FormularioResenia.vue'
 import TarjetaResenia from '../components/TarjetaResenia.vue'
+import { useNotificaciones } from '../composables/useNotificaciones'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import {
   cargarCriterios,
@@ -19,13 +20,15 @@ import {
 } from '../servicios/resenias'
 import {
   descripcionHito,
+  estadoEntregaDe,
+  estadoPagoDe,
   estadoPedidoDe,
-  etiquetaEntrega,
-  etiquetaPago,
   etiquetaTipoHito,
   formatearFecha,
   formatearFechaHora,
+  hitoPrioritario,
   pagoPendiente,
+  resumenPagos,
 } from '../servicios/pedidos'
 
 const route = useRoute()
@@ -35,8 +38,6 @@ const idPedido = computed(() => Number(route.params.idPedido))
 const pedido = ref(null)
 const cargando = ref(true)
 const error = ref('')
-const errorAccion = ref('')
-const aviso = ref('')
 const procesando = ref(false)
 const avisoPago = ref('')
 const sondeandoPago = ref(false)
@@ -45,7 +46,12 @@ const revisionHitoId = ref(null)
 const motivoRevision = ref('')
 const visor = reactive({ abierto: false, imagen: '' })
 const { abrirVerificada } = useSubirImagen()
+const { exito, error: errorToast } = useNotificaciones()
 const idsEnPortfolio = ref([])
+const pestanaActiva = ref('resumen')
+const tabsRef = ref(null)
+const contenidoRef = ref(null)
+const hitoAbierto = ref(null)
 const confirmacion = reactive({
   abierto: false,
   titulo: '',
@@ -89,12 +95,102 @@ function formatearMontoHito(hito) {
   )
 }
 
+const pestanas = computed(() => {
+  const lista = [
+    { id: 'resumen', etiqueta: 'Resumen' },
+    { id: 'plan-pagos', etiqueta: 'Plan de pagos' },
+  ]
+  if (esArtista.value || esCliente.value) {
+    lista.push({ id: 'galeria', etiqueta: 'Galería' })
+  }
+  if (puedeVerResenias.value) {
+    lista.push({ id: 'resenas', etiqueta: 'Reseñas' })
+  }
+  return lista
+})
+
+const resumen = computed(() => resumenPagos(hitos.value))
+
+const claseFondoBarra = computed(() => (
+  route.path.startsWith('/admin') ? 'bg-blanco' : 'bg-crema'
+))
+
+function claseNodoHito(hito) {
+  if (hito.puedePagar || hito.puedeAprobar || hito.puedeEntregar || pagoPendiente(hito)) {
+    return 'border-coral bg-coral text-white'
+  }
+  if (hito.estadoPago === 'PAGADO') {
+    return 'border-green-700/40 bg-green-700/10 text-green-700'
+  }
+  return 'border-rosa bg-blanco text-cafe/60'
+}
+
+function aplicarPestanaDesdeUrl() {
+  const ids = pestanas.value.map((pestana) => pestana.id)
+  const tab = route.query.tab
+  pestanaActiva.value = ids.includes(tab) ? tab : 'resumen'
+}
+
+function sincronizarUrl() {
+  const query = { ...route.query }
+  if (pestanaActiva.value === 'resumen') {
+    delete query.tab
+  } else {
+    query.tab = pestanaActiva.value
+  }
+  if (query.tab === route.query.tab) return
+  router.replace({ query })
+}
+
+function cambiarPestana(pestana) {
+  if (pestanaActiva.value === pestana) return
+
+  const tabs = tabsRef.value
+  const alturaHeader = window.innerWidth >= 640 ? 64 : 56
+  const estabaFijo = tabs && tabs.getBoundingClientRect().top <= alturaHeader + 1
+
+  pestanaActiva.value = pestana
+  sincronizarUrl()
+
+  if (!estabaFijo || !contenidoRef.value) return
+
+  const top = contenidoRef.value.getBoundingClientRect().top
+    + window.scrollY
+    - alturaHeader
+    - tabs.getBoundingClientRect().height
+    - 12
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+}
+
+function navegarPestanas(event) {
+  const ids = pestanas.value.map((pestana) => pestana.id)
+  const actual = ids.indexOf(pestanaActiva.value)
+  const destino = {
+    ArrowRight: ids[(actual + 1) % ids.length],
+    ArrowLeft: ids[(actual - 1 + ids.length) % ids.length],
+    Home: ids[0],
+    End: ids[ids.length - 1],
+  }[event.key]
+  if (!destino) return
+  event.preventDefault()
+  cambiarPestana(destino)
+  nextTick(() => document.getElementById(`pestana-${destino}`)?.focus())
+}
+
+function alternarHito(idHitoPedido) {
+  hitoAbierto.value = hitoAbierto.value === idHitoPedido ? null : idHitoPedido
+}
+
+watch(() => route.query.tab, aplicarPestanaDesdeUrl)
+
 async function cargar() {
   cargando.value = true
   error.value = ''
   try {
     const res = await api.get(`/pedidos/${idPedido.value}`)
     pedido.value = res.data
+    hitoAbierto.value = hitoPrioritario(res.data?.hitos || [])?.idHitoPedido ?? null
+    aplicarPestanaDesdeUrl()
     if (res.data?.rolVista === 'CLIENTE') {
       await sincronizarPagoPendiente()
     }
@@ -177,7 +273,7 @@ async function guardarResenia(payload) {
       await crearResenia(idPedido.value, payload)
     }
     editandoResenia.value = false
-    aviso.value = eraEdicion ? 'Reseña actualizada.' : 'Reseña publicada.'
+    exito(eraEdicion ? 'Reseña actualizada.' : 'Reseña publicada.')
     await cargarResenias()
   } catch (e) {
     if (e.response?.status === 401) {
@@ -202,7 +298,7 @@ function eliminarMiResenia() {
     try {
       await eliminarResenia(idPedido.value)
       editandoResenia.value = false
-      aviso.value = 'Eliminaste tu reseña.'
+      exito('Eliminaste tu reseña.')
       await cargarResenias()
     } catch (e) {
       errorResenia.value = e.response?.data?.message
@@ -220,20 +316,18 @@ function agregarAlPortfolio({ archivo, entrega }) {
 async function ejecutar(accion, mensaje) {
   if (procesando.value) return false
   procesando.value = true
-  errorAccion.value = ''
-  aviso.value = ''
   try {
     const res = await accion()
     if (res?.data) pedido.value = res.data
-    aviso.value = mensaje
+    exito(mensaje)
     return true
   } catch (e) {
     if (e.response?.status === 401) {
       router.push({ name: 'login' })
       return false
     }
-    errorAccion.value = e.response?.data?.message
-      || 'No se pudo completar la acción.'
+    errorToast(e.response?.data?.message
+      || 'No se pudo completar la acción.')
     return false
   } finally {
     procesando.value = false
@@ -266,14 +360,12 @@ function urlCheckoutMercadoPago(data) {
 async function pagarHito(hito) {
   if (procesando.value) return
   procesando.value = true
-  errorAccion.value = ''
-  aviso.value = ''
   try {
     await sincronizarPagoPendiente()
     const actualizado = (pedido.value?.hitos || [])
       .find((item) => item.idHitoPedido === hito.idHitoPedido)
     if (actualizado && actualizado.estadoPago !== 'PENDIENTE') {
-      aviso.value = 'El pago ya fue acreditado.'
+      exito('El pago ya fue acreditado.')
       return
     }
     const res = await api.post(
@@ -285,14 +377,14 @@ async function pagarHito(hito) {
       window.location.href = url
       return
     }
-    aviso.value = 'Pago iniciado. Confirmalo para activar el hito.'
+    exito('Pago iniciado. Confirmalo para activar el hito.')
   } catch (e) {
     if (e.response?.status === 401) {
       router.push({ name: 'login' })
       return
     }
-    errorAccion.value = e.response?.data?.message
-      || 'No se pudo completar la acción.'
+    errorToast(e.response?.data?.message
+      || 'No se pudo completar la acción.')
   } finally {
     procesando.value = false
   }
@@ -386,7 +478,7 @@ function cerrarRevision() {
 
 async function solicitarRevision(hito) {
   if (!motivoRevision.value.trim()) {
-    errorAccion.value = 'Escribí el motivo de la revisión.'
+    errorToast('Escribí el motivo de la revisión.')
     return
   }
   const ok = await ejecutar(
@@ -400,19 +492,19 @@ async function solicitarRevision(hito) {
 }
 
 function cancelar() {
-  if (!window.confirm(
-    '¿Cancelar el pedido? Los pagos ya realizados no se devuelven automáticamente.',
-  )) return
-  ejecutar(
+  pedirConfirmacion({
+    titulo: '¿Cancelar el pedido?',
+    mensaje: 'El pedido va a quedar cancelado para el cliente y el artista. Los pagos ya realizados no se devuelven automáticamente.',
+    textoConfirmar: 'Sí, cancelar pedido',
+  }, () => ejecutar(
     () => api.post(`/pedidos/${idPedido.value}/cancelar`),
     'El pedido fue cancelado.',
-  )
+  ))
 }
 
 function alEntregar(data) {
   if (data) pedido.value = data
-  errorAccion.value = ''
-  aviso.value = 'Entregable subido. El cliente fue notificado.'
+  exito('Entregable subido. El cliente fue notificado.')
 }
 
 async function autorizarPublicacion(autoriza) {
@@ -451,7 +543,6 @@ function cerrarVisor() {
 async function descargarConstancia() {
   if (descargandoConstancia.value) return
   descargandoConstancia.value = true
-  errorAccion.value = ''
   try {
     const res = await api.get(
       `/pedidos/${idPedido.value}/constancia`,
@@ -465,8 +556,9 @@ async function descargarConstancia() {
     enlace.click()
     enlace.remove()
     URL.revokeObjectURL(url)
+    exito('Constancia descargada.')
   } catch (e) {
-    errorAccion.value = 'No se pudo descargar la constancia.'
+    errorToast('No se pudo descargar la constancia.')
   } finally {
     descargandoConstancia.value = false
   }
@@ -548,8 +640,44 @@ onMounted(async () => {
         <span v-if="sondeandoPago" class="text-cafe/60"> Actualizando...</span>
       </p>
 
-      <section class="mt-6 rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
-        <dl class="grid gap-3 text-sm sm:grid-cols-3">
+      <div
+        ref="tabsRef"
+        class="sticky top-14 z-20 mt-6 -mx-1 flex flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-borde/50 px-1 pb-1.5 pt-1.5 sm:top-16 sm:gap-2"
+        :class="claseFondoBarra"
+        role="tablist"
+        aria-label="Secciones del pedido"
+        @keydown="navegarPestanas"
+      >
+        <button
+          v-for="pestana in pestanas"
+          :id="`pestana-${pestana.id}`"
+          :key="pestana.id"
+          type="button"
+          role="tab"
+          :aria-controls="`panel-${pestana.id}`"
+          :aria-selected="pestanaActiva === pestana.id"
+          :tabindex="pestanaActiva === pestana.id ? 0 : -1"
+          class="shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-[13px] font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral sm:px-5 sm:py-2.5 sm:text-sm"
+          :class="pestanaActiva === pestana.id
+            ? 'bg-coral text-white shadow-sm'
+            : 'text-cafe/60 hover:bg-rosa/25 hover:text-granate'"
+          @click="cambiarPestana(pestana.id)"
+        >
+          {{ pestana.etiqueta }}
+        </button>
+      </div>
+
+      <div ref="contenidoRef" class="mt-6 flex flex-col gap-4">
+        <section
+          v-show="pestanaActiva === 'resumen'"
+          id="panel-resumen"
+          role="tabpanel"
+          aria-labelledby="pestana-resumen"
+          tabindex="0"
+          class="space-y-4 focus-visible:outline-none"
+        >
+          <section class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
+            <dl class="grid gap-3 text-sm sm:grid-cols-3">
           <div class="rounded-xl bg-rosa/10 px-3 py-2">
             <dt class="text-xs text-cafe/50">Total</dt>
             <dd class="mt-0.5 text-xl font-bold text-granate">{{ total }}</dd>
@@ -595,9 +723,9 @@ onMounted(async () => {
             </div>
           </dl>
         </div>
-      </section>
+          </section>
 
-      <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-coral/25 bg-coral/5 p-4">
+          <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-coral/25 bg-coral/5 p-4">
         <div class="min-w-0">
           <p class="text-sm font-semibold text-granate">Constancia del pedido</p>
           <p class="text-xs leading-relaxed text-cafe/60">
@@ -613,28 +741,35 @@ onMounted(async () => {
           <IconoDescarga />
           {{ descargandoConstancia ? 'Generando...' : 'Descargar PDF' }}
         </button>
-      </div>
+          </div>
 
-      <p
-        v-if="errorAccion"
-        class="mt-4 rounded-xl border border-rojizo/25 bg-rojizo/5 px-4 py-3 text-sm text-rojizo"
-        role="alert"
-      >
-        {{ errorAccion }}
-      </p>
-      <p
-        v-else-if="aviso"
-        class="mt-4 rounded-xl border border-green-700/25 bg-green-700/5 px-4 py-3 text-sm text-green-700"
-        role="status"
-      >
-        {{ aviso }}
-      </p>
+          <div v-if="pedido.puedeCancelar" class="rounded-2xl border border-rojizo/25 bg-rojizo/5 p-5 sm:p-6">
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-rojizo">Zona de riesgo</p>
+            <p class="mt-1 text-sm leading-relaxed text-cafe/65">
+              Cancelar detiene el trabajo y no devuelve automáticamente los pagos ya realizados.
+            </p>
+            <button
+              type="button"
+              :disabled="procesando"
+              class="mt-3 inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-5 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10 disabled:opacity-50"
+              @click="cancelar"
+            >
+              Cancelar pedido
+            </button>
+          </div>
+        </section>
 
-      <section
-        v-if="esArtista || esCliente"
-        class="mt-4 rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6"
-      >
-        <div class="flex flex-wrap items-start justify-between gap-3">
+        <template v-if="esArtista || esCliente">
+          <section
+            v-show="pestanaActiva === 'galeria'"
+            id="panel-galeria"
+            role="tabpanel"
+            aria-labelledby="pestana-galeria"
+            tabindex="0"
+            class="space-y-4 focus-visible:outline-none"
+          >
+            <section class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
+              <div class="flex flex-wrap items-start justify-between gap-3">
           <div class="min-w-0">
             <h2 class="text-lg font-semibold text-granate">
               {{ esArtista ? 'Galería del cliente' : 'Mi galería de pedidos' }}
@@ -798,41 +933,128 @@ onMounted(async () => {
             </router-link>
           </div>
         </div>
-      </section>
+            </section>
+          </section>
+        </template>
 
-      <section class="mt-6 space-y-4">
-        <h2 class="text-xl font-semibold text-granate">Plan de pagos</h2>
-
-        <article
-          v-for="hito in hitos"
-          :key="hito.idHitoPedido"
-          class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6"
+        <section
+          v-show="pestanaActiva === 'plan-pagos'"
+          id="panel-plan-pagos"
+          role="tabpanel"
+          aria-labelledby="pestana-plan-pagos"
+          tabindex="0"
+          class="space-y-4 focus-visible:outline-none"
         >
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0">
-              <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
-                {{ etiquetaTipoHito(hito.tipo) }}
-              </p>
-              <h3 class="mt-1 text-lg font-semibold text-granate">{{ hito.nombre }}</h3>
-              <p v-if="hito.descripcion" class="mt-1 text-sm leading-relaxed text-cafe/70">
-                {{ hito.descripcion }}
-              </p>
-              <p class="mt-1 text-xs text-cafe/55">{{ descripcionHito(hito) }}</p>
-            </div>
-            <div class="text-right">
-              <p class="text-lg font-bold text-granate">{{ formatearMontoHito(hito) }}</p>
-              <div class="mt-1 flex flex-wrap justify-end gap-1.5">
-                <span class="rounded-full bg-rosa/20 px-2.5 py-1 text-[11px] font-semibold text-cafe/70">
-                  Pago: {{ etiquetaPago(hito.estadoPago) }}
-                </span>
-                <span class="rounded-full bg-coral/10 px-2.5 py-1 text-[11px] font-semibold text-coral">
-                  Entrega: {{ etiquetaEntrega(hito.estadoEntrega) }}
-                </span>
+          <div class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 class="text-xl font-semibold text-granate">Plan de pagos</h2>
+                <p class="mt-1 text-sm text-cafe/60">
+                  {{ resumen.pagados }} de {{ resumen.total }} hitos pagados
+                </p>
               </div>
+              <p class="text-sm font-semibold text-granate">
+                {{ formatearPrecio(resumen.montoPagado, moneda) }}
+                <span class="font-normal text-cafe/55">
+                  de {{ formatearPrecio(resumen.montoTotal, moneda) }}
+                </span>
+              </p>
+            </div>
+            <div
+              class="mt-3 h-2 overflow-hidden rounded-full bg-rosa/30"
+              role="progressbar"
+              :aria-valuenow="resumen.porcentaje"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-label="`${resumen.pagados} de ${resumen.total} hitos pagados`"
+            >
+              <div
+                class="h-full rounded-full bg-coral transition-all"
+                :style="{ width: `${resumen.porcentaje}%` }"
+              ></div>
             </div>
           </div>
 
-          <dl class="mt-4 grid gap-2 text-xs sm:grid-cols-3">
+          <ol class="space-y-3">
+            <li
+              v-for="(hito, indice) in hitos"
+              :key="hito.idHitoPedido"
+              class="flex gap-3"
+            >
+              <div class="flex w-8 shrink-0 flex-col items-center">
+                <span
+                  class="flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-bold"
+                  :class="claseNodoHito(hito)"
+                >
+                  {{ hito.estadoPago === 'PAGADO' ? '✓' : indice + 1 }}
+                </span>
+                <span
+                  v-if="indice < hitos.length - 1"
+                  class="mt-2 w-px flex-1 bg-rosa/60"
+                ></span>
+              </div>
+
+              <article class="min-w-0 flex-1 rounded-2xl border border-rosa/50 bg-blanco">
+                <div class="flex flex-wrap items-start gap-3 p-4 sm:p-5">
+                  <button
+                    type="button"
+                    class="min-w-0 flex-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral"
+                    :aria-expanded="hitoAbierto === hito.idHitoPedido"
+                    :aria-controls="`hito-${hito.idHitoPedido}`"
+                    @click="alternarHito(hito.idHitoPedido)"
+                  >
+                    <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                      {{ etiquetaTipoHito(hito.tipo) }}
+                    </span>
+                    <span class="mt-1 block text-lg font-semibold text-granate">{{ hito.nombre }}</span>
+                    <span class="mt-1.5 flex flex-wrap gap-1.5">
+                      <span
+                        class="rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                        :class="estadoPagoDe(hito.estadoPago).clase"
+                      >
+                        Pago: {{ estadoPagoDe(hito.estadoPago).etiqueta }}
+                      </span>
+                      <span
+                        class="rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                        :class="estadoEntregaDe(hito.estadoEntrega).clase"
+                      >
+                        Entrega: {{ estadoEntregaDe(hito.estadoEntrega).etiqueta }}
+                      </span>
+                    </span>
+                  </button>
+
+                  <div class="flex flex-col items-end gap-2">
+                    <p class="text-lg font-bold text-granate">{{ formatearMontoHito(hito) }}</p>
+                    <button
+                      v-if="hito.puedePagar"
+                      type="button"
+                      :disabled="procesando"
+                      class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition hover:bg-rojizo disabled:opacity-50"
+                      @click="pagarHito(hito)"
+                    >
+                      {{ hito.tipo === 'ENTREGA' ? 'Pagar y desbloquear' : 'Pagar' }}
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  class="grid transition-all duration-200"
+                  :class="hitoAbierto === hito.idHitoPedido ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+                >
+                  <div
+                    :id="`hito-${hito.idHitoPedido}`"
+                    class="overflow-hidden"
+                    :inert="hitoAbierto !== hito.idHitoPedido"
+                  >
+                    <div class="space-y-3 border-t border-rosa/40 px-4 py-4 sm:px-5">
+                      <div>
+                        <p v-if="hito.descripcion" class="text-sm leading-relaxed text-cafe/70">
+                          {{ hito.descripcion }}
+                        </p>
+                        <p class="mt-1 text-xs text-cafe/55">{{ descripcionHito(hito) }}</p>
+                      </div>
+
+                      <dl class="grid gap-2 text-xs sm:grid-cols-3">
             <div v-if="hito.fechaLimitePago">
               <dt class="text-cafe/50">Pagar antes de</dt>
               <dd class="mt-0.5 text-cafe">{{ formatearFechaHora(hito.fechaLimitePago) }}</dd>
@@ -930,23 +1152,7 @@ onMounted(async () => {
             </a>
           </div>
 
-          <div class="mt-4 flex flex-wrap gap-2">
-            <button
-              v-if="hito.puedePagar"
-              type="button"
-              :disabled="procesando"
-              class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition hover:bg-rojizo disabled:opacity-50"
-              @click="pagarHito(hito)"
-            >
-              {{
-                hito.tipo === 'ENTREGA'
-                  ? 'Pagar y desbloquear entrega'
-                  : `Pagar ${hito.nombre}`
-              }}
-            </button>
-          </div>
-
-          <div v-if="hito.puedeAprobar" class="mt-4 flex flex-wrap gap-2">
+          <div v-if="hito.puedeAprobar" class="flex flex-wrap gap-2">
             <button
               type="button"
               :disabled="procesando"
@@ -997,18 +1203,31 @@ onMounted(async () => {
             </div>
           </div>
 
-          <SubirEntregable
-            v-if="esArtista && hito.puedeEntregar"
-            :id-pedido="idPedido"
-            :hito="hito"
-            :dibujos="pedido.dibujos || []"
-            @entregado="alEntregar"
-          />
-        </article>
-      </section>
+                      <SubirEntregable
+                        v-if="esArtista && hito.puedeEntregar"
+                        :id-pedido="idPedido"
+                        :hito="hito"
+                        :dibujos="pedido.dibujos || []"
+                        @entregado="alEntregar"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </article>
+            </li>
+          </ol>
+        </section>
 
-      <section v-if="puedeVerResenias" class="mt-6 space-y-4">
-        <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <template v-if="puedeVerResenias">
+          <section
+            v-show="pestanaActiva === 'resenas'"
+            id="panel-resenas"
+            role="tabpanel"
+            aria-labelledby="pestana-resenas"
+            tabindex="0"
+            class="space-y-4 focus-visible:outline-none"
+          >
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
           <h2 class="text-xl font-semibold text-granate">Reseñas</h2>
           <p v-if="reseniaEstado" class="text-xs text-cafe/50">
             {{ esArtista
@@ -1085,17 +1304,8 @@ onMounted(async () => {
             </p>
           </div>
         </template>
-      </section>
-
-      <div v-if="pedido.puedeCancelar" class="mt-6">
-        <button
-          type="button"
-          :disabled="procesando"
-          class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-5 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10 disabled:opacity-50"
-          @click="cancelar"
-        >
-          Cancelar pedido
-        </button>
+          </section>
+        </template>
       </div>
     </template>
 
