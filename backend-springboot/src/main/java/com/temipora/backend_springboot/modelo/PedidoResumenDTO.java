@@ -32,6 +32,9 @@ public class PedidoResumenDTO {
     private BigDecimal proximoHitoMontoMostrado;
     private String monedaMostrada;
     private String rolVista;
+    private int hitosTotales;
+    private int hitosPagados;
+    private int porcentajeAvance;
     private boolean puedePagar;
     private boolean puedeEntregar;
     private boolean puedeAprobar;

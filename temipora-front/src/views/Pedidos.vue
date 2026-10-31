@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
@@ -15,7 +15,7 @@ const router = useRouter()
 const esArtista = localStorage.getItem('rol') === 'ARTISTA'
 
 const bandejaActiva = ref(esArtista ? 'recibidos' : 'enviados')
-const estadoFiltro = ref('')
+const estadoFiltro = ref(route.query.estado || '')
 const pedidos = ref([])
 const pagina = ref(0)
 const hayMas = ref(false)
@@ -97,6 +97,24 @@ function cambiarBandeja(clave) {
 function cambiarEstado() {
   cargar(true)
 }
+
+watch(estadoFiltro, (valor) => {
+  const query = { ...route.query }
+  if (valor) {
+    query.estado = valor
+  } else {
+    delete query.estado
+  }
+  router.replace({ query })
+})
+
+watch(() => route.query.estado, (valor) => {
+  const nuevo = valor || ''
+  if (nuevo !== estadoFiltro.value) {
+    estadoFiltro.value = nuevo
+    cargar(true)
+  }
+})
 
 function verPedido(idPedido) {
   router.push({

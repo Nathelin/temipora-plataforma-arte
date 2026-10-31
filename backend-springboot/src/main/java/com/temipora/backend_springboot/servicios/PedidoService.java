@@ -72,6 +72,13 @@ public class PedidoService {
     private static final String NOTIF_PUBLICACION_RETIRADA =
         "PEDIDO_PUBLICACION_RETIRADA";
 
+    private static final List<EstadoPedido> ESTADOS_PANEL_ACTIVOS = List.of(
+        EstadoPedido.PENDIENTE_PAGO,
+        EstadoPedido.EN_CURSO,
+        EstadoPedido.IMPAGO);
+    private static final int MAX_HITOS_PANEL = 10;
+    private static final int DIAS_HITO_POR_VENCER = 3;
+
     private final PedidoRepository pedidoRepository;
     private final HitoPedidoRepository hitoPedidoRepository;
     private final PagoRepository pagoRepository;
@@ -564,6 +571,210 @@ public class PedidoService {
         return aPagina(page, idArtista);
     }
 
+    public record ActividadArtista(
+            List<PedidoResumenDTO> pedidosActivos,
+            List<HitoPedidoDTO> hitosAtencion,
+            long pedidosEnCurso,
+            long pedidosPendientesPago,
+            long pedidosImpagos,
+            long entregasPendientes,
+            long entregasConRevision,
+            long hitosPorVencer,
+            BigDecimal porCobrar,
+            String monedaMostrada) {
+    }
+
+    private record HitoAtencion(
+            int prioridad, LocalDateTime fecha, HitoPedidoDTO dto) {
+    }
+
+    @Transactional(readOnly = true)
+    public ActividadArtista actividadArtista(Long idArtista) {
+        LocalDateTime ahora = LocalDateTime.now();
+        Moneda mostrada = monedaVistaService.preferidaDe(idArtista);
+        List<Pedido> pedidos = pedidoRepository
+            .findByArtistaIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
+                idArtista, ESTADOS_PANEL_ACTIVOS, PageRequest.of(0, 50));
+
+        List<PedidoResumenDTO> resumenes = new ArrayList<>();
+        List<HitoAtencion> atenciones = new ArrayList<>();
+        long enCurso = 0;
+        long pendientePago = 0;
+        long impagos = 0;
+        long entregasPendientes = 0;
+        long conRevision = 0;
+        long porVencer = 0;
+        BigDecimal porCobrar = BigDecimal.ZERO;
+
+        for (Pedido pedido : pedidos) {
+            if (pedido.getEstado() == EstadoPedido.EN_CURSO) {
+                enCurso++;
+            } else if (pedido.getEstado() == EstadoPedido.PENDIENTE_PAGO) {
+                pendientePago++;
+            } else if (pedido.getEstado() == EstadoPedido.IMPAGO) {
+                impagos++;
+            }
+
+            boolean muestraOrigen = PresupuestoDTO.mismaMoneda(
+                mostrada, pedido.getMoneda());
+            boolean muestraCobro = !muestraOrigen
+                && PresupuestoDTO.mismaMoneda(
+                    mostrada, pedido.getMonedaCobro());
+            BigDecimal factorCobro = mostrada != null
+                ? monedaVistaService.factorCobroAMostrada(mostrada, ahora)
+                : null;
+            BigDecimal factorOrigen = mostrada != null
+                ? monedaVistaService.factorOrigenAMostrada(
+                    pedido.getMoneda(), mostrada, ahora)
+                : null;
+
+            for (HitoPedido hito : pedido.getHitos()) {
+                boolean entregable = puedeEntregar(pedido, hito);
+                boolean revision = hito.getEstadoEntrega()
+                    == EstadoEntregaHito.CON_REVISION;
+                boolean vencido = hito.getEstadoPago()
+                    == EstadoPagoHito.VENCIDO;
+                boolean vencePronto = hito.getEstadoPago()
+                        == EstadoPagoHito.PENDIENTE
+                    && hito.getFechaLimitePago() != null
+                    && !hito.getFechaLimitePago().isAfter(
+                        ahora.plusDays(DIAS_HITO_POR_VENCER));
+
+                if (revision) {
+                    conRevision++;
+                }
+                if (entregable) {
+                    entregasPendientes++;
+                }
+                if (vencePronto) {
+                    porVencer++;
+                }
+                if (hito.getEstadoPago() == EstadoPagoHito.PENDIENTE) {
+                    porCobrar = sumar(porCobrar, netoMostrado(
+                        hito,
+                        muestraOrigen,
+                        muestraCobro,
+                        factorCobro,
+                        factorOrigen));
+                }
+
+                int prioridad = revision ? 0
+                    : vencido ? 1
+                    : entregable ? 2
+                    : vencePronto ? 3
+                    : -1;
+                if (prioridad < 0) {
+                    continue;
+                }
+                LocalDateTime fecha = hito.getFechaLimitePago() != null
+                    ? hito.getFechaLimitePago()
+                    : hito.getFechaEntrega();
+                atenciones.add(new HitoAtencion(
+                    prioridad,
+                    fecha,
+                    HitoPedidoDTO.desdeHito(
+                        hito,
+                        List.of(),
+                        true,
+                        true,
+                        List.of(),
+                        false,
+                        entregable,
+                        false,
+                        false,
+                        muestraOrigen,
+                        muestraCobro,
+                        factorCobro,
+                        factorOrigen)));
+            }
+
+            resumenes.add(construirResumen(pedido, idArtista));
+        }
+
+        resumenes.sort(Comparator
+            .comparingInt(this::urgenciaPedido)
+            .thenComparing(
+                PedidoResumenDTO::getFechaCreacion,
+                Comparator.nullsLast(
+                    Comparator.<LocalDateTime>reverseOrder())));
+        atenciones.sort(Comparator
+            .comparingInt(HitoAtencion::prioridad)
+            .thenComparing(
+                HitoAtencion::fecha,
+                Comparator.nullsLast(
+                    Comparator.<LocalDateTime>naturalOrder())));
+
+        return new ActividadArtista(
+            resumenes,
+            atenciones.stream()
+                .limit(MAX_HITOS_PANEL)
+                .map(HitoAtencion::dto)
+                .toList(),
+            enCurso,
+            pendientePago,
+            impagos,
+            entregasPendientes,
+            conRevision,
+            porVencer,
+            porCobrar,
+            mostrada != null ? mostrada.getCodigo() : null);
+    }
+
+    public BigDecimal netoMostradoDe(
+            HitoPedido hito, Moneda mostrada, LocalDateTime fecha) {
+        Pedido pedido = hito.getPedido();
+        boolean muestraOrigen = PresupuestoDTO.mismaMoneda(
+            mostrada, pedido.getMoneda());
+        boolean muestraCobro = !muestraOrigen && PresupuestoDTO.mismaMoneda(
+            mostrada, pedido.getMonedaCobro());
+        BigDecimal factorCobro = mostrada != null
+            ? monedaVistaService.factorCobroAMostrada(mostrada, fecha)
+            : null;
+        BigDecimal factorOrigen = mostrada != null
+            ? monedaVistaService.factorOrigenAMostrada(
+                pedido.getMoneda(), mostrada, fecha)
+            : null;
+        return netoMostrado(
+            hito, muestraOrigen, muestraCobro, factorCobro, factorOrigen);
+    }
+
+    private int urgenciaPedido(PedidoResumenDTO resumen) {
+        if (EstadoPedido.IMPAGO.name().equals(resumen.getEstado())) {
+            return 0;
+        }
+        if (resumen.isPuedeEntregar()) {
+            return 1;
+        }
+        if (EstadoPedido.PENDIENTE_PAGO.name().equals(resumen.getEstado())) {
+            return 2;
+        }
+        return 3;
+    }
+
+    private BigDecimal netoMostrado(
+            HitoPedido hito,
+            boolean muestraOrigen,
+            boolean muestraCobro,
+            BigDecimal factorCobro,
+            BigDecimal factorOrigen) {
+        BigDecimal neto = hito.getMontoNeto();
+        BigDecimal netoCobro = hito.getMontoNetoCobro();
+        if (neto == null) {
+            neto = hito.getMonto() != null && hito.getComisionMonto() != null
+                ? hito.getMonto().subtract(hito.getComisionMonto())
+                : hito.getMonto();
+        }
+        if (netoCobro == null) {
+            netoCobro = hito.getMontoCobro() != null
+                    && hito.getComisionMontoCobro() != null
+                ? hito.getMontoCobro().subtract(hito.getComisionMontoCobro())
+                : hito.getMontoCobro();
+        }
+        return PresupuestoDTO.totalMostrado(
+            neto, netoCobro, muestraOrigen, muestraCobro,
+            factorCobro, factorOrigen);
+    }
+
     @Transactional
     public int aprobarAutomaticamente() {
         LocalDateTime ahora = LocalDateTime.now();
@@ -905,6 +1116,9 @@ public class PedidoService {
                     ? pedido.getMoneda().getCodigo()
                     : null))
             .rolVista(esArtista ? "ARTISTA" : "CLIENTE")
+            .hitosTotales(pedido.getHitos().size())
+            .hitosPagados(hitosPagadosDe(pedido))
+            .porcentajeAvance(porcentajeAvanceDe(pedido))
             .idConversacion(conversacion != null
                 ? conversacion.getIdConversacion()
                 : null)
@@ -920,6 +1134,20 @@ public class PedidoService {
             .puedeAprobar(esCliente && pedido.getHitos().stream()
                 .anyMatch(this::puedeAprobar))
             .build();
+    }
+
+    private int hitosPagadosDe(Pedido pedido) {
+        return (int) pedido.getHitos().stream()
+            .filter(hito -> hito.getEstadoPago() == EstadoPagoHito.PAGADO)
+            .count();
+    }
+
+    private int porcentajeAvanceDe(Pedido pedido) {
+        int total = pedido.getHitos().size();
+        if (total == 0) {
+            return 0;
+        }
+        return Math.round(hitosPagadosDe(pedido) * 100f / total);
     }
 
     private PaginaDTO<PedidoResumenDTO> aPagina(

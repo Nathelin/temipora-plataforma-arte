@@ -1,5 +1,7 @@
 package com.temipora.backend_springboot.repositorios;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -33,6 +35,9 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
 
     Page<Pedido> findByArtistaIdUsuarioAndEstado(
         Long idArtista, EstadoPedido estado, Pageable pageable);
+
+    List<Pedido> findByArtistaIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
+        Long idArtista, Collection<EstadoPedido> estados, Pageable pageable);
 
     boolean existsByArtistaIdUsuarioAndClienteIdUsuario(
         Long idArtista, Long idCliente);

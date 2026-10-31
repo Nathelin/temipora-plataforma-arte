@@ -187,6 +187,7 @@ const routes = [
           { path: 'servicios/:id/editar', name: 'servicio-editar', component: ServicioForm, meta: { title: 'Editar servicio' } },
           { path: 'servicios/:id/solicitudes', name: 'servicio-solicitudes', component: ServicioSolicitudes, meta: { title: 'Solicitudes del servicio' } },
           { path: 'solicitudes', name: 'panel-solicitudes', component: Solicitudes, meta: { title: 'Solicitudes' } },
+          { path: 'solicitudes/:idSolicitud', name: 'panel-solicitud-detalle', component: SolicitudDetalle, meta: { title: 'Solicitud' } },
           { path: 'solicitudes/:idSolicitud/presupuesto', name: 'presupuesto-crear', component: PresupuestoForm, meta: { title: 'Enviar presupuesto' } },
           { path: 'pedidos', name: 'panel-pedidos', component: Pedidos, meta: { title: 'Pedidos' } },
           { path: 'pedidos/:idPedido', name: 'panel-pedido-detalle', component: PedidoDetalle, meta: { title: 'Pedido' } },
