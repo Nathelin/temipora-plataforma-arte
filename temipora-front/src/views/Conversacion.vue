@@ -61,6 +61,18 @@ const idPedidoOrigen = computed(() => {
   return Number.isInteger(id) && id > 0 ? id : null
 })
 
+const idSolicitudOrigen = computed(() => {
+  if (route.query.volverA !== 'solicitud') return null
+  const id = Number(route.query.idSolicitud)
+  return Number.isInteger(id) && id > 0 ? id : null
+})
+
+const etiquetaVolver = computed(() => {
+  if (idPedidoOrigen.value) return 'Volver al pedido'
+  if (idSolicitudOrigen.value) return 'Volver a la solicitud'
+  return 'Volver a mensajes'
+})
+
 watch(idConversacion, () => {
   modalRechazo.value = false
   modalCancelar.value = false
@@ -79,6 +91,13 @@ function volver() {
     router.push({
       name: enPanel.value ? 'panel-pedido-detalle' : 'pedido-detalle',
       params: { idPedido: idPedidoOrigen.value },
+    })
+    return
+  }
+  if (idSolicitudOrigen.value) {
+    router.push({
+      name: 'solicitud-detalle',
+      params: { idSolicitud: idSolicitudOrigen.value },
     })
     return
   }
@@ -126,7 +145,7 @@ async function alternarArchivadoYVolver() {
       class="text-sm font-medium text-cafe/70 transition hover:text-coral"
       @click="volver"
     >
-      ← {{ idPedidoOrigen ? 'Volver al pedido' : 'Volver a mensajes' }}
+      ← {{ etiquetaVolver }}
     </button>
 
     <div v-if="cargando" class="mt-6 space-y-3" role="status" aria-live="polite">

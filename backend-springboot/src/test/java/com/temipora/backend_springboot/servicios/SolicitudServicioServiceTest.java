@@ -30,7 +30,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.AccionSolicitud;
+import com.temipora.backend_springboot.modelo.Conversacion;
 import com.temipora.backend_springboot.modelo.DisponibilidadServicioDTO;
+import com.temipora.backend_springboot.modelo.EstadoConversacion;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.Formulario;
@@ -54,6 +56,7 @@ import com.temipora.backend_springboot.modelo.TipoAccionSolicitud;
 import com.temipora.backend_springboot.modelo.TipoCampo;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.AccionSolicitudRepository;
+import com.temipora.backend_springboot.repositorios.ConversacionRepository;
 import com.temipora.backend_springboot.repositorios.FormularioRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
@@ -114,6 +117,9 @@ class SolicitudServicioServiceTest {
 
     @Mock
     private ConversacionService conversacionService;
+
+    @Mock
+    private ConversacionRepository conversacionRepository;
 
     @InjectMocks
     private SolicitudServicioService solicitudServicioService;
@@ -828,6 +834,24 @@ class SolicitudServicioServiceTest {
                 assertThat(accion.getMotivo()).isNull();
                 assertThat(accion.getTipoAccion()).isEqualTo(TipoAccionSolicitud.RECHAZO);
             });
+    }
+
+    @Test
+    void obtenerSolicitud_incluyeLaConversacionHabilitada() {
+        Solicitud solicitud = solicitudResumen(EstadoSolicitud.PENDIENTE, 1);
+        Conversacion conversacion = new Conversacion();
+        conversacion.setIdConversacion(44L);
+        conversacion.setEstado(EstadoConversacion.ACEPTADA);
+        when(solicitudRepository.findByIdSolicitud(solicitud.getIdSolicitud()))
+            .thenReturn(Optional.of(solicitud));
+        when(conversacionRepository.buscarPorPar(CLIENTE, ARTISTA))
+            .thenReturn(Optional.of(conversacion));
+
+        SolicitudDTO resultado = solicitudServicioService.obtenerSolicitud(
+            solicitud.getIdSolicitud(), CLIENTE);
+
+        assertThat(resultado.getIdConversacion()).isEqualTo(44L);
+        assertThat(resultado.getEstadoConversacion()).isEqualTo("ACEPTADA");
     }
 
     private void prepararCreacion() {
