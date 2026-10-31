@@ -26,7 +26,7 @@ public class PanelArtistaService {
 
     private static final int MAX_SOLICITUDES = 5;
     private static final int HORAS_PRESUPUESTO_POR_VENCER = 48;
-    private static final List<EstadoSolicitud> ESTADOS_VISIBLES = List.of(
+    private static final List<EstadoSolicitud> ESTADOS_ACTIVOS = List.of(
         EstadoSolicitud.PENDIENTE,
         EstadoSolicitud.EN_LISTA_ESPERA,
         EstadoSolicitud.PRESUPUESTADA,
@@ -60,7 +60,8 @@ public class PanelArtistaService {
         Moneda mostrada = monedaVistaService.preferidaDe(idArtista);
 
         List<SolicitudResumenDTO> recibidas =
-            solicitudServicioService.listarRecibidas(idArtista, null);
+            solicitudServicioService.listarRecibidasEnEstados(
+                idArtista, ESTADOS_ACTIVOS);
 
         List<SolicitudResumenDTO> porResponder = recibidas.stream()
             .filter(solicitud ->
@@ -91,8 +92,6 @@ public class PanelArtistaService {
             .toList();
 
         List<SolicitudResumenDTO> recientes = recibidas.stream()
-            .filter(solicitud ->
-                ESTADOS_VISIBLES.contains(solicitud.getEstado()))
             .limit(MAX_SOLICITUDES)
             .toList();
 

@@ -24,8 +24,9 @@ const contenedorNav = ref(null)
 const estaLogueado = computed(() => !!token.value)
 const esAdmin = computed(() => rol.value === 'ADMIN')
 const esArtista = computed(() => rol.value === 'ARTISTA')
-const esCliente = computed(() => rol.value === 'CLIENTE')
-const puedeVerSolicitudes = computed(() => estaLogueado.value && esCliente.value)
+const puedeVerMisCompras = computed(() => estaLogueado.value && !esAdmin.value)
+const enMisCompras = computed(() => route.path.startsWith('/pedidos')
+  || route.path.startsWith('/solicitudes'))
 const enPanel = computed(() => route.path.startsWith('/panel'))
 
 const {
@@ -143,20 +144,6 @@ function irAPerfil() {
               Explorar
             </router-link>
             <router-link
-              v-if="puedeVerSolicitudes"
-              to="/solicitudes"
-              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
-            >
-              Solicitudes
-            </router-link>
-            <router-link
-              v-if="estaLogueado && !esAdmin"
-              to="/pedidos"
-              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
-            >
-              Pedidos
-            </router-link>
-            <router-link
               v-if="estaLogueado && !esAdmin"
               to="/mensajes"
               class="relative inline-flex items-center gap-1 text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
@@ -178,6 +165,15 @@ function irAPerfil() {
               Favoritos
             </router-link>
             <router-link
+              v-if="puedeVerMisCompras"
+              to="/mis-compras"
+              class="relative inline-flex items-center gap-2 rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-sm font-semibold text-coral transition hover:bg-coral/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+              :class="enMisCompras ? 'ring-2 ring-coral/40' : ''"
+              :aria-current="enMisCompras ? 'page' : undefined"
+            >
+              Mis compras
+            </router-link>
+            <router-link
               v-if="estaLogueado && esAdmin"
               :to="{ name: 'usuarios' }"
               class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
@@ -185,7 +181,10 @@ function irAPerfil() {
               Panel
             </router-link>
           </nav>
+        </div>
 
+        <!-- Acciones -->
+        <div class="flex items-center gap-2.5 sm:gap-3">
           <router-link
             v-if="estaLogueado && esArtista"
             to="/panel"
@@ -199,10 +198,7 @@ function irAPerfil() {
             <span>Panel de artista</span>
             <span class="transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true">→</span>
           </router-link>
-        </div>
 
-        <!-- Acciones -->
-        <div class="flex items-center gap-2.5 sm:gap-3">
           <ThemeToggle />
 
           <PanelNotificaciones v-if="estaLogueado" />
@@ -283,12 +279,12 @@ function irAPerfil() {
                   </span>
                 </button>
                 <button
-                  v-if="puedeVerSolicitudes"
+                  v-if="puedeVerMisCompras"
                   class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
                   role="menuitem"
-                  @click="menuAbierto = false; router.push({ name: 'solicitudes' })"
+                  @click="menuAbierto = false; router.push({ name: 'pedidos' })"
                 >
-                  Mis solicitudes
+                  Mis compras
                 </button>
                 <button
                   v-if="esArtista"
@@ -390,12 +386,12 @@ function irAPerfil() {
                 </span>
               </router-link>
               <router-link
-                v-if="puedeVerSolicitudes"
-                to="/solicitudes"
+                v-if="puedeVerMisCompras"
+                to="/mis-compras"
                 class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
                 @click="menuMovilAbierto = false"
               >
-                Solicitudes
+                Mis compras
               </router-link>
               <router-link
                 v-if="estaLogueado && esAdmin"

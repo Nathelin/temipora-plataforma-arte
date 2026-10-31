@@ -167,8 +167,7 @@ export function formatearFechaHora(valor) {
 export const GRUPOS_PEDIDO = [
   { clave: 'en-curso', texto: 'En curso', contador: 'enCurso' },
   { clave: 'accion', texto: 'Requiere tu acción', contador: 'accion', soloSiHay: true },
-  { clave: 'finalizados', texto: 'Finalizados', contador: 'finalizados' },
-  { clave: 'cerrados', texto: 'Cancelados / sin pago', contador: 'cerrados' },
+  { clave: 'archivo', texto: 'Archivo', contador: 'archivo' },
   { clave: 'todos', texto: 'Todos', contador: 'todos' },
 ]
 

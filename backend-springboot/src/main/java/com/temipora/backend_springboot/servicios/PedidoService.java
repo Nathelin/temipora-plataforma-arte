@@ -84,11 +84,16 @@ public class PedidoService {
     private static final String GRUPO_ACCION = "accion";
     private static final String GRUPO_FINALIZADOS = "finalizados";
     private static final String GRUPO_CERRADOS = "cerrados";
+    private static final String GRUPO_ARCHIVO = "archivo";
     private static final String ORDEN_LIMITE = "limite";
     private static final String ORDEN_MONTO = "monto";
 
     private static final List<EstadoPedido> ESTADOS_EN_CURSO = List.of(
         EstadoPedido.PENDIENTE_PAGO, EstadoPedido.EN_CURSO);
+    private static final List<EstadoPedido> ESTADOS_ARCHIVO = List.of(
+        EstadoPedido.FINALIZADO,
+        EstadoPedido.CANCELADO,
+        EstadoPedido.IMPAGO);
     private static final List<EstadoPedido> ESTADOS_CERRADOS = List.of(
         EstadoPedido.CANCELADO, EstadoPedido.IMPAGO);
     private static final List<EstadoEntregaHito> ESTADOS_ENTREGA_ABIERTA =
@@ -595,9 +600,7 @@ public class PedidoService {
         return ContadoresPedidosDTO.builder()
             .todos(todos)
             .enCurso(contar(recibidos, idVista, ESTADOS_EN_CURSO))
-            .finalizados(contar(
-                recibidos, idVista, List.of(EstadoPedido.FINALIZADO)))
-            .cerrados(contar(recibidos, idVista, ESTADOS_CERRADOS))
+            .archivo(contar(recibidos, idVista, ESTADOS_ARCHIVO))
             .accion(candidatosAccion(
                 idVista,
                 recibidos,
@@ -707,6 +710,7 @@ public class PedidoService {
         }
         return switch (grupo) {
             case GRUPO_EN_CURSO -> ESTADOS_EN_CURSO;
+            case GRUPO_ARCHIVO -> ESTADOS_ARCHIVO;
             case GRUPO_FINALIZADOS -> List.of(EstadoPedido.FINALIZADO);
             case GRUPO_CERRADOS -> ESTADOS_CERRADOS;
             default -> List.of(EstadoPedido.values());
@@ -771,7 +775,7 @@ public class PedidoService {
         Moneda mostrada = monedaVistaService.preferidaDe(idArtista);
         List<Pedido> pedidos = pedidoRepository
             .findByArtistaIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
-                idArtista, ESTADOS_PANEL_ACTIVOS, PageRequest.of(0, 50));
+                idArtista, ESTADOS_PANEL_ACTIVOS, PageRequest.of(0, 20));
 
         List<PedidoResumenDTO> resumenes = new ArrayList<>();
         List<HitoAtencion> atenciones = new ArrayList<>();

@@ -12,17 +12,17 @@ import FilaPedidoActivo from '../components/FilaPedidoActivo.vue'
 
 const route = useRoute()
 const router = useRouter()
-const esArtista = localStorage.getItem('rol') === 'ARTISTA'
 
 const CONTADORES_VACIOS = {
   todos: 0,
   enCurso: 0,
   accion: 0,
-  finalizados: 0,
-  cerrados: 0,
+  archivo: 0,
 }
 
-const bandejaActiva = ref(esArtista ? 'recibidos' : 'enviados')
+const esAreaArtista = computed(() => route.path.startsWith('/panel'))
+const bandejaActiva = computed(() => (esAreaArtista.value ? 'recibidos' : 'enviados'))
+
 const grupoActivo = ref(grupoDeQuery(route.query.grupo))
 const idServicio = ref(route.query.servicio ? String(route.query.servicio) : '')
 const busqueda = ref(String(route.query.q || ''))
@@ -39,17 +39,7 @@ const error = ref('')
 
 let temporizadorBusqueda = null
 
-const enPanel = computed(() => route.path.startsWith('/panel'))
-const bandejas = computed(() => (esArtista
-  ? [
-      { clave: 'recibidos', texto: 'Recibidos' },
-      { clave: 'enviados', texto: 'Enviados' },
-    ]
-  : [{ clave: 'enviados', texto: 'Enviados' }]))
-
-const mostrarFiltroServicio = computed(
-  () => esArtista && bandejaActiva.value === 'recibidos',
-)
+const mostrarFiltroServicio = computed(() => esAreaArtista.value)
 
 const hayFiltros = computed(() => Boolean(idServicio.value)
   || busqueda.value.trim().length >= 2)
@@ -73,16 +63,10 @@ const emptyState = computed(() => {
       detalle: 'No hay entregas ni aprobaciones esperando tu acción.',
     }
   }
-  if (grupoActivo.value === 'finalizados') {
+  if (grupoActivo.value === 'archivo') {
     return {
-      titulo: 'Todavía no hay pedidos finalizados',
-      detalle: 'Cuando un pedido se complete, va a quedar archivado acá.',
-    }
-  }
-  if (grupoActivo.value === 'cerrados') {
-    return {
-      titulo: 'No hay pedidos cancelados',
-      detalle: 'Acá van a quedar los pedidos cancelados o dados de baja por falta de pago.',
+      titulo: 'El archivo está vacío',
+      detalle: 'Acá van a quedar los pedidos finalizados, cancelados y los que se quedaron sin pago.',
     }
   }
   if (grupoActivo.value === 'en-curso') {
@@ -100,7 +84,8 @@ const emptyState = computed(() => {
 })
 
 function grupoDeQuery(valor) {
-  const clave = String(valor || '')
+  const alias = { finalizados: 'archivo', cerrados: 'archivo' }
+  const clave = alias[String(valor || '')] || String(valor || '')
   return GRUPOS_PEDIDO.some((grupo) => grupo.clave === clave)
     ? clave
     : GRUPO_PEDIDO_DEFAULT
@@ -175,10 +160,6 @@ async function cargar(reset = true) {
 }
 
 async function cargarContadores() {
-  if (bandejaActiva.value === 'recibidos' && !esArtista) {
-    contadores.value = { ...CONTADORES_VACIOS }
-    return
-  }
   try {
     const res = await api.get('/pedidos/contadores', {
       params: { bandeja: bandejaActiva.value },
@@ -190,7 +171,7 @@ async function cargarContadores() {
 }
 
 async function cargarServicios() {
-  if (!esArtista) return
+  if (!esAreaArtista.value) return
   try {
     const res = await api.get('/mis-servicios')
     servicios.value = res.data || []
@@ -203,14 +184,6 @@ function aplicarCambios() {
   window.clearTimeout(temporizadorBusqueda)
   sincronizarUrl()
   cargar(true)
-}
-
-function cambiarBandeja(clave) {
-  if (bandejaActiva.value === clave) return
-  bandejaActiva.value = clave
-  idServicio.value = ''
-  aplicarCambios()
-  cargarContadores()
 }
 
 function cambiarGrupo(clave) {
@@ -270,36 +243,7 @@ onUnmounted(() => {
     </header>
 
     <div
-      v-if="bandejas.length > 1"
-      class="mt-5 flex gap-1 rounded-xl border border-rosa/60 bg-blanco p-1"
-      role="group"
-      aria-label="Elegir bandeja de pedidos"
-    >
-      <button
-        v-for="bandeja in bandejas"
-        :key="bandeja.clave"
-        type="button"
-        class="flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition"
-        :class="bandejaActiva === bandeja.clave
-          ? 'bg-coral text-white shadow-sm'
-          : 'text-cafe/70 hover:bg-rosa/20 hover:text-granate'"
-        :aria-pressed="bandejaActiva === bandeja.clave"
-        @click="cambiarBandeja(bandeja.clave)"
-      >
-        {{ bandeja.texto }}
-        <span
-          v-if="bandejaActiva === bandeja.clave"
-          class="rounded-full px-1.5 py-0.5 text-[11px] leading-none"
-          :class="bandejaActiva === bandeja.clave ? 'bg-white/20 text-white' : 'bg-rosa/30 text-granate'"
-        >
-          {{ contadores.todos }}
-        </span>
-      </button>
-    </div>
-
-    <div
-      class="flex gap-1 overflow-x-auto rounded-xl border border-rosa/60 bg-blanco p-1"
-      :class="bandejas.length > 1 ? 'mt-3' : 'mt-5'"
+      class="mt-5 flex gap-1 overflow-x-auto rounded-xl border border-rosa/60 bg-blanco p-1"
       role="group"
       aria-label="Filtrar pedidos por grupo"
     >

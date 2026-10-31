@@ -31,6 +31,10 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
             Long idArtista, EstadoSolicitud estado);
 
     @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda", "presupuesto" })
+    List<Solicitud> findByArtistaIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
+            Long idArtista, Collection<EstadoSolicitud> estados);
+
+    @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda", "presupuesto" })
     List<Solicitud> findByClienteIdUsuarioOrderByFechaCreacionDesc(Long idCliente);
 
     @EntityGraph(attributePaths = { "servicio", "cliente", "artista", "moneda", "presupuesto" })

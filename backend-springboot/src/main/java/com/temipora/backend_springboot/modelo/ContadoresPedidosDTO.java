@@ -16,6 +16,5 @@ public class ContadoresPedidosDTO {
     private long todos;
     private long enCurso;
     private long accion;
-    private long finalizados;
-    private long cerrados;
+    private long archivo;
 }

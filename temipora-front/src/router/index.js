@@ -25,6 +25,7 @@ import MainLayout from '../layouts/MainLayout.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
 import ConfiguracionLayout from '../layouts/ConfiguracionLayout.vue'
 import ArtistLayout from '../layouts/ArtistLayout.vue'
+import ClientLayout from '../layouts/ClientLayout.vue'
 import Inicio from '../views/Inicio.vue'
 import PanelResumen from '../views/PanelResumen.vue'
 import Perfil from '../views/Perfil.vue'
@@ -122,18 +123,24 @@ const routes = [
       },
       {
         path: 'solicitudes',
-        name: 'solicitudes',
-        component: Solicitudes,
-        meta: { title: 'Mis solicitudes', requiresAuth: true },
-      },
-      {
-        path: 'solicitudes/:idSolicitud',
-        name: 'solicitud-detalle',
-        component: SolicitudDetalle,
-        meta: {
-          title: (route) => `Solicitud #${route.params.idSolicitud}`,
-          requiresAuth: true,
-        },
+        component: ClientLayout,
+        meta: { requiresAuth: true },
+        children: [
+          {
+            path: '',
+            name: 'solicitudes',
+            component: Solicitudes,
+            meta: { title: 'Mis solicitudes' },
+          },
+          {
+            path: ':idSolicitud',
+            name: 'solicitud-detalle',
+            component: SolicitudDetalle,
+            meta: {
+              title: (route) => `Solicitud #${route.params.idSolicitud}`,
+            },
+          },
+        ],
       },
       {
         path: 'solicitudes/:idSolicitud/pagar',
@@ -147,19 +154,26 @@ const routes = [
       },
       {
         path: 'pedidos',
-        name: 'pedidos',
-        component: Pedidos,
-        meta: { title: 'Pedidos', requiresAuth: true },
+        component: ClientLayout,
+        meta: { requiresAuth: true },
+        children: [
+          {
+            path: '',
+            name: 'pedidos',
+            component: Pedidos,
+            meta: { title: 'Mis pedidos' },
+          },
+          {
+            path: ':idPedido',
+            name: 'pedido-detalle',
+            component: PedidoDetalle,
+            meta: {
+              title: (route) => `Pedido #${route.params.idPedido}`,
+            },
+          },
+        ],
       },
-      {
-        path: 'pedidos/:idPedido',
-        name: 'pedido-detalle',
-        component: PedidoDetalle,
-        meta: {
-          title: (route) => `Pedido #${route.params.idPedido}`,
-          requiresAuth: true,
-        },
-      },
+      { path: 'mis-compras', redirect: { name: 'pedidos' } },
       {
         path: 'mensajes',
         name: 'mensajes',

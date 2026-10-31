@@ -29,6 +29,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.temipora.backend_springboot.modelo.ContadoresPedidosDTO;
 import com.temipora.backend_springboot.modelo.Conversacion;
 import com.temipora.backend_springboot.modelo.EntregaHitoMultipartRequest;
 import com.temipora.backend_springboot.modelo.ETiempoEntregaUnidad;
@@ -514,6 +515,48 @@ class PedidoServiceTest {
         assertThat(pedido.getEstado()).isEqualTo(EstadoPedido.IMPAGO);
         assertThat(solicitud.getEstado()).isEqualTo(EstadoSolicitud.CANCELADA);
         verify(pagoService).cancelarPendientes(hito);
+    }
+
+    @Test
+    void listarRecibidos_conGrupoArchivo_consultaFinalizadosCanceladosEImpagos() {
+        when(pedidoRepository.buscarRecibidos(
+            eq(ARTISTA), any(), any(), any(), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(pedido)));
+        ArgumentCaptor<Collection<EstadoPedido>> estados =
+            ArgumentCaptor.forClass(Collection.class);
+
+        pedidoService.listarRecibidos(
+            ARTISTA, filtro(null, "archivo"), 0, 20);
+
+        verify(pedidoRepository).buscarRecibidos(
+            eq(ARTISTA), estados.capture(), any(), any(),
+            any(Pageable.class));
+        assertThat(estados.getValue()).containsExactlyInAnyOrder(
+            EstadoPedido.FINALIZADO,
+            EstadoPedido.CANCELADO,
+            EstadoPedido.IMPAGO);
+    }
+
+    @Test
+    void contadores_incluyeArchivoYAccion() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PAGADO);
+        hito.setEstadoEntrega(EstadoEntregaHito.NO_INICIADO);
+        when(pedidoRepository.countByArtistaIdUsuario(ARTISTA))
+            .thenReturn(10L);
+        when(pedidoRepository.countByArtistaIdUsuarioAndEstadoIn(
+            eq(ARTISTA), any())).thenReturn(3L);
+        when(pedidoRepository.candidatosAccionRecibidos(
+            eq(ARTISTA), any(), any(), any(), any()))
+            .thenReturn(List.of(pedido));
+
+        ContadoresPedidosDTO contadores = pedidoService.contadores(
+            ARTISTA, true);
+
+        assertThat(contadores.getTodos()).isEqualTo(10);
+        assertThat(contadores.getEnCurso()).isEqualTo(3);
+        assertThat(contadores.getArchivo()).isEqualTo(3);
+        assertThat(contadores.getAccion()).isEqualTo(1);
     }
 
     @Test

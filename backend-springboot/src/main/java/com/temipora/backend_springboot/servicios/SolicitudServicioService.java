@@ -3,6 +3,7 @@ package com.temipora.backend_springboot.servicios;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -598,6 +599,20 @@ public class SolicitudServicioService {
             ? solicitudRepository.findByArtistaIdUsuarioOrderByFechaCreacionDesc(idArtista)
             : solicitudRepository.findByArtistaIdUsuarioAndEstadoOrderByFechaCreacionDesc(
                 idArtista, estado);
+        return aResumenesConReputacion(solicitudes, idArtista);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SolicitudResumenDTO> listarRecibidasEnEstados(
+            Long idArtista, Collection<EstadoSolicitud> estados) {
+        return aResumenesConReputacion(
+            solicitudRepository.findByArtistaIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
+                idArtista, estados),
+            idArtista);
+    }
+
+    private List<SolicitudResumenDTO> aResumenesConReputacion(
+            List<Solicitud> solicitudes, Long idArtista) {
         List<SolicitudResumenDTO> dtos = solicitudes.stream()
             .map(solicitud -> aResumen(solicitud, idArtista))
             .toList();

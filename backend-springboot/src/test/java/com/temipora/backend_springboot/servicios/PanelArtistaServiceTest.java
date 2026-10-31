@@ -48,7 +48,8 @@ class PanelArtistaServiceTest {
 
     @Test
     void sinDatosDevuelveTodoEnCero() {
-        when(solicitudServicioService.listarRecibidas(ARTISTA, null))
+        when(solicitudServicioService.listarRecibidasEnEstados(
+            eq(ARTISTA), any()))
             .thenReturn(List.of());
         sinPedidosNiCobros();
 
@@ -82,7 +83,8 @@ class PanelArtistaServiceTest {
             5L, EstadoSolicitud.PRESUPUESTADA, ahora.minusDays(1));
         lejano.setFechaVencimiento(ahora.plusHours(72));
 
-        when(solicitudServicioService.listarRecibidas(ARTISTA, null))
+        when(solicitudServicioService.listarRecibidasEnEstados(
+            eq(ARTISTA), any()))
             .thenReturn(List.of(
                 nueva, vieja, enEspera, porVencer, lejano));
         sinPedidosNiCobros();
@@ -114,7 +116,8 @@ class PanelArtistaServiceTest {
             solicitud(5L, EstadoSolicitud.PENDIENTE, ahora.minusDays(2)),
             solicitud(6L, EstadoSolicitud.PENDIENTE, ahora.minusDays(1)));
 
-        when(solicitudServicioService.listarRecibidas(ARTISTA, null))
+        when(solicitudServicioService.listarRecibidasEnEstados(
+            eq(ARTISTA), any()))
             .thenReturn(pendientes);
         sinPedidosNiCobros();
 
@@ -131,7 +134,8 @@ class PanelArtistaServiceTest {
         HitoPedido deEsteMes = hitoPagado(LocalDateTime.now());
         HitoPedido anterior = hitoPagado(LocalDateTime.now().minusMonths(2));
 
-        when(solicitudServicioService.listarRecibidas(ARTISTA, null))
+        when(solicitudServicioService.listarRecibidasEnEstados(
+            eq(ARTISTA), any()))
             .thenReturn(List.of());
         when(pedidoService.actividadArtista(ARTISTA)).thenReturn(
             new PedidoService.ActividadArtista(

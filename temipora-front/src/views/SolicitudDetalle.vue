@@ -351,7 +351,7 @@ async function confirmarCancelacion(motivo) {
 }
 
 function volver() {
-  const destino = localStorage.getItem('rol') === 'ARTISTA' ? 'panel-solicitudes' : 'solicitudes'
+  const destino = route.path.startsWith('/panel') ? 'panel-solicitudes' : 'solicitudes'
   router.push({ name: destino })
 }
 
