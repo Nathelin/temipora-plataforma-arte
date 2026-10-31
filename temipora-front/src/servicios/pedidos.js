@@ -163,3 +163,20 @@ export function formatearFechaHora(valor) {
     return valor
   }
 }
+
+export const GRUPOS_PEDIDO = [
+  { clave: 'en-curso', texto: 'En curso', contador: 'enCurso' },
+  { clave: 'accion', texto: 'Requiere tu acción', contador: 'accion', soloSiHay: true },
+  { clave: 'archivo', texto: 'Archivo', contador: 'archivo' },
+  { clave: 'todos', texto: 'Todos', contador: 'todos' },
+]
+
+export const GRUPO_PEDIDO_DEFAULT = 'en-curso'
+
+export const ORDENES_PEDIDO = [
+  { clave: 'reciente', texto: 'Más recientes' },
+  { clave: 'limite', texto: 'Vence antes' },
+  { clave: 'monto', texto: 'Mayor monto' },
+]
+
+export const ORDEN_PEDIDO_DEFAULT = 'reciente'

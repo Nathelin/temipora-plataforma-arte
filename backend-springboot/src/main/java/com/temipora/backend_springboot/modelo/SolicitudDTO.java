@@ -46,6 +46,8 @@ public class SolicitudDTO {
     private PresupuestoDTO presupuesto;
     private Long idPedido;
     private EstadoPedido estadoPedido;
+    private Long idConversacion;
+    private String estadoConversacion;
     private Integer posicionCola;
     private boolean puedePresupuestar;
     private String motivoNoPresupuestable;

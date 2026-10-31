@@ -18,32 +18,15 @@ import ReputacionChip from '../components/ReputacionChip.vue'
 const route = useRoute()
 const router = useRouter()
 
-const esArtista = localStorage.getItem('rol') === 'ARTISTA'
-
-const recibidas = ref([])
-const enviadas = ref([])
-const bandejaActiva = ref(esArtista ? 'recibidas' : 'enviadas')
+const bandejaActiva = computed(() => (route.path.startsWith('/panel')
+  ? 'recibidas'
+  : 'enviadas'))
+const solicitudes = ref([])
 const cargando = ref(true)
 const error = ref('')
 const grupoActivo = ref('todas')
 
 const esBandejaRecibidas = computed(() => bandejaActiva.value === 'recibidas')
-const solicitudes = computed(() =>
-  esBandejaRecibidas.value ? recibidas.value : enviadas.value,
-)
-
-const bandejas = computed(() => {
-  const opciones = [
-    { clave: 'recibidas', texto: 'Recibidas', cantidad: recibidas.value.length },
-    { clave: 'enviadas', texto: 'Enviadas', cantidad: enviadas.value.length },
-  ]
-  return esArtista ? opciones : opciones.filter((bandeja) => bandeja.clave === 'enviadas')
-})
-
-function cambiarBandeja(clave) {
-  bandejaActiva.value = clave
-  grupoActivo.value = 'todas'
-}
 
 const grupos = computed(() =>
   (esBandejaRecibidas.value ? GRUPOS_RECIBIDAS : GRUPOS_ESTADO).map((grupo) => ({
@@ -80,17 +63,11 @@ async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    if (esArtista) {
-      const [resRecibidas, resEnviadas] = await Promise.all([
-        api.get('/solicitudes-servicio/recibidas'),
-        api.get('/solicitudes-servicio/enviadas'),
-      ])
-      recibidas.value = resRecibidas.data || []
-      enviadas.value = resEnviadas.data || []
-    } else {
-      const res = await api.get('/solicitudes-servicio/enviadas')
-      enviadas.value = res.data || []
-    }
+    const endpoint = esBandejaRecibidas.value
+      ? '/solicitudes-servicio/recibidas'
+      : '/solicitudes-servicio/enviadas'
+    const res = await api.get(endpoint)
+    solicitudes.value = res.data || []
   } catch (e) {
     if (e.response?.status === 401) {
       router.push({ name: 'login' })
@@ -149,33 +126,6 @@ onMounted(cargar)
 
     <div v-else>
       <div
-        v-if="bandejas.length > 1"
-        class="mt-8 flex gap-1 rounded-xl border border-rosa/60 bg-blanco p-1"
-        role="group"
-        aria-label="Elegir bandeja de solicitudes"
-      >
-        <button
-          v-for="bandeja in bandejas"
-          :key="bandeja.clave"
-          type="button"
-          class="flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition"
-          :class="bandejaActiva === bandeja.clave
-            ? 'bg-coral text-white shadow-sm'
-            : 'text-cafe/70 hover:bg-rosa/20 hover:text-granate'"
-          :aria-pressed="bandejaActiva === bandeja.clave"
-          @click="cambiarBandeja(bandeja.clave)"
-        >
-          {{ bandeja.texto }}
-          <span
-            class="rounded-full px-1.5 py-0.5 text-[11px] leading-none"
-            :class="bandejaActiva === bandeja.clave ? 'bg-white/20 text-white' : 'bg-rosa/30 text-granate'"
-          >
-            {{ bandeja.cantidad }}
-          </span>
-        </button>
-      </div>
-
-      <div
         v-if="!total"
         class="mt-8 rounded-3xl border border-dashed border-rosa/70 bg-blanco px-6 py-16 text-center"
       >
@@ -203,8 +153,7 @@ onMounted(cargar)
 
       <template v-else>
         <div
-          class="flex gap-1 overflow-x-auto rounded-xl border border-rosa/60 bg-blanco p-1"
-          :class="bandejas.length > 1 ? 'mt-3' : 'mt-8'"
+          class="mt-8 flex gap-1 overflow-x-auto rounded-xl border border-rosa/60 bg-blanco p-1"
           role="group"
           aria-label="Filtrar solicitudes por estado"
         >

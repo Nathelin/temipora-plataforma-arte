@@ -34,4 +34,14 @@ public interface HitoPedidoRepository extends JpaRepository<HitoPedido, Long> {
 
     List<HitoPedido> findByEstadoPagoAndFechaLimitePagoBefore(
         EstadoPagoHito estado, LocalDateTime limite);
+
+    @Query("""
+        select h from HitoPedido h
+        join fetch h.pedido p
+        where p.artista.idUsuario = :idArtista and h.estadoPago = :pagado
+        order by h.fechaPago desc
+        """)
+    List<HitoPedido> findPagadosDeArtista(
+        @Param("idArtista") Long idArtista,
+        @Param("pagado") EstadoPagoHito pagado);
 }

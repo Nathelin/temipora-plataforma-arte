@@ -20,6 +20,7 @@ import lombok.Setter;
 public class HitoPedidoDTO {
 
     private Long idHitoPedido;
+    private Long idPedido;
     private Integer orden;
     private String nombre;
     private String descripcion;
@@ -99,6 +100,9 @@ public class HitoPedidoDTO {
 
         return HitoPedidoDTO.builder()
             .idHitoPedido(hito.getIdHitoPedido())
+            .idPedido(hito.getPedido() != null
+                ? hito.getPedido().getIdPedido()
+                : null)
             .orden(hito.getOrden())
             .nombre(hito.getNombre())
             .descripcion(hito.getDescripcion())

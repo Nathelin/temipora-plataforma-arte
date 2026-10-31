@@ -4,13 +4,16 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
 import EntregasHito from '../components/EntregasHito.vue'
+import HiloConversacion from '../components/HiloConversacion.vue'
 import IconoDescarga from '../components/IconoDescarga.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import SubirEntregable from '../components/SubirEntregable.vue'
 import FormularioResenia from '../components/FormularioResenia.vue'
 import TarjetaResenia from '../components/TarjetaResenia.vue'
 import { useNotificaciones } from '../composables/useNotificaciones'
+import { useHiloConversacion } from '../composables/useHiloConversacion'
 import { useSubirImagen } from '../composables/useSubirImagen'
+import { estadoConversacionDe } from '../servicios/mensajes'
 import {
   cargarCriterios,
   cargarEstadoResenia,
@@ -60,6 +63,42 @@ const confirmacion = reactive({
   accion: null,
 })
 
+const chatMontado = ref(false)
+const idConversacionChat = computed(() => pedido.value?.idConversacion ?? null)
+const chatActivo = computed(() => chatMontado.value
+  && pestanaActiva.value === 'chat'
+  && Boolean(idConversacionChat.value))
+
+const {
+  conversacion: chatConversacion,
+  mensajes: chatMensajes,
+  hayMas: chatHayMas,
+  cargando: chatCargando,
+  cargandoMas: chatCargandoMas,
+  error: chatError,
+  errorEnvio: chatErrorEnvio,
+  texto: chatTexto,
+  enviando: chatEnviando,
+  contraparteEscribiendo: chatEscribiendo,
+  contraparte: chatContraparte,
+  maxMensaje: chatMaxMensaje,
+  esAceptada: chatAceptada,
+  cargarAnteriores: chatCargarAnteriores,
+  enviar: chatEnviar,
+  avisarEscribiendo: chatAvisarEscribiendo,
+} = useHiloConversacion(idConversacionChat, { activo: chatActivo })
+
+const enlaceConversacion = computed(() => {
+  const idConversacion = chatConversacion.value?.idConversacion
+    ?? idConversacionChat.value
+  if (!idConversacion) return null
+  return {
+    name: route.path.startsWith('/panel') ? 'panel-conversacion' : 'conversacion',
+    params: { idConversacion },
+    query: { volverA: 'pedido', idPedido: idPedido.value },
+  }
+})
+
 const reseniaEstado = ref(null)
 const criteriosResenia = ref([])
 const cargandoResenias = ref(false)
@@ -100,6 +139,9 @@ const pestanas = computed(() => {
     { id: 'resumen', etiqueta: 'Resumen' },
     { id: 'plan-pagos', etiqueta: 'Plan de pagos' },
   ]
+  if (pedido.value?.idConversacion) {
+    lista.push({ id: 'chat', etiqueta: 'Chat' })
+  }
   if (esArtista.value || esCliente.value) {
     lista.push({ id: 'galeria', etiqueta: 'Galería' })
   }
@@ -199,6 +241,7 @@ function aplicarPestanaDesdeUrl() {
   const ids = pestanas.value.map((pestana) => pestana.id)
   const tab = route.query.tab
   pestanaActiva.value = ids.includes(tab) ? tab : 'resumen'
+  if (pestanaActiva.value === 'chat') chatMontado.value = true
 }
 
 function sincronizarUrl() {
@@ -214,6 +257,7 @@ function sincronizarUrl() {
 
 function cambiarPestana(pestana) {
   if (pestanaActiva.value === pestana) return
+  if (pestana === 'chat') chatMontado.value = true
 
   const tabs = tabsRef.value
   const alturaHeader = window.innerWidth >= 640 ? 64 : 56
@@ -669,6 +713,12 @@ function volver() {
   router.push({ name: enPanel ? 'panel-pedidos' : 'pedidos' })
 }
 
+function abrirChat() {
+  if (!pedido.value?.idConversacion) return
+  chatMontado.value = true
+  cambiarPestana('chat')
+}
+
 onMounted(async () => {
   await cargar()
   void procesarRetornoPago()
@@ -712,6 +762,20 @@ onMounted(async () => {
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+          <button
+            v-if="pedido.idConversacion"
+            type="button"
+            class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+            @click="abrirChat"
+          >
+            Chat
+            <span
+              v-if="pedido.noLeidos > 0"
+              class="inline-flex min-w-5 items-center justify-center rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-bold text-white"
+            >
+              {{ pedido.noLeidos > 9 ? '9+' : pedido.noLeidos }}
+            </span>
+          </button>
           <span
             v-if="pedido.rolVista === 'ADMIN'"
             class="rounded-full border border-coral/30 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral"
@@ -1387,6 +1451,76 @@ onMounted(async () => {
               </article>
             </li>
           </ol>
+        </section>
+
+        <section
+          v-if="chatMontado"
+          v-show="pestanaActiva === 'chat'"
+          id="panel-chat"
+          role="tabpanel"
+          aria-labelledby="pestana-chat"
+          tabindex="0"
+          class="focus-visible:outline-none"
+        >
+          <div class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="min-w-0">
+                <h2 class="text-xl font-semibold text-granate">Chat del pedido</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-cafe/65">
+                  Conversación privada con
+                  @{{ chatContraparte?.nombreUsuario || 'la otra parte' }}.
+                </p>
+              </div>
+              <p
+                v-if="chatConversacion?.estado"
+                class="rounded-full border px-3 py-1 text-xs font-semibold"
+                :class="estadoConversacionDe(chatConversacion.estado).clase"
+              >
+                {{ estadoConversacionDe(chatConversacion.estado).texto }}
+              </p>
+            </div>
+
+            <p v-if="chatCargando" class="mt-4 text-sm text-cafe/60">
+              Cargando conversación...
+            </p>
+            <p v-else-if="chatError" role="alert" class="mt-4 text-sm text-rojizo">
+              {{ chatError }}
+            </p>
+            <div v-else-if="chatAceptada" class="mt-4">
+              <HiloConversacion
+                v-model:texto="chatTexto"
+                :mensajes="chatMensajes"
+                :max-mensaje="chatMaxMensaje"
+                :enviando="chatEnviando"
+                :error-envio="chatErrorEnvio"
+                :hay-mas="chatHayMas"
+                :cargando-mas="chatCargandoMas"
+                :contraparte-escribiendo="chatEscribiendo"
+                :nombre-contraparte="chatContraparte?.nombreDisplay || chatContraparte?.nombreUsuario || 'Usuario'"
+                :puede-enviar="Boolean(chatConversacion?.puedeEnviar)"
+                :motivo-no-enviable="chatConversacion?.motivoNoEnviable || ''"
+                :cargar-anteriores="chatCargarAnteriores"
+                altura="45vh"
+                @enviar="chatEnviar"
+                @escribiendo="chatAvisarEscribiendo"
+              />
+            </div>
+            <div
+              v-else
+              class="mt-4 rounded-xl border border-rosa/40 bg-rosa/5 px-4 py-3"
+            >
+              <p class="text-sm text-cafe/65">
+                La conversación todavía no está activa.
+              </p>
+              <router-link
+                v-if="enlaceConversacion"
+                :to="enlaceConversacion"
+                class="mt-2 inline-flex text-sm font-semibold text-coral transition hover:text-rojizo"
+              >
+                Abrirla en Mensajes →
+              </router-link>
+            </div>
+          </div>
         </section>
 
         <template v-if="puedeVerResenias">

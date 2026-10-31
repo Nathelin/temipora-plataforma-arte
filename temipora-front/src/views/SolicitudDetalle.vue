@@ -17,6 +17,8 @@ import ModalCancelacion from '../components/ModalCancelacion.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import TarjetaPresupuesto from '../components/TarjetaPresupuesto.vue'
 import ReputacionCliente from '../components/ReputacionCliente.vue'
+import ValoracionEstrellas from '../components/ValoracionEstrellas.vue'
+import { cargarResumenReseniasArtista, formatearPromedio } from '../servicios/resenias'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,6 +29,7 @@ const contenidoRef = ref(null)
 const tabsRef = ref(null)
 const cargando = ref(true)
 const errorCarga = ref('')
+const resumenArtista = ref(null)
 
 const idActual = Number(localStorage.getItem('idUsuario'))
 
@@ -52,6 +55,27 @@ const tienePresupuesto = computed(() => Boolean(solicitud.value?.presupuesto))
 const nombreRutaPedido = computed(() => (
   esArtistaDeLaSolicitud.value ? 'panel-pedido-detalle' : 'pedido-detalle'
 ))
+
+const ayudaContacto = computed(() => {
+  if (!contraparte.value) return ''
+  const estado = solicitud.value?.estado
+  if (esArtistaDeLaSolicitud.value) {
+    if (estado === 'PENDIENTE' || estado === 'EN_LISTA_ESPERA') {
+      return 'Si el formulario no alcanza para presupuestar, escribile al cliente.'
+    }
+    if (estado === 'PRESUPUESTADA') {
+      return 'Si querés ajustar algo del presupuesto, hablá con el cliente antes de que decida.'
+    }
+    return '¿Tenés dudas sobre esta etapa? Podés escribirle al cliente.'
+  }
+  if (estado === 'PENDIENTE' || estado === 'EN_LISTA_ESPERA') {
+    return 'Si te falta contar algo para el presupuesto, escribile al artista.'
+  }
+  if (estado === 'PRESUPUESTADA') {
+    return 'Si tenés dudas sobre el presupuesto, escribile al artista antes de aceptar.'
+  }
+  return '¿Tenés dudas sobre esta etapa? Podés escribirle al artista.'
+})
 
 const avisoServicio = computed(() => {
   const estado = solicitud.value?.estadoServicio
@@ -232,6 +256,37 @@ function irAPagar() {
   })
 }
 
+function irAlPerfil() {
+  const usuario = contraparte.value?.nombreUsuario
+  if (!usuario) return
+  router.push({ name: 'perfil', params: { nombreUsuario: usuario } })
+}
+
+function irAlChat() {
+  const idConversacion = solicitud.value?.idConversacion
+  if (!idConversacion) {
+    irAlPerfil()
+    return
+  }
+  router.push({
+    name: 'conversacion',
+    params: { idConversacion },
+    query: { volverA: 'solicitud', idSolicitud: solicitud.value.idSolicitud },
+  })
+}
+
+async function cargarResumenArtista() {
+  resumenArtista.value = null
+  const nombre = solicitud.value?.artista?.nombreUsuario
+  if (!nombre || esArtistaDeLaSolicitud.value) return
+  try {
+    const res = await cargarResumenReseniasArtista(nombre)
+    resumenArtista.value = res.data || null
+  } catch {
+    resumenArtista.value = null
+  }
+}
+
 function abrirModalRetiro() {
   errorRetiro.value = ''
   modalRetiroAbierto.value = true
@@ -296,7 +351,7 @@ async function confirmarCancelacion(motivo) {
 }
 
 function volver() {
-  const destino = localStorage.getItem('rol') === 'ARTISTA' ? 'panel-solicitudes' : 'solicitudes'
+  const destino = route.path.startsWith('/panel') ? 'panel-solicitudes' : 'solicitudes'
   router.push({ name: destino })
 }
 
@@ -307,6 +362,7 @@ async function cargar() {
   try {
     const res = await api.get(`/solicitudes-servicio/${route.params.idSolicitud}`)
     solicitud.value = res.data
+    void cargarResumenArtista()
   } catch (e) {
     if (e.response?.status === 401) {
       router.push({ name: 'login' })
@@ -494,25 +550,43 @@ onMounted(cargar)
                 {{ tituloContraparte }}
               </p>
 
-              <div v-if="contraparte" class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
-                <img
-                  v-if="fotoContraparte"
-                  :src="fotoContraparte"
-                  alt=""
-                  class="h-16 w-16 shrink-0 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-rosa/70"
-                />
-                <span
-                  v-else
-                  class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-rosa text-xl font-bold text-granate shadow-sm ring-1 ring-white/70"
-                  aria-hidden="true"
-                >
-                  {{ inicialContraparte }}
-                </span>
+              <div v-if="contraparte" class="mt-4 grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <div class="flex min-w-0 items-center gap-4">
+                  <img
+                    v-if="fotoContraparte"
+                    :src="fotoContraparte"
+                    alt=""
+                    class="h-16 w-16 shrink-0 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-rosa/70"
+                  />
+                  <span
+                    v-else
+                    class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-rosa text-xl font-bold text-granate shadow-sm ring-1 ring-white/70"
+                    aria-hidden="true"
+                  >
+                    {{ inicialContraparte }}
+                  </span>
 
-                <div class="min-w-0">
-                  <p class="text-lg font-semibold text-granate">{{ nombreContraparte }}</p>
-                  <p v-if="usuarioContraparte" class="text-sm text-cafe/55">@{{ usuarioContraparte }}</p>
-                  <p v-if="contraparte.nombrePais" class="mt-1 text-xs text-cafe/50">{{ contraparte.nombrePais }}</p>
+                  <div class="min-w-0">
+                    <p class="text-lg font-semibold text-granate">{{ nombreContraparte }}</p>
+                    <p v-if="usuarioContraparte" class="text-sm text-cafe/55">@{{ usuarioContraparte }}</p>
+                    <p v-if="contraparte.nombrePais" class="mt-1 text-xs text-cafe/50">{{ contraparte.nombrePais }}</p>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2 md:flex-col md:border-l md:border-rosa/40 md:pl-5">
+                  <router-link
+                    :to="{ name: 'perfil', params: { nombreUsuario: contraparte.nombreUsuario } }"
+                    class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+                  >
+                    Ver perfil
+                  </router-link>
+                  <button
+                    type="button"
+                    class="inline-flex min-h-9 items-center justify-center rounded-full border border-coral/40 bg-coral/5 px-4 text-sm font-semibold text-coral transition hover:bg-coral/10"
+                    @click="irAlChat"
+                  >
+                    Enviar mensaje
+                  </button>
                 </div>
               </div>
 
@@ -522,6 +596,31 @@ onMounted(cargar)
 
               <p v-if="contraparte?.biografia" class="mt-4 border-t border-rosa/40 pt-4 text-sm leading-relaxed text-cafe/70">
                 {{ contraparte.biografia }}
+              </p>
+
+              <div
+                v-if="!esArtistaDeLaSolicitud && resumenArtista?.hayDatos"
+                class="mt-3 flex flex-wrap items-center gap-2"
+              >
+                <ValoracionEstrellas
+                  :model-value="Math.round(Number(resumenArtista.promedio))"
+                  readonly
+                  tamano="sm"
+                  etiqueta="Promedio de reseñas del artista"
+                />
+                <span class="text-sm font-semibold text-granate">
+                  {{ formatearPromedio(resumenArtista.promedio) }}
+                </span>
+                <span class="text-xs text-cafe/55">
+                  ({{ resumenArtista.cantidad }}
+                  {{ resumenArtista.cantidad === 1 ? 'reseña' : 'reseñas' }})
+                </span>
+              </div>
+              <p
+                v-else-if="!esArtistaDeLaSolicitud && resumenArtista"
+                class="mt-3 text-xs text-cafe/50"
+              >
+                El artista todavía no tiene reseñas.
               </p>
             </section>
 
@@ -709,6 +808,20 @@ onMounted(cargar)
 
           <section class="rounded-2xl border border-rosa/50 bg-blanco p-5">
             <h2 class="text-base font-semibold text-granate">Acciones</h2>
+
+            <div
+              v-if="contraparte && ayudaContacto"
+              class="mt-3 rounded-xl border border-coral/25 bg-coral/5 px-3 py-2.5"
+            >
+              <p class="text-xs leading-relaxed text-cafe/70">{{ ayudaContacto }}</p>
+              <button
+                type="button"
+                class="mt-1.5 text-xs font-semibold text-coral transition hover:text-rojizo"
+                @click="irAlChat"
+              >
+                Escribirle a {{ nombreContraparte }} →
+              </button>
+            </div>
 
             <p
               v-if="avisoExito"

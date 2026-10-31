@@ -40,6 +40,10 @@ public class Conversacion {
     @Column(nullable = false, length = 20)
     private EstadoConversacion estado = EstadoConversacion.PENDIENTE;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private OrigenConversacion origen = OrigenConversacion.SOLICITUD_MENSAJE;
+
     @Column(name = "motivo_contacto", nullable = false, length = 200)
     private String motivoContacto;
 

@@ -3,6 +3,7 @@ package com.temipora.backend_springboot.servicios;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.AccionSolicitud;
+import com.temipora.backend_springboot.modelo.Conversacion;
 import com.temipora.backend_springboot.modelo.DisponibilidadServicioDTO;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
@@ -45,6 +47,7 @@ import com.temipora.backend_springboot.modelo.TipoAccionSolicitud;
 import com.temipora.backend_springboot.modelo.TipoCampo;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.AccionSolicitudRepository;
+import com.temipora.backend_springboot.repositorios.ConversacionRepository;
 import com.temipora.backend_springboot.repositorios.FormularioRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
@@ -103,6 +106,8 @@ public class SolicitudServicioService {
     private final ColaSolicitudesService colaSolicitudesService;
     private final MonedaVistaService monedaVistaService;
     private final ReseniaPublicaService reseniaPublicaService;
+    private final ConversacionService conversacionService;
+    private final ConversacionRepository conversacionRepository;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -118,7 +123,9 @@ public class SolicitudServicioService {
             NotificacionService notificacionService,
             ColaSolicitudesService colaSolicitudesService,
             MonedaVistaService monedaVistaService,
-            ReseniaPublicaService reseniaPublicaService) {
+            ReseniaPublicaService reseniaPublicaService,
+            ConversacionService conversacionService,
+            ConversacionRepository conversacionRepository) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -133,6 +140,8 @@ public class SolicitudServicioService {
         this.colaSolicitudesService = colaSolicitudesService;
         this.monedaVistaService = monedaVistaService;
         this.reseniaPublicaService = reseniaPublicaService;
+        this.conversacionService = conversacionService;
+        this.conversacionRepository = conversacionRepository;
     }
 
     @Transactional(readOnly = true)
@@ -319,6 +328,9 @@ public class SolicitudServicioService {
             estado,
             ordenados);
         solicitudRepository.save(solicitud);
+
+        conversacionService.asegurarPorSolicitud(
+            cliente, artista, solicitud.getIdSolicitud(), servicio.getNombre());
 
         if (estado == EstadoSolicitud.EN_LISTA_ESPERA) {
             ListaEspera lista = listaEsperaService.crear(
@@ -545,6 +557,9 @@ public class SolicitudServicioService {
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
 
+        conversacionService.archivarPorSolicitud(
+            solicitud.getCliente(), solicitud.getArtista());
+
         return ahora;
     }
 
@@ -584,6 +599,20 @@ public class SolicitudServicioService {
             ? solicitudRepository.findByArtistaIdUsuarioOrderByFechaCreacionDesc(idArtista)
             : solicitudRepository.findByArtistaIdUsuarioAndEstadoOrderByFechaCreacionDesc(
                 idArtista, estado);
+        return aResumenesConReputacion(solicitudes, idArtista);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SolicitudResumenDTO> listarRecibidasEnEstados(
+            Long idArtista, Collection<EstadoSolicitud> estados) {
+        return aResumenesConReputacion(
+            solicitudRepository.findByArtistaIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
+                idArtista, estados),
+            idArtista);
+    }
+
+    private List<SolicitudResumenDTO> aResumenesConReputacion(
+            List<Solicitud> solicitudes, Long idArtista) {
         List<SolicitudResumenDTO> dtos = solicitudes.stream()
             .map(solicitud -> aResumen(solicitud, idArtista))
             .toList();
@@ -648,7 +677,29 @@ public class SolicitudServicioService {
             dto.setReputacionCliente(reputacionDe(
                 solicitud.getCliente().getIdUsuario()));
         }
+        aplicarConversacion(dto, solicitud);
         return dto;
+    }
+
+    private void aplicarConversacion(SolicitudDTO dto, Solicitud solicitud) {
+        if (solicitud.getCliente() == null
+                || solicitud.getArtista() == null
+                || solicitud.getCliente().getIdUsuario() == null
+                || solicitud.getArtista().getIdUsuario() == null) {
+            return;
+        }
+        Conversacion conversacion = conversacionRepository
+            .buscarPorPar(
+                solicitud.getCliente().getIdUsuario(),
+                solicitud.getArtista().getIdUsuario())
+            .orElse(null);
+        if (conversacion == null) {
+            return;
+        }
+        dto.setIdConversacion(conversacion.getIdConversacion());
+        if (conversacion.getEstado() != null) {
+            dto.setEstadoConversacion(conversacion.getEstado().name());
+        }
     }
 
     private ReputacionClienteDTO reputacionDe(Long idCliente) {

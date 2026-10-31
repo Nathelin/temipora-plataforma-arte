@@ -41,6 +41,7 @@ import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EstadoConversacion;
 import com.temipora.backend_springboot.modelo.EstadoRelacionMensaje;
 import com.temipora.backend_springboot.modelo.Mensaje;
+import com.temipora.backend_springboot.modelo.OrigenConversacion;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.RechazoConversacionRequest;
 import com.temipora.backend_springboot.modelo.Rol;
@@ -528,6 +529,192 @@ class ConversacionServiceTest {
             eq(ConversacionService.TIPO_REFERENCIA_CONVERSACION));
         verify(eventoPublisher)
             .publishEvent(any(ConversacionActualizadaEvent.class));
+    }
+
+    @Test
+    void asegurarPorSolicitud_sinHilo_creaAceptadaConAperturaAutomatica() {
+        Usuario cliente = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        prepararApertura(Optional.empty());
+
+        conversacionService.asegurarPorSolicitud(cliente, artista, 55L, "Ilustración");
+
+        ArgumentCaptor<Conversacion> captor =
+            ArgumentCaptor.forClass(Conversacion.class);
+        verify(conversacionRepository).save(captor.capture());
+        Conversacion creada = captor.getValue();
+        assertThat(creada.getEstado()).isEqualTo(EstadoConversacion.ACEPTADA);
+        assertThat(creada.getOrigen()).isEqualTo(OrigenConversacion.SOLICITUD_SERVICIO);
+        assertThat(creada.getMotivoContacto()).isEqualTo("Solicitud #55 · Ilustración");
+        assertThat(creada.getIniciador()).isSameAs(cliente);
+        assertThat(creada.getDestinatario()).isSameAs(artista);
+        assertThat(creada.getFechaRespuesta()).isNotNull();
+
+        ArgumentCaptor<ConversacionAccion> accion =
+            ArgumentCaptor.forClass(ConversacionAccion.class);
+        verify(accionRepository).save(accion.capture());
+        assertThat(accion.getValue().getTipoAccion())
+            .isEqualTo(TipoAccionConversacion.APERTURA_AUTOMATICA);
+        assertThat(accion.getValue().getUsuario()).isSameAs(cliente);
+        verify(eventoPublisher).publishEvent(any(ConversacionActualizadaEvent.class));
+    }
+
+    @Test
+    void asegurarPorSolicitud_hiloPendiente_loAceptaSinCrearOtro() {
+        Usuario cliente = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        Conversacion existente = conversacion(
+            EstadoConversacion.PENDIENTE, cliente, artista);
+        prepararApertura(Optional.of(existente));
+
+        conversacionService.asegurarPorSolicitud(cliente, artista, 55L, "Ilustración");
+
+        assertThat(existente.getEstado()).isEqualTo(EstadoConversacion.ACEPTADA);
+        assertThat(existente.getOrigen()).isEqualTo(OrigenConversacion.SOLICITUD_SERVICIO);
+        assertThat(existente.getFechaRespuesta()).isNotNull();
+        verify(conversacionRepository, never()).save(any(Conversacion.class));
+
+        ArgumentCaptor<ConversacionAccion> accion =
+            ArgumentCaptor.forClass(ConversacionAccion.class);
+        verify(accionRepository).save(accion.capture());
+        assertThat(accion.getValue().getTipoAccion())
+            .isEqualTo(TipoAccionConversacion.APERTURA_AUTOMATICA);
+        assertThat(accion.getValue().getMotivo()).contains("PENDIENTE");
+    }
+
+    @Test
+    void asegurarPorSolicitud_hiloRechazado_loReabreYRegistraEstadoAnterior() {
+        Usuario cliente = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        Conversacion existente = conversacion(
+            EstadoConversacion.RECHAZADA, cliente, artista);
+        existente.setOrigen(OrigenConversacion.SOLICITUD_MENSAJE);
+        prepararApertura(Optional.of(existente));
+
+        conversacionService.asegurarPorSolicitud(cliente, artista, 55L, "Ilustración");
+
+        assertThat(existente.getEstado()).isEqualTo(EstadoConversacion.ACEPTADA);
+        assertThat(existente.getOrigen()).isEqualTo(OrigenConversacion.SOLICITUD_SERVICIO);
+        assertThat(existente.getMotivoContacto())
+            .isEqualTo("Solicitud #55 · Ilustración");
+
+        ArgumentCaptor<ConversacionAccion> accion =
+            ArgumentCaptor.forClass(ConversacionAccion.class);
+        verify(accionRepository).save(accion.capture());
+        assertThat(accion.getValue().getMotivo())
+            .contains("RECHAZADA");
+    }
+
+    @Test
+    void asegurarPorSolicitud_hiloAceptadoNoLoDuplicaNiConsumeCupos() {
+        Usuario cliente = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        Conversacion existente = conversacion(
+            EstadoConversacion.ACEPTADA, cliente, artista);
+        ConversacionParticipante participanteCliente =
+            participante(existente, cliente, true);
+        ConversacionParticipante participanteArtista =
+            participante(existente, artista, true);
+        when(conversacionRepository.buscarPorPar(1L, 2L))
+            .thenReturn(Optional.of(existente));
+        when(participanteRepository
+            .findByConversacionIdConversacionAndUsuarioIdUsuario(10L, 1L))
+            .thenReturn(Optional.of(participanteCliente));
+        when(participanteRepository
+            .findByConversacionIdConversacionAndUsuarioIdUsuario(10L, 2L))
+            .thenReturn(Optional.of(participanteArtista));
+
+        conversacionService.asegurarPorSolicitud(cliente, artista, 55L, "Ilustración");
+
+        verify(conversacionRepository, never()).save(any(Conversacion.class));
+        verify(accionRepository, never()).save(any(ConversacionAccion.class));
+        verify(conversacionRepository, never())
+            .countByIniciadorIdUsuarioAndEstado(anyLong(), any());
+        verify(accionRepository, never())
+            .countByUsuarioIdUsuarioAndTipoAccionInAndFechaAfter(
+                anyLong(), anyCollection(), any());
+        assertThat(participanteCliente.isArchivada()).isFalse();
+        assertThat(participanteArtista.isArchivada()).isFalse();
+        verify(eventoPublisher).publishEvent(any(ConversacionActualizadaEvent.class));
+    }
+
+    @Test
+    void archivarPorSolicitud_archivaElHiloAbiertoPorServicio() {
+        Usuario cliente = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        Conversacion existente = conversacion(
+            EstadoConversacion.ACEPTADA, cliente, artista);
+        existente.setOrigen(OrigenConversacion.SOLICITUD_SERVICIO);
+        ConversacionParticipante participanteCliente =
+            participante(existente, cliente, false);
+        ConversacionParticipante participanteArtista =
+            participante(existente, artista, false);
+        when(conversacionRepository.buscarPorPar(1L, 2L))
+            .thenReturn(Optional.of(existente));
+        when(participanteRepository
+            .findByConversacionIdConversacionAndUsuarioIdUsuario(10L, 1L))
+            .thenReturn(Optional.of(participanteCliente));
+        when(participanteRepository
+            .findByConversacionIdConversacionAndUsuarioIdUsuario(10L, 2L))
+            .thenReturn(Optional.of(participanteArtista));
+
+        conversacionService.archivarPorSolicitud(cliente, artista);
+
+        assertThat(participanteCliente.isArchivada()).isTrue();
+        assertThat(participanteArtista.isArchivada()).isTrue();
+        verify(eventoPublisher).publishEvent(any(ConversacionActualizadaEvent.class));
+    }
+
+    @Test
+    void archivarPorSolicitud_ignoraHiloIniciadoPorSolicitudDeMensaje() {
+        Usuario cliente = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        Conversacion existente = conversacion(
+            EstadoConversacion.ACEPTADA, cliente, artista);
+        ConversacionParticipante participanteCliente =
+            participante(existente, cliente, false);
+        ConversacionParticipante participanteArtista =
+            participante(existente, artista, false);
+        when(conversacionRepository.buscarPorPar(1L, 2L))
+            .thenReturn(Optional.of(existente));
+        when(participanteRepository
+            .findByConversacionIdConversacionAndUsuarioIdUsuario(10L, 1L))
+            .thenReturn(Optional.of(participanteCliente));
+        when(participanteRepository
+            .findByConversacionIdConversacionAndUsuarioIdUsuario(10L, 2L))
+            .thenReturn(Optional.of(participanteArtista));
+
+        conversacionService.archivarPorSolicitud(cliente, artista);
+
+        assertThat(participanteCliente.isArchivada()).isFalse();
+        assertThat(participanteArtista.isArchivada()).isFalse();
+        verify(eventoPublisher, never()).publishEvent(any());
+    }
+
+    private void prepararApertura(Optional<Conversacion> existente) {
+        when(conversacionRepository.buscarPorPar(1L, 2L)).thenReturn(existente);
+        when(conversacionRepository.save(any(Conversacion.class)))
+            .thenAnswer(inv -> {
+                Conversacion c = inv.getArgument(0);
+                c.setIdConversacion(10L);
+                return c;
+            });
+        when(participanteRepository
+            .findByConversacionIdConversacionAndUsuarioIdUsuario(anyLong(), anyLong()))
+            .thenReturn(Optional.empty());
+        when(participanteRepository.save(any(ConversacionParticipante.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+        when(accionRepository.save(any(ConversacionAccion.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    private ConversacionParticipante participante(
+            Conversacion conversacion, Usuario usuario, boolean archivada) {
+        ConversacionParticipante participante = new ConversacionParticipante();
+        participante.setConversacion(conversacion);
+        participante.setUsuario(usuario);
+        participante.setArchivada(archivada);
+        return participante;
     }
 
     private void prepararCreacion(Usuario remitente, Usuario destinatario) {
