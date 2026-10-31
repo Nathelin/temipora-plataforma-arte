@@ -63,6 +63,8 @@ public class SecurityConfig {
                     "/api/upload",
                     "/api/checkNombreUsuario",
                     "/uploads/**",
+                    "/ws",
+                    "/ws/**",
                     "/TOS",
                     "/css/**",
                     "/js/**",

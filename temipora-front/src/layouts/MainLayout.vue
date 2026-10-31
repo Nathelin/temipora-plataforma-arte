@@ -5,6 +5,8 @@ import BrandLogo from '../components/BrandLogo.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
+import { useMensajes } from '../composables/useMensajes'
+import { useMensajeriaSocket } from '../composables/useMensajeriaSocket'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,6 +27,28 @@ const esArtista = computed(() => rol.value === 'ARTISTA')
 const esCliente = computed(() => rol.value === 'CLIENTE')
 const puedeVerSolicitudes = computed(() => estaLogueado.value && esCliente.value)
 const enPanel = computed(() => route.path.startsWith('/panel'))
+
+const {
+  noLeidos: mensajesNoLeidos,
+  solicitudesPendientes,
+  iniciarPolling: iniciarPollingMensajes,
+  detenerPolling: detenerPollingMensajes,
+  cargarContador: cargarContadorMensajes,
+  limpiar: limpiarMensajes,
+} = useMensajes()
+
+const {
+  conectar: conectarSocket,
+  desconectar: desconectarSocket,
+  suscribir: suscribirSocket,
+} = useMensajeriaSocket()
+let quitarSuscripcionSocket = null
+const totalMensajes = computed(
+  () => mensajesNoLeidos.value + solicitudesPendientes.value,
+)
+const badgeMensajes = computed(() =>
+  totalMensajes.value > 9 ? '9+' : String(totalMensajes.value),
+)
 
 function alternarMenu() {
   menuAbierto.value = !menuAbierto.value
@@ -54,12 +78,30 @@ onMounted(() => {
   window.addEventListener('perfil-foto-actualizada', actualizarFotoPerfil)
   document.addEventListener('click', manejarClickExterior)
   document.addEventListener('keydown', manejarTecla)
+  iniciarPollingMensajes()
+
+  if (estaLogueado.value && !esAdmin.value) {
+    conectarSocket()
+    quitarSuscripcionSocket = suscribirSocket((evento) => {
+      if (evento?.tipo === 'MENSAJE'
+        && evento.mensaje
+        && !evento.mensaje.esPropio) {
+        cargarContadorMensajes({ silencioso: true })
+      }
+      if (evento?.tipo === 'CONVERSACION') {
+        cargarContadorMensajes({ silencioso: true })
+      }
+    })
+  }
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('perfil-foto-actualizada', actualizarFotoPerfil)
   document.removeEventListener('click', manejarClickExterior)
   document.removeEventListener('keydown', manejarTecla)
+  detenerPollingMensajes()
+  quitarSuscripcionSocket?.()
+  desconectarSocket()
 })
 
 function cerrarSesion() {
@@ -68,6 +110,8 @@ function cerrarSesion() {
   localStorage.removeItem('nombreUsuario')
   localStorage.removeItem('idUsuario')
   localStorage.removeItem('urlFotoPerfil')
+  limpiarMensajes()
+  desconectarSocket()
   router.push({ name: 'login' })
 }
 
@@ -111,6 +155,20 @@ function irAPerfil() {
               class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
             >
               Pedidos
+            </router-link>
+            <router-link
+              v-if="estaLogueado && !esAdmin"
+              to="/mensajes"
+              class="relative inline-flex items-center gap-1 text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+            >
+              Mensajes
+              <span
+                v-if="totalMensajes"
+                class="inline-flex min-w-4 items-center justify-center rounded-full bg-coral px-1 py-0.5 text-[10px] font-bold leading-none text-white"
+                :aria-label="`${totalMensajes} mensajes pendientes`"
+              >
+                {{ badgeMensajes }}
+              </span>
             </router-link>
             <router-link
               v-if="estaLogueado"
@@ -211,6 +269,20 @@ function irAPerfil() {
                   Favoritos
                 </button>
                 <button
+                  v-if="!esAdmin"
+                  class="flex w-full items-center justify-between gap-2 rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  role="menuitem"
+                  @click="menuAbierto = false; router.push({ name: 'mensajes' })"
+                >
+                  <span>Mensajes</span>
+                  <span
+                    v-if="totalMensajes"
+                    class="rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-bold leading-none text-white"
+                  >
+                    {{ badgeMensajes }}
+                  </span>
+                </button>
+                <button
                   v-if="puedeVerSolicitudes"
                   class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
                   role="menuitem"
@@ -302,6 +374,20 @@ function irAPerfil() {
                 @click="menuMovilAbierto = false"
               >
                 Favoritos
+              </router-link>
+              <router-link
+                v-if="estaLogueado && !esAdmin"
+                to="/mensajes"
+                class="flex w-full items-center justify-between gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                @click="menuMovilAbierto = false"
+              >
+                <span>Mensajes</span>
+                <span
+                  v-if="totalMensajes"
+                  class="rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-bold leading-none text-white"
+                >
+                  {{ badgeMensajes }}
+                </span>
               </router-link>
               <router-link
                 v-if="puedeVerSolicitudes"

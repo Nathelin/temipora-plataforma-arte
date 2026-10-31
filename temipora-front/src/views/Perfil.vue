@@ -15,6 +15,12 @@ import {
   cargarReseniasArtista as cargarReseniasArtistaApi,
   cargarResumenReseniasArtista as cargarResumenReseniasArtistaApi,
 } from '../servicios/resenias'
+import ModalSolicitudMensaje from '../components/ModalSolicitudMensaje.vue'
+import {
+  cargarConfiguracionMensajeria,
+  enviarSolicitudMensaje,
+  obtenerEstadoConUsuario,
+} from '../servicios/mensajes'
 
 const route = useRoute()
 const router = useRouter()
@@ -567,6 +573,147 @@ function fotoInicial(nombre) {
 
 const { abrir } = useSubirImagen()
 
+const estadoMensaje = ref(null)
+const cargandoEstadoMensaje = ref(false)
+const modalMensajeAbierto = ref(false)
+const enviandoSolicitud = ref(false)
+const errorSolicitud = ref('')
+const configMensajeria = ref({
+  longitudMaximaMensaje: 2000,
+  longitudMaximaMotivo: 200,
+})
+
+const puedeEnviarMensaje = computed(() =>
+  haySesion.value
+  && !esDuenio.value
+  && (perfil.value.rol === 'ARTISTA' || perfil.value.rol === 'CLIENTE'))
+
+const textoBotonMensaje = computed(() => {
+  if (cargandoEstadoMensaje.value) return 'Cargando...'
+  const estado = estadoMensaje.value
+  if (!estado || estado.estadoRelacion === 'NINGUNA') {
+    return estado && !estado.puedeSolicitar ? 'Mensaje no disponible' : 'Enviar mensaje'
+  }
+  switch (estado.estadoRelacion) {
+    case 'PENDIENTE_RECIBIDA':
+      return 'Responder solicitud'
+    case 'PENDIENTE_ENVIADA':
+      return 'Solicitud enviada'
+    case 'ACEPTADA':
+      return 'Ver conversación'
+    case 'RECHAZADA':
+    case 'CANCELADA':
+    case 'VENCIDA':
+      return estado.puedeSolicitar ? 'Volver a solicitar' : 'Ver estado'
+    default:
+      return 'Enviar mensaje'
+  }
+})
+
+const mensajeDestacado = computed(() => {
+  const estado = estadoMensaje.value
+  if (!estado) return true
+  return estado.estadoRelacion === 'NINGUNA'
+    || estado.estadoRelacion === 'ACEPTADA'
+    || estado.estadoRelacion === 'PENDIENTE_RECIBIDA'
+})
+
+async function cargarEstadoMensaje() {
+  estadoMensaje.value = null
+  if (!puedeEnviarMensaje.value) return
+  const nombre = perfil.value.nombreUsuario
+  cargandoEstadoMensaje.value = true
+  try {
+    const res = await obtenerEstadoConUsuario(nombre)
+    if (perfil.value.nombreUsuario === nombre) {
+      estadoMensaje.value = res.data
+    }
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+    }
+  } finally {
+    if (perfil.value.nombreUsuario === nombre) {
+      cargandoEstadoMensaje.value = false
+    }
+  }
+}
+
+function accionMensaje() {
+  if (!haySesion.value) {
+    router.push({ name: 'login' })
+    return
+  }
+  if (cargandoEstadoMensaje.value) return
+
+  const estado = estadoMensaje.value
+  if (!estado || estado.puedeSolicitar) {
+    errorSolicitud.value = ''
+    modalMensajeAbierto.value = true
+    return
+  }
+  if (estado.idConversacion) {
+    router.push({
+      name: 'conversacion',
+      params: { idConversacion: estado.idConversacion },
+    })
+    return
+  }
+  notificarError(
+    estado.motivoNoSolicitable || 'No podés enviar una solicitud en este momento.',
+  )
+}
+
+async function enviarSolicitud(datos) {
+  if (enviandoSolicitud.value) return
+  enviandoSolicitud.value = true
+  errorSolicitud.value = ''
+  try {
+    const res = await enviarSolicitudMensaje({
+      nombreUsuarioDestinatario: perfil.value.nombreUsuario,
+      ...datos,
+    })
+    modalMensajeAbierto.value = false
+    exito(`Enviaste la solicitud de mensaje a @${perfil.value.nombreUsuario}.`)
+    estadoMensaje.value = {
+      estadoRelacion: 'PENDIENTE_ENVIADA',
+      idConversacion: res.data?.idConversacion,
+      puedeSolicitar: false,
+    }
+    if (res.data?.idConversacion) {
+      router.push({
+        name: 'conversacion',
+        params: { idConversacion: res.data.idConversacion },
+      })
+    }
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    errorSolicitud.value =
+      e.response?.data?.message || 'No se pudo enviar la solicitud.'
+  } finally {
+    enviandoSolicitud.value = false
+  }
+}
+
+watch(
+  () => [perfil.value.nombreUsuario, perfil.value.rol],
+  () => {
+    void cargarEstadoMensaje()
+  },
+)
+
+onMounted(() => {
+  if (!haySesion.value) return
+  cargarConfiguracionMensajeria()
+    .then((res) => {
+      if (res.data) configMensajeria.value = res.data
+    })
+    .catch(() => {})
+})
+
 const imagenSeleccionada = ref(null)
 const mostrarImagenSensible = ref(false)
 const zoomActivo = ref(false)
@@ -774,6 +921,21 @@ function irASubirImagen(imagen = null) {
               <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z" />
             </svg>
             <span>{{ actualizandoFavorito ? 'Guardando...' : esFavorito ? 'En favoritos' : 'Favorito' }}</span>
+          </button>
+          <button
+            v-if="puedeEnviarMensaje"
+            type="button"
+            class="inline-flex min-h-10 items-center gap-2 rounded-full border px-5 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60"
+            :class="mensajeDestacado
+              ? 'border-coral bg-coral text-white shadow-sm hover:bg-rojizo'
+              : 'border-coral/50 bg-superficie text-granate hover:bg-rosa/25'"
+            :disabled="cargandoEstadoMensaje"
+            @click="accionMensaje"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+            </svg>
+            <span>{{ textoBotonMensaje }}</span>
           </button>
           <button v-if="esDuenio"
             class="inline-flex min-h-10 items-center rounded-full border border-borde/60 bg-superficie px-5 text-sm font-semibold text-granate transition hover:bg-rosa/25"
@@ -1792,5 +1954,16 @@ function irASubirImagen(imagen = null) {
     </div>
 
     </template>
+
+    <ModalSolicitudMensaje
+      :abierto="modalMensajeAbierto"
+      :destinatario="perfil"
+      :motivo-maximo="configMensajeria.longitudMaximaMotivo || 200"
+      :mensaje-maximo="configMensajeria.longitudMaximaMensaje || 2000"
+      :cargando="enviandoSolicitud"
+      :error="errorSolicitud"
+      @cerrar="modalMensajeAbierto = false"
+      @enviar="enviarSolicitud"
+    />
   </div>
 </template>

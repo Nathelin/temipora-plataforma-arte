@@ -59,6 +59,7 @@ const secciones = [
       { nombre: 'Presupuestos', to: '/admin/ajustes/presupuestos' },
       { nombre: 'Comisiones', to: '/admin/ajustes/comisiones' },
       { nombre: 'Hitos y pedidos', to: '/admin/ajustes/pedidos' },
+      { nombre: 'Mensajería', to: '/admin/ajustes/mensajeria' },
       { nombre: 'Términos de la plataforma', to: '/admin/ajustes/terminos-plataforma' },
     ],
   },
