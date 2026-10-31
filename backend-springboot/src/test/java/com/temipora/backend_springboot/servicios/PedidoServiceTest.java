@@ -13,17 +13,20 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.temipora.backend_springboot.modelo.Conversacion;
@@ -515,12 +518,12 @@ class PedidoServiceTest {
 
     @Test
     void listarEnviados_devuelveElResumen() {
-        when(pedidoRepository.findByClienteIdUsuario(
-            eq(CLIENTE), any(Pageable.class)))
+        when(pedidoRepository.buscarEnviados(
+            eq(CLIENTE), any(), any(), any(), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(pedido)));
 
         PaginaDTO<PedidoResumenDTO> pagina = pedidoService.listarEnviados(
-            CLIENTE, null, 0, 20);
+            CLIENTE, filtro(null, null), 0, 20);
 
         assertThat(pagina.getContenido()).hasSize(1);
         assertThat(pagina.getContenido().get(0).getIdPedido())
@@ -529,14 +532,128 @@ class PedidoServiceTest {
 
     @Test
     void listarRecibidos_devuelveElResumen() {
-        when(pedidoRepository.findByArtistaIdUsuario(
-            eq(ARTISTA), any(Pageable.class)))
+        when(pedidoRepository.buscarRecibidos(
+            eq(ARTISTA), any(), any(), any(), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(pedido)));
 
         PaginaDTO<PedidoResumenDTO> pagina = pedidoService.listarRecibidos(
-            ARTISTA, null, 0, 20);
+            ARTISTA, filtro(null, null), 0, 20);
 
         assertThat(pagina.getContenido()).hasSize(1);
+    }
+
+    @Test
+    void listarRecibidos_conGrupoEnCurso_consultaLosEstadosActivos() {
+        when(pedidoRepository.buscarRecibidos(
+            eq(ARTISTA), any(), any(), any(), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(pedido)));
+        ArgumentCaptor<Collection<EstadoPedido>> estados =
+            ArgumentCaptor.forClass(Collection.class);
+
+        pedidoService.listarRecibidos(
+            ARTISTA, filtro(null, "en-curso"), 0, 20);
+
+        verify(pedidoRepository).buscarRecibidos(
+            eq(ARTISTA), estados.capture(), any(), any(),
+            any(Pageable.class));
+        assertThat(estados.getValue()).containsExactlyInAnyOrder(
+            EstadoPedido.PENDIENTE_PAGO, EstadoPedido.EN_CURSO);
+    }
+
+    @Test
+    void listarRecibidos_conGrupoCerrados_consultaCanceladosEImpagos() {
+        when(pedidoRepository.buscarRecibidos(
+            eq(ARTISTA), any(), any(), any(), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(pedido)));
+        ArgumentCaptor<Collection<EstadoPedido>> estados =
+            ArgumentCaptor.forClass(Collection.class);
+
+        pedidoService.listarRecibidos(
+            ARTISTA, filtro(null, "cerrados"), 0, 20);
+
+        verify(pedidoRepository).buscarRecibidos(
+            eq(ARTISTA), estados.capture(), any(), any(),
+            any(Pageable.class));
+        assertThat(estados.getValue()).containsExactlyInAnyOrder(
+            EstadoPedido.CANCELADO, EstadoPedido.IMPAGO);
+    }
+
+    @Test
+    void listarRecibidos_conOrdenLimite_ordenaPorFechaDeEntrega() {
+        when(pedidoRepository.buscarRecibidos(
+            eq(ARTISTA), any(), any(), any(), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(pedido)));
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+
+        pedidoService.listarRecibidos(
+            ARTISTA, filtro("limite", "en-curso"), 0, 20);
+
+        verify(pedidoRepository).buscarRecibidos(
+            eq(ARTISTA), any(), any(), any(), pageable.capture());
+        Sort.Order orden = pageable.getValue().getSort()
+            .getOrderFor("limiteEntrega");
+        assertThat(orden).isNotNull();
+        assertThat(orden.getDirection()).isEqualTo(Sort.Direction.ASC);
+    }
+
+    @Test
+    void listarRecibidos_grupoAccion_soloDevuelvePedidosEntregables() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PAGADO);
+        hito.setEstadoEntrega(EstadoEntregaHito.NO_INICIADO);
+        when(pedidoRepository.candidatosAccionRecibidos(
+            eq(ARTISTA), any(), any(), any(), any()))
+            .thenReturn(List.of(pedido));
+
+        PaginaDTO<PedidoResumenDTO> pagina = pedidoService.listarRecibidos(
+            ARTISTA, filtro(null, "accion"), 0, 20);
+
+        assertThat(pagina.getContenido()).hasSize(1);
+        assertThat(pagina.getContenido().get(0).isPuedeEntregar()).isTrue();
+    }
+
+    @Test
+    void listarEnviados_grupoAccion_soloDevuelvePedidosAAprobar() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PAGADO);
+        hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
+        when(pedidoRepository.candidatosAccionEnviados(
+            eq(CLIENTE), any(), any(), any(), any(), any()))
+            .thenReturn(List.of(pedido));
+
+        PaginaDTO<PedidoResumenDTO> pagina = pedidoService.listarEnviados(
+            CLIENTE, filtro(null, "accion"), 0, 20);
+
+        assertThat(pagina.getContenido()).hasSize(1);
+        assertThat(pagina.getContenido().get(0).isPuedeAprobar()).isTrue();
+    }
+
+    @Test
+    void listarRecibidos_grupoAccion_paginaEnMemoria() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PAGADO);
+        hito.setEstadoEntrega(EstadoEntregaHito.NO_INICIADO);
+        when(pedidoRepository.candidatosAccionRecibidos(
+            eq(ARTISTA), any(), any(), any(), any()))
+            .thenReturn(List.of(
+                pedido, pedido, pedido, pedido, pedido, pedido, pedido));
+
+        PaginaDTO<PedidoResumenDTO> primera = pedidoService.listarRecibidos(
+            ARTISTA, filtro(null, "accion"), 0, 5);
+        PaginaDTO<PedidoResumenDTO> segunda = pedidoService.listarRecibidos(
+            ARTISTA, filtro(null, "accion"), 1, 5);
+
+        assertThat(primera.getContenido()).hasSize(5);
+        assertThat(primera.getTotalElementos()).isEqualTo(7);
+        assertThat(primera.isHayMas()).isTrue();
+        assertThat(segunda.getContenido()).hasSize(2);
+        assertThat(segunda.isHayMas()).isFalse();
+    }
+
+    private PedidoService.FiltroPedidos filtro(
+            String orden, String grupo) {
+        return new PedidoService.FiltroPedidos(
+            null, grupo, null, null, orden);
     }
 
     @Test
@@ -603,8 +720,8 @@ class PedidoServiceTest {
     @Test
     void listarEnviados_incluyeConversacionYNoLeidos() {
         Conversacion conversacion = conversacion(44L, EstadoConversacion.ACEPTADA);
-        when(pedidoRepository.findByClienteIdUsuario(
-            eq(CLIENTE), any(Pageable.class)))
+        when(pedidoRepository.buscarEnviados(
+            eq(CLIENTE), any(), any(), any(), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(pedido)));
         when(conversacionRepository.buscarPorPar(CLIENTE, ARTISTA))
             .thenReturn(Optional.of(conversacion));
@@ -613,7 +730,7 @@ class PedidoServiceTest {
             .thenReturn(List.<Object[]>of(new Object[] {44L, 2L}));
 
         PaginaDTO<PedidoResumenDTO> pagina =
-            pedidoService.listarEnviados(CLIENTE, null, 0, 12);
+            pedidoService.listarEnviados(CLIENTE, filtro(null, null), 0, 12);
 
         PedidoResumenDTO resumen = pagina.getContenido().get(0);
         assertThat(resumen.getIdConversacion()).isEqualTo(44L);

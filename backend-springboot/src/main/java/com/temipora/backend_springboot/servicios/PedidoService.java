@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.temipora.backend_springboot.modelo.ContadoresPedidosDTO;
 import com.temipora.backend_springboot.modelo.Conversacion;
 import com.temipora.backend_springboot.modelo.DibujoResumenDTO;
 import com.temipora.backend_springboot.modelo.EntregaHitoDTO;
@@ -78,6 +79,23 @@ public class PedidoService {
         EstadoPedido.IMPAGO);
     private static final int MAX_HITOS_PANEL = 10;
     private static final int DIAS_HITO_POR_VENCER = 3;
+
+    private static final String GRUPO_EN_CURSO = "en-curso";
+    private static final String GRUPO_ACCION = "accion";
+    private static final String GRUPO_FINALIZADOS = "finalizados";
+    private static final String GRUPO_CERRADOS = "cerrados";
+    private static final String ORDEN_LIMITE = "limite";
+    private static final String ORDEN_MONTO = "monto";
+
+    private static final List<EstadoPedido> ESTADOS_EN_CURSO = List.of(
+        EstadoPedido.PENDIENTE_PAGO, EstadoPedido.EN_CURSO);
+    private static final List<EstadoPedido> ESTADOS_CERRADOS = List.of(
+        EstadoPedido.CANCELADO, EstadoPedido.IMPAGO);
+    private static final List<EstadoEntregaHito> ESTADOS_ENTREGA_ABIERTA =
+        List.of(
+            EstadoEntregaHito.NO_INICIADO,
+            EstadoEntregaHito.EN_PROCESO,
+            EstadoEntregaHito.CON_REVISION);
 
     private final PedidoRepository pedidoRepository;
     private final HitoPedidoRepository hitoPedidoRepository;
@@ -549,26 +567,185 @@ public class PedidoService {
         return construirDTO(pedido, idUsuario, esAdmin);
     }
 
+    public record FiltroPedidos(
+            EstadoPedido estado,
+            String grupo,
+            Long idServicio,
+            String busqueda,
+            String orden) {
+    }
+
     @Transactional(readOnly = true)
     public PaginaDTO<PedidoResumenDTO> listarEnviados(
-            Long idCliente, EstadoPedido estado, int pagina, int tamanio) {
-        Pageable pageable = pageable(pagina, tamanio);
-        Page<Pedido> page = estado == null
-            ? pedidoRepository.findByClienteIdUsuario(idCliente, pageable)
-            : pedidoRepository.findByClienteIdUsuarioAndEstado(
-                idCliente, estado, pageable);
-        return aPagina(page, idCliente);
+            Long idCliente, FiltroPedidos filtro, int pagina, int tamanio) {
+        return listar(idCliente, false, filtro, pagina, tamanio);
     }
 
     @Transactional(readOnly = true)
     public PaginaDTO<PedidoResumenDTO> listarRecibidos(
-            Long idArtista, EstadoPedido estado, int pagina, int tamanio) {
-        Pageable pageable = pageable(pagina, tamanio);
-        Page<Pedido> page = estado == null
-            ? pedidoRepository.findByArtistaIdUsuario(idArtista, pageable)
-            : pedidoRepository.findByArtistaIdUsuarioAndEstado(
-                idArtista, estado, pageable);
-        return aPagina(page, idArtista);
+            Long idArtista, FiltroPedidos filtro, int pagina, int tamanio) {
+        return listar(idArtista, true, filtro, pagina, tamanio);
+    }
+
+    @Transactional(readOnly = true)
+    public ContadoresPedidosDTO contadores(Long idVista, boolean recibidos) {
+        long todos = recibidos
+            ? pedidoRepository.countByArtistaIdUsuario(idVista)
+            : pedidoRepository.countByClienteIdUsuario(idVista);
+        return ContadoresPedidosDTO.builder()
+            .todos(todos)
+            .enCurso(contar(recibidos, idVista, ESTADOS_EN_CURSO))
+            .finalizados(contar(
+                recibidos, idVista, List.of(EstadoPedido.FINALIZADO)))
+            .cerrados(contar(recibidos, idVista, ESTADOS_CERRADOS))
+            .accion(candidatosAccion(
+                idVista,
+                recibidos,
+                new FiltroPedidos(null, GRUPO_ACCION, null, null, null))
+                .size())
+            .build();
+    }
+
+    private PaginaDTO<PedidoResumenDTO> listar(
+            Long idVista,
+            boolean recibidos,
+            FiltroPedidos filtro,
+            int pagina,
+            int tamanio) {
+        String grupo = filtro.grupo() != null ? filtro.grupo().trim() : null;
+        if (GRUPO_ACCION.equals(grupo)) {
+            return listarAccion(idVista, recibidos, filtro, pagina, tamanio);
+        }
+
+        List<EstadoPedido> estados = estadosDe(grupo, filtro.estado());
+        Pageable pageable = pageable(pagina, tamanio, orden(filtro.orden()));
+        String patron = patron(filtro.busqueda());
+        Page<Pedido> page = recibidos
+            ? pedidoRepository.buscarRecibidos(
+                idVista, estados, filtro.idServicio(), patron, pageable)
+            : pedidoRepository.buscarEnviados(
+                idVista, estados, filtro.idServicio(), patron, pageable);
+        return aPagina(page, idVista);
+    }
+
+    private PaginaDTO<PedidoResumenDTO> listarAccion(
+            Long idVista,
+            boolean recibidos,
+            FiltroPedidos filtro,
+            int pagina,
+            int tamanio) {
+        List<Pedido> pedidos = candidatosAccion(idVista, recibidos, filtro);
+        int tamanioPagina = Math.min(Math.max(1, tamanio), 50);
+        int paginaSegura = Math.max(0, pagina);
+        int total = pedidos.size();
+        int desde = paginaSegura * tamanioPagina;
+        List<PedidoResumenDTO> contenido = desde >= total
+            ? List.of()
+            : pedidos.subList(desde, Math.min(desde + tamanioPagina, total))
+                .stream()
+                .map(pedido -> construirResumen(pedido, idVista))
+                .toList();
+
+        return PaginaDTO.<PedidoResumenDTO>builder()
+            .contenido(contenido)
+            .pagina(paginaSegura)
+            .tamanio(tamanioPagina)
+            .totalElementos(total)
+            .totalPaginas((int) Math.ceil((double) total / tamanioPagina))
+            .hayMas(desde + contenido.size() < total)
+            .build();
+    }
+
+    private List<Pedido> candidatosAccion(
+            Long idVista, boolean recibidos, FiltroPedidos filtro) {
+        String patron = patron(filtro.busqueda());
+        List<Pedido> candidatos = recibidos
+            ? pedidoRepository.candidatosAccionRecibidos(
+                idVista,
+                EstadoPedido.EN_CURSO,
+                ESTADOS_ENTREGA_ABIERTA,
+                filtro.idServicio(),
+                patron)
+            : pedidoRepository.candidatosAccionEnviados(
+                idVista,
+                ESTADOS_EN_CURSO,
+                EstadoPagoHito.PENDIENTE,
+                EstadoEntregaHito.ENTREGADO,
+                filtro.idServicio(),
+                patron);
+
+        return candidatos.stream()
+            .filter(pedido -> tieneAccion(pedido, recibidos))
+            .sorted(comparador(filtro.orden()))
+            .toList();
+    }
+
+    private boolean tieneAccion(Pedido pedido, boolean recibidos) {
+        if (recibidos) {
+            return pedido.getHitos().stream()
+                .anyMatch(hito -> puedeEntregar(pedido, hito));
+        }
+        return pedido.getHitos().stream()
+            .anyMatch(hito -> puedePagar(pedido, hito, List.of())
+                || puedeAprobar(hito));
+    }
+
+    private long contar(
+            boolean recibidos, Long idVista, List<EstadoPedido> estados) {
+        return recibidos
+            ? pedidoRepository.countByArtistaIdUsuarioAndEstadoIn(
+                idVista, estados)
+            : pedidoRepository.countByClienteIdUsuarioAndEstadoIn(
+                idVista, estados);
+    }
+
+    private List<EstadoPedido> estadosDe(String grupo, EstadoPedido estado) {
+        if (grupo == null || grupo.isBlank()) {
+            return estado != null
+                ? List.of(estado)
+                : List.of(EstadoPedido.values());
+        }
+        return switch (grupo) {
+            case GRUPO_EN_CURSO -> ESTADOS_EN_CURSO;
+            case GRUPO_FINALIZADOS -> List.of(EstadoPedido.FINALIZADO);
+            case GRUPO_CERRADOS -> ESTADOS_CERRADOS;
+            default -> List.of(EstadoPedido.values());
+        };
+    }
+
+    private String patron(String busqueda) {
+        if (busqueda == null) {
+            return "";
+        }
+        String limpio = busqueda.trim().toLowerCase();
+        return limpio.length() < 2 ? "" : limpio;
+    }
+
+    private Sort orden(String valor) {
+        if (ORDEN_LIMITE.equals(valor)) {
+            return Sort.by(Sort.Direction.ASC, "limiteEntrega");
+        }
+        if (ORDEN_MONTO.equals(valor)) {
+            return Sort.by(Sort.Direction.DESC, "precioFinalCobro");
+        }
+        return Sort.by(Sort.Direction.DESC, "fechaCreacion");
+    }
+
+    private Comparator<Pedido> comparador(String valor) {
+        if (ORDEN_LIMITE.equals(valor)) {
+            return Comparator.comparing(
+                Pedido::getLimiteEntrega,
+                Comparator.nullsLast(Comparator.<LocalDate>naturalOrder()));
+        }
+        if (ORDEN_MONTO.equals(valor)) {
+            return Comparator.comparing(
+                Pedido::getPrecioFinalCobro,
+                Comparator.nullsLast(Comparator.<BigDecimal>reverseOrder()));
+        }
+        return Comparator.comparing(
+            Pedido::getFechaCreacion,
+            Comparator.nullsLast(
+                Comparator.<LocalDateTime>reverseOrder()));
     }
 
     public record ActividadArtista(
@@ -1188,11 +1365,11 @@ public class PedidoService {
         return ((Number) filas.get(0)[1]).longValue();
     }
 
-    private Pageable pageable(int pagina, int tamanio) {
+    private Pageable pageable(int pagina, int tamanio, Sort sort) {
         return PageRequest.of(
             Math.max(0, pagina),
             Math.min(Math.max(1, tamanio), 50),
-            Sort.by(Sort.Direction.DESC, "fechaCreacion"));
+            sort);
     }
 
     private boolean puedePagar(

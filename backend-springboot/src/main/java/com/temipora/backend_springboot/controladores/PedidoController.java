@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.temipora.backend_springboot.modelo.ContadoresPedidosDTO;
 import com.temipora.backend_springboot.modelo.EntregaHitoMultipartRequest;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
@@ -104,22 +105,47 @@ public class PedidoController {
     @PreAuthorize("hasRole('ARTISTA')")
     public PaginaDTO<PedidoResumenDTO> recibidos(
             @RequestParam(required = false) EstadoPedido estado,
+            @RequestParam(required = false) String grupo,
+            @RequestParam(required = false) Long idServicio,
+            @RequestParam(required = false, name = "q") String busqueda,
+            @RequestParam(required = false) String orden,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "20") int tamanio,
             Authentication authentication) {
         return pedidoService.listarRecibidos(
-            idAutenticado(authentication), estado, pagina, tamanio);
+            idAutenticado(authentication),
+            new PedidoService.FiltroPedidos(
+                estado, grupo, idServicio, busqueda, orden),
+            pagina,
+            tamanio);
     }
 
     @GetMapping("/enviados")
     @PreAuthorize("hasAnyRole('CLIENTE', 'ARTISTA')")
     public PaginaDTO<PedidoResumenDTO> enviados(
             @RequestParam(required = false) EstadoPedido estado,
+            @RequestParam(required = false) String grupo,
+            @RequestParam(required = false) Long idServicio,
+            @RequestParam(required = false, name = "q") String busqueda,
+            @RequestParam(required = false) String orden,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "20") int tamanio,
             Authentication authentication) {
         return pedidoService.listarEnviados(
-            idAutenticado(authentication), estado, pagina, tamanio);
+            idAutenticado(authentication),
+            new PedidoService.FiltroPedidos(
+                estado, grupo, idServicio, busqueda, orden),
+            pagina,
+            tamanio);
+    }
+
+    @GetMapping("/contadores")
+    @PreAuthorize("hasAnyRole('CLIENTE', 'ARTISTA')")
+    public ContadoresPedidosDTO contadores(
+            @RequestParam(defaultValue = "recibidos") String bandeja,
+            Authentication authentication) {
+        return pedidoService.contadores(
+            idAutenticado(authentication), "recibidos".equals(bandeja));
     }
 
     @PostMapping("/{idPedido}/hitos/{idHito}/pagar")

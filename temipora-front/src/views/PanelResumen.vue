@@ -114,7 +114,7 @@ const tarjetas = computed(() => {
         : m.entregasPendientes
           ? 'Esperando tu entrega'
           : 'Nada para entregar',
-      to: { name: 'panel-pedidos', query: { estado: 'EN_CURSO' } },
+      to: { name: 'panel-pedidos', query: { grupo: 'accion' } },
       icono: ICONOS.entregas,
       monto: false,
     },

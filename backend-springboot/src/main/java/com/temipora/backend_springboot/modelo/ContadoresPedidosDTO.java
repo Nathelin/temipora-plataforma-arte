@@ -1,0 +1,21 @@
+package com.temipora.backend_springboot.modelo;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ContadoresPedidosDTO {
+
+    private long todos;
+    private long enCurso;
+    private long accion;
+    private long finalizados;
+    private long cerrados;
+}
