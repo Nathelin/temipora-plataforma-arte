@@ -40,6 +40,8 @@ import PagoPresupuesto from '../views/PagoPresupuesto.vue'
 import Pedidos from '../views/Pedidos.vue'
 import PedidoDetalle from '../views/PedidoDetalle.vue'
 import Notificaciones from '../views/Notificaciones.vue'
+import Mensajes from '../views/Mensajes.vue'
+import Conversacion from '../views/Conversacion.vue'
 import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
 import ConfiguracionApariencia from '../views/ConfiguracionApariencia.vue'
 import ConfiguracionPrivacidad from '../views/ConfiguracionPrivacidad.vue'
@@ -158,6 +160,22 @@ const routes = [
         },
       },
       {
+        path: 'mensajes',
+        name: 'mensajes',
+        component: Mensajes,
+        meta: { title: 'Mensajes', requiresAuth: true, requiresComprador: true },
+      },
+      {
+        path: 'mensajes/:idConversacion',
+        name: 'conversacion',
+        component: Conversacion,
+        meta: {
+          title: 'Conversación',
+          requiresAuth: true,
+          requiresComprador: true,
+        },
+      },
+      {
         path: 'panel',
         component: ArtistLayout,
         meta: { requiresAuth: true, requiresArtist: true },
@@ -171,6 +189,8 @@ const routes = [
           { path: 'solicitudes/:idSolicitud/presupuesto', name: 'presupuesto-crear', component: PresupuestoForm, meta: { title: 'Enviar presupuesto' } },
           { path: 'pedidos', name: 'panel-pedidos', component: Pedidos, meta: { title: 'Pedidos' } },
           { path: 'pedidos/:idPedido', name: 'panel-pedido-detalle', component: PedidoDetalle, meta: { title: 'Pedido' } },
+          { path: 'mensajes', name: 'panel-mensajes', component: Mensajes, meta: { title: 'Mensajes' } },
+          { path: 'mensajes/:idConversacion', name: 'panel-conversacion', component: Conversacion, meta: { title: 'Conversación' } },
           { path: 'formulario-pedidos', name: 'panel-formulario-pedidos', component: ConfiguracionFormularioPedidos, meta: { title: 'Formulario de pedidos' } },
           { path: 'terminos', name: 'panel-terminos', component: ConfiguracionTerminosArtista, meta: { title: 'Términos y condiciones' } },
           { path: 'etiquetas', name: 'panel-etiquetas', component: ConfiguracionEtiquetas, meta: { title: 'Mis etiquetas' } },
