@@ -1469,7 +1469,6 @@ onMounted(async () => {
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-cafe/65">
                   Conversación privada con
                   @{{ chatContraparte?.nombreUsuario || 'la otra parte' }}.
-                  Es el mismo hilo que aparece en Mensajes.
                 </p>
               </div>
               <p
