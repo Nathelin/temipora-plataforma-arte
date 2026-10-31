@@ -26,9 +26,12 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.temipora.backend_springboot.modelo.Conversacion;
 import com.temipora.backend_springboot.modelo.EntregaHitoMultipartRequest;
 import com.temipora.backend_springboot.modelo.ETiempoEntregaUnidad;
+import com.temipora.backend_springboot.modelo.EstadoConversacion;
 import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
+import com.temipora.backend_springboot.modelo.EstadoMensaje;
 import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
@@ -47,7 +50,9 @@ import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.SolicitudRevisionRequest;
 import com.temipora.backend_springboot.modelo.TipoHito;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.ConversacionRepository;
 import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
+import com.temipora.backend_springboot.repositorios.MensajeRepository;
 import com.temipora.backend_springboot.repositorios.PagoRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
@@ -82,6 +87,10 @@ class PedidoServiceTest {
     private EntregaService entregaService;
     @Mock
     private PedidoCierreService pedidoCierreService;
+    @Mock
+    private ConversacionRepository conversacionRepository;
+    @Mock
+    private MensajeRepository mensajeRepository;
 
     @InjectMocks
     private PedidoService pedidoService;
@@ -546,6 +555,77 @@ class PedidoServiceTest {
 
         assertThatThrownBy(() -> pedidoService.obtener(PEDIDO, 99L))
             .isInstanceOf(AccesoDenegadoException.class);
+    }
+
+    @Test
+    void obtener_incluyeConversacionYNoLeidos() {
+        Conversacion conversacion = conversacion(44L, EstadoConversacion.ACEPTADA);
+        when(pedidoRepository.findById(PEDIDO)).thenReturn(Optional.of(pedido));
+        when(conversacionRepository.buscarPorPar(CLIENTE, ARTISTA))
+            .thenReturn(Optional.of(conversacion));
+        when(mensajeRepository.contarNoLeidosPorConversacion(
+            eq(CLIENTE), any(), eq(EstadoMensaje.ENVIADO)))
+            .thenReturn(List.<Object[]>of(new Object[] {44L, 3L}));
+
+        PedidoDTO dto = pedidoService.obtener(PEDIDO, CLIENTE);
+
+        assertThat(dto.getIdConversacion()).isEqualTo(44L);
+        assertThat(dto.getEstadoConversacion()).isEqualTo("ACEPTADA");
+        assertThat(dto.getNoLeidos()).isEqualTo(3L);
+    }
+
+    @Test
+    void obtener_sinConversacion_devuelveSinChatYSinNoLeidos() {
+        when(pedidoRepository.findById(PEDIDO)).thenReturn(Optional.of(pedido));
+        when(conversacionRepository.buscarPorPar(CLIENTE, ARTISTA))
+            .thenReturn(Optional.empty());
+
+        PedidoDTO dto = pedidoService.obtener(PEDIDO, CLIENTE);
+
+        assertThat(dto.getIdConversacion()).isNull();
+        assertThat(dto.getEstadoConversacion()).isNull();
+        assertThat(dto.getNoLeidos()).isZero();
+        verify(mensajeRepository, never())
+            .contarNoLeidosPorConversacion(anyLong(), any(), any());
+    }
+
+    @Test
+    void obtener_comoAdmin_noResuelveConversacion() {
+        when(pedidoRepository.findById(PEDIDO)).thenReturn(Optional.of(pedido));
+
+        PedidoDTO dto = pedidoService.obtener(PEDIDO, 99L, true);
+
+        assertThat(dto.getIdConversacion()).isNull();
+        assertThat(dto.getNoLeidos()).isZero();
+        verify(conversacionRepository, never()).buscarPorPar(anyLong(), anyLong());
+    }
+
+    @Test
+    void listarEnviados_incluyeConversacionYNoLeidos() {
+        Conversacion conversacion = conversacion(44L, EstadoConversacion.ACEPTADA);
+        when(pedidoRepository.findByClienteIdUsuario(
+            eq(CLIENTE), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(pedido)));
+        when(conversacionRepository.buscarPorPar(CLIENTE, ARTISTA))
+            .thenReturn(Optional.of(conversacion));
+        when(mensajeRepository.contarNoLeidosPorConversacion(
+            eq(CLIENTE), any(), eq(EstadoMensaje.ENVIADO)))
+            .thenReturn(List.<Object[]>of(new Object[] {44L, 2L}));
+
+        PaginaDTO<PedidoResumenDTO> pagina =
+            pedidoService.listarEnviados(CLIENTE, null, 0, 12);
+
+        PedidoResumenDTO resumen = pagina.getContenido().get(0);
+        assertThat(resumen.getIdConversacion()).isEqualTo(44L);
+        assertThat(resumen.getEstadoConversacion()).isEqualTo("ACEPTADA");
+        assertThat(resumen.getNoLeidos()).isEqualTo(2L);
+    }
+
+    private Conversacion conversacion(Long id, EstadoConversacion estado) {
+        Conversacion conversacion = new Conversacion();
+        conversacion.setIdConversacion(id);
+        conversacion.setEstado(estado);
+        return conversacion;
     }
 
     private void prepararCreacion() {

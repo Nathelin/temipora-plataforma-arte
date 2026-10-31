@@ -5,5 +5,6 @@ public enum TipoAccionConversacion {
     ACEPTACION,
     RECHAZO,
     CANCELACION,
-    REENVIO
+    REENVIO,
+    APERTURA_AUTOMATICA
 }

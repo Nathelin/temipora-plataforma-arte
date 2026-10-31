@@ -112,6 +112,9 @@ class SolicitudServicioServiceTest {
     @Mock
     private ReseniaPublicaService reseniaPublicaService;
 
+    @Mock
+    private ConversacionService conversacionService;
+
     @InjectMocks
     private SolicitudServicioService solicitudServicioService;
 
@@ -250,6 +253,8 @@ class SolicitudServicioServiceTest {
         verify(listaEsperaService, never()).crear(any(), any(), any(), anyInt());
         verify(notificacionService).crearParaUsuario(
             eq(ARTISTA), anyString(), anyString(), anyString(), anyLong(), eq("SOLICITUD"));
+        verify(conversacionService).asegurarPorSolicitud(
+            cliente, artista, resultado.getIdSolicitud(), "Ilustración");
     }
 
     @Test
@@ -457,6 +462,7 @@ class SolicitudServicioServiceTest {
             eq(CLIENTE), eq("SOLICITUD_RECHAZADA"), eq("Solicitud rechazada"),
             contains("No llego con los tiempos"), eq(solicitud.getIdSolicitud()), eq("SOLICITUD"));
         verify(listaEsperaService, never()).marcarRechazada(any());
+        verify(conversacionService).archivarPorSolicitud(cliente, artista);
     }
 
     @Test

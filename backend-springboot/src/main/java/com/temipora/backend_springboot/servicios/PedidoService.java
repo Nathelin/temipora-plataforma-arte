@@ -20,10 +20,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.temipora.backend_springboot.modelo.Conversacion;
 import com.temipora.backend_springboot.modelo.DibujoResumenDTO;
 import com.temipora.backend_springboot.modelo.EntregaHitoDTO;
 import com.temipora.backend_springboot.modelo.EntregaHitoMultipartRequest;
+import com.temipora.backend_springboot.modelo.EstadoConversacion;
 import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
+import com.temipora.backend_springboot.modelo.EstadoMensaje;
 import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
@@ -45,7 +48,9 @@ import com.temipora.backend_springboot.modelo.SolicitudRevisionRequest;
 import com.temipora.backend_springboot.modelo.TerminosPlataforma;
 import com.temipora.backend_springboot.modelo.TipoHito;
 import com.temipora.backend_springboot.modelo.UsuarioResumenDTO;
+import com.temipora.backend_springboot.repositorios.ConversacionRepository;
 import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
+import com.temipora.backend_springboot.repositorios.MensajeRepository;
 import com.temipora.backend_springboot.repositorios.PagoRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
@@ -78,6 +83,8 @@ public class PedidoService {
     private final MonedaVistaService monedaVistaService;
     private final EntregaService entregaService;
     private final PedidoCierreService pedidoCierreService;
+    private final ConversacionRepository conversacionRepository;
+    private final MensajeRepository mensajeRepository;
 
     public PedidoService(
             PedidoRepository pedidoRepository,
@@ -90,7 +97,9 @@ public class PedidoService {
             NotificacionService notificacionService,
             MonedaVistaService monedaVistaService,
             EntregaService entregaService,
-            PedidoCierreService pedidoCierreService) {
+            PedidoCierreService pedidoCierreService,
+            ConversacionRepository conversacionRepository,
+            MensajeRepository mensajeRepository) {
         this.pedidoRepository = pedidoRepository;
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.pagoRepository = pagoRepository;
@@ -102,6 +111,8 @@ public class PedidoService {
         this.monedaVistaService = monedaVistaService;
         this.entregaService = entregaService;
         this.pedidoCierreService = pedidoCierreService;
+        this.conversacionRepository = conversacionRepository;
+        this.mensajeRepository = mensajeRepository;
     }
 
     @Transactional
@@ -641,6 +652,7 @@ public class PedidoService {
         boolean esArtista = pedido.getArtista().getIdUsuario().equals(idVista);
         boolean esCliente = pedido.getCliente().getIdUsuario().equals(idVista);
         boolean incluirComision = esArtista || esAdmin;
+        Conversacion conversacion = esAdmin ? null : conversacionDe(pedido);
         LocalDateTime ahora = LocalDateTime.now();
         Moneda mostrada = monedaVistaService.preferidaDe(idVista);
         boolean muestraOrigen = PresupuestoDTO.mismaMoneda(
@@ -816,6 +828,14 @@ public class PedidoService {
             .rolVista(esAdmin
                 ? "ADMIN"
                 : esArtista ? "ARTISTA" : "CLIENTE")
+            .idConversacion(conversacion != null
+                ? conversacion.getIdConversacion()
+                : null)
+            .estadoConversacion(conversacion != null
+                    && conversacion.getEstado() != null
+                ? conversacion.getEstado().name()
+                : null)
+            .noLeidos(noLeidosDe(conversacion, idVista))
             .publicacionAutorizada(pedido.isPublicacionAutorizada())
             .publicacionAutorizadaEn(pedido.getPublicacionAutorizadaEn())
             .publicacionOcultadaCliente(pedido.isPublicacionOcultadaCliente())
@@ -830,6 +850,7 @@ public class PedidoService {
     private PedidoResumenDTO construirResumen(Pedido pedido, Long idVista) {
         boolean esArtista = pedido.getArtista().getIdUsuario().equals(idVista);
         boolean esCliente = pedido.getCliente().getIdUsuario().equals(idVista);
+        Conversacion conversacion = conversacionDe(pedido);
         LocalDateTime ahora = LocalDateTime.now();
         Moneda mostrada = monedaVistaService.preferidaDe(idVista);
         boolean muestraOrigen = PresupuestoDTO.mismaMoneda(
@@ -884,6 +905,14 @@ public class PedidoService {
                     ? pedido.getMoneda().getCodigo()
                     : null))
             .rolVista(esArtista ? "ARTISTA" : "CLIENTE")
+            .idConversacion(conversacion != null
+                ? conversacion.getIdConversacion()
+                : null)
+            .estadoConversacion(conversacion != null
+                    && conversacion.getEstado() != null
+                ? conversacion.getEstado().name()
+                : null)
+            .noLeidos(noLeidosDe(conversacion, idVista))
             .puedePagar(esCliente && pedido.getHitos().stream()
                 .anyMatch(hito -> puedePagar(pedido, hito, List.of())))
             .puedeEntregar(esArtista && pedido.getHitos().stream()
@@ -905,6 +934,30 @@ public class PedidoService {
             .totalPaginas(page.getTotalPages())
             .hayMas(page.hasNext())
             .build();
+    }
+
+    private Conversacion conversacionDe(Pedido pedido) {
+        return conversacionRepository
+            .buscarPorPar(
+                pedido.getCliente().getIdUsuario(),
+                pedido.getArtista().getIdUsuario())
+            .orElse(null);
+    }
+
+    private long noLeidosDe(Conversacion conversacion, Long idUsuario) {
+        if (conversacion == null
+                || idUsuario == null
+                || conversacion.getEstado() != EstadoConversacion.ACEPTADA) {
+            return 0L;
+        }
+        List<Object[]> filas = mensajeRepository.contarNoLeidosPorConversacion(
+            idUsuario,
+            List.of(conversacion.getIdConversacion()),
+            EstadoMensaje.ENVIADO);
+        if (filas.isEmpty()) {
+            return 0L;
+        }
+        return ((Number) filas.get(0)[1]).longValue();
     }
 
     private Pageable pageable(int pagina, int tamanio) {

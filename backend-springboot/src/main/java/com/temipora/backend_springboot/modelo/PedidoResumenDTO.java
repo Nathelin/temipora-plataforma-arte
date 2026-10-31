@@ -35,4 +35,7 @@ public class PedidoResumenDTO {
     private boolean puedePagar;
     private boolean puedeEntregar;
     private boolean puedeAprobar;
+    private Long idConversacion;
+    private String estadoConversacion;
+    private long noLeidos;
 }

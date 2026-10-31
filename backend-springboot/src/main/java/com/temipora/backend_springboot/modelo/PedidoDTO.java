@@ -60,6 +60,9 @@ public class PedidoDTO {
     private List<DibujoResumenDTO> dibujos;
     private boolean puedeCancelar;
     private String rolVista;
+    private Long idConversacion;
+    private String estadoConversacion;
+    private long noLeidos;
 
     private boolean publicacionAutorizada;
     private LocalDateTime publicacionAutorizadaEn;

@@ -33,6 +33,7 @@ import com.temipora.backend_springboot.modelo.EstadoMensaje;
 import com.temipora.backend_springboot.modelo.EstadoRelacionMensaje;
 import com.temipora.backend_springboot.modelo.EstadoRelacionMensajeDTO;
 import com.temipora.backend_springboot.modelo.Mensaje;
+import com.temipora.backend_springboot.modelo.OrigenConversacion;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.RechazoConversacionRequest;
 import com.temipora.backend_springboot.modelo.SolicitudMensajeRequest;
@@ -173,6 +174,89 @@ public class ConversacionService {
         publicarCambio(conversacion);
 
         return aDTO(conversacion, remitente.getIdUsuario(), config);
+    }
+
+    @Transactional
+    public void asegurarPorSolicitud(
+            Usuario cliente,
+            Usuario artista,
+            Long idSolicitud,
+            String nombreServicio) {
+        if (!participantesValidos(cliente, artista)) {
+            return;
+        }
+
+        LocalDateTime ahora = LocalDateTime.now();
+        String motivo = motivoAperturaPorSolicitud(idSolicitud, nombreServicio);
+        Optional<Conversacion> existente = conversacionRepository
+            .buscarPorPar(cliente.getIdUsuario(), artista.getIdUsuario());
+
+        if (existente.isEmpty()) {
+            Conversacion conversacion = new Conversacion();
+            conversacion.setIniciador(cliente);
+            conversacion.setDestinatario(artista);
+            conversacion.setEstado(EstadoConversacion.ACEPTADA);
+            conversacion.setOrigen(OrigenConversacion.SOLICITUD_SERVICIO);
+            conversacion.setMotivoContacto(motivo);
+            conversacion.setFechaSolicitud(ahora);
+            conversacion.setFechaRespuesta(ahora);
+            conversacion.setFechaActualizacion(ahora);
+            conversacionRepository.save(conversacion);
+
+            asegurarParticipante(conversacion, cliente);
+            asegurarParticipante(conversacion, artista);
+            registrarAccion(
+                conversacion, TipoAccionConversacion.APERTURA_AUTOMATICA, cliente, motivo);
+            publicarCambio(conversacion);
+            return;
+        }
+
+        Conversacion conversacion = existente.get();
+        EstadoConversacion anterior = conversacion.getEstado();
+        boolean reabierta = anterior != EstadoConversacion.ACEPTADA;
+        if (reabierta) {
+            conversacion.setEstado(EstadoConversacion.ACEPTADA);
+            conversacion.setOrigen(OrigenConversacion.SOLICITUD_SERVICIO);
+            conversacion.setMotivoContacto(motivo);
+            conversacion.setFechaSolicitud(ahora);
+            conversacion.setFechaRespuesta(ahora);
+            conversacion.setFechaActualizacion(ahora);
+            registrarAccion(
+                conversacion,
+                TipoAccionConversacion.APERTURA_AUTOMATICA,
+                cliente,
+                motivoReaperturaPorSolicitud(idSolicitud, anterior));
+        }
+
+        boolean desarchivada = desarchivar(conversacion, cliente);
+        desarchivada |= desarchivar(conversacion, artista);
+        if (reabierta || desarchivada) {
+            publicarCambio(conversacion);
+        }
+    }
+
+    @Transactional
+    public void archivarPorSolicitud(Usuario cliente, Usuario artista) {
+        if (!participantesValidos(cliente, artista)) {
+            return;
+        }
+
+        Optional<Conversacion> existente = conversacionRepository
+            .buscarPorPar(cliente.getIdUsuario(), artista.getIdUsuario());
+        if (existente.isEmpty()) {
+            return;
+        }
+
+        Conversacion conversacion = existente.get();
+        if (conversacion.getOrigen() != OrigenConversacion.SOLICITUD_SERVICIO) {
+            return;
+        }
+
+        boolean archivada = archivar(conversacion, cliente);
+        archivada |= archivar(conversacion, artista);
+        if (archivada) {
+            publicarCambio(conversacion);
+        }
     }
 
     @Transactional
@@ -778,6 +862,57 @@ public class ConversacionService {
             .motivoNoSolicitable(motivoNoSolicitable)
             .fechaProximoEnvio(fechaProximoEnvio)
             .build();
+    }
+
+    private boolean participantesValidos(Usuario cliente, Usuario artista) {
+        return cliente != null
+            && artista != null
+            && cliente.getIdUsuario() != null
+            && artista.getIdUsuario() != null
+            && !cliente.getIdUsuario().equals(artista.getIdUsuario());
+    }
+
+    private String motivoAperturaPorSolicitud(Long idSolicitud, String nombreServicio) {
+        String motivo = idSolicitud != null
+            ? "Solicitud #" + idSolicitud
+            : "Solicitud de servicio";
+        if (nombreServicio != null && !nombreServicio.isBlank()) {
+            motivo += " · " + nombreServicio.trim();
+        }
+        return recortarAMaximo(motivo, 200);
+    }
+
+    private String motivoReaperturaPorSolicitud(
+            Long idSolicitud, EstadoConversacion anterior) {
+        String motivo = (idSolicitud != null
+            ? "Solicitud #" + idSolicitud
+            : "Solicitud de servicio")
+            + " · reabierta desde " + anterior.name();
+        return recortarAMaximo(motivo, 200);
+    }
+
+    private String recortarAMaximo(String valor, int maximo) {
+        return valor.length() <= maximo ? valor : valor.substring(0, maximo);
+    }
+
+    private boolean archivar(Conversacion conversacion, Usuario usuario) {
+        ConversacionParticipante participante =
+            asegurarParticipante(conversacion, usuario);
+        if (participante.isArchivada()) {
+            return false;
+        }
+        participante.setArchivada(true);
+        return true;
+    }
+
+    private boolean desarchivar(Conversacion conversacion, Usuario usuario) {
+        ConversacionParticipante participante =
+            asegurarParticipante(conversacion, usuario);
+        if (!participante.isArchivada()) {
+            return false;
+        }
+        participante.setArchivada(false);
+        return true;
     }
 
     private ConversacionParticipante asegurarParticipante(

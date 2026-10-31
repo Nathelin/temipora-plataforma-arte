@@ -105,6 +105,15 @@ function verPedido(idPedido) {
   })
 }
 
+function abrirChat(pedido) {
+  if (!pedido?.idConversacion) return
+  router.push({
+    name: enPanel.value ? 'panel-conversacion' : 'conversacion',
+    params: { idConversacion: pedido.idConversacion },
+    query: { volverA: 'pedido', idPedido: pedido.idPedido },
+  })
+}
+
 onMounted(() => cargar(true))
 </script>
 
@@ -253,6 +262,20 @@ onMounted(() => cargar(true))
             @click="verPedido(pedido.idPedido)"
           >
             Ver pedido
+          </button>
+          <button
+            v-if="pedido.idConversacion"
+            type="button"
+            class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+            @click="abrirChat(pedido)"
+          >
+            Chat
+            <span
+              v-if="pedido.noLeidos > 0"
+              class="inline-flex min-w-5 items-center justify-center rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-bold text-white"
+            >
+              {{ pedido.noLeidos > 9 ? '9+' : pedido.noLeidos }}
+            </span>
           </button>
           <span
             v-if="pedido.puedePagar"

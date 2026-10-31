@@ -103,6 +103,7 @@ public class SolicitudServicioService {
     private final ColaSolicitudesService colaSolicitudesService;
     private final MonedaVistaService monedaVistaService;
     private final ReseniaPublicaService reseniaPublicaService;
+    private final ConversacionService conversacionService;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -118,7 +119,8 @@ public class SolicitudServicioService {
             NotificacionService notificacionService,
             ColaSolicitudesService colaSolicitudesService,
             MonedaVistaService monedaVistaService,
-            ReseniaPublicaService reseniaPublicaService) {
+            ReseniaPublicaService reseniaPublicaService,
+            ConversacionService conversacionService) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -133,6 +135,7 @@ public class SolicitudServicioService {
         this.colaSolicitudesService = colaSolicitudesService;
         this.monedaVistaService = monedaVistaService;
         this.reseniaPublicaService = reseniaPublicaService;
+        this.conversacionService = conversacionService;
     }
 
     @Transactional(readOnly = true)
@@ -319,6 +322,9 @@ public class SolicitudServicioService {
             estado,
             ordenados);
         solicitudRepository.save(solicitud);
+
+        conversacionService.asegurarPorSolicitud(
+            cliente, artista, solicitud.getIdSolicitud(), servicio.getNombre());
 
         if (estado == EstadoSolicitud.EN_LISTA_ESPERA) {
             ListaEspera lista = listaEsperaService.crear(
@@ -544,6 +550,9 @@ public class SolicitudServicioService {
             descripcion,
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
+
+        conversacionService.archivarPorSolicitud(
+            solicitud.getCliente(), solicitud.getArtista());
 
         return ahora;
     }
