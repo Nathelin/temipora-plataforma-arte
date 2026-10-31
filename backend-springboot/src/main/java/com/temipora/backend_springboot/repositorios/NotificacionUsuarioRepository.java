@@ -28,21 +28,4 @@ public interface NotificacionUsuarioRepository extends JpaRepository<Notificacio
 
     Optional<NotificacionUsuario> findByNotificacionIdNotificacionAndUsuarioIdUsuario(
             Long idNotificacion, Long idUsuario);
-
-    @Query("""
-        SELECT COUNT(nu)
-        FROM NotificacionUsuario nu
-        JOIN nu.notificacion n
-        JOIN n.tipoNotificacion t
-        WHERE nu.usuario.idUsuario = :idUsuario
-          AND nu.leida = false
-          AND t.codigo = :codigo
-          AND n.idReferencia = :idReferencia
-          AND n.tipoReferencia = :tipoReferencia
-        """)
-    long contarNoLeidasPorReferencia(
-            @Param("idUsuario") Long idUsuario,
-            @Param("codigo") String codigo,
-            @Param("idReferencia") Long idReferencia,
-            @Param("tipoReferencia") String tipoReferencia);
 }

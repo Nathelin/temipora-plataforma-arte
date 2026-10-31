@@ -82,16 +82,6 @@ public class NotificacionService {
         return notificacionUsuarioRepository.countByUsuarioIdUsuarioAndLeidaFalse(idUsuario);
     }
 
-    @Transactional(readOnly = true)
-    public boolean existeNoLeidaPara(
-            Long idUsuario,
-            String codigoTipo,
-            Long idReferencia,
-            String tipoReferencia) {
-        return notificacionUsuarioRepository.contarNoLeidasPorReferencia(
-            idUsuario, codigoTipo, idReferencia, tipoReferencia) > 0;
-    }
-
     @Transactional
     public NotificacionDTO marcarLeida(Long idNotificacionUsuario, Long idUsuario) {
         NotificacionUsuario destinatario = notificacionUsuarioRepository

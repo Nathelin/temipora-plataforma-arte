@@ -74,6 +74,14 @@ export function marcarConversacionLeida(idConversacion) {
   return api.post(`/conversaciones/${idConversacion}/leer`)
 }
 
+export function marcarEscribiendo(idConversacion) {
+  return api.post(`/conversaciones/${idConversacion}/escribiendo`)
+}
+
+export function consultarEscribiendo(idConversacion) {
+  return api.get(`/conversaciones/${idConversacion}/escribiendo`)
+}
+
 export function cargarContadorMensajes() {
   return api.get('/conversaciones/contador')
 }

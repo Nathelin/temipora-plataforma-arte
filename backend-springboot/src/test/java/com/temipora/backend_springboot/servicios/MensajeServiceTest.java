@@ -3,7 +3,6 @@ package com.temipora.backend_springboot.servicios;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -15,7 +14,6 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -58,7 +56,7 @@ class MensajeServiceTest {
     private ConfiguracionMensajeriaService configuracionService;
 
     @Mock
-    private NotificacionService notificacionService;
+    private IndicadorEscritura indicadorEscritura;
 
     @InjectMocks
     private MensajeService mensajeService;
@@ -128,7 +126,7 @@ class MensajeServiceTest {
     }
 
     @Test
-    void enviar_ok_guardaYNotificaSinIncluirElContenido() {
+    void enviar_ok_guardaDesarchivaYApagaElIndicadorDeEscritura() {
         Conversacion conversacion = conversacion(
             EstadoConversacion.ACEPTADA,
             usuario(1L, "cliente", ERol.CLIENTE),
@@ -142,12 +140,14 @@ class MensajeServiceTest {
                 m.setIdMensaje(100L);
                 return m;
             });
-        when(notificacionService.existeNoLeidaPara(
-            2L,
-            ConversacionService.NOTIFICACION_MENSAJE,
-            10L,
-            ConversacionService.TIPO_REFERENCIA_CONVERSACION))
-            .thenReturn(false);
+        ConversacionParticipante participanteDestinatario =
+            new ConversacionParticipante();
+        participanteDestinatario.setConversacion(conversacion);
+        participanteDestinatario.setUsuario(conversacion.getDestinatario());
+        participanteDestinatario.setArchivada(true);
+        when(participanteRepository
+            .findByConversacionIdConversacionAndUsuarioIdUsuario(10L, 2L))
+            .thenReturn(Optional.of(participanteDestinatario));
 
         MensajeDTO dto = mensajeService.enviar(
             10L, 1L, request("Un contenido privado"));
@@ -157,37 +157,8 @@ class MensajeServiceTest {
         assertThat(dto.isEsPropio()).isTrue();
         assertThat(dto.isLeido()).isFalse();
         assertThat(conversacion.getFechaUltimoMensaje()).isNotNull();
-
-        ArgumentCaptor<String> descripcion = ArgumentCaptor.forClass(String.class);
-        verify(notificacionService).crearParaUsuario(
-            eq(2L),
-            eq(ConversacionService.NOTIFICACION_MENSAJE),
-            anyString(),
-            descripcion.capture(),
-            eq(10L),
-            eq(ConversacionService.TIPO_REFERENCIA_CONVERSACION));
-        assertThat(descripcion.getValue())
-            .doesNotContain("Un contenido privado");
-    }
-
-    @Test
-    void enviar_conNotificacionPendiente_noDuplicaAviso() {
-        Conversacion conversacion = conversacion(
-            EstadoConversacion.ACEPTADA,
-            usuario(1L, "cliente", ERol.CLIENTE),
-            usuario(2L, "artista", ERol.ARTISTA));
-        prepararEnvio(conversacion, new ConfiguracionMensajeria());
-        when(mensajeRepository.countByRemitenteIdUsuarioAndFechaEnvioAfter(
-            eq(1L), any(LocalDateTime.class))).thenReturn(0L);
-        when(mensajeRepository.save(any(Mensaje.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
-        when(notificacionService.existeNoLeidaPara(
-            eq(2L), anyString(), eq(10L), anyString())).thenReturn(true);
-
-        mensajeService.enviar(10L, 1L, request("Hola"));
-
-        verify(notificacionService, never()).crearParaUsuario(
-            any(), anyString(), anyString(), anyString(), any(), anyString());
+        assertThat(participanteDestinatario.isArchivada()).isFalse();
+        verify(indicadorEscritura).limpiar(10L, 1L);
     }
 
     @Test
@@ -271,8 +242,6 @@ class MensajeServiceTest {
         when(usuarioRepository.findByIdUsuario(1L))
             .thenReturn(Optional.of(conversacion.getIniciador()));
         when(configuracionService.obtener()).thenReturn(config);
-        when(notificacionService.existeNoLeidaPara(any(), anyString(), any(), anyString()))
-            .thenReturn(false);
     }
 
     private Usuario usuario(Long id, String nombre, ERol rol) {

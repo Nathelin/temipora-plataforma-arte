@@ -36,7 +36,7 @@ public class MensajeService {
     private final ConversacionParticipanteRepository participanteRepository;
     private final UsuarioRepository usuarioRepository;
     private final ConfiguracionMensajeriaService configuracionService;
-    private final NotificacionService notificacionService;
+    private final IndicadorEscritura indicadorEscritura;
 
     public MensajeService(
             MensajeRepository mensajeRepository,
@@ -44,13 +44,13 @@ public class MensajeService {
             ConversacionParticipanteRepository participanteRepository,
             UsuarioRepository usuarioRepository,
             ConfiguracionMensajeriaService configuracionService,
-            NotificacionService notificacionService) {
+            IndicadorEscritura indicadorEscritura) {
         this.mensajeRepository = mensajeRepository;
         this.conversacionRepository = conversacionRepository;
         this.participanteRepository = participanteRepository;
         this.usuarioRepository = usuarioRepository;
         this.configuracionService = configuracionService;
-        this.notificacionService = notificacionService;
+        this.indicadorEscritura = indicadorEscritura;
     }
 
     @Transactional
@@ -106,19 +106,15 @@ public class MensajeService {
         conversacion.setFechaUltimoMensaje(ahora);
         conversacion.setFechaActualizacion(ahora);
 
-        if (!notificacionService.existeNoLeidaPara(
-                contraparte.getIdUsuario(),
-                ConversacionService.NOTIFICACION_MENSAJE,
-                idConversacion,
-                ConversacionService.TIPO_REFERENCIA_CONVERSACION)) {
-            notificacionService.crearParaUsuario(
-                contraparte.getIdUsuario(),
-                ConversacionService.NOTIFICACION_MENSAJE,
-                "Nuevo mensaje",
-                "@" + remitente.getNombreUsuario() + " te envió un mensaje.",
-                idConversacion,
-                ConversacionService.TIPO_REFERENCIA_CONVERSACION);
-        }
+        participanteRepository
+            .findByConversacionIdConversacionAndUsuarioIdUsuario(
+                idConversacion, remitente.getIdUsuario())
+            .ifPresent(participante -> participante.setArchivada(false));
+        participanteRepository
+            .findByConversacionIdConversacionAndUsuarioIdUsuario(
+                idConversacion, contraparte.getIdUsuario())
+            .ifPresent(participante -> participante.setArchivada(false));
+        indicadorEscritura.limpiar(idConversacion, idRemitente);
 
         return MensajeDTO.desdeMensaje(mensaje, idRemitente, null);
     }

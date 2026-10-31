@@ -24,6 +24,7 @@ import com.temipora.backend_springboot.modelo.ConversacionDTO;
 import com.temipora.backend_springboot.modelo.ConversacionParticipante;
 import com.temipora.backend_springboot.modelo.ConversacionResumenDTO;
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.EscribiendoDTO;
 import com.temipora.backend_springboot.modelo.EstadoConversacion;
 import com.temipora.backend_springboot.modelo.EstadoMensaje;
 import com.temipora.backend_springboot.modelo.EstadoRelacionMensaje;
@@ -49,7 +50,6 @@ public class ConversacionService {
     public static final String NOTIFICACION_ACEPTADA = "SOLICITUD_MENSAJE_ACEPTADA";
     public static final String NOTIFICACION_RECHAZADA = "SOLICITUD_MENSAJE_RECHAZADA";
     public static final String NOTIFICACION_CANCELADA = "SOLICITUD_MENSAJE_CANCELADA";
-    public static final String NOTIFICACION_MENSAJE = "MENSAJE_RECIBIDO";
 
     private static final int TAMANIO_MAXIMO_BANDEJA = 50;
     private static final int LARGO_PREVIEW = 120;
@@ -63,6 +63,7 @@ public class ConversacionService {
     private final UsuarioRepository usuarioRepository;
     private final ConfiguracionMensajeriaService configuracionService;
     private final NotificacionService notificacionService;
+    private final IndicadorEscritura indicadorEscritura;
 
     public ConversacionService(
             ConversacionRepository conversacionRepository,
@@ -71,7 +72,8 @@ public class ConversacionService {
             MensajeRepository mensajeRepository,
             UsuarioRepository usuarioRepository,
             ConfiguracionMensajeriaService configuracionService,
-            NotificacionService notificacionService) {
+            NotificacionService notificacionService,
+            IndicadorEscritura indicadorEscritura) {
         this.conversacionRepository = conversacionRepository;
         this.participanteRepository = participanteRepository;
         this.accionRepository = accionRepository;
@@ -79,6 +81,7 @@ public class ConversacionService {
         this.usuarioRepository = usuarioRepository;
         this.configuracionService = configuracionService;
         this.notificacionService = notificacionService;
+        this.indicadorEscritura = indicadorEscritura;
     }
 
     @Transactional
@@ -467,6 +470,39 @@ public class ConversacionService {
         return ContadorMensajesDTO.builder()
             .solicitudesPendientes(pendientes)
             .noLeidos(noLeidos)
+            .build();
+    }
+
+    @Transactional(readOnly = true)
+    public void marcarEscribiendo(Long idConversacion, Long idUsuario) {
+        Conversacion conversacion = obtenerConversacion(idConversacion);
+        validarParticipante(conversacion, idUsuario,
+            "No podés indicar escritura en esta conversación.");
+        if (conversacion.getEstado() != EstadoConversacion.ACEPTADA) {
+            return;
+        }
+        Usuario usuario = obtenerUsuario(idUsuario);
+        if (!usuario.isEstadoCuenta()) {
+            return;
+        }
+        indicadorEscritura.marcar(idConversacion, idUsuario);
+    }
+
+    @Transactional(readOnly = true)
+    public EscribiendoDTO estadoEscritura(Long idConversacion, Long idUsuario) {
+        Conversacion conversacion = obtenerConversacion(idConversacion);
+        validarParticipante(conversacion, idUsuario,
+            "No podés ver el estado de escritura de esta conversación.");
+        if (conversacion.getEstado() != EstadoConversacion.ACEPTADA) {
+            return EscribiendoDTO.builder().escribiendo(false).build();
+        }
+        Usuario contraparte = conversacion.contraparteDe(idUsuario);
+        if (contraparte == null || !contraparte.isEstadoCuenta()) {
+            return EscribiendoDTO.builder().escribiendo(false).build();
+        }
+        return EscribiendoDTO.builder()
+            .escribiendo(indicadorEscritura.estaEscribiendo(
+                idConversacion, contraparte.getIdUsuario()))
             .build();
     }
 

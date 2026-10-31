@@ -14,12 +14,14 @@ import {
   cancelarConversacion,
   cargarConfiguracionMensajeria,
   cargarMensajes,
+  consultarEscribiendo,
   enviarMensaje,
   estadoConversacionDe,
   formatearFechaHora,
   formatearFechaMensaje,
   inicialDe,
   marcarConversacionLeida,
+  marcarEscribiendo,
   obtenerConversacion,
   rechazarConversacion,
 } from '../servicios/mensajes'
@@ -56,8 +58,13 @@ const config = ref({
 const modalRechazo = ref(false)
 const modalCancelar = ref(false)
 const refLista = ref(null)
+const campoMensaje = ref(null)
+const contraparteEscribiendo = ref(false)
 
 let intervalo = null
+let intervaloEscritura = null
+let ultimoLatido = 0
+let consultandoEscritura = false
 
 const enPanel = computed(() => route.path.startsWith('/panel'))
 const nombreBandeja = computed(() => (enPanel.value ? 'panel-mensajes' : 'mensajes'))
@@ -161,6 +168,10 @@ async function sincronizarNuevos() {
     const nuevos = res.data?.mensajes || []
     if (!nuevos.length) return
 
+    if (nuevos.some((mensaje) => !mensaje.esPropio)) {
+      contraparteEscribiendo.value = false
+    }
+
     const mapa = new Map()
     for (const mensaje of mensajes.value) {
       mapa.set(mensaje.idMensaje, mensaje)
@@ -234,6 +245,8 @@ function reiniciar() {
   errorAccion.value = ''
   modalRechazo.value = false
   modalCancelar.value = false
+  contraparteEscribiendo.value = false
+  ultimoLatido = 0
   inicializar()
 }
 
@@ -286,7 +299,19 @@ async function enviar() {
       e.response?.data?.message || 'No se pudo enviar el mensaje.'
   } finally {
     enviando.value = false
+    ultimoLatido = 0
+    await nextTick()
+    campoMensaje.value?.focus()
   }
+}
+
+function avisarEscribiendo() {
+  if (!conversacion.value?.puedeEnviar) return
+  if (!texto.value.trim()) return
+  const ahora = Date.now()
+  if (ahora - ultimoLatido < 2000) return
+  ultimoLatido = ahora
+  marcarEscribiendo(idConversacion.value).catch(() => {})
 }
 
 function manejarEnter(event) {
@@ -306,6 +331,7 @@ async function aceptar() {
     await marcarLeida()
     await nextTick()
     scrollAlFinal()
+    campoMensaje.value?.focus()
     exito('Aceptaste la solicitud. Ya pueden escribirle.')
   } catch (e) {
     if (e.response?.status === 401) {
@@ -421,6 +447,36 @@ function detenerPolling() {
   }
 }
 
+async function consultarEstadoEscritura() {
+  if (consultandoEscritura) return
+  if (document.visibilityState !== 'visible') return
+  if (!esAceptada.value) {
+    contraparteEscribiendo.value = false
+    return
+  }
+  consultandoEscritura = true
+  try {
+    const res = await consultarEscribiendo(idConversacion.value)
+    contraparteEscribiendo.value = Boolean(res.data?.escribiendo)
+  } catch {
+    contraparteEscribiendo.value = false
+  } finally {
+    consultandoEscritura = false
+  }
+}
+
+function iniciarPollingEscritura() {
+  detenerPollingEscritura()
+  intervaloEscritura = window.setInterval(consultarEstadoEscritura, 2000)
+}
+
+function detenerPollingEscritura() {
+  if (intervaloEscritura) {
+    window.clearInterval(intervaloEscritura)
+    intervaloEscritura = null
+  }
+}
+
 watch(idConversacion, (nuevo, anterior) => {
   if (nuevo && nuevo !== anterior) reiniciar()
 })
@@ -428,9 +484,13 @@ watch(idConversacion, (nuevo, anterior) => {
 onMounted(() => {
   inicializar()
   iniciarPolling()
+  iniciarPollingEscritura()
 })
 
-onBeforeUnmount(detenerPolling)
+onBeforeUnmount(() => {
+  detenerPolling()
+  detenerPollingEscritura()
+})
 </script>
 
 <template>
@@ -658,6 +718,22 @@ onBeforeUnmount(detenerPolling)
         </div>
       </div>
 
+      <div
+        v-if="esAceptada"
+        class="mt-3 min-h-5 px-1 text-xs text-cafe/55"
+        role="status"
+        aria-live="polite"
+      >
+        <span v-if="contraparteEscribiendo" class="inline-flex items-center gap-1.5">
+          <span class="inline-flex items-center gap-0.5" aria-hidden="true">
+            <span class="h-1 w-1 animate-bounce rounded-full bg-coral motion-reduce:animate-none" style="animation-delay: -0.3s"></span>
+            <span class="h-1 w-1 animate-bounce rounded-full bg-coral motion-reduce:animate-none" style="animation-delay: -0.15s"></span>
+            <span class="h-1 w-1 animate-bounce rounded-full bg-coral motion-reduce:animate-none"></span>
+          </span>
+          {{ nombreContraparte }} está escribiendo…
+        </span>
+      </div>
+
       <form
         v-if="esAceptada"
         class="mt-4 rounded-3xl border border-rosa/50 bg-blanco p-3 sm:p-4"
@@ -666,13 +742,15 @@ onBeforeUnmount(detenerPolling)
         <label for="cuerpo-mensaje" class="sr-only">Escribí un mensaje</label>
         <textarea
           id="cuerpo-mensaje"
+          ref="campoMensaje"
           v-model="texto"
           rows="3"
           :maxlength="maxMensaje"
           :disabled="!conversacion.puedeEnviar || enviando"
-          :aria-describedby="'contador-mensaje'"
+          aria-describedby="contador-mensaje"
           placeholder="Escribí un mensaje..."
           class="w-full resize-none rounded-2xl border border-rosa/70 bg-blanco px-3.5 py-2.5 text-sm text-cafe transition placeholder:text-cafe/40 focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20 disabled:cursor-not-allowed disabled:opacity-60"
+          @input="avisarEscribiendo"
           @keydown.enter.exact="manejarEnter"
         ></textarea>
 

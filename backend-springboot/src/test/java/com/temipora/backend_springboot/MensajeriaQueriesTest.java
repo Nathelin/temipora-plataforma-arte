@@ -19,7 +19,6 @@ import com.temipora.backend_springboot.repositorios.ConversacionAccionRepository
 import com.temipora.backend_springboot.repositorios.ConversacionParticipanteRepository;
 import com.temipora.backend_springboot.repositorios.ConversacionRepository;
 import com.temipora.backend_springboot.repositorios.MensajeRepository;
-import com.temipora.backend_springboot.repositorios.NotificacionUsuarioRepository;
 import com.temipora.backend_springboot.repositorios.TipoNotificacionRepository;
 
 @SpringBootTest
@@ -42,9 +41,6 @@ class MensajeriaQueriesTest {
 
     @Autowired
     private TipoNotificacionRepository tipoNotificacionRepository;
-
-    @Autowired
-    private NotificacionUsuarioRepository notificacionUsuarioRepository;
 
     @Test
     void configuracion_mensajeriaTieneSuFilaUnica() {
@@ -107,7 +103,7 @@ class MensajeriaQueriesTest {
     }
 
     @Test
-    void acciones_yNotificaciones_deReferenciaInexistente_seEjecutanVacias() {
+    void acciones_deReferenciaInexistente_seEjecutanVacias() {
         assertThat(accionRepository
             .countByUsuarioIdUsuarioAndTipoAccionInAndFechaAfter(
                 -1L,
@@ -118,7 +114,5 @@ class MensajeriaQueriesTest {
             .findFirstByConversacionIdConversacionAndTipoAccionOrderByFechaDesc(
                 -1L, TipoAccionConversacion.RECHAZO))
             .isEmpty();
-        assertThat(notificacionUsuarioRepository.contarNoLeidasPorReferencia(
-            -1L, "MENSAJE_RECIBIDO", -1L, "CONVERSACION")).isZero();
     }
 }

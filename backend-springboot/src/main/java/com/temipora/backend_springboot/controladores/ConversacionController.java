@@ -17,6 +17,7 @@ import com.temipora.backend_springboot.modelo.ConfiguracionMensajeriaDTO;
 import com.temipora.backend_springboot.modelo.ContadorMensajesDTO;
 import com.temipora.backend_springboot.modelo.ConversacionDTO;
 import com.temipora.backend_springboot.modelo.ConversacionResumenDTO;
+import com.temipora.backend_springboot.modelo.EscribiendoDTO;
 import com.temipora.backend_springboot.modelo.EstadoConversacion;
 import com.temipora.backend_springboot.modelo.EstadoRelacionMensajeDTO;
 import com.temipora.backend_springboot.modelo.HistorialMensajesDTO;
@@ -177,6 +178,23 @@ public class ConversacionController {
         mensajeService.marcarLeido(
             idConversacion, idAutenticado(authentication));
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{idConversacion}/escribiendo")
+    public ResponseEntity<Void> marcarEscribiendo(
+            @PathVariable Long idConversacion,
+            Authentication authentication) {
+        conversacionService.marcarEscribiendo(
+            idConversacion, idAutenticado(authentication));
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{idConversacion}/escribiendo")
+    public EscribiendoDTO estadoEscritura(
+            @PathVariable Long idConversacion,
+            Authentication authentication) {
+        return conversacionService.estadoEscritura(
+            idConversacion, idAutenticado(authentication));
     }
 
     private Long idAutenticado(Authentication authentication) {

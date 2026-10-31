@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { cargarContadorMensajes } from '../servicios/mensajes'
 
-const INTERVALO_MS = 30000
+const INTERVALO_MS = 20000
 
 const noLeidos = ref(0)
 const solicitudesPendientes = ref(0)

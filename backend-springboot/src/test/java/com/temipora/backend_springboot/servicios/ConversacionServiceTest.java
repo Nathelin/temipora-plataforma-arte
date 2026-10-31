@@ -75,6 +75,9 @@ class ConversacionServiceTest {
     @Mock
     private NotificacionService notificacionService;
 
+    @Mock
+    private IndicadorEscritura indicadorEscritura;
+
     @InjectMocks
     private ConversacionService conversacionService;
 
@@ -399,6 +402,79 @@ class ConversacionServiceTest {
         assertThat(pagina.isHayMas()).isFalse();
         verify(conversacionRepository, never())
             .findByIdConversacionForUpdate(anyLong());
+    }
+
+    @Test
+    void marcarEscribiendo_enConversacionAceptada_marcaAlUsuario() {
+        Usuario iniciador = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario destinatario = usuario(2L, "artista", ERol.ARTISTA);
+        Conversacion conversacion = conversacion(
+            EstadoConversacion.ACEPTADA, iniciador, destinatario);
+        when(conversacionRepository.findByIdConversacion(10L))
+            .thenReturn(Optional.of(conversacion));
+        when(usuarioRepository.findByIdUsuario(2L))
+            .thenReturn(Optional.of(destinatario));
+
+        conversacionService.marcarEscribiendo(10L, 2L);
+
+        verify(indicadorEscritura).marcar(10L, 2L);
+    }
+
+    @Test
+    void marcarEscribiendo_enSolicitudPendiente_noMarcaNada() {
+        Usuario iniciador = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario destinatario = usuario(2L, "artista", ERol.ARTISTA);
+        Conversacion conversacion = conversacion(
+            EstadoConversacion.PENDIENTE, iniciador, destinatario);
+        when(conversacionRepository.findByIdConversacion(10L))
+            .thenReturn(Optional.of(conversacion));
+
+        conversacionService.marcarEscribiendo(10L, 2L);
+
+        verify(indicadorEscritura, never()).marcar(anyLong(), anyLong());
+    }
+
+    @Test
+    void marcarEscribiendo_noParticipante_lanzaAccesoDenegado() {
+        Usuario iniciador = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario destinatario = usuario(2L, "artista", ERol.ARTISTA);
+        Conversacion conversacion = conversacion(
+            EstadoConversacion.ACEPTADA, iniciador, destinatario);
+        when(conversacionRepository.findByIdConversacion(10L))
+            .thenReturn(Optional.of(conversacion));
+
+        assertThatThrownBy(() -> conversacionService.marcarEscribiendo(10L, 3L))
+            .isInstanceOf(AccesoDenegadoException.class)
+            .hasMessageContaining("No podés indicar escritura");
+    }
+
+    @Test
+    void estadoEscritura_aceptada_consultaALaContraparte() {
+        Usuario iniciador = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario destinatario = usuario(2L, "artista", ERol.ARTISTA);
+        Conversacion conversacion = conversacion(
+            EstadoConversacion.ACEPTADA, iniciador, destinatario);
+        when(conversacionRepository.findByIdConversacion(10L))
+            .thenReturn(Optional.of(conversacion));
+        when(indicadorEscritura.estaEscribiendo(10L, 2L)).thenReturn(true);
+
+        var estado = conversacionService.estadoEscritura(10L, 1L);
+
+        assertThat(estado.isEscribiendo()).isTrue();
+    }
+
+    @Test
+    void estadoEscritura_enSolicitudPendiente_devuelveFalse() {
+        Usuario iniciador = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario destinatario = usuario(2L, "artista", ERol.ARTISTA);
+        Conversacion conversacion = conversacion(
+            EstadoConversacion.PENDIENTE, iniciador, destinatario);
+        when(conversacionRepository.findByIdConversacion(10L))
+            .thenReturn(Optional.of(conversacion));
+
+        var estado = conversacionService.estadoEscritura(10L, 1L);
+
+        assertThat(estado.isEscribiendo()).isFalse();
     }
 
     private void prepararCreacion(Usuario remitente, Usuario destinatario) {
