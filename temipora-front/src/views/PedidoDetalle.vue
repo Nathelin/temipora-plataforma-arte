@@ -111,6 +111,76 @@ const pestanas = computed(() => {
 
 const resumen = computed(() => resumenPagos(hitos.value))
 
+const proximoPaso = computed(() => {
+  if (!pedido.value) return null
+  const estado = pedido.value.estado
+  if (!['PENDIENTE_PAGO', 'EN_CURSO', 'FINALIZADO'].includes(estado)) return null
+
+  if (esCliente.value && estado !== 'FINALIZADO') {
+    const hitoPendiente = hitos.value.find((hito) => pagoPendiente(hito))
+    if (hitoPendiente) {
+      return {
+        titulo: `Hay un pago pendiente en «${hitoPendiente.nombre}»`,
+        detalle: 'Completá el pago para activar el hito.',
+        accion: 'Ver pago',
+        destino: 'plan-pagos',
+        ancla: 'pago',
+        idHitoPedido: hitoPendiente.idHitoPedido,
+      }
+    }
+
+    const hitoPagar = hitos.value.find((hito) => hito.puedePagar)
+    if (hitoPagar) {
+      return {
+        titulo: `Tenés que pagar «${hitoPagar.nombre}»`,
+        detalle: `${formatearMontoHito(hitoPagar)} para que el pedido siga avanzando.`,
+        accion: 'Ir a pagar',
+        destino: 'plan-pagos',
+        ancla: 'hito',
+        idHitoPedido: hitoPagar.idHitoPedido,
+      }
+    }
+
+    const hitoAprobar = hitos.value.find((hito) => hito.puedeAprobar)
+    if (hitoAprobar) {
+      return {
+        titulo: `Hay una entrega para revisar en «${hitoAprobar.nombre}»`,
+        detalle: 'Revisá el entregable y aprobalo o pedí una revisión.',
+        accion: 'Revisar entrega',
+        destino: 'plan-pagos',
+        ancla: 'aprobar',
+        idHitoPedido: hitoAprobar.idHitoPedido,
+      }
+    }
+  }
+
+  const hitoEntregar = hitos.value.find((hito) => hito.puedeEntregar)
+  if (hitoEntregar) {
+    return {
+      titulo: `Falta subir la entrega de «${hitoEntregar.nombre}»`,
+      detalle: 'Cuando la subas, el cliente va a poder aprobarla.',
+      accion: 'Subir entrega',
+      destino: 'plan-pagos',
+      ancla: 'entrega',
+      idHitoPedido: hitoEntregar.idHitoPedido,
+    }
+  }
+
+  if (puedeVerResenias.value && reseniaEstado.value?.puedeCrear) {
+    return {
+      titulo: 'El pedido terminó: dejá tu reseña',
+      detalle: esArtista.value
+        ? 'Tu reseña interna ayuda a la reputación del cliente.'
+        : 'Tu opinión ayuda a la reputación del artista.',
+      accion: 'Reseñar',
+      destino: 'resenas',
+      idHitoPedido: null,
+    }
+  }
+
+  return null
+})
+
 const claseFondoBarra = computed(() => (
   route.path.startsWith('/admin') ? 'bg-blanco' : 'bg-crema'
 ))
@@ -179,6 +249,32 @@ function navegarPestanas(event) {
 
 function alternarHito(idHitoPedido) {
   hitoAbierto.value = hitoAbierto.value === idHitoPedido ? null : idHitoPedido
+}
+
+function irAlProximoPaso() {
+  const paso = proximoPaso.value
+  if (!paso) return
+
+  if (paso.destino === 'resenas') {
+    cambiarPestana('resenas')
+    return
+  }
+
+  pestanaActiva.value = 'plan-pagos'
+  hitoAbierto.value = paso.idHitoPedido
+  sincronizarUrl()
+
+  const ancla = {
+    pago: `pago-${paso.idHitoPedido}`,
+    aprobar: `aprobar-${paso.idHitoPedido}`,
+    entrega: `entrega-${paso.idHitoPedido}`,
+    hito: `hito-card-${paso.idHitoPedido}`,
+  }[paso.ancla] || `hito-card-${paso.idHitoPedido}`
+
+  nextTick(() => {
+    document.getElementById(ancla)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 watch(() => route.query.tab, aplicarPestanaDesdeUrl)
@@ -641,6 +737,30 @@ onMounted(async () => {
       </p>
 
       <div
+        v-if="proximoPaso"
+        class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-coral/30 bg-coral/5 px-4 py-3"
+      >
+        <div class="min-w-0">
+          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-coral">
+            Próximo paso
+          </p>
+          <p class="mt-0.5 text-sm font-semibold text-granate">
+            {{ proximoPaso.titulo }}
+          </p>
+          <p class="mt-0.5 text-xs leading-relaxed text-cafe/60">
+            {{ proximoPaso.detalle }}
+          </p>
+        </div>
+        <button
+          type="button"
+          class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition hover:bg-rojizo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral"
+          @click="irAlProximoPaso"
+        >
+          {{ proximoPaso.accion }}
+        </button>
+      </div>
+
+      <div
         ref="tabsRef"
         class="sticky top-14 z-20 mt-6 -mx-1 flex flex-nowrap items-center gap-1.5 overflow-x-auto border-b border-borde/50 px-1 pb-1.5 pt-1.5 sm:top-16 sm:gap-2"
         :class="claseFondoBarra"
@@ -677,7 +797,12 @@ onMounted(async () => {
           class="space-y-4 focus-visible:outline-none"
         >
           <section class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
-            <dl class="grid gap-3 text-sm sm:grid-cols-3">
+            <dl
+              class="grid gap-3 text-sm"
+              :class="pedido.finalizadoEn
+                ? 'sm:grid-cols-2 lg:grid-cols-4'
+                : 'sm:grid-cols-3'"
+            >
           <div class="rounded-xl bg-rosa/10 px-3 py-2">
             <dt class="text-xs text-cafe/50">Total</dt>
             <dd class="mt-0.5 text-xl font-bold text-granate">{{ total }}</dd>
@@ -695,6 +820,12 @@ onMounted(async () => {
             <dt class="text-xs text-cafe/50">Límite de entrega</dt>
             <dd class="mt-0.5 font-medium text-cafe">
               {{ pedido.limiteEntrega ? formatearFecha(pedido.limiteEntrega) : 'A confirmar' }}
+            </dd>
+          </div>
+          <div v-if="pedido.finalizadoEn" class="rounded-xl bg-rosa/10 px-3 py-2">
+            <dt class="text-xs text-cafe/50">Finalizado</dt>
+            <dd class="mt-0.5 font-medium text-cafe">
+              {{ formatearFechaHora(pedido.finalizadoEn) }}
             </dd>
           </div>
         </dl>
@@ -994,7 +1125,10 @@ onMounted(async () => {
                 ></span>
               </div>
 
-              <article class="min-w-0 flex-1 rounded-2xl border border-rosa/50 bg-blanco">
+              <article
+                :id="`hito-card-${hito.idHitoPedido}`"
+                class="min-w-0 flex-1 scroll-mt-28 rounded-2xl border border-rosa/50 bg-blanco"
+              >
                 <div class="flex flex-wrap items-start gap-3 p-4 sm:p-5">
                   <button
                     type="button"
@@ -1023,16 +1157,43 @@ onMounted(async () => {
                     </span>
                   </button>
 
-                  <div class="flex flex-col items-end gap-2">
-                    <p class="text-lg font-bold text-granate">{{ formatearMontoHito(hito) }}</p>
+                  <div class="ml-auto flex items-center gap-2">
+                    <div class="flex flex-col items-end gap-2">
+                      <p class="text-lg font-bold text-granate">{{ formatearMontoHito(hito) }}</p>
+                      <button
+                        v-if="hito.puedePagar"
+                        type="button"
+                        :disabled="procesando"
+                        class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition hover:bg-rojizo disabled:opacity-50"
+                        @click="pagarHito(hito)"
+                      >
+                        {{ hito.tipo === 'ENTREGA' ? 'Pagar y desbloquear' : 'Pagar' }}
+                      </button>
+                    </div>
                     <button
-                      v-if="hito.puedePagar"
                       type="button"
-                      :disabled="procesando"
-                      class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition hover:bg-rojizo disabled:opacity-50"
-                      @click="pagarHito(hito)"
+                      class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-rosa bg-blanco text-cafe transition hover:bg-rosa/20 hover:text-granate focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral"
+                      :aria-expanded="hitoAbierto === hito.idHitoPedido"
+                      :aria-controls="`hito-${hito.idHitoPedido}`"
+                      :aria-label="hitoAbierto === hito.idHitoPedido
+                        ? `Contraer ${hito.nombre}`
+                        : `Expandir ${hito.nombre}`"
+                      :title="hitoAbierto === hito.idHitoPedido ? 'Contraer detalle' : 'Expandir detalle'"
+                      @click="alternarHito(hito.idHitoPedido)"
                     >
-                      {{ hito.tipo === 'ENTREGA' ? 'Pagar y desbloquear' : 'Pagar' }}
+                      <svg
+                        class="h-4 w-4 transition-transform"
+                        :class="hitoAbierto === hito.idHitoPedido ? 'rotate-180' : ''"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
                     </button>
                   </div>
                 </div>
@@ -1124,7 +1285,8 @@ onMounted(async () => {
 
           <div
             v-if="pagoPendiente(hito)"
-            class="mt-4 rounded-xl border border-coral/30 bg-coral/5 px-4 py-3"
+            :id="`pago-${hito.idHitoPedido}`"
+            class="mt-4 scroll-mt-28 rounded-xl border border-coral/30 bg-coral/5 px-4 py-3"
           >
             <p class="text-sm text-cafe/75">
               <template v-if="pagoPendiente(hito).proveedor === 'MERCADOPAGO'">
@@ -1152,7 +1314,11 @@ onMounted(async () => {
             </a>
           </div>
 
-          <div v-if="hito.puedeAprobar" class="flex flex-wrap gap-2">
+          <div
+            v-if="hito.puedeAprobar"
+            :id="`aprobar-${hito.idHitoPedido}`"
+            class="flex scroll-mt-28 flex-wrap gap-2"
+          >
             <button
               type="button"
               :disabled="procesando"
@@ -1203,13 +1369,18 @@ onMounted(async () => {
             </div>
           </div>
 
-                      <SubirEntregable
+                      <div
                         v-if="esArtista && hito.puedeEntregar"
-                        :id-pedido="idPedido"
-                        :hito="hito"
-                        :dibujos="pedido.dibujos || []"
-                        @entregado="alEntregar"
-                      />
+                        :id="`entrega-${hito.idHitoPedido}`"
+                        class="scroll-mt-28"
+                      >
+                        <SubirEntregable
+                          :id-pedido="idPedido"
+                          :hito="hito"
+                          :dibujos="pedido.dibujos || []"
+                          @entregado="alEntregar"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

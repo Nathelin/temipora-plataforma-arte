@@ -22,13 +22,22 @@ const error = ref('')
 const subiendo = ref(false)
 const confirmacionAbierta = ref(false)
 
+const unicoDibujo = computed(() => (
+  props.dibujos.length === 1 ? props.dibujos[0] : null
+))
+const mostrarSelectorDibujo = computed(() => props.dibujos.length > 1)
+const tieneColumnaDibujo = computed(() => props.dibujos.length > 0)
+
 const mensajeConfirmacion = computed(() => {
   const cantidad = seleccionados.value.length
   const archivos = cantidad === 1 ? '1 archivo' : `${cantidad} archivos`
+  const destino = unicoDibujo.value
+    ? ` para ${etiquetaDibujo(unicoDibujo.value)}`
+    : ''
   if (props.hito.tipo === 'ENTREGA') {
-    return `Vas a entregar ${archivos} como versión final. El cliente verá la preview protegida y el original se libera al pagar la última cuota.`
+    return `Vas a entregar ${archivos}${destino} como versión final. El cliente verá la preview protegida y el original se libera al pagar la última cuota.`
   }
-  return `Vas a entregar ${archivos}. El cliente podrá aprobar el lote o pedir una revisión.`
+  return `Vas a entregar ${archivos}${destino}. El cliente podrá aprobar el lote o pedir una revisión.`
 })
 
 function etiquetaDibujo(dibujo) {
@@ -68,7 +77,7 @@ function agregar(event) {
     }
     seleccionados.value.push({
       file: archivo,
-      idItemSolicitud: '',
+      idItemSolicitud: unicoDibujo.value?.idItemSolicitud ?? '',
       previewUrl: URL.createObjectURL(archivo),
     })
   }
@@ -130,6 +139,12 @@ onBeforeUnmount(limpiar)
       <template v-if="hito.tipo === 'ENTREGA'">
         El cliente verá el archivo recién cuando pague la última cuota.
       </template>
+      <template v-else-if="unicoDibujo">
+        Los archivos se asocian automáticamente al único dibujo del pedido.
+      </template>
+      <template v-else-if="!dibujos.length">
+        Los archivos se entregan sin asociarlos a un dibujo específico.
+      </template>
       <template v-else>
         Podés subir varios archivos y asociarlos a cada dibujo. El cliente aprueba el lote.
       </template>
@@ -152,7 +167,10 @@ onBeforeUnmount(limpiar)
       <li
         v-for="(archivo, indice) in seleccionados"
         :key="`${archivo.file.name}-${indice}`"
-        class="grid gap-2 rounded-xl border border-rosa/40 bg-blanco p-2 sm:grid-cols-[4rem_minmax(0,1fr)_minmax(0,14rem)_auto] sm:items-center"
+        class="grid gap-2 rounded-xl border border-rosa/40 bg-blanco p-2 sm:items-center"
+        :class="tieneColumnaDibujo
+          ? 'sm:grid-cols-[4rem_minmax(0,1fr)_minmax(0,14rem)_auto]'
+          : 'sm:grid-cols-[4rem_minmax(0,1fr)_auto]'"
       >
         <img
           :src="archivo.previewUrl"
@@ -163,7 +181,15 @@ onBeforeUnmount(limpiar)
           <p class="truncate text-xs font-semibold text-cafe">{{ archivo.file.name }}</p>
           <p class="text-[11px] text-cafe/50">{{ peso(archivo.file.size) }}</p>
         </div>
+        <p
+          v-if="unicoDibujo"
+          class="min-w-0 truncate rounded-lg border border-rosa/40 bg-rosa/10 px-2.5 py-1.5 text-xs font-semibold text-cafe/70"
+          :title="etiquetaDibujo(unicoDibujo)"
+        >
+          {{ etiquetaDibujo(unicoDibujo) }}
+        </p>
         <select
+          v-else-if="mostrarSelectorDibujo"
           v-model="archivo.idItemSolicitud"
           class="block w-full rounded-lg border-0 bg-blanco px-2 py-1.5 text-xs text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
         >
