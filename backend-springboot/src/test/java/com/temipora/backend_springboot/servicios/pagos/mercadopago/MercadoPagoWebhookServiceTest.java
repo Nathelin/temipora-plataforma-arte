@@ -27,6 +27,8 @@ class MercadoPagoWebhookServiceTest {
     @Mock
     private MercadoPagoClient cliente;
     @Mock
+    private MercadoPagoOAuthService oauthService;
+    @Mock
     private PagoRepository pagoRepository;
     @Mock
     private PagoService pagoService;
@@ -38,6 +40,23 @@ class MercadoPagoWebhookServiceTest {
     void procesarPago_aprobado_aplicaElEstado() {
         Pago pago = pago();
         when(cliente.consultarPago("123")).thenReturn(pagoMp("approved", "50.00"));
+        when(pagoRepository.findById(30L)).thenReturn(Optional.of(pago));
+
+        webhookService.procesarPago("123");
+
+        verify(pagoService).aplicarEstadoProveedor(
+            30L, EstadoPago.APROBADO, "123", "approved", "accredited");
+    }
+
+    @Test
+    void procesarPago_siLaPlataformaNoPuedeLeerlo_usaElTokenDelVendedor() {
+        Pago pago = pago();
+        when(cliente.consultarPago("123"))
+            .thenThrow(new MercadoPagoException("MercadoPago respondió 404"));
+        when(oauthService.tokensVigentes())
+            .thenReturn(java.util.List.of("TOKEN-VENDEDOR"));
+        when(cliente.consultarPago("123", "TOKEN-VENDEDOR"))
+            .thenReturn(pagoMp("approved", "50.00"));
         when(pagoRepository.findById(30L)).thenReturn(Optional.of(pago));
 
         webhookService.procesarPago("123");

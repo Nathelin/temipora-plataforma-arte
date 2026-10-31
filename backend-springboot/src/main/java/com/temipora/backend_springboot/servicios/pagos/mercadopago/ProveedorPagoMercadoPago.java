@@ -31,18 +31,24 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
     private final String notificationUrl;
     private final String frontendUrl;
     private final boolean sandbox;
+    private final boolean binaryMode;
+    private final boolean comisionEnSandbox;
 
     public ProveedorPagoMercadoPago(
             MercadoPagoClient cliente,
             MercadoPagoOAuthService oauthService,
             @Value("${pagos.mercadopago.notification-url:}") String notificationUrl,
             @Value("${app.frontend.url:http://localhost:5173}") String frontendUrl,
-            @Value("${pagos.mercadopago.sandbox:true}") boolean sandbox) {
+            @Value("${pagos.mercadopago.sandbox:false}") boolean sandbox,
+            @Value("${pagos.mercadopago.binary-mode:false}") boolean binaryMode,
+            @Value("${pagos.mercadopago.comision-en-sandbox:false}") boolean comisionEnSandbox) {
         this.cliente = cliente;
         this.oauthService = oauthService;
         this.notificationUrl = notificationUrl;
         this.frontendUrl = frontendUrl;
         this.sandbox = sandbox;
+        this.binaryMode = binaryMode;
+        this.comisionEnSandbox = comisionEnSandbox;
     }
 
     @Override
@@ -83,13 +89,17 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
         if (frontendUrl != null && frontendUrl.startsWith("https://")) {
             cuerpo.put("auto_return", "approved");
         }
-        cuerpo.put("binary_mode", true);
+        // En producción conviene dejarlo apagado: con un challenge (3DS,
+        // verificación de identidad) el modo binario no puede devolver
+        // approved/rejected y el checkout termina en service_error.
+        if (binaryMode) {
+            cuerpo.put("binary_mode", true);
+        }
         cuerpo.put("metadata", Map.of(
             "idPago", pago.getIdPago(),
             "idPedido", pedido.getIdPedido(),
             "idHitoPedido", hito.getIdHitoPedido()));
-        if (hito.getComisionMontoCobro() != null
-                && hito.getComisionMontoCobro().signum() > 0) {
+        if (enviarComision(hito)) {
             cuerpo.put("marketplace_fee", hito.getComisionMontoCobro());
         }
 
@@ -149,6 +159,18 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
         } catch (RuntimeException e) {
             return null;
         }
+    }
+
+    /**
+     * En sandbox MercadoPago exige verificación de identidad del pagador para
+     * los pagos con comisión (split), y los usuarios de prueba no pueden
+     * completarla. La comisión se puede forzar con
+     * pagos.mercadopago.comision-en-sandbox.
+     */
+    private boolean enviarComision(HitoPedido hito) {
+        return hito.getComisionMontoCobro() != null
+            && hito.getComisionMontoCobro().signum() > 0
+            && (!sandbox || comisionEnSandbox);
     }
 
     private String urlRetorno(Pedido pedido, String resultado) {

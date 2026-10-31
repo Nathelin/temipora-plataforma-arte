@@ -41,8 +41,8 @@ class ProveedorPagoMercadoPagoTest {
 
     @Test
     void crearCobro_armaLaPreferenciaYDevuelveElCheckoutSandbox() {
-        ProveedorPagoMercadoPago proveedor =
-            new ProveedorPagoMercadoPago(cliente, oauthService, WEBHOOK, FRONT, true);
+        ProveedorPagoMercadoPago proveedor = new ProveedorPagoMercadoPago(
+            cliente, oauthService, WEBHOOK, FRONT, true, false, true);
         when(oauthService.tokenVigente(2L)).thenReturn("seller-token");
         when(cliente.crearPreferencia(any(), anyString(), anyString()))
             .thenReturn(new MercadoPagoPreferencia(
@@ -63,6 +63,7 @@ class ProveedorPagoMercadoPagoTest {
         assertThat(cuerpo.get("external_reference")).isEqualTo("30");
         assertThat(cuerpo.get("notification_url")).isEqualTo(WEBHOOK);
         assertThat(cuerpo.get("auto_return")).isEqualTo("approved");
+        assertThat(cuerpo).doesNotContainKey("binary_mode");
         assertThat(cuerpo.get("back_urls")).isEqualTo(Map.of(
             "success", FRONT + "/pedidos/10?pago=success",
             "failure", FRONT + "/pedidos/10?pago=failure",
@@ -85,9 +86,29 @@ class ProveedorPagoMercadoPagoTest {
     }
 
     @Test
+    void crearCobro_enSandbox_omiteLaComision() {
+        ProveedorPagoMercadoPago proveedor = new ProveedorPagoMercadoPago(
+            cliente, oauthService, WEBHOOK, FRONT, true, true, false);
+        when(oauthService.tokenVigente(2L)).thenReturn("seller-token");
+        when(cliente.crearPreferencia(any(), anyString(), anyString()))
+            .thenReturn(new MercadoPagoPreferencia(
+                "pref-1", "https://prod", "https://sandbox"));
+
+        proveedor.crearCobro(nuevoPago());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor =
+            ArgumentCaptor.forClass(Map.class);
+        verify(cliente).crearPreferencia(
+            captor.capture(), anyString(), eq("seller-token"));
+        assertThat(captor.getValue()).doesNotContainKey("marketplace_fee");
+        assertThat(captor.getValue().get("binary_mode")).isEqualTo(true);
+    }
+
+    @Test
     void crearCobro_enProduccion_usaInitPoint() {
-        ProveedorPagoMercadoPago proveedor =
-            new ProveedorPagoMercadoPago(cliente, oauthService, WEBHOOK, FRONT, false);
+        ProveedorPagoMercadoPago proveedor = new ProveedorPagoMercadoPago(
+            cliente, oauthService, WEBHOOK, FRONT, false, false, false);
         when(oauthService.tokenVigente(2L)).thenReturn("seller-token");
         when(cliente.crearPreferencia(any(), anyString(), anyString()))
             .thenReturn(new MercadoPagoPreferencia(
@@ -101,8 +122,8 @@ class ProveedorPagoMercadoPagoTest {
     @Test
     void crearCobro_conFrontHttp_omiteAutoReturn() {
         String frontLocal = "http://localhost:5173";
-        ProveedorPagoMercadoPago proveedor =
-            new ProveedorPagoMercadoPago(cliente, oauthService, WEBHOOK, frontLocal, true);
+        ProveedorPagoMercadoPago proveedor = new ProveedorPagoMercadoPago(
+            cliente, oauthService, WEBHOOK, frontLocal, true, false, false);
         when(oauthService.tokenVigente(2L)).thenReturn("seller-token");
         when(cliente.crearPreferencia(any(), anyString(), anyString()))
             .thenReturn(new MercadoPagoPreferencia(
@@ -120,8 +141,8 @@ class ProveedorPagoMercadoPagoTest {
 
     @Test
     void crearCobro_sinNotificationUrl_lanza() {
-        ProveedorPagoMercadoPago proveedor =
-            new ProveedorPagoMercadoPago(cliente, oauthService, "", FRONT, true);
+        ProveedorPagoMercadoPago proveedor = new ProveedorPagoMercadoPago(
+            cliente, oauthService, "", FRONT, true, false, false);
 
         assertThatThrownBy(() -> proveedor.crearCobro(nuevoPago()))
             .isInstanceOf(MercadoPagoException.class)
@@ -130,8 +151,8 @@ class ProveedorPagoMercadoPagoTest {
 
     @Test
     void consultarEstado_aprobado_devuelveElPagoDeMercadoPago() {
-        ProveedorPagoMercadoPago proveedor =
-            new ProveedorPagoMercadoPago(cliente, oauthService, WEBHOOK, FRONT, true);
+        ProveedorPagoMercadoPago proveedor = new ProveedorPagoMercadoPago(
+            cliente, oauthService, WEBHOOK, FRONT, true, false, false);
         when(oauthService.tokenVigente(2L)).thenReturn("seller-token");
         when(cliente.buscarPagos("30", "seller-token")).thenReturn(List.of(
             new MercadoPagoPago(
@@ -149,8 +170,8 @@ class ProveedorPagoMercadoPagoTest {
 
     @Test
     void nombre_esMercadoPago() {
-        ProveedorPagoMercadoPago proveedor =
-            new ProveedorPagoMercadoPago(cliente, oauthService, WEBHOOK, FRONT, true);
+        ProveedorPagoMercadoPago proveedor = new ProveedorPagoMercadoPago(
+            cliente, oauthService, WEBHOOK, FRONT, true, false, false);
 
         assertThat(proveedor.nombre()).isEqualTo("MERCADOPAGO");
     }

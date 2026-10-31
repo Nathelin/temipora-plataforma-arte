@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -101,6 +102,35 @@ class MercadoPagoOAuthServiceTest {
     }
 
     @Test
+    void procesarCallback_sinTestToken_canjeaSinTokenDePrueba() {
+        MercadoPagoOAuthService sinTestToken = new MercadoPagoOAuthService(
+            cliente,
+            state,
+            cuentas,
+            usuarios,
+            cifrador,
+            "client-id",
+            "https://auth.test/authorization",
+            "https://front.test",
+            false);
+        when(state.validar("state")).thenReturn(5L);
+        Usuario usuario = new Usuario();
+        usuario.setIdUsuario(5L);
+        when(usuarios.findById(5L)).thenReturn(Optional.of(usuario));
+        when(cliente.intercambiarCodigo("code", REDIRECT, false))
+            .thenReturn(new MercadoPagoToken(
+                "AT", "RT", 3600L, 123L, "offline_access", "bearer"));
+        when(cuentas.findByUsuarioIdUsuarioAndProveedor(5L, "MERCADOPAGO"))
+            .thenReturn(Optional.empty());
+        when(cifrador.cifrar("AT")).thenReturn("encAT");
+        when(cifrador.cifrar("RT")).thenReturn("encRT");
+
+        sinTestToken.procesarCallback("code", "state");
+
+        verify(cliente).intercambiarCodigo("code", REDIRECT, false);
+    }
+
+    @Test
     void tokenVigente_devuelveElTokenDescifrado() {
         CuentaPagoUsuario cuenta = cuenta();
         when(cuentas.findByUsuarioIdUsuarioAndProveedor(5L, "MERCADOPAGO"))
@@ -136,6 +166,21 @@ class MercadoPagoOAuthServiceTest {
         assertThatThrownBy(() -> service.tokenVigente(5L))
             .isInstanceOf(ConflictoException.class)
             .hasMessageContaining("no conectó");
+    }
+
+    @Test
+    void tokensVigentes_devuelveSoloLosDeLasCuentasQueSePuedenDescifrar() {
+        CuentaPagoUsuario buena = cuenta();
+        CuentaPagoUsuario rota = cuenta();
+        rota.setAccessToken("encRoto");
+        when(cuentas.findByProveedorAndEstado(
+                "MERCADOPAGO", EstadoCuentaPago.ACTIVA))
+            .thenReturn(List.of(buena, rota));
+        when(cifrador.descifrar("encAT")).thenReturn("AT");
+        when(cifrador.descifrar("encRoto"))
+            .thenThrow(new IllegalStateException("Token cifrado inválido."));
+
+        assertThat(service.tokensVigentes()).containsExactly("AT");
     }
 
     @Test

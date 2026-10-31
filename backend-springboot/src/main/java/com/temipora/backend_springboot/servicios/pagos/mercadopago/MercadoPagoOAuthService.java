@@ -1,6 +1,8 @@
 package com.temipora.backend_springboot.servicios.pagos.mercadopago;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.NoSuchElementException;
 
 import org.slf4j.Logger;
@@ -34,7 +36,7 @@ public class MercadoPagoOAuthService {
     private final String clientId;
     private final String oauthUrl;
     private final String frontendUrl;
-    private final boolean sandbox;
+    private final boolean oauthTestToken;
 
     public MercadoPagoOAuthService(
             MercadoPagoClient cliente,
@@ -45,7 +47,7 @@ public class MercadoPagoOAuthService {
             @Value("${pagos.mercadopago.client-id:}") String clientId,
             @Value("${pagos.mercadopago.oauth-url:https://auth.mercadopago.com/authorization}") String oauthUrl,
             @Value("${app.frontend.url:http://localhost:5173}") String frontendUrl,
-            @Value("${pagos.mercadopago.sandbox:true}") boolean sandbox) {
+            @Value("${pagos.mercadopago.oauth-test-token:${pagos.mercadopago.sandbox:false}}") boolean oauthTestToken) {
         this.cliente = cliente;
         this.state = state;
         this.cuentas = cuentas;
@@ -54,7 +56,7 @@ public class MercadoPagoOAuthService {
         this.clientId = clientId;
         this.oauthUrl = oauthUrl;
         this.frontendUrl = frontendUrl;
-        this.sandbox = sandbox;
+        this.oauthTestToken = oauthTestToken;
     }
 
     public String urlAutorizacion(Long idUsuario) {
@@ -87,7 +89,7 @@ public class MercadoPagoOAuthService {
             .orElseThrow(() -> new NoSuchElementException(
                 "Usuario no encontrado: " + idUsuario));
         MercadoPagoToken token = cliente.intercambiarCodigo(
-            codigo, redirectUri(), sandbox);
+            codigo, redirectUri(), oauthTestToken);
         if (token.accessToken() == null || token.accessToken().isBlank()) {
             throw new MercadoPagoException(
                 "MercadoPago no devolvió un access token.");
@@ -135,13 +137,40 @@ public class MercadoPagoOAuthService {
             throw new ConflictoException(
                 "La cuenta de MercadoPago del artista no está activa.");
         }
-        if (cuenta.getAccessToken() == null
-                || cuenta.getTokenExpiraEn() == null
-                || cuenta.getTokenExpiraEn()
-                    .isBefore(LocalDateTime.now().plusMinutes(5))) {
+        if (necesitaRefresco(cuenta)) {
             refrescar(cuenta);
         }
         return cifrador.descifrar(cuenta.getAccessToken());
+    }
+
+    /**
+     * Tokens de todas las cuentas activas. Se usa cuando el dueño del cobro no
+     * se conoce de antemano: en marketplace el pago pertenece al vendedor, así
+     * que el token de la plataforma no siempre puede leerlo.
+     */
+    @Transactional
+    public List<String> tokensVigentes() {
+        List<String> tokens = new ArrayList<>();
+        for (CuentaPagoUsuario cuenta : cuentas.findByProveedorAndEstado(
+                PROVEEDOR, EstadoCuentaPago.ACTIVA)) {
+            try {
+                if (necesitaRefresco(cuenta)) {
+                    refrescar(cuenta);
+                }
+                tokens.add(cifrador.descifrar(cuenta.getAccessToken()));
+            } catch (RuntimeException e) {
+                log.warn("No se pudo obtener el token de la cuenta {}: {}",
+                    cuenta.getIdCuentaPago(), e.getMessage());
+            }
+        }
+        return tokens;
+    }
+
+    private boolean necesitaRefresco(CuentaPagoUsuario cuenta) {
+        return cuenta.getAccessToken() == null
+            || cuenta.getTokenExpiraEn() == null
+            || cuenta.getTokenExpiraEn()
+                .isBefore(LocalDateTime.now().plusMinutes(5));
     }
 
     private void refrescar(CuentaPagoUsuario cuenta) {
