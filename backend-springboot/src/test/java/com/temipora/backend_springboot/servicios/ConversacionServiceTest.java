@@ -486,6 +486,50 @@ class ConversacionServiceTest {
         assertThat(estado.isEscribiendo()).isFalse();
     }
 
+    @Test
+    void vencerPendientes_sinPlazo_noHaceNada() {
+        ConfiguracionMensajeria config = new ConfiguracionMensajeria();
+        config.setDiasVencimientoSolicitud(0);
+        when(configuracionService.obtener()).thenReturn(config);
+
+        assertThat(conversacionService.vencerPendientes()).isZero();
+        verify(conversacionRepository, never())
+            .findByEstadoAndFechaSolicitudBefore(any(), any());
+    }
+
+    @Test
+    void vencerPendientes_ok_marcaVencidaYNotificaAlIniciador() {
+        ConfiguracionMensajeria config = new ConfiguracionMensajeria();
+        config.setDiasVencimientoSolicitud(30);
+        when(configuracionService.obtener()).thenReturn(config);
+
+        Usuario iniciador = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario destinatario = usuario(2L, "artista", ERol.ARTISTA);
+        Conversacion candidata = conversacion(
+            EstadoConversacion.PENDIENTE, iniciador, destinatario);
+        candidata.setFechaSolicitud(LocalDateTime.now().minusDays(40));
+        when(conversacionRepository.findByEstadoAndFechaSolicitudBefore(
+            eq(EstadoConversacion.PENDIENTE), any(LocalDateTime.class)))
+            .thenReturn(List.of(candidata));
+        when(conversacionRepository.findByIdConversacionForUpdate(10L))
+            .thenReturn(Optional.of(candidata));
+
+        int vencidas = conversacionService.vencerPendientes();
+
+        assertThat(vencidas).isEqualTo(1);
+        assertThat(candidata.getEstado()).isEqualTo(EstadoConversacion.VENCIDA);
+        assertThat(candidata.getFechaRespuesta()).isNotNull();
+        verify(notificacionService).crearParaUsuario(
+            eq(1L),
+            eq(ConversacionService.NOTIFICACION_VENCIDA),
+            anyString(),
+            anyString(),
+            eq(10L),
+            eq(ConversacionService.TIPO_REFERENCIA_CONVERSACION));
+        verify(eventoPublisher)
+            .publishEvent(any(ConversacionActualizadaEvent.class));
+    }
+
     private void prepararCreacion(Usuario remitente, Usuario destinatario) {
         when(configuracionService.obtener()).thenReturn(new ConfiguracionMensajeria());
         when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(remitente));

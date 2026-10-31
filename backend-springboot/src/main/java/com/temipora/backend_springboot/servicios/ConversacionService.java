@@ -53,6 +53,7 @@ public class ConversacionService {
     public static final String NOTIFICACION_ACEPTADA = "SOLICITUD_MENSAJE_ACEPTADA";
     public static final String NOTIFICACION_RECHAZADA = "SOLICITUD_MENSAJE_RECHAZADA";
     public static final String NOTIFICACION_CANCELADA = "SOLICITUD_MENSAJE_CANCELADA";
+    public static final String NOTIFICACION_VENCIDA = "SOLICITUD_MENSAJE_VENCIDA";
 
     private static final int TAMANIO_MAXIMO_BANDEJA = 50;
     private static final int LARGO_PREVIEW = 120;
@@ -139,6 +140,7 @@ public class ConversacionService {
                         conversacion, remitente, destinatario, motivo, primerMensaje, config);
                 }
                 case CANCELADA:
+                case VENCIDA:
                     return reenviar(
                         conversacion, remitente, destinatario, motivo, primerMensaje, config);
                 default:
@@ -445,6 +447,15 @@ public class ConversacionService {
                     motivo,
                     null);
             }
+            case VENCIDA -> {
+                String motivo = motivoCupoSolicitudes(idUsuario, config);
+                yield relacion(
+                    EstadoRelacionMensaje.VENCIDA,
+                    conversacion.getIdConversacion(),
+                    motivo == null,
+                    motivo,
+                    null);
+            }
             case RECHAZADA -> {
                 LocalDateTime disponible =
                     fechaDisponibleReenvio(conversacion, config);
@@ -481,6 +492,50 @@ public class ConversacionService {
             .solicitudesPendientes(pendientes)
             .noLeidos(noLeidos)
             .build();
+    }
+
+    @Transactional
+    public int vencerPendientes() {
+        ConfiguracionMensajeria config = configuracionService.obtener();
+        int dias = config.getDiasVencimientoSolicitud() != null
+            ? config.getDiasVencimientoSolicitud()
+            : 0;
+        if (dias <= 0) {
+            return 0;
+        }
+
+        LocalDateTime limite = LocalDateTime.now().minusDays(dias);
+        List<Conversacion> candidatas = conversacionRepository
+            .findByEstadoAndFechaSolicitudBefore(
+                EstadoConversacion.PENDIENTE, limite);
+        int vencidas = 0;
+        for (Conversacion candidata : candidatas) {
+            Conversacion conversacion = conversacionRepository
+                .findByIdConversacionForUpdate(candidata.getIdConversacion())
+                .orElse(null);
+            if (conversacion == null
+                    || conversacion.getEstado() != EstadoConversacion.PENDIENTE) {
+                continue;
+            }
+
+            LocalDateTime ahora = LocalDateTime.now();
+            conversacion.setEstado(EstadoConversacion.VENCIDA);
+            conversacion.setFechaRespuesta(ahora);
+            conversacion.setFechaActualizacion(ahora);
+
+            notificacionService.crearParaUsuario(
+                conversacion.getIniciador().getIdUsuario(),
+                NOTIFICACION_VENCIDA,
+                "Solicitud de mensaje vencida",
+                "Tu solicitud para contactar a @"
+                    + conversacion.getDestinatario().getNombreUsuario()
+                    + " venció sin respuesta.",
+                conversacion.getIdConversacion(),
+                TIPO_REFERENCIA_CONVERSACION);
+            publicarCambio(conversacion);
+            vencidas++;
+        }
+        return vencidas;
     }
 
     @Transactional(readOnly = true)
@@ -629,6 +684,7 @@ public class ConversacionService {
                 case PENDIENTE -> "La solicitud todavía no fue aceptada.";
                 case RECHAZADA -> "La conversación fue rechazada.";
                 case CANCELADA -> "La solicitud fue cancelada.";
+                case VENCIDA -> "La solicitud venció.";
                 case ACEPTADA -> null;
             };
         }

@@ -43,6 +43,13 @@ const VISTAS = [
     archivadas: false,
   },
   {
+    clave: 'vencidas',
+    texto: 'Vencidas',
+    estado: 'VENCIDA',
+    bandeja: 'TODAS',
+    archivadas: false,
+  },
+  {
     clave: 'archivadas',
     texto: 'Archivadas',
     estado: null,
@@ -85,7 +92,7 @@ function nombreDe(conversacion) {
 }
 
 function previewDe(conversacion) {
-  if (conversacion.estado === 'PENDIENTE') {
+  if (conversacion.estado === 'PENDIENTE' || conversacion.estado === 'VENCIDA') {
     return `Motivo: ${conversacion.motivoContacto || 'Sin motivo'}`
   }
   return conversacion.ultimoMensajePreview || 'Todavía no hay mensajes.'
@@ -162,6 +169,8 @@ function textoVacio() {
       return 'Cuando alguien quiera contactarte, la solicitud va a aparecer acá.'
     case 'enviadas':
       return 'Todavía no enviaste solicitudes de mensaje.'
+    case 'vencidas':
+      return 'No tenés solicitudes de mensaje vencidas.'
     case 'archivadas':
       return 'No tenés conversaciones archivadas.'
     default:

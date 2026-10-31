@@ -21,6 +21,7 @@ public class ConfiguracionMensajeriaDTO {
     private Integer maxSolicitudesPendientes;
     private Integer maxSolicitudesPorDia;
     private Integer maxMensajesPorDia;
+    private Integer diasVencimientoSolicitud;
     private LocalDateTime fechaActualizacion;
 
     public static ConfiguracionMensajeriaDTO desdeConfiguracion(
@@ -32,6 +33,7 @@ public class ConfiguracionMensajeriaDTO {
             .maxSolicitudesPendientes(config.getMaxSolicitudesPendientes())
             .maxSolicitudesPorDia(config.getMaxSolicitudesPorDia())
             .maxMensajesPorDia(config.getMaxMensajesPorDia())
+            .diasVencimientoSolicitud(config.getDiasVencimientoSolicitud())
             .fechaActualizacion(config.getFechaActualizacion())
             .build();
     }

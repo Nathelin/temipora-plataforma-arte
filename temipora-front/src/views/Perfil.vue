@@ -603,6 +603,7 @@ const textoBotonMensaje = computed(() => {
       return 'Ver conversación'
     case 'RECHAZADA':
     case 'CANCELADA':
+    case 'VENCIDA':
       return estado.puedeSolicitar ? 'Volver a solicitar' : 'Ver estado'
     default:
       return 'Enviar mensaje'

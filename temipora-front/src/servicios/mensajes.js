@@ -17,6 +17,10 @@ export const ESTADOS_CONVERSACION = {
     texto: 'Cancelada',
     clase: 'border-borde/60 bg-superficie-alt text-cafe/60',
   },
+  VENCIDA: {
+    texto: 'Vencida',
+    clase: 'border-borde/60 bg-superficie-alt text-cafe/60',
+  },
 }
 
 export function estadoConversacionDe(estado) {

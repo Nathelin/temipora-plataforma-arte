@@ -41,4 +41,9 @@ public class ConfiguracionMensajeriaRequest {
     @Min(value = 1, message = "El máximo de mensajes por día debe ser al menos 1.")
     @Max(value = 10000, message = "El máximo de mensajes por día no puede superar 10000.")
     private Integer maxMensajesPorDia;
+
+    @NotNull(message = "Los días para vencer una solicitud son obligatorios.")
+    @Min(value = 0, message = "Los días para vencer una solicitud no pueden ser negativos.")
+    @Max(value = 3650, message = "Los días para vencer una solicitud no pueden superar 3650.")
+    private Integer diasVencimientoSolicitud;
 }

@@ -4,5 +4,6 @@ public enum EstadoConversacion {
     PENDIENTE,
     ACEPTADA,
     RECHAZADA,
-    CANCELADA
+    CANCELADA,
+    VENCIDA
 }

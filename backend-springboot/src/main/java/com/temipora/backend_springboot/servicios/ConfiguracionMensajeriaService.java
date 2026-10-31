@@ -38,6 +38,8 @@ public class ConfiguracionMensajeriaService {
                     ConfiguracionMensajeria.MAX_SOLICITUDES_POR_DIA_POR_DEFECTO);
                 config.setMaxMensajesPorDia(
                     ConfiguracionMensajeria.MAX_MENSAJES_POR_DIA_POR_DEFECTO);
+                config.setDiasVencimientoSolicitud(
+                    ConfiguracionMensajeria.DIAS_VENCIMIENTO_SOLICITUD_POR_DEFECTO);
                 return configuracionRepository.save(config);
             });
     }
@@ -61,6 +63,7 @@ public class ConfiguracionMensajeriaService {
         config.setMaxSolicitudesPendientes(request.getMaxSolicitudesPendientes());
         config.setMaxSolicitudesPorDia(request.getMaxSolicitudesPorDia());
         config.setMaxMensajesPorDia(request.getMaxMensajesPorDia());
+        config.setDiasVencimientoSolicitud(request.getDiasVencimientoSolicitud());
         config.setFechaActualizacion(LocalDateTime.now());
         return ConfiguracionMensajeriaDTO.desdeConfiguracion(
             configuracionRepository.save(config));

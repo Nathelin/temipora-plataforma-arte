@@ -218,6 +218,7 @@ public class MensajeService {
             case PENDIENTE -> "La solicitud todavía no fue aceptada.";
             case RECHAZADA -> "La conversación fue rechazada.";
             case CANCELADA -> "La solicitud fue cancelada.";
+            case VENCIDA -> "La solicitud venció.";
             case ACEPTADA -> "La conversación no admite mensajes.";
         };
     }

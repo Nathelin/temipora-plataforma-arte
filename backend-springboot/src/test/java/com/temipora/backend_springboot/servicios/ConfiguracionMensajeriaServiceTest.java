@@ -42,6 +42,7 @@ class ConfiguracionMensajeriaServiceTest {
         assertThat(config.getMaxSolicitudesPendientes()).isEqualTo(5);
         assertThat(config.getMaxSolicitudesPorDia()).isEqualTo(10);
         assertThat(config.getMaxMensajesPorDia()).isEqualTo(100);
+        assertThat(config.getDiasVencimientoSolicitud()).isEqualTo(30);
     }
 
     @Test
@@ -58,6 +59,7 @@ class ConfiguracionMensajeriaServiceTest {
         assertThat(resultado.getHorasEsperaReenvio()).isZero();
         assertThat(resultado.getMaxSolicitudesPendientes()).isEqualTo(2);
         assertThat(resultado.getMaxMensajesPorDia()).isEqualTo(50);
+        assertThat(resultado.getDiasVencimientoSolicitud()).isEqualTo(15);
         assertThat(resultado.getFechaActualizacion()).isNotNull();
     }
 
@@ -76,6 +78,7 @@ class ConfiguracionMensajeriaServiceTest {
         request.setMaxSolicitudesPendientes(2);
         request.setMaxSolicitudesPorDia(4);
         request.setMaxMensajesPorDia(50);
+        request.setDiasVencimientoSolicitud(15);
         return request;
     }
 }

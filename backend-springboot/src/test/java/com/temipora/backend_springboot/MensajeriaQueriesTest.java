@@ -71,6 +71,11 @@ class MensajeriaQueriesTest {
         assertThat(conversacionRepository
             .countByDestinatarioIdUsuarioAndEstado(
                 -1L, EstadoConversacion.PENDIENTE)).isZero();
+        assertThat(conversacionRepository
+            .findByEstadoAndFechaSolicitudBefore(
+                EstadoConversacion.PENDIENTE,
+                LocalDateTime.of(1900, 1, 1, 0, 0)))
+            .isEmpty();
     }
 
     @Test

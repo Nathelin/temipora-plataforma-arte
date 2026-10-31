@@ -6,5 +6,6 @@ public enum EstadoRelacionMensaje {
     PENDIENTE_RECIBIDA,
     ACEPTADA,
     RECHAZADA,
-    CANCELADA
+    CANCELADA,
+    VENCIDA
 }

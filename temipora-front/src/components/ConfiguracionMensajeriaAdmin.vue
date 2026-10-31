@@ -15,6 +15,7 @@ const horasEsperaReenvio = ref('168')
 const maxSolicitudesPendientes = ref('5')
 const maxSolicitudesPorDia = ref('10')
 const maxMensajesPorDia = ref('100')
+const diasVencimientoSolicitud = ref('30')
 
 function formatearHoras(valor) {
   const horas = Number(valor)
@@ -30,6 +31,13 @@ function formatearHoras(valor) {
 const horasTexto = computed(() =>
   formatearHoras(config.value?.horasEsperaReenvio))
 
+const diasVencimientoTexto = computed(() => {
+  const dias = Number(config.value?.diasVencimientoSolicitud)
+  if (!Number.isInteger(dias) || dias < 0) return '—'
+  if (dias === 0) return 'Nunca'
+  return `${dias} ${dias === 1 ? 'día' : 'días'}`
+})
+
 async function cargar() {
   cargando.value = true
   error.value = ''
@@ -42,6 +50,7 @@ async function cargar() {
     maxSolicitudesPendientes.value = res.data?.maxSolicitudesPendientes ?? 5
     maxSolicitudesPorDia.value = res.data?.maxSolicitudesPorDia ?? 10
     maxMensajesPorDia.value = res.data?.maxMensajesPorDia ?? 100
+    diasVencimientoSolicitud.value = res.data?.diasVencimientoSolicitud ?? 30
   } catch (e) {
     error.value = e.response?.data?.message
       || 'No se pudo cargar la configuración de mensajería.'
@@ -78,6 +87,12 @@ async function guardar() {
     entero(maxSolicitudesPendientes.value, 1, 100, 'El máximo de solicitudes pendientes'),
     entero(maxSolicitudesPorDia.value, 1, 1000, 'El máximo de solicitudes por día'),
     entero(maxMensajesPorDia.value, 1, 10000, 'El máximo de mensajes por día'),
+    entero(
+      diasVencimientoSolicitud.value,
+      0,
+      3650,
+      'Los días para vencer una solicitud',
+    ),
   ].filter(Boolean)
 
   if (errores.length) {
@@ -94,6 +109,7 @@ async function guardar() {
       maxSolicitudesPendientes: Number(maxSolicitudesPendientes.value),
       maxSolicitudesPorDia: Number(maxSolicitudesPorDia.value),
       maxMensajesPorDia: Number(maxMensajesPorDia.value),
+      diasVencimientoSolicitud: Number(diasVencimientoSolicitud.value),
     })
     config.value = res.data
     mensaje.value = 'Configuración guardada.'
@@ -237,6 +253,28 @@ onMounted(cargar)
           </div>
         </div>
 
+        <div class="border-t border-rosa/40 pt-6">
+          <h2 class="mb-4 text-base text-granate">Vencimiento de solicitudes</h2>
+          <div class="sm:w-1/3">
+            <label for="dias-vencimiento" class="mb-2 block text-sm text-cafe">
+              Días para vencer una solicitud <span class="text-rojizo">*</span>
+            </label>
+            <input
+              id="dias-vencimiento"
+              v-model="diasVencimientoSolicitud"
+              type="number"
+              min="0"
+              max="3650"
+              step="1"
+              class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+            />
+            <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+              Si nadie responde en este plazo, la solicitud pasa a “Vencida” y
+              quien la envió recibe un aviso. Con 0, no vence nunca.
+            </p>
+          </div>
+        </div>
+
         <p v-if="errorAccion" class="text-sm text-rojizo">{{ errorAccion }}</p>
         <p v-else-if="mensaje" class="text-sm text-green-700">{{ mensaje }}</p>
 
@@ -285,6 +323,10 @@ onMounted(cargar)
           <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Mensajes por día</dt>
             <dd class="text-cafe">{{ config.maxMensajesPorDia }}</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Vencimiento de solicitudes</dt>
+            <dd class="text-right text-cafe">{{ diasVencimientoTexto }}</dd>
           </div>
           <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Última modificación</dt>

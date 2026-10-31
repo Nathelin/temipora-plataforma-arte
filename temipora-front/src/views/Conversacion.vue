@@ -91,6 +91,8 @@ const esRechazada = computed(
   () => conversacion.value?.estado === 'RECHAZADA')
 const esCancelada = computed(
   () => conversacion.value?.estado === 'CANCELADA')
+const esVencida = computed(
+  () => conversacion.value?.estado === 'VENCIDA')
 const puedoResponderSolicitud = computed(() =>
   Boolean(conversacion.value?.puedeAceptar || conversacion.value?.puedeRechazar))
 const primerMensaje = computed(() => {
@@ -104,6 +106,27 @@ const primerMensaje = computed(() => {
     ) || mensajes.value[0]
   )
 })
+const ultimoMensajePropioId = computed(() => {
+  for (let i = mensajes.value.length - 1; i >= 0; i--) {
+    if (mensajes.value[i].esPropio) return mensajes.value[i].idMensaje
+  }
+  return null
+})
+
+function mostrarHora(indice) {
+  const actual = mensajes.value[indice]
+  const siguiente = mensajes.value[indice + 1]
+  if (!actual) return false
+  if (!siguiente) return true
+  if (siguiente.esPropio !== actual.esPropio) return true
+  return formatearFechaMensaje(actual.fechaEnvio)
+    !== formatearFechaMensaje(siguiente.fechaEnvio)
+}
+
+function esUltimoPropio(mensaje) {
+  return mensaje.esPropio && mensaje.idMensaje === ultimoMensajePropioId.value
+}
+
 const enviarDeshabilitado = computed(
   () => enviando.value || !conversacion.value?.puedeEnviar || !texto.value.trim())
 const nombreContraparte = computed(
@@ -756,6 +779,35 @@ onBeforeUnmount(() => {
         </p>
       </section>
 
+      <section
+        v-else-if="esVencida"
+        class="mt-5 rounded-3xl border border-borde/60 bg-superficie-alt p-5"
+      >
+        <p class="text-sm font-semibold text-cafe">
+          {{ conversacion.soyIniciador
+            ? 'La solicitud venció sin respuesta.'
+            : 'La solicitud venció.' }}
+        </p>
+        <p class="mt-2 text-sm text-cafe/70">
+          <span class="font-semibold">Motivo:</span>
+          {{ conversacion.motivoContacto }}
+        </p>
+        <p v-if="conversacion.fechaRespuesta" class="mt-2 text-xs text-cafe/55">
+          Venció el {{ formatearFechaHora(conversacion.fechaRespuesta) }}
+        </p>
+        <p v-if="conversacion.soyIniciador" class="mt-3 text-sm text-cafe/70">
+          Podés volver a enviar una solicitud desde el perfil de {{ nombreContraparte }}.
+        </p>
+        <button
+          v-if="conversacion.soyIniciador"
+          type="button"
+          class="mt-3 min-h-9 rounded-full border border-rosa bg-blanco px-4 text-xs font-semibold text-cafe transition hover:bg-rosa/20"
+          @click="irAlPerfil"
+        >
+          Ir al perfil
+        </button>
+      </section>
+
       <div
         v-if="esAceptada"
         ref="refLista"
@@ -781,7 +833,7 @@ onBeforeUnmount(() => {
         </p>
 
         <div
-          v-for="mensaje in mensajes"
+          v-for="(mensaje, indice) in mensajes"
           :key="mensaje.idMensaje"
           class="flex"
           :class="mensaje.esPropio ? 'justify-end' : 'justify-start'"
@@ -796,12 +848,13 @@ onBeforeUnmount(() => {
               {{ mensaje.contenido }}
             </div>
             <p
+              v-if="mostrarHora(indice)"
               class="mt-1 text-[10px] text-cafe/45"
               :class="mensaje.esPropio ? 'text-right' : 'text-left'"
             >
               {{ formatearFechaMensaje(mensaje.fechaEnvio) }}
               <span
-                v-if="mensaje.esPropio && mensaje.leido"
+                v-if="esUltimoPropio(mensaje) && mensaje.leido"
                 class="font-semibold text-coral"
               >
                 · Leído

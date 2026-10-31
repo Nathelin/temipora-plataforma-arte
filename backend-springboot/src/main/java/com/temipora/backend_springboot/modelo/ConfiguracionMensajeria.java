@@ -24,6 +24,7 @@ public class ConfiguracionMensajeria {
     public static final int MAX_SOLICITUDES_PENDIENTES_POR_DEFECTO = 5;
     public static final int MAX_SOLICITUDES_POR_DIA_POR_DEFECTO = 10;
     public static final int MAX_MENSAJES_POR_DIA_POR_DEFECTO = 100;
+    public static final int DIAS_VENCIMIENTO_SOLICITUD_POR_DEFECTO = 30;
 
     @Id
     @Column(name = "id_configuracion", nullable = false)
@@ -46,6 +47,9 @@ public class ConfiguracionMensajeria {
 
     @Column(name = "max_mensajes_por_dia", nullable = false)
     private Integer maxMensajesPorDia = MAX_MENSAJES_POR_DIA_POR_DEFECTO;
+
+    @Column(name = "dias_vencimiento_solicitud", nullable = false)
+    private Integer diasVencimientoSolicitud = DIAS_VENCIMIENTO_SOLICITUD_POR_DEFECTO;
 
     @Column(name = "fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
