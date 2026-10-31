@@ -126,6 +126,11 @@ public interface ReseniaRepository extends JpaRepository<Resenia, Long> {
               SELECT MAX(v2.numero) FROM ReseniaVersion v2 WHERE v2.resenia = r
           )
           AND (:calificacion IS NULL OR v.calificacionGeneral = :calificacion)
+          AND (:idOpcion IS NULL OR EXISTS (
+              SELECT 1 FROM ReseniaOpcion ro
+              WHERE ro.version = v
+                AND ro.opcion.idOpcionCriterio = :idOpcion
+          ))
         ORDER BY
           CASE WHEN :orden = 'MEJOR' THEN v.calificacionGeneral END DESC,
           CASE WHEN :orden = 'PEOR' THEN v.calificacionGeneral END ASC,
@@ -144,9 +149,15 @@ public interface ReseniaRepository extends JpaRepository<Resenia, Long> {
               SELECT MAX(v2.numero) FROM ReseniaVersion v2 WHERE v2.resenia = r
           )
           AND (:calificacion IS NULL OR v.calificacionGeneral = :calificacion)
+          AND (:idOpcion IS NULL OR EXISTS (
+              SELECT 1 FROM ReseniaOpcion ro
+              WHERE ro.version = v
+                AND ro.opcion.idOpcionCriterio = :idOpcion
+          ))
         """)
     Page<Resenia> findPublicasPorServicio(
         @Param("idServicio") Long idServicio,
+        @Param("idOpcion") Long idOpcion,
         @Param("calificacion") Integer calificacion,
         @Param("orden") String orden,
         @Param("estado") EstadoResenia estado,

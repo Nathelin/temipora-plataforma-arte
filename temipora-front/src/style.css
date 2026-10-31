@@ -224,9 +224,38 @@
   color: var(--color-inverso-suave);
 }
 
+/* Los fondos decorativos se usan como tintes suaves en temas oscuros para que
+   el texto claro conserve contraste; los fondos plenos siguen siendo claros y
+   se combinan con texto oscuro (text-tinta). */
+[data-oscuro='true'] .bg-durazno\/20,
+[data-oscuro='true'] .bg-durazno\/25,
+[data-oscuro='true'] .bg-durazno\/30,
+[data-oscuro='true'] .bg-durazno\/35,
 [data-oscuro='true'] .bg-durazno\/40,
-[data-oscuro='true'] .bg-durazno\/50 {
-  background-color: color-mix(in oklab, var(--color-decorativo-2) 18%, transparent);
+[data-oscuro='true'] .bg-durazno\/50,
+[data-oscuro='true'] .bg-durazno\/60,
+[data-oscuro='true'] .bg-durazno\/70 {
+  background-color: color-mix(in oklab, var(--color-decorativo-2) 20%, transparent);
+}
+
+[data-oscuro='true'] .hover\:bg-durazno:hover {
+  background-color: color-mix(in oklab, var(--color-decorativo-2) 26%, transparent);
+}
+
+[data-oscuro='true'] .bg-mantequilla\/20,
+[data-oscuro='true'] .bg-mantequilla\/25,
+[data-oscuro='true'] .bg-mantequilla\/30,
+[data-oscuro='true'] .bg-mantequilla\/35,
+[data-oscuro='true'] .bg-mantequilla\/40,
+[data-oscuro='true'] .bg-mantequilla\/50,
+[data-oscuro='true'] .bg-mantequilla\/60,
+[data-oscuro='true'] .bg-mantequilla\/70,
+[data-oscuro='true'] .bg-mantequilla\/80 {
+  background-color: color-mix(in oklab, var(--color-decorativo-3) 20%, transparent);
+}
+
+[data-oscuro='true'] .hover\:bg-mantequilla:hover {
+  background-color: color-mix(in oklab, var(--color-decorativo-3) 26%, transparent);
 }
 
 [data-oscuro='true'] .text-green-700,

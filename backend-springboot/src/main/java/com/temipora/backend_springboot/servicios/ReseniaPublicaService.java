@@ -49,6 +49,7 @@ import com.temipora.backend_springboot.repositorios.ReseniaVersionRepository;
 public class ReseniaPublicaService {
 
     private static final int MINIMO_DESGLOSE = 3;
+    private static final int MINIMO_DESTACADOS = 10;
     private static final int TAMANIO_MAXIMO = 50;
     private static final String ORDEN_RECIENTES = "RECIENTES";
     private static final String ORDEN_MEJOR = "MEJOR";
@@ -113,6 +114,7 @@ public class ReseniaPublicaService {
     @Transactional(readOnly = true)
     public PaginaReseniasDTO listarServicio(
             Long idServicio,
+            Long idOpcion,
             Integer calificacion,
             String orden,
             int pagina,
@@ -121,6 +123,7 @@ public class ReseniaPublicaService {
         Pageable pageable = pagina(pagina, tamanio);
         Page<Resenia> page = reseniaRepository.findPublicasPorServicio(
             idServicio,
+            idOpcion,
             calificacion,
             normalizarOrden(orden),
             EstadoResenia.PUBLICADA,
@@ -251,7 +254,7 @@ public class ReseniaPublicaService {
             .criterios(cantidad >= MINIMO_DESGLOSE
                 ? criterios(idServicio, idArtista)
                 : List.of())
-            .destacados(cantidad >= MINIMO_DESGLOSE
+            .destacados(cantidad >= MINIMO_DESTACADOS
                 ? destacados(idServicio, idArtista, cantidad)
                 : List.of())
             .build();

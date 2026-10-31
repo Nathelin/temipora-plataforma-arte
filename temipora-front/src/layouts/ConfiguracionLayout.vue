@@ -12,6 +12,7 @@ const ICONOS = {
   apariencia: 'M4.098 19.902a3.75 3.75 0 0 0 5.304 0l6.401-6.402M6.75 21A3.75 3.75 0 0 1 3 17.25V4.125C3 3.504 3.504 3 4.125 3h5.25c.621 0 1.125.504 1.125 1.125v4.072M6.75 21a3.75 3.75 0 0 0 3.75-3.75V8.197M6.75 21h13.125c.621 0 1.125-.504 1.125-1.125v-5.25c0-.621-.504-1.125-1.125-1.125h-4.072M10.5 8.197l2.88-2.88c.438-.439 1.15-.439 1.59 0l3.712 3.713c.44.44.44 1.152 0 1.59l-2.879 2.88M6.75 17.25h.008v.008H6.75v-.008Z',
   privacidad: 'M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z',
   cuenta: 'M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z',
+  cobros: 'M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z',
 }
 
 const secciones = [
@@ -19,10 +20,17 @@ const secciones = [
   { nombre: 'Apariencia', to: '/configuracion/apariencia', icono: ICONOS.apariencia },
   { nombre: 'Privacidad y contenido', to: '/configuracion/privacidad', icono: ICONOS.privacidad },
   { nombre: 'Cuenta y seguridad', to: '/configuracion/cuenta', icono: ICONOS.cuenta },
+  { nombre: 'Cobros', to: '/configuracion/cobros', icono: ICONOS.cobros, soloArtista: true },
 ]
 
+const seccionesVisibles = computed(
+  () => secciones.filter((s) => !s.soloArtista || esArtista),
+)
+
 const esActiva = (to) => route.path === to
-const nombreActivo = computed(() => secciones.find((s) => esActiva(s.to))?.nombre || 'Configuración')
+const nombreActivo = computed(
+  () => seccionesVisibles.value.find((s) => esActiva(s.to))?.nombre || 'Configuración',
+)
 </script>
 
 <template>
@@ -61,7 +69,7 @@ const nombreActivo = computed(() => secciones.find((s) => esActiva(s.to))?.nombr
             :class="menuAbierto ? 'mt-2 block' : 'hidden lg:block lg:mt-0'"
           >
             <router-link
-              v-for="s in secciones"
+              v-for="s in seccionesVisibles"
               :key="s.to"
               :to="s.to"
               class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition"

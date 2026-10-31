@@ -27,4 +27,13 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Pago p where p.idPago = :id")
     Optional<Pago> findByIdPagoForUpdate(@Param("id") Long id);
+
+    @Query("""
+        select p from Pago p
+        join fetch p.hitoPedido h
+        join fetch h.pedido
+        join fetch p.usuarioPagador
+        where p.idPago = :id
+        """)
+    Optional<Pago> findByIdPagoConPedido(@Param("id") Long id);
 }

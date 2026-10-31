@@ -103,7 +103,7 @@ class ReseniaPublicaServiceTest {
             List.of(resenia), PageRequest.of(0, 10), 1);
 
         when(reseniaRepository.findPublicasPorServicio(
-            eq(1L), isNull(), eq("RECIENTES"),
+            eq(1L), isNull(), isNull(), eq("RECIENTES"),
             eq(EstadoResenia.PUBLICADA), eq(EstadoPedido.FINALIZADO),
             any(Pageable.class))).thenReturn(page);
         when(reseniaRepository.resumenConteoPromedio(
@@ -121,7 +121,7 @@ class ReseniaPublicaServiceTest {
             .thenReturn(List.of());
 
         PaginaReseniasDTO pagina =
-            reseniaPublicaService.listarServicio(1L, null, "RECIENTES", 0, 10);
+            reseniaPublicaService.listarServicio(1L, null, null, "RECIENTES", 0, 10);
 
         assertThat(pagina.getResumen().getCantidad()).isEqualTo(1);
         assertThat(pagina.getResumen().getPromedio())

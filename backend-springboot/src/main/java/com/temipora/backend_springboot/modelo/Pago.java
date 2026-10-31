@@ -73,6 +73,18 @@ public class Pago {
     @Column(name = "clave_idempotencia", length = 100, unique = true)
     private String claveIdempotencia;
 
+    @Column(name = "id_pago_externo", length = 100)
+    private String idPagoExterno;
+
+    @Column(name = "estado_externo", length = 50)
+    private String estadoExterno;
+
+    @Column(name = "expira_en")
+    private LocalDateTime expiraEn;
+
+    @Column(name = "fecha_actualizacion_proveedor")
+    private LocalDateTime fechaActualizacionProveedor;
+
     @Column(columnDefinition = "TEXT")
     private String payload;
 

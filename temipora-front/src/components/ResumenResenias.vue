@@ -7,9 +7,14 @@ const props = defineProps({
   resumen: { type: Object, default: null },
   compacto: { type: Boolean, default: false },
   clickable: { type: Boolean, default: false },
+  filtrable: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['ver-todas'])
+const emit = defineEmits(['ver-todas', 'filtrar-opcion'])
+
+const MINIMO_RESENIAS_DESTACADOS = 10
+const MINIMO_PORCENTAJE_DESTACADO = 50
+const MAX_DESTACADOS = 2
 
 const hayDatos = computed(() => Boolean(
   props.resumen?.hayDatos && Number(props.resumen?.cantidad) > 0,
@@ -17,8 +22,21 @@ const hayDatos = computed(() => Boolean(
 const cantidad = computed(() => Number(props.resumen?.cantidad || 0))
 const estrellas = computed(() => Math.round(Number(props.resumen?.promedio || 0)))
 
+const destacadosVisibles = computed(() => {
+  if (cantidad.value < MINIMO_RESENIAS_DESTACADOS) return []
+  return (props.resumen?.destacados || [])
+    .filter((destacado) => Number(destacado?.porcentaje || 0) >= MINIMO_PORCENTAJE_DESTACADO)
+    .slice(0, MAX_DESTACADOS)
+})
+
 function porcentaje(fila) {
   return Math.min(100, Math.max(0, Number(fila?.porcentaje || 0)))
+}
+
+function prefijoDestacado(destacado) {
+  if (destacado?.polaridad === 'NEGATIVA') return 'Varios usuarios señalan'
+  if (destacado?.polaridad === 'POSITIVA') return 'Muchos usuarios resaltan'
+  return 'Varios usuarios mencionan'
 }
 </script>
 
@@ -100,30 +118,45 @@ function porcentaje(fila) {
         </div>
       </div>
 
-      <div v-if="resumen.criterios?.length" class="grid gap-2 sm:grid-cols-2">
+      <div v-if="resumen.criterios?.length" class="space-y-1.5">
         <div
           v-for="criterio in resumen.criterios"
           :key="criterio.idCriterio"
-          class="flex items-center justify-between gap-2 rounded-lg bg-rosa/10 px-3 py-2 text-xs"
+          class="flex items-center justify-between gap-2 rounded-lg bg-rosa/10 px-3 py-1.5 text-xs"
         >
           <span class="text-cafe/70">{{ criterio.nombre }}</span>
-          <span class="font-semibold text-granate">
+          <span class="flex shrink-0 items-center gap-1 font-semibold text-granate">
+            <span class="text-coral" aria-hidden="true">★</span>
             {{ formatearPromedio(criterio.promedio) }}
           </span>
         </div>
       </div>
 
-      <div v-if="resumen.destacados?.length" class="flex flex-wrap gap-2">
-        <span
-          v-for="destacado in resumen.destacados"
+      <div v-if="destacadosVisibles.length" class="space-y-1.5 border-t border-rosa/30 pt-3">
+        <p class="text-[11px] font-semibold uppercase tracking-wide text-cafe/55">
+          Lo que más se repite
+        </p>
+        <p
+          v-for="destacado in destacadosVisibles"
           :key="destacado.idOpcion"
-          class="rounded-full border px-3 py-1 text-[11px] font-medium"
-          :class="destacado.polaridad === 'NEGATIVA'
-            ? 'border-rojizo/30 bg-rojizo/5 text-rojizo'
-            : 'border-rosa bg-blanco text-cafe'"
+          class="text-sm leading-relaxed text-cafe/80"
         >
-          {{ destacado.etiqueta }} · {{ Math.round(destacado.porcentaje || 0) }}%
-        </span>
+          <button
+            v-if="filtrable"
+            type="button"
+            class="text-left transition hover:text-coral focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/50"
+            @click="emit('filtrar-opcion', destacado)"
+          >
+            {{ prefijoDestacado(destacado) }}
+            <span class="font-semibold text-granate underline decoration-coral/40 underline-offset-4">
+              “{{ destacado.etiqueta }}”
+            </span>.
+          </button>
+          <span v-else>
+            {{ prefijoDestacado(destacado) }}
+            <span class="font-semibold text-granate">“{{ destacado.etiqueta }}”</span>.
+          </span>
+        </p>
       </div>
     </div>
   </div>

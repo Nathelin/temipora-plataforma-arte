@@ -95,11 +95,11 @@ onBeforeUnmount(() => {
 
         <button
           type="button"
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 text-white transition hover:bg-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           aria-label="Cerrar visor"
           @click="emit('cerrar')"
         >
-          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6 6 18" />
           </svg>
         </button>
@@ -112,11 +112,11 @@ onBeforeUnmount(() => {
         <button
           v-if="total > 1"
           type="button"
-          class="absolute left-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:left-4"
+          class="absolute left-2 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/90 text-tinta shadow-xl transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:left-4"
           aria-label="Imagen anterior"
           @click="mover(-1)"
         >
-          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
@@ -131,11 +131,11 @@ onBeforeUnmount(() => {
         <button
           v-if="total > 1"
           type="button"
-          class="absolute right-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:right-4"
+          class="absolute right-2 z-10 flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/90 text-tinta shadow-xl transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:right-4"
           aria-label="Imagen siguiente"
           @click="mover(1)"
         >
-          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
           </svg>
         </button>

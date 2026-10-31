@@ -14,6 +14,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import com.temipora.backend_springboot.servicios.AccesoDenegadoException;
 import com.temipora.backend_springboot.servicios.ConflictoException;
 import com.temipora.backend_springboot.servicios.ServicioNoDisponibleException;
+import com.temipora.backend_springboot.servicios.pagos.mercadopago.MercadoPagoException;
 
 @RestControllerAdvice
 public class ManejoGlobalErrores {
@@ -42,6 +43,12 @@ public class ManejoGlobalErrores {
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<Map<String, String>> manejarNoEncontrado(NoSuchElementException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+    }
+
+    @ExceptionHandler(MercadoPagoException.class)
+    public ResponseEntity<Map<String, String>> manejarMercadoPago(MercadoPagoException e) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+            .body(Map.of("message", e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

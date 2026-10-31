@@ -75,7 +75,9 @@ public class SecurityConfig {
                     "/api/resenias/**",
                     "/api/terminos-plataforma",
                     "/api/comisiones/**",
-                    "/api/configuracion-pedido"
+                    "/api/configuracion-pedido",
+                    "/api/pagos/mercadopago/webhook",
+                    "/api/pagos/mercadopago/oauth/callback"
                 ).permitAll()
                 .anyRequest().authenticated()
             )
@@ -98,7 +100,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
+        config.setAllowedOriginPatterns(List.of(
+            "http://localhost:5173",
+            "https://*.ngrok-free.dev",
+            "https://*.ngrok-free.app",
+            "https://*.trycloudflare.com"
+        ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

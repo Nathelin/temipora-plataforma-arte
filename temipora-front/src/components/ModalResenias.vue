@@ -13,9 +13,15 @@ defineProps({
   servicios: { type: Array, default: () => [] },
   mostrarFiltroServicio: { type: Boolean, default: false },
   mostrarServicio: { type: Boolean, default: false },
+  filtroOpcion: { type: String, default: '' },
 })
 
-const emit = defineEmits(['cerrar', 'cambiar-filtros', 'cambiar-pagina'])
+const emit = defineEmits([
+  'cerrar',
+  'cambiar-filtros',
+  'cambiar-pagina',
+  'quitar-filtro-opcion',
+])
 </script>
 
 <template>
@@ -41,6 +47,23 @@ const emit = defineEmits(['cerrar', 'cambiar-filtros', 'cambiar-pagina'])
       </header>
 
       <div class="overflow-y-auto p-5">
+        <div
+          v-if="filtroOpcion"
+          class="mb-4 flex flex-wrap items-center gap-2 rounded-xl bg-rosa/15 px-3 py-2 text-sm text-cafe"
+        >
+          <span>Filtrando por:</span>
+          <span class="rounded-full bg-coral/10 px-3 py-0.5 font-semibold text-granate">
+            {{ filtroOpcion }}
+          </span>
+          <button
+            type="button"
+            class="ml-auto text-xs font-semibold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
+            @click="emit('quitar-filtro-opcion')"
+          >
+            Quitar filtro
+          </button>
+        </div>
+
         <ListaResenias
           :resenias="resenias"
           :resumen="resumen"

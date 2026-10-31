@@ -47,6 +47,7 @@ import ConfiguracionEtiquetas from '../views/ConfiguracionEtiquetas.vue'
 import ConfiguracionFormularioPedidos from '../views/ConfiguracionFormularioPedidos.vue'
 import ConfiguracionTerminosArtista from '../views/ConfiguracionTerminosArtista.vue'
 import ConfiguracionCuenta from '../views/ConfiguracionCuenta.vue'
+import ConfiguracionCobros from '../views/ConfiguracionCobros.vue'
 import PortfolioSubir from '../views/PortfolioSubir.vue'
 import MisServicios from '../views/MisServicios.vue'
 import ServicioForm from '../views/ServicioForm.vue'
@@ -199,6 +200,7 @@ const routes = [
           { path: 'apariencia', name: 'configuracion-apariencia', component: ConfiguracionApariencia, meta: { title: 'Configuración - Apariencia' } },
           { path: 'privacidad', name: 'configuracion-privacidad', component: ConfiguracionPrivacidad, meta: { title: 'Configuración - Privacidad' } },
           { path: 'cuenta', name: 'configuracion-cuenta', component: ConfiguracionCuenta, meta: { title: 'Configuración - Cuenta' } },
+          { path: 'cobros', name: 'configuracion-cobros', component: ConfiguracionCobros, meta: { title: 'Configuración - Cobros', requiresArtist: true } },
         ],
       },
       { path: 'about', redirect: '/' },
