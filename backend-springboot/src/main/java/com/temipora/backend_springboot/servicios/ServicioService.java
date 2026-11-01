@@ -86,6 +86,7 @@ public class ServicioService {
     private final MonedaService monedaService;
     private final ReseniaPublicaService reseniaPublicaService;
     private final RecomendacionService recomendacionService;
+    private final OfertaReactivacionService ofertaReactivacionService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -102,7 +103,8 @@ public class ServicioService {
             ConversionMonedaService conversionMonedaService,
             MonedaService monedaService,
             ReseniaPublicaService reseniaPublicaService,
-            RecomendacionService recomendacionService) {
+            RecomendacionService recomendacionService,
+            OfertaReactivacionService ofertaReactivacionService) {
         this.servicioRepository = servicioRepository;
         this.solicitudRepository = solicitudRepository;
         this.usuarioRepository = usuarioRepository;
@@ -115,6 +117,7 @@ public class ServicioService {
         this.monedaService = monedaService;
         this.reseniaPublicaService = reseniaPublicaService;
         this.recomendacionService = recomendacionService;
+        this.ofertaReactivacionService = ofertaReactivacionService;
     }
 
     @Transactional(readOnly = true)
@@ -163,6 +166,7 @@ public class ServicioService {
             .map(s -> aDTO(s, requiereAdvertencia(s, pref, viewerId), moneda))
             .toList();
         aplicarPromedios(dtos);
+        aplicarOfertas(dtos, viewerId);
         return dtos;
     }
 
@@ -246,6 +250,7 @@ public class ServicioService {
                 ocupados.getOrDefault(s.getIdServicio(), 0)))
             .toList();
         aplicarPromedios(dtos);
+        aplicarOfertas(dtos, viewerId);
 
         int totalPaginas = (int) Math.ceil(total / (double) tamanioSeguro);
         return PaginaDTO.<ServicioDTO>builder()
@@ -278,6 +283,7 @@ public class ServicioService {
                 ocupados.getOrDefault(s.getIdServicio(), 0)))
             .toList();
         aplicarPromedios(dtos);
+        aplicarOfertas(dtos, viewerId);
         return dtos;
     }
 
@@ -438,7 +444,34 @@ public class ServicioService {
                 aDTO(servicio, requiereAdvertencia(servicio, pref, viewerId), moneda));
         }
         aplicarPromedios(resultado.values());
+        aplicarOfertas(resultado.values(), viewerId);
         return resultado;
+    }
+
+    private void aplicarOfertas(Collection<ServicioDTO> dtos, Long viewerId) {
+        if (viewerId == null || dtos == null || dtos.isEmpty()) {
+            return;
+        }
+        List<Long> ids = dtos.stream()
+            .map(ServicioDTO::getIdServicio)
+            .filter(Objects::nonNull)
+            .toList();
+        if (ids.isEmpty()) {
+            return;
+        }
+        Map<Long, OfertaReactivacionService.OfertaVigente> ofertas =
+            ofertaReactivacionService.ofertasVigentesPorServicios(viewerId, ids);
+        if (ofertas == null || ofertas.isEmpty()) {
+            return;
+        }
+        for (ServicioDTO dto : dtos) {
+            OfertaReactivacionService.OfertaVigente oferta =
+                ofertas.get(dto.getIdServicio());
+            if (oferta != null) {
+                dto.setIdOferta(oferta.idOferta());
+                dto.setDescuentoOfertaPorcentaje(oferta.porcentajeDescuento());
+            }
+        }
     }
 
     private void aplicarPromedios(Collection<ServicioDTO> dtos) {
@@ -689,6 +722,7 @@ public class ServicioService {
         }
         ServicioDTO dto = aDTO(servicio, requiereAdvertencia(servicio, pref, viewerId), monedaPreferidaDe(viewerId));
         aplicarPromedios(List.of(dto));
+        aplicarOfertas(List.of(dto), viewerId);
         return dto;
     }
 

@@ -51,4 +51,18 @@ public interface OfertaReactivacionRepository
         ORDER BY o.idOferta ASC
         """)
     List<OfertaReactivacion> findByTokenCampana(@Param("token") String token);
+
+    @Query("""
+        SELECT o FROM OfertaReactivacion o
+        JOIN FETCH o.servicio s
+        WHERE o.campana.usuario.idUsuario = :idUsuario
+          AND s.idServicio IN :ids
+          AND o.estado IN :estados
+          AND o.fechaVencimiento > :ahora
+        """)
+    List<OfertaReactivacion> findVigentesPorUsuarioYServicios(
+        @Param("idUsuario") Long idUsuario,
+        @Param("ids") Collection<Long> ids,
+        @Param("estados") Collection<EstadoOfertaReactivacion> estados,
+        @Param("ahora") LocalDateTime ahora);
 }

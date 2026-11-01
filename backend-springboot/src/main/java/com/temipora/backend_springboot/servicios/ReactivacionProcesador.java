@@ -135,6 +135,10 @@ public class ReactivacionProcesador {
         BigDecimal comisionPorcentaje = comisionService.obtener()
             .getPorcentajeServicio()
             .setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal porcentajeEfectivo = config.getPorcentajeDescuento()
+            .min(comisionPorcentaje)
+            .max(BigDecimal.ZERO)
+            .setScale(2, java.math.RoundingMode.HALF_UP);
 
         CampanaReactivacion campana = new CampanaReactivacion();
         campana.setUsuario(usuario);
@@ -149,7 +153,7 @@ public class ReactivacionProcesador {
             OfertaReactivacion oferta = new OfertaReactivacion();
             oferta.setServicio(servicio);
             oferta.setArtista(servicio.getArtista());
-            oferta.setPorcentajeDescuento(config.getPorcentajeDescuento());
+            oferta.setPorcentajeDescuento(porcentajeEfectivo);
             oferta.setComisionTopePorcentaje(comisionPorcentaje);
             oferta.setMotivo(item.motivo());
             oferta.setEstado(EstadoOfertaReactivacion.OFRECIDA);
@@ -159,7 +163,7 @@ public class ReactivacionProcesador {
         }
         campanaRepository.save(campana);
 
-        String porcentaje = config.getPorcentajeDescuento()
+        String porcentaje = porcentajeEfectivo
             .stripTrailingZeros()
             .toPlainString();
         notificacionService.crearParaUsuario(

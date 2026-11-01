@@ -50,6 +50,13 @@ const secciones = [
     ],
   },
   {
+    nombre: 'Campañas',
+    base: '/admin/campanas',
+    subsecciones: [
+      { nombre: 'Promociones', to: '/admin/campanas/promociones' },
+    ],
+  },
+  {
     nombre: 'Ajustes generales',
     base: '/admin/ajustes',
     subsecciones: [

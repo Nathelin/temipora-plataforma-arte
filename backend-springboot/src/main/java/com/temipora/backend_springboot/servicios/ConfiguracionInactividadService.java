@@ -15,10 +15,13 @@ import com.temipora.backend_springboot.repositorios.ConfiguracionInactividadRepo
 public class ConfiguracionInactividadService {
 
     private final ConfiguracionInactividadRepository repository;
+    private final ComisionService comisionService;
 
     public ConfiguracionInactividadService(
-            ConfiguracionInactividadRepository repository) {
+            ConfiguracionInactividadRepository repository,
+            ComisionService comisionService) {
         this.repository = repository;
+        this.comisionService = comisionService;
     }
 
     @Transactional
@@ -49,6 +52,16 @@ public class ConfiguracionInactividadService {
                 || porcentaje.compareTo(new BigDecimal("50.00")) > 0) {
             throw new IllegalArgumentException(
                 "El descuento debe estar entre 0 y 50%.");
+        }
+
+        BigDecimal comisionVigente = comisionService.obtener()
+            .getPorcentajeServicio()
+            .setScale(2, RoundingMode.HALF_UP);
+        if (porcentaje.compareTo(comisionVigente) > 0) {
+            throw new IllegalArgumentException(
+                "El descuento no puede superar la comisión vigente de servicios ("
+                    + comisionVigente.stripTrailingZeros().toPlainString()
+                    + "%). Cambiala en Comisiones si querés descontar más.");
         }
 
         ConfiguracionInactividad config = obtener();

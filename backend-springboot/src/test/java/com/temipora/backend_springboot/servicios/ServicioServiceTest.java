@@ -85,6 +85,9 @@ class ServicioServiceTest {
     @Mock
     private ReseniaPublicaService reseniaPublicaService;
 
+    @Mock
+    private OfertaReactivacionService ofertaReactivacionService;
+
     @InjectMocks
     private ServicioService servicioService;
 

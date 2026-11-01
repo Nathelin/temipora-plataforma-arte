@@ -37,6 +37,13 @@ public class OfertaReactivacionDTO {
     public static OfertaReactivacionDTO desdeEntidad(
             OfertaReactivacion oferta,
             LocalDateTime ahora) {
+        return desdeEntidad(oferta, ahora, null);
+    }
+
+    public static OfertaReactivacionDTO desdeEntidad(
+            OfertaReactivacion oferta,
+            LocalDateTime ahora,
+            BigDecimal comisionVigente) {
         Servicio servicio = oferta.getServicio();
         Usuario artista = oferta.getArtista() != null
             ? oferta.getArtista()
@@ -53,6 +60,11 @@ public class OfertaReactivacionDTO {
             && campana.getFechaVencimiento() != null
             && campana.getFechaVencimiento().isAfter(ahora);
 
+        BigDecimal porcentaje = oferta.getPorcentajeDescuento();
+        if (porcentaje != null && comisionVigente != null) {
+            porcentaje = porcentaje.min(comisionVigente).max(BigDecimal.ZERO);
+        }
+
         return OfertaReactivacionDTO.builder()
             .idOferta(oferta.getIdOferta())
             .idCampana(campana != null ? campana.getIdCampana() : null)
@@ -68,7 +80,7 @@ public class OfertaReactivacionDTO {
             .moneda(servicio != null && servicio.getMoneda() != null
                 ? servicio.getMoneda().getCodigo()
                 : null)
-            .porcentajeDescuento(oferta.getPorcentajeDescuento())
+            .porcentajeDescuento(porcentaje)
             .fechaVencimiento(oferta.getFechaVencimiento())
             .motivo(oferta.getMotivo())
             .estado(oferta.getEstado() != null ? oferta.getEstado().name() : null)

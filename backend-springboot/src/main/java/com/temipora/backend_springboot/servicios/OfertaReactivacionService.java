@@ -1,7 +1,12 @@
 package com.temipora.backend_springboot.servicios;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.springframework.stereotype.Service;
@@ -23,12 +28,18 @@ public class OfertaReactivacionService {
 
     private final OfertaReactivacionRepository ofertaRepository;
     private final CampanaReactivacionRepository campanaRepository;
+    private final ComisionService comisionService;
 
     public OfertaReactivacionService(
             OfertaReactivacionRepository ofertaRepository,
-            CampanaReactivacionRepository campanaRepository) {
+            CampanaReactivacionRepository campanaRepository,
+            ComisionService comisionService) {
         this.ofertaRepository = ofertaRepository;
         this.campanaRepository = campanaRepository;
+        this.comisionService = comisionService;
+    }
+
+    public record OfertaVigente(Long idOferta, BigDecimal porcentajeDescuento) {
     }
 
     @Transactional(readOnly = true)
@@ -42,6 +53,41 @@ public class OfertaReactivacionService {
                 && oferta.getCampana().getFechaVencimiento() != null
                 && oferta.getCampana().getFechaVencimiento().isAfter(ahora))
             .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, OfertaVigente> ofertasVigentesPorServicios(
+            Long idUsuario,
+            Collection<Long> idsServicios) {
+        if (idUsuario == null || idsServicios == null || idsServicios.isEmpty()) {
+            return Map.of();
+        }
+        BigDecimal comision = comisionService.obtener()
+            .getPorcentajeServicio()
+            .setScale(2, RoundingMode.HALF_UP);
+        Map<Long, OfertaVigente> resultado = new HashMap<>();
+        for (OfertaReactivacion oferta : ofertaRepository
+                .findVigentesPorUsuarioYServicios(
+                    idUsuario, idsServicios, ESTADOS_VIGENTES, LocalDateTime.now())) {
+            if (oferta.getServicio() == null) {
+                continue;
+            }
+            BigDecimal efectivo = oferta.getPorcentajeDescuento()
+                .min(comision)
+                .max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+            if (efectivo.signum() <= 0) {
+                continue;
+            }
+            Long idServicio = oferta.getServicio().getIdServicio();
+            OfertaVigente candidata = new OfertaVigente(
+                oferta.getIdOferta(), efectivo);
+            resultado.merge(idServicio, candidata, (actual, nueva) ->
+                nueva.porcentajeDescuento()
+                    .compareTo(actual.porcentajeDescuento()) > 0
+                    ? nueva : actual);
+        }
+        return resultado;
     }
 
     @Transactional(readOnly = true)
