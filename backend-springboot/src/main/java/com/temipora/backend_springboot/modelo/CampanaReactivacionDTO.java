@@ -20,6 +20,7 @@ public class CampanaReactivacionDTO {
 
     private Long idCampana;
     private String token;
+    private String nombreUsuario;
     private String estado;
     private LocalDateTime fechaVencimiento;
     private boolean vigente;
@@ -50,6 +51,8 @@ public class CampanaReactivacionDTO {
         return CampanaReactivacionDTO.builder()
             .idCampana(campana.getIdCampana())
             .token(campana.getToken())
+            .nombreUsuario(campana.getUsuario() != null
+                ? campana.getUsuario().getNombreUsuario() : null)
             .estado(campana.getEstado() != null ? campana.getEstado().name() : null)
             .fechaVencimiento(campana.getFechaVencimiento())
             .vigente(vigente)

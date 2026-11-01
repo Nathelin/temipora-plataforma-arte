@@ -25,6 +25,7 @@ public interface CampanaReactivacionRepository
 
     @Query("""
         SELECT DISTINCT c FROM CampanaReactivacion c
+        JOIN FETCH c.usuario
         LEFT JOIN FETCH c.ofertas o
         LEFT JOIN FETCH o.servicio s
         LEFT JOIN FETCH s.artista

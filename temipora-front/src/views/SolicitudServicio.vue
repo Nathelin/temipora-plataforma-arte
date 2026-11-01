@@ -156,8 +156,21 @@ async function cargar() {
       try {
         const ofertaRes = await api.get(`/ofertas/${idOferta.value}`)
         oferta.value = ofertaRes.data
-      } catch {
+      } catch (e) {
         oferta.value = null
+        const status = e.response?.status
+        if (status === 403) {
+          errorCarga.value =
+            'Esta oferta no pertenece a tu cuenta. Iniciá sesión con la cuenta correcta para usarla.'
+          return
+        }
+        if (status === 404) {
+          errorCarga.value = 'La oferta no existe o ya no está disponible.'
+          return
+        }
+        errorCarga.value =
+          'No pudimos validar la oferta de este link. Probá de nuevo en un rato.'
+        return
       }
     }
     ajustarCantidad()

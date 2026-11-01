@@ -21,16 +21,21 @@ const objetivoAcceso = ref(null)
 const mostrarPrompt = ref(false)
 const procesandoAcceso = ref(false)
 const accesoError = ref('')
+const puedeCanjearAcceso = ref(false)
 
 const token = computed(() => route.params.token || null)
 const esCampana = computed(() => !!token.value)
 const ofertaDestacada = computed(() => String(route.query.oferta || ''))
 
+const cuentaOferta = computed(() => {
+  const objetivo = objetivoAcceso.value?.nombreUsuario
+  return objetivo || campana.value?.nombreUsuario || ''
+})
+
 const mismaCuenta = computed(() => {
-  if (!objetivoAcceso.value) return true
+  if (!cuentaOferta.value) return true
   return !!cuentaActual.value
-    && String(objetivoAcceso.value.nombreUsuario || '').toLowerCase()
-      === cuentaActual.value.toLowerCase()
+    && cuentaOferta.value.toLowerCase() === cuentaActual.value.toLowerCase()
 })
 
 const vigente = computed(() => {
@@ -107,6 +112,7 @@ async function consumirAcceso() {
     accesoError.value = mensajeAcceso(e)
     mostrarPrompt.value = false
     objetivoAcceso.value = null
+    puedeCanjearAcceso.value = false
     limpiarAcceso()
   } finally {
     procesandoAcceso.value = false
@@ -123,6 +129,7 @@ async function procesarAcceso() {
       tokenAcceso: accesoToken.value,
     })
     objetivoAcceso.value = data
+    puedeCanjearAcceso.value = true
     if (!cuentaActual.value) {
       await consumirAcceso()
       return
@@ -134,6 +141,7 @@ async function procesarAcceso() {
     mostrarPrompt.value = true
   } catch (e) {
     accesoError.value = mensajeAcceso(e)
+    puedeCanjearAcceso.value = false
     limpiarAcceso()
   }
 }
@@ -141,6 +149,14 @@ async function procesarAcceso() {
 function seguirConMiCuenta() {
   mostrarPrompt.value = false
   limpiarAcceso()
+}
+
+function cambiarOCuenta() {
+  if (puedeCanjearAcceso.value) {
+    consumirAcceso()
+  } else {
+    irALogin()
+  }
 }
 
 function irALogin() {
@@ -260,20 +276,27 @@ onMounted(async () => {
     </p>
 
     <div
-      v-if="objetivoAcceso && !mismaCuenta && !mostrarPrompt"
+      v-if="cuentaOferta && !mismaCuenta && !mostrarPrompt"
       class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-coral/25 bg-coral/5 px-5 py-4"
     >
       <p class="text-sm leading-relaxed text-granate">
-        Estas ofertas son para <strong>@{{ objetivoAcceso.nombreUsuario }}</strong>.
-        Cambiá de cuenta para solicitar con el descuento.
+        Estas ofertas son para <strong>@{{ cuentaOferta }}</strong>.
+        <span v-if="cuentaActual">Estás con <strong>@{{ cuentaActual }}</strong>.</span>
+        Iniciá sesión con la cuenta correcta para solicitar.
       </p>
       <button
         type="button"
         class="inline-flex min-h-10 items-center rounded-full bg-coral px-5 text-sm font-bold text-white transition hover:bg-rojizo disabled:opacity-60"
         :disabled="procesandoAcceso"
-        @click="consumirAcceso"
+        @click="cambiarOCuenta"
       >
-        {{ procesandoAcceso ? 'Cambiando...' : 'Cambiar de cuenta' }}
+        {{ procesandoAcceso
+          ? 'Procesando...'
+          : puedeCanjearAcceso
+            ? 'Cambiar de cuenta'
+            : autenticado
+              ? 'Iniciar sesión con otra cuenta'
+              : 'Iniciar sesión' }}
       </button>
     </div>
 
@@ -296,7 +319,7 @@ onMounted(async () => {
       </div>
 
       <div
-        v-if="!autenticado"
+        v-if="!autenticado && !cuentaOferta"
         class="mt-8 flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-coral/25 bg-coral/5 px-5 py-4"
       >
         <p class="text-sm leading-relaxed text-granate">
