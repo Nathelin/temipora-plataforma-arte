@@ -41,6 +41,7 @@ import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.QuitarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
 import com.temipora.backend_springboot.servicios.UsuarioService;
+import com.temipora.backend_springboot.servicios.VisitaService;
 
 @WebMvcTest(controllers = UsuarioController.class)
 @Import({ SecurityConfig.class, JwtUtils.class })
@@ -61,6 +62,9 @@ class UsuarioControllerTest {
 
     @MockitoBean
     private UsuarioService usuarioService;
+
+    @MockitoBean
+    private VisitaService visitaService;
 
     @MockitoBean
     private UserDetailsService userDetailsService;

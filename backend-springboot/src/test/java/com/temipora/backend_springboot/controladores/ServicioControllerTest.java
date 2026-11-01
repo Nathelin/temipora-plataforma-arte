@@ -33,6 +33,7 @@ import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.servicios.ServicioBajaService;
 import com.temipora.backend_springboot.servicios.ServicioService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
+import com.temipora.backend_springboot.servicios.VisitaService;
 
 @WebMvcTest(controllers = ServicioController.class)
 @Import({ SecurityConfig.class, JwtUtils.class })
@@ -61,6 +62,9 @@ class ServicioControllerTest {
 
     @MockitoBean
     private UsuarioService usuarioService;
+
+    @MockitoBean
+    private VisitaService visitaService;
 
     @MockitoBean
     private UserDetailsService userDetailsService;

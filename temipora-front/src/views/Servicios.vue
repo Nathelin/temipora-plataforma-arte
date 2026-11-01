@@ -11,9 +11,16 @@ const { exito, error: notificarError } = useNotificaciones()
 const servicios = ref([])
 const tipos = ref([])
 const cargando = ref(true)
+const cargandoMas = ref(false)
 const error = ref('')
 const favoritos = ref(new Set())
 const actualizandoFavorito = ref(new Set())
+const orden = ref('RELEVANCIA')
+const pagina = ref(0)
+const tamanio = 24
+const totalElementos = ref(0)
+const hayMas = ref(false)
+const personalizado = ref(false)
 
 const filtros = ref({
   nombre: '',
@@ -32,13 +39,22 @@ const descripcionTipoSeleccionado = computed(() => {
 
 let secuencia = 0
 
-async function cargar() {
+async function cargar({ reiniciar = true } = {}) {
   const miSecuencia = ++secuencia
-  cargando.value = true
+  if (reiniciar) {
+    pagina.value = 0
+    cargando.value = true
+  } else {
+    cargandoMas.value = true
+  }
   error.value = ''
   try {
     const f = filtros.value
-    const params = {}
+    const params = {
+      orden: orden.value,
+      pagina: pagina.value,
+      tamanio,
+    }
     if (f.nombre.trim()) params.nombre = f.nombre.trim()
     if (f.nombreArtista.trim()) params.nombreArtista = f.nombreArtista.trim()
     if (f.idTipoServicio) params.idTipoServicio = f.idTipoServicio
@@ -49,14 +65,33 @@ async function cargar() {
 
     const res = await api.get('/servicios', { params })
     if (miSecuencia !== secuencia) return
-    servicios.value = res.data
+    const data = res.data || {}
+    const contenido = Array.isArray(data.contenido) ? data.contenido : []
+    servicios.value = reiniciar ? contenido : [...servicios.value, ...contenido]
+    totalElementos.value = data.totalElementos ?? contenido.length
+    hayMas.value = !!data.hayMas
+    personalizado.value = !!data.personalizado
   } catch (e) {
     if (miSecuencia !== secuencia) return
-    servicios.value = []
+    if (reiniciar) {
+      servicios.value = []
+      totalElementos.value = 0
+      hayMas.value = false
+      personalizado.value = false
+    }
     error.value = e.response?.data?.message || 'No se pudieron cargar los servicios.'
   } finally {
-    if (miSecuencia === secuencia) cargando.value = false
+    if (miSecuencia === secuencia) {
+      cargando.value = false
+      cargandoMas.value = false
+    }
   }
+}
+
+async function cargarMas() {
+  if (!hayMas.value || cargandoMas.value || cargando.value) return
+  pagina.value += 1
+  await cargar({ reiniciar: false })
 }
 
 function limpiarFiltros() {
@@ -104,6 +139,11 @@ watch(filtros, () => {
   if (temporizador) clearTimeout(temporizador)
   temporizador = setTimeout(cargar, 350)
 }, { deep: true })
+
+watch(orden, () => {
+  if (temporizador) clearTimeout(temporizador)
+  void cargar()
+})
 
 async function cargarFavoritos() {
   if (!localStorage.getItem('token')) return
@@ -201,6 +241,19 @@ onMounted(async () => {
             ✕
           </button>
         </div>
+
+        <label class="inline-flex items-center">
+          <span class="sr-only">Ordenar resultados</span>
+          <select
+            v-model="orden"
+            class="min-h-10 rounded-full border border-borde/60 bg-crema px-4 text-sm font-semibold text-cafe transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+          >
+            <option value="RELEVANCIA">Para vos</option>
+            <option value="NOMBRE">Nombre</option>
+            <option value="PRECIO_ASC">Precio: menor a mayor</option>
+            <option value="PRECIO_DESC">Precio: mayor a menor</option>
+          </select>
+        </label>
 
         <button
           type="button"
@@ -311,10 +364,20 @@ onMounted(async () => {
       <p v-else-if="error" class="rounded-3xl border border-rojizo/20 bg-rojizo/5 px-6 py-12 text-center text-rojizo">{{ error }}</p>
 
       <template v-else>
-        <div v-if="servicios.length" class="mb-4 flex items-center justify-between gap-4">
-          <p class="text-sm text-cafe/60">
-            {{ servicios.length }} {{ servicios.length === 1 ? 'servicio' : 'servicios' }} para explorar
-          </p>
+        <div v-if="servicios.length" class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <p class="text-sm text-cafe/60">
+              {{ totalElementos }} {{ totalElementos === 1 ? 'servicio' : 'servicios' }} para explorar
+            </p>
+            <span
+              v-if="personalizado && orden === 'RELEVANCIA'"
+              class="inline-flex items-center gap-1.5 rounded-full bg-mantequilla px-3 py-1 text-xs font-bold text-tinta"
+              title="Usamos tus favoritos, pedidos y visitas para ordenar los resultados."
+            >
+              <span aria-hidden="true">✦</span>
+              Ordenado para vos
+            </span>
+          </div>
           <button
             v-if="hayFiltrosActivos"
             type="button"
@@ -345,6 +408,17 @@ onMounted(async () => {
             :actualizando-favorito="actualizandoFavorito.has(s.idServicio)"
             @alternar-favorito="alternarFavorito"
           />
+        </div>
+
+        <div v-if="hayMas" class="mt-8 flex justify-center">
+          <button
+            type="button"
+            class="inline-flex min-h-11 items-center rounded-full bg-coral px-6 text-sm font-bold text-white shadow-sm transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="cargandoMas"
+            @click="cargarMas"
+          >
+            {{ cargandoMas ? 'Cargando...' : 'Cargar más servicios' }}
+          </button>
         </div>
       </template>
     </div>

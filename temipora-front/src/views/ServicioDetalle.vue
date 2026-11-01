@@ -8,6 +8,7 @@ import ResumenResenias from '../components/ResumenResenias.vue'
 import TarjetaReseniaPublica from '../components/TarjetaReseniaPublica.vue'
 import ModalResenias from '../components/ModalResenias.vue'
 import VisorImagenes from '../components/VisorImagenes.vue'
+import TarjetaArtistaRecomendado from '../components/TarjetaArtistaRecomendado.vue'
 import {
   cargarReseniasServicio,
   cargarResumenReseniasArtista,
@@ -34,6 +35,7 @@ const actualizandoFavorito = ref(false)
 
 const artista = ref(null)
 const resumenArtista = ref(null)
+const artistasSimilares = ref([])
 
 const resumenResenias = ref(null)
 const reseniasPreview = ref([])
@@ -283,6 +285,15 @@ function aplicarSolicitudPublica(data) {
   terminosValidos.value = !!data.terminosValidos
 }
 
+async function cargarSimilares() {
+  try {
+    const res = await api.get(`/servicios/${route.params.id}/similares`)
+    artistasSimilares.value = Array.isArray(res.data) ? res.data : []
+  } catch {
+    artistasSimilares.value = []
+  }
+}
+
 async function cargarEstadoFavorito() {
   esFavorito.value = false
   if (!puedeMarcarFavorito.value) return
@@ -465,6 +476,7 @@ onMounted(async () => {
   await cargar()
   if (servicio.value) {
     void cargarArtista()
+    void cargarSimilares()
     await cargarReseniasPreview()
   }
   void cargarEstadoFavorito()
@@ -968,6 +980,36 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
               :ocultar-vacios="true"
             />
           </div>
+        </div>
+      </section>
+
+      <section v-if="artistasSimilares.length" class="mt-12">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-coral">
+              Para seguir explorando
+            </p>
+            <h2 class="mt-2 font-display text-3xl font-extrabold text-granate sm:text-4xl">
+              Artistas similares
+            </h2>
+            <p class="mt-1 text-sm text-cafe/60">
+              Mismo estilo o rango de precio, con cupos disponibles.
+            </p>
+          </div>
+          <router-link
+            to="/servicios"
+            class="text-sm font-bold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
+          >
+            Ver todos →
+          </router-link>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          <TarjetaArtistaRecomendado
+            v-for="recomendado in artistasSimilares"
+            :key="recomendado.idArtista"
+            :artista="recomendado"
+          />
         </div>
       </section>
 

@@ -2,6 +2,8 @@ package com.temipora.backend_springboot.modelo;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,4 +23,7 @@ public class PaginaDTO<T> {
     private long totalElementos;
     private int totalPaginas;
     private boolean hayMas;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Boolean personalizado;
 }

@@ -27,7 +27,8 @@ public interface ServicioRepository extends JpaRepository<Servicio, Long>, JpaSp
         "moneda",
         "imagenes",
         "etiquetas",
-        "etiquetas.etiqueta"
+        "etiquetas.etiqueta",
+        "etiquetas.etiqueta.categoria"
     })
     List<Servicio> findByIdServicioIn(Collection<Long> ids);
 
@@ -35,10 +36,26 @@ public interface ServicioRepository extends JpaRepository<Servicio, Long>, JpaSp
     @Query("SELECT s FROM Servicio s WHERE s.idServicio = :idServicio")
     Optional<Servicio> findByIdServicioForUpdate(@Param("idServicio") Long idServicio);
 
+    @EntityGraph(attributePaths = {
+        "artista",
+        "imagenes",
+        "etiquetas",
+        "etiquetas.etiqueta",
+        "etiquetas.etiqueta.categoria"
+    })
     List<Servicio> findByArtistaIdUsuarioAndEstadoNotOrderByNombreAsc(
             Long idUsuario, EstadoServicio estado);
 
-    @EntityGraph(attributePaths = { "artista", "tipoServicio", "etiquetas", "etiquetas.etiqueta" })
+    @EntityGraph(attributePaths = {
+        "artista",
+        "tipoServicio",
+        "medio",
+        "moneda",
+        "imagenes",
+        "etiquetas",
+        "etiquetas.etiqueta",
+        "etiquetas.etiqueta.categoria"
+    })
     List<Servicio> findByArtistaIdUsuarioInAndEstado(
             Collection<Long> idsArtista, EstadoServicio estado);
 
