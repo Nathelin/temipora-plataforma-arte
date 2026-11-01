@@ -147,6 +147,9 @@ public class ReactivacionProcesador {
         campana.setFechaCreacion(ahora);
         campana.setFechaVencimiento(
             ahora.plusHours(Math.max(1, config.getVigenciaHoras())));
+        String tokenAcceso = TokenAccesoOferta.generar();
+        campana.setTokenAccesoHash(TokenAccesoOferta.hash(tokenAcceso));
+        campana.setTokenAccesoExpira(campana.getFechaVencimiento());
 
         for (RecomendacionService.ServicioPuntuado item : seleccionados) {
             Servicio servicio = item.servicio();
@@ -176,7 +179,7 @@ public class ReactivacionProcesador {
             TIPO_REFERENCIA);
 
         if (usuario.isRecibirEmailsPromocionales()) {
-            enviarEmail(usuario, campana, motivos);
+            enviarEmail(usuario, campana, motivos, tokenAcceso);
         }
 
         log.info("Campaña {} generada para el usuario {} con {} oferta(s).",
@@ -187,7 +190,8 @@ public class ReactivacionProcesador {
     private void enviarEmail(
             Usuario usuario,
             CampanaReactivacion campana,
-            Map<Long, String> motivos) {
+            Map<Long, String> motivos,
+            String tokenAcceso) {
         if (usuario.getTokenBajaEmail() == null
                 || usuario.getTokenBajaEmail().isBlank()) {
             usuario.setTokenBajaEmail(UUID.randomUUID().toString());
@@ -204,7 +208,8 @@ public class ReactivacionProcesador {
                 imagen = servicio.getImagenes().get(0).getUrl();
             }
             String url = baseUrl + "/ofertas/" + campana.getToken()
-                + "?oferta=" + oferta.getIdOferta();
+                + "?acceso=" + tokenAcceso
+                + "&oferta=" + oferta.getIdOferta();
             ofertas.add(new OfertaEmail(
                 oferta.getIdOferta(),
                 servicio.getNombre(),

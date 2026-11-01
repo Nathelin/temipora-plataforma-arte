@@ -60,6 +60,8 @@ public class SecurityConfig {
                     "/",
                     "/api/auth/login",
                     "/api/auth/registrarse",
+                    "/api/auth/acceso-oferta",
+                    "/api/auth/acceso-oferta/**",
                     "/api/upload",
                     "/api/checkNombreUsuario",
                     "/uploads/**",

@@ -3,18 +3,35 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
+import { useSesion } from '../composables/useSesion'
 
 const route = useRoute()
 const router = useRouter()
+const { guardarSesion, usuarioActual, estaAutenticado } = useSesion()
 
 const ofertas = ref([])
 const campana = ref(null)
 const cargando = ref(true)
 const error = ref('')
-const autenticado = ref(!!localStorage.getItem('token'))
+const autenticado = ref(estaAutenticado())
+const cuentaActual = ref(usuarioActual())
+
+const accesoToken = ref('')
+const objetivoAcceso = ref(null)
+const mostrarPrompt = ref(false)
+const procesandoAcceso = ref(false)
+const accesoError = ref('')
 
 const token = computed(() => route.params.token || null)
 const esCampana = computed(() => !!token.value)
+const ofertaDestacada = computed(() => String(route.query.oferta || ''))
+
+const mismaCuenta = computed(() => {
+  if (!objetivoAcceso.value) return true
+  return !!cuentaActual.value
+    && String(objetivoAcceso.value.nombreUsuario || '').toLowerCase()
+      === cuentaActual.value.toLowerCase()
+})
 
 const vigente = computed(() => {
   if (esCampana.value) return !!campana.value?.vigente
@@ -54,8 +71,87 @@ function inicial(oferta) {
   return String(nombre).charAt(0).toUpperCase()
 }
 
+function urlSinAcceso() {
+  const query = { ...route.query }
+  delete query.acceso
+  return router.resolve({
+    name: route.name,
+    params: route.params,
+    query,
+  }).href
+}
+
+function limpiarAcceso() {
+  const query = { ...route.query }
+  delete query.acceso
+  router.replace({ query })
+}
+
+function mensajeAcceso(e) {
+  return e.response?.data?.message
+    || 'El enlace de acceso venció o ya fue usado. Iniciá sesión manualmente.'
+}
+
+async function consumirAcceso() {
+  if (!accesoToken.value) return
+  procesandoAcceso.value = true
+  accesoError.value = ''
+  try {
+    const { data } = await api.post('/auth/acceso-oferta', {
+      tokenCampana: token.value,
+      tokenAcceso: accesoToken.value,
+    })
+    guardarSesion(data)
+    window.location.replace(urlSinAcceso())
+  } catch (e) {
+    accesoError.value = mensajeAcceso(e)
+    mostrarPrompt.value = false
+    objetivoAcceso.value = null
+    limpiarAcceso()
+  } finally {
+    procesandoAcceso.value = false
+  }
+}
+
+async function procesarAcceso() {
+  const acceso = route.query.acceso
+  if (!acceso || !esCampana.value) return
+  accesoToken.value = String(acceso)
+  try {
+    const { data } = await api.post('/auth/acceso-oferta/verificar', {
+      tokenCampana: token.value,
+      tokenAcceso: accesoToken.value,
+    })
+    objetivoAcceso.value = data
+    if (!cuentaActual.value) {
+      await consumirAcceso()
+      return
+    }
+    if (mismaCuenta.value) {
+      limpiarAcceso()
+      return
+    }
+    mostrarPrompt.value = true
+  } catch (e) {
+    accesoError.value = mensajeAcceso(e)
+    limpiarAcceso()
+  }
+}
+
+function seguirConMiCuenta() {
+  mostrarPrompt.value = false
+  limpiarAcceso()
+}
+
 function irALogin() {
-  router.push({ name: 'login', query: { redirect: route.fullPath } })
+  const query = { ...route.query }
+  delete query.acceso
+  const redirect = router.resolve({
+    name: route.name,
+    params: route.params,
+    query,
+  }).href
+  router.push({ name: 'login', query: { redirect } })
 }
 
 function solicitar(oferta) {
@@ -63,7 +159,7 @@ function solicitar(oferta) {
     irALogin()
     return
   }
-  if (!oferta?.vigente) return
+  if (!mismaCuenta.value || !oferta?.vigente) return
   router.push({
     name: 'solicitud-servicio',
     params: { id: oferta.idServicio },
@@ -72,7 +168,11 @@ function solicitar(oferta) {
 }
 
 function verServicio(oferta) {
-  router.push({ name: 'servicio-detalle', params: { id: oferta.idServicio } })
+  router.push({
+    name: 'servicio-detalle',
+    params: { id: oferta.idServicio },
+    query: oferta.idOferta ? { oferta: oferta.idOferta } : {},
+  })
 }
 
 async function cargar() {
@@ -96,7 +196,10 @@ async function cargar() {
   }
 }
 
-onMounted(cargar)
+onMounted(async () => {
+  await cargar()
+  await procesarAcceso()
+})
 </script>
 
 <template>
@@ -120,6 +223,58 @@ onMounted(cargar)
       >
         Seguir explorando →
       </router-link>
+    </div>
+
+    <div
+      v-if="mostrarPrompt"
+      class="mt-6 rounded-[24px] border border-coral/30 bg-coral/5 px-5 py-4"
+    >
+      <p class="text-sm leading-relaxed text-granate">
+        Esta oferta es para <strong>@{{ objetivoAcceso?.nombreUsuario }}</strong>,
+        pero estás con <strong>@{{ cuentaActual }}</strong>. ¿Querés cambiar de cuenta?
+      </p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="inline-flex min-h-10 items-center rounded-full bg-coral px-5 text-sm font-bold text-white transition hover:bg-rojizo disabled:opacity-60"
+          :disabled="procesandoAcceso"
+          @click="consumirAcceso"
+        >
+          {{ procesandoAcceso ? 'Cambiando...' : 'Cambiar de cuenta' }}
+        </button>
+        <button
+          type="button"
+          class="inline-flex min-h-10 items-center rounded-full border border-coral/40 px-5 text-sm font-bold text-coral transition hover:bg-coral/5"
+          @click="seguirConMiCuenta"
+        >
+          Seguir con mi cuenta
+        </button>
+      </div>
+    </div>
+
+    <p
+      v-if="accesoError"
+      class="mt-6 rounded-2xl border border-rojizo/20 bg-rojizo/5 px-4 py-3 text-sm text-rojizo"
+    >
+      {{ accesoError }}
+    </p>
+
+    <div
+      v-if="objetivoAcceso && !mismaCuenta && !mostrarPrompt"
+      class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-coral/25 bg-coral/5 px-5 py-4"
+    >
+      <p class="text-sm leading-relaxed text-granate">
+        Estas ofertas son para <strong>@{{ objetivoAcceso.nombreUsuario }}</strong>.
+        Cambiá de cuenta para solicitar con el descuento.
+      </p>
+      <button
+        type="button"
+        class="inline-flex min-h-10 items-center rounded-full bg-coral px-5 text-sm font-bold text-white transition hover:bg-rojizo disabled:opacity-60"
+        :disabled="procesandoAcceso"
+        @click="consumirAcceso"
+      >
+        {{ procesandoAcceso ? 'Cambiando...' : 'Cambiar de cuenta' }}
+      </button>
     </div>
 
     <div v-if="cargando" class="flex flex-col items-center justify-center py-20 text-cafe/60">
@@ -193,6 +348,7 @@ onMounted(cargar)
           v-for="oferta in ofertas"
           :key="oferta.idOferta"
           class="flex h-full flex-col overflow-hidden rounded-[28px] border border-borde/60 bg-superficie shadow-[0_12px_30px_rgba(74,29,46,0.08)]"
+          :class="{ 'ring-2 ring-coral/60': String(oferta.idOferta) === ofertaDestacada }"
         >
           <div class="relative aspect-[4/3] overflow-hidden bg-rosa/30">
             <img
@@ -263,7 +419,7 @@ onMounted(cargar)
                 <button
                   type="button"
                   class="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-coral px-4 text-sm font-bold text-white transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 disabled:cursor-not-allowed disabled:opacity-50"
-                  :disabled="!oferta.vigente"
+                  :disabled="!oferta.vigente || (autenticado && !mismaCuenta)"
                   @click="solicitar(oferta)"
                 >
                   {{ autenticado ? 'Solicitar con descuento' : 'Iniciar sesión' }}

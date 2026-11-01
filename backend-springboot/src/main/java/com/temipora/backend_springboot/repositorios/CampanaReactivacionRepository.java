@@ -4,16 +4,24 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.CampanaReactivacion;
 import com.temipora.backend_springboot.modelo.EstadoCampanaReactivacion;
 
+import jakarta.persistence.LockModeType;
+
 public interface CampanaReactivacionRepository
         extends JpaRepository<CampanaReactivacion, Long> {
 
     Optional<CampanaReactivacion> findByToken(String token);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM CampanaReactivacion c WHERE c.token = :token")
+    Optional<CampanaReactivacion> findByTokenParaActualizar(
+        @Param("token") String token);
 
     @Query("""
         SELECT DISTINCT c FROM CampanaReactivacion c

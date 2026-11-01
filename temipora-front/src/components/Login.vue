@@ -2,11 +2,13 @@
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
+import { useSesion } from '../composables/useSesion'
 import fondo from '../assets/fondos/prueba.png'
 import welcomeLogo from '../assets/welcome logo.png'
 
 const router = useRouter()
 const route = useRoute()
+const { guardarSesion } = useSesion()
 const nombreUsuario = ref('')
 const contrasenia = ref('')
 const error = ref('')
@@ -22,15 +24,8 @@ async function iniciarSesion() {
       contrasenia: contrasenia.value,
     })
 
-    const token = res.data.token
     const rol = res.data.rol
-    const usuario = res.data.NombreUsuario
-
-    localStorage.setItem('token', token)
-    localStorage.setItem('rol', rol)
-    localStorage.setItem('nombreUsuario', usuario)
-    localStorage.setItem('idUsuario', res.data.idUsuario ?? '')
-    localStorage.setItem('urlFotoPerfil', res.data.urlFotoPerfil ?? '')
+    guardarSesion(res.data)
 
     const redirect = route.query.redirect
     if (redirect) {

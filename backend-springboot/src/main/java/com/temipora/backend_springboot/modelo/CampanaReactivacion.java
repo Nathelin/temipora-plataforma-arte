@@ -51,6 +51,15 @@ public class CampanaReactivacion {
     @Column(name = "fecha_vencimiento", nullable = false)
     private LocalDateTime fechaVencimiento;
 
+    @Column(name = "token_acceso_hash", length = 64)
+    private String tokenAccesoHash;
+
+    @Column(name = "token_acceso_expira")
+    private LocalDateTime tokenAccesoExpira;
+
+    @Column(name = "token_acceso_usado_en")
+    private LocalDateTime tokenAccesoUsadoEn;
+
     @OneToMany(mappedBy = "campana", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("idOferta ASC")
     private List<OfertaReactivacion> ofertas = new ArrayList<>();
