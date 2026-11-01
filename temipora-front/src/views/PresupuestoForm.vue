@@ -576,7 +576,7 @@ function anterior() {
 
 function volver() {
   router.push({
-    name: 'solicitud-detalle',
+    name: 'panel-solicitud-detalle',
     params: { idSolicitud: idSolicitud.value },
   })
 }
@@ -614,7 +614,7 @@ async function enviar() {
     await api.post(`/solicitudes-servicio/${idSolicitud.value}/presupuesto`, payload)
     exito('Presupuesto enviado. El cliente ya recibió la notificación.')
     router.push({
-      name: 'solicitud-detalle',
+      name: 'panel-solicitud-detalle',
       params: { idSolicitud: idSolicitud.value },
     })
   } catch (e) {

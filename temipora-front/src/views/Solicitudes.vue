@@ -197,7 +197,7 @@ onMounted(cargar)
         <ul v-else class="mt-4 space-y-3">
           <li v-for="solicitud in solicitudesFiltradas" :key="solicitud.idSolicitud">
           <router-link
-            :to="{ name: 'solicitud-detalle', params: { idSolicitud: solicitud.idSolicitud } }"
+            :to="{ name: esBandejaRecibidas ? 'panel-solicitud-detalle' : 'solicitud-detalle', params: { idSolicitud: solicitud.idSolicitud } }"
             class="group flex flex-col gap-4 rounded-2xl border border-rosa/50 bg-blanco p-4 transition hover:border-coral/40 hover:bg-rosa/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/50 sm:flex-row sm:items-center sm:justify-between sm:p-5"
           >
             <div class="flex min-w-0 items-start gap-3">

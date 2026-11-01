@@ -48,17 +48,17 @@ function destinoDe(notificacion) {
 
   if (tipo === 'SOLICITUD') {
     if (rol === 'ADMIN') return null
-    return { name: 'solicitud-detalle', params: { idSolicitud: id } }
+    return notificacion.rolReferencia === 'ARTISTA'
+      ? { name: 'panel-solicitud-detalle', params: { idSolicitud: id } }
+      : { name: 'solicitud-detalle', params: { idSolicitud: id } }
   }
 
   if (rol === 'ADMIN') {
     return { name: 'admin-pedido-detalle', params: { idPedido: id } }
   }
-  if (rol === 'ARTISTA'
-    && router.currentRoute.value.path.startsWith('/panel')) {
-    return { name: 'panel-pedido-detalle', params: { idPedido: id } }
-  }
-  return { name: 'pedido-detalle', params: { idPedido: id } }
+  return notificacion.rolReferencia === 'ARTISTA'
+    ? { name: 'panel-pedido-detalle', params: { idPedido: id } }
+    : { name: 'pedido-detalle', params: { idPedido: id } }
 }
 
 function textoDestino(notificacion) {

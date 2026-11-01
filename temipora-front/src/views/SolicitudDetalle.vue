@@ -269,7 +269,7 @@ function irAlChat() {
     return
   }
   router.push({
-    name: 'conversacion',
+    name: route.path.startsWith('/panel') ? 'panel-conversacion' : 'conversacion',
     params: { idConversacion },
     query: { volverA: 'solicitud', idSolicitud: solicitud.value.idSolicitud },
   })

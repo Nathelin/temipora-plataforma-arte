@@ -14,6 +14,8 @@ import com.temipora.backend_springboot.modelo.TipoNotificacion;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.NotificacionRepository;
 import com.temipora.backend_springboot.repositorios.NotificacionUsuarioRepository;
+import com.temipora.backend_springboot.repositorios.PedidoRepository;
+import com.temipora.backend_springboot.repositorios.SolicitudRepository;
 import com.temipora.backend_springboot.repositorios.TipoNotificacionRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -27,16 +29,22 @@ public class NotificacionService {
     private final NotificacionUsuarioRepository notificacionUsuarioRepository;
     private final TipoNotificacionRepository tipoNotificacionRepository;
     private final UsuarioRepository usuarioRepository;
+    private final PedidoRepository pedidoRepository;
+    private final SolicitudRepository solicitudRepository;
 
     public NotificacionService(
             NotificacionRepository notificacionRepository,
             NotificacionUsuarioRepository notificacionUsuarioRepository,
             TipoNotificacionRepository tipoNotificacionRepository,
-            UsuarioRepository usuarioRepository) {
+            UsuarioRepository usuarioRepository,
+            PedidoRepository pedidoRepository,
+            SolicitudRepository solicitudRepository) {
         this.notificacionRepository = notificacionRepository;
         this.notificacionUsuarioRepository = notificacionUsuarioRepository;
         this.tipoNotificacionRepository = tipoNotificacionRepository;
         this.usuarioRepository = usuarioRepository;
+        this.pedidoRepository = pedidoRepository;
+        this.solicitudRepository = solicitudRepository;
     }
 
     @Transactional
@@ -73,7 +81,7 @@ public class NotificacionService {
     @Transactional(readOnly = true)
     public List<NotificacionDTO> listar(Long idUsuario) {
         return notificacionUsuarioRepository.listarPorUsuario(idUsuario).stream()
-            .map(NotificacionDTO::desdeNotificacionUsuario)
+            .map(destinatario -> aDTO(destinatario, idUsuario))
             .toList();
     }
 
@@ -92,7 +100,50 @@ public class NotificacionService {
             destinatario.setLeida(true);
             destinatario.setFechaLectura(LocalDateTime.now());
         }
-        return NotificacionDTO.desdeNotificacionUsuario(destinatario);
+        return aDTO(destinatario, idUsuario);
+    }
+
+    private NotificacionDTO aDTO(NotificacionUsuario destinatario, Long idUsuario) {
+        NotificacionDTO dto = NotificacionDTO.desdeNotificacionUsuario(destinatario);
+        completarRolReferencia(dto, idUsuario);
+        return dto;
+    }
+
+    private void completarRolReferencia(NotificacionDTO dto, Long idUsuario) {
+        if (dto == null || idUsuario == null
+                || dto.getTipoReferencia() == null || dto.getIdReferencia() == null) {
+            return;
+        }
+        String rol = switch (dto.getTipoReferencia()) {
+            case "PEDIDO" -> rolEnPedido(dto.getIdReferencia(), idUsuario);
+            case "SOLICITUD" -> rolEnSolicitud(dto.getIdReferencia(), idUsuario);
+            default -> null;
+        };
+        dto.setRolReferencia(rol);
+    }
+
+    private String rolEnPedido(Long idPedido, Long idUsuario) {
+        return pedidoRepository.findById(idPedido)
+            .map(pedido -> rolEnReferencia(
+                idUsuario, pedido.getArtista(), pedido.getCliente()))
+            .orElse(null);
+    }
+
+    private String rolEnSolicitud(Long idSolicitud, Long idUsuario) {
+        return solicitudRepository.findById(idSolicitud)
+            .map(solicitud -> rolEnReferencia(
+                idUsuario, solicitud.getArtista(), solicitud.getCliente()))
+            .orElse(null);
+    }
+
+    private String rolEnReferencia(Long idUsuario, Usuario artista, Usuario cliente) {
+        if (artista != null && idUsuario.equals(artista.getIdUsuario())) {
+            return "ARTISTA";
+        }
+        if (cliente != null && idUsuario.equals(cliente.getIdUsuario())) {
+            return "CLIENTE";
+        }
+        return null;
     }
 
     private String limitar(String valor, int largo) {
