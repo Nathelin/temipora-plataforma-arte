@@ -78,6 +78,8 @@ public class SecurityConfig {
                     "/api/terminos-plataforma",
                     "/api/comisiones/**",
                     "/api/configuracion-pedido",
+                    "/api/ofertas/campana/**",
+                    "/api/emails/baja/**",
                     "/api/pagos/mercadopago/webhook",
                     "/api/pagos/mercadopago/oauth/callback"
                 ).permitAll()

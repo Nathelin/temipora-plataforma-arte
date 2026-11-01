@@ -38,6 +38,15 @@ public class PresupuestoDTO {
     private BigDecimal precioFinalMostrado;
     private String monedaMostrada;
 
+    // Descuento de reactivación congelado en el presupuesto.
+    private BigDecimal descuentoPorcentaje;
+    private BigDecimal descuentoMonto;
+    private BigDecimal descuentoMontoCobro;
+    private BigDecimal descuentoMostrado;
+    private BigDecimal precioFinalCliente;
+    private BigDecimal precioFinalClienteCobro;
+    private BigDecimal precioFinalClienteMostrado;
+
     // Comisión de la plataforma, descontada del precio del artista.
     // Solo se envía al artista dueño o a un admin: el cliente no debe verla.
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -98,6 +107,17 @@ public class PresupuestoDTO {
         Moneda cobro = presupuesto.getMonedaCobro();
         Moneda destino = monedaDestino != null ? monedaDestino : origen;
 
+        // Compatibilidad con presupuestos creados antes de la V58: si el
+        // importe del cliente quedó en cero, se usa el bruto del artista.
+        BigDecimal finalCliente = presupuesto.getPrecioFinalCliente();
+        if (finalCliente == null || finalCliente.signum() == 0) {
+            finalCliente = presupuesto.getPrecioFinal();
+        }
+        BigDecimal finalClienteCobro = presupuesto.getPrecioFinalClienteCobro();
+        if (finalClienteCobro == null || finalClienteCobro.signum() == 0) {
+            finalClienteCobro = presupuesto.getPrecioFinalCobro();
+        }
+
         boolean muestraOrigen = mismaMoneda(destino, origen);
         boolean muestraCobro = !muestraOrigen && mismaMoneda(destino, cobro);
         String codigoMostrado = destino != null
@@ -114,6 +134,20 @@ public class PresupuestoDTO {
         BigDecimal finalMostrado = totalMostrado(
             presupuesto.getPrecioFinal(),
             presupuesto.getPrecioFinalCobro(),
+            muestraOrigen,
+            muestraCobro,
+            factorCobroDestino,
+            factorOrigenDestino);
+        BigDecimal descuentoMostrado = totalMostrado(
+            presupuesto.getDescuentoMonto(),
+            presupuesto.getDescuentoMontoCobro(),
+            muestraOrigen,
+            muestraCobro,
+            factorCobroDestino,
+            factorOrigenDestino);
+        BigDecimal finalClienteMostrado = totalMostrado(
+            finalCliente,
+            finalClienteCobro,
             muestraOrigen,
             muestraCobro,
             factorCobroDestino,
@@ -157,6 +191,13 @@ public class PresupuestoDTO {
             .precioBaseTotalMostrado(baseMostrado)
             .precioFinalMostrado(finalMostrado)
             .monedaMostrada(codigoMostrado)
+            .descuentoPorcentaje(presupuesto.getDescuentoPorcentaje())
+            .descuentoMonto(presupuesto.getDescuentoMonto())
+            .descuentoMontoCobro(presupuesto.getDescuentoMontoCobro())
+            .descuentoMostrado(descuentoMostrado)
+            .precioFinalCliente(finalCliente)
+            .precioFinalClienteCobro(finalClienteCobro)
+            .precioFinalClienteMostrado(finalClienteMostrado)
             .comisionPorcentaje(incluirComision
                 ? presupuesto.getComisionPorcentaje() : null)
             .comisionMonto(incluirComision

@@ -37,6 +37,24 @@ public final class HitoCalculadora {
             BigDecimal comisionMonto,
             BigDecimal comisionMontoCobro,
             Limites limites) {
+        return construir(requests, precioFinal, precioFinalCobro,
+            comisionMonto, comisionMontoCobro, BigDecimal.ZERO, limites);
+    }
+
+    /**
+     * Construye el plan de pagos aplicando un descuento financiado por la
+     * plataforma. El monto del cliente y la comisión bajan; el neto del
+     * artista queda igual que sin descuento. El último hito absorbe el
+     * redondeo para que la suma cierre exacta.
+     */
+    public static List<HitoPresupuesto> construir(
+            List<HitoPresupuestoRequest> requests,
+            BigDecimal precioFinal,
+            BigDecimal precioFinalCobro,
+            BigDecimal comisionMonto,
+            BigDecimal comisionMontoCobro,
+            BigDecimal descuentoPorcentaje,
+            Limites limites) {
 
         List<HitoPresupuestoRequest> normalizados = normalizar(requests);
         int maxHitos = limites != null && limites.maxHitos() > 0
@@ -81,11 +99,18 @@ public final class HitoCalculadora {
             }
         }
 
+        BigDecimal descuentoTotal = calcularDescuento(
+            precioFinal, comisionMonto, descuentoPorcentaje);
+        BigDecimal descuentoTotalCobro = calcularDescuento(
+            precioFinalCobro, comisionMontoCobro, descuentoPorcentaje);
+
         List<HitoPresupuesto> hitos = new ArrayList<>();
         BigDecimal acumuladoMonto = BigDecimal.ZERO;
         BigDecimal acumuladoCobro = BigDecimal.ZERO;
         BigDecimal acumuladoComision = BigDecimal.ZERO;
         BigDecimal acumuladoComisionCobro = BigDecimal.ZERO;
+        BigDecimal acumuladoDescuento = BigDecimal.ZERO;
+        BigDecimal acumuladoDescuentoCobro = BigDecimal.ZERO;
 
         for (int i = 0; i < porcentajes.size(); i++) {
             BigDecimal porcentaje = porcentajes.get(i);
@@ -108,6 +133,24 @@ public final class HitoCalculadora {
                     || comision.signum() < 0 || comisionCobro.signum() < 0) {
                 throw new IllegalArgumentException(
                     "Los porcentajes de los hitos no son válidos.");
+            }
+
+            BigDecimal descuento = ultimo
+                ? descuentoTotal.subtract(acumuladoDescuento)
+                : parte(descuentoTotal, porcentaje);
+            BigDecimal descuentoCobro = ultimo
+                ? descuentoTotalCobro.subtract(acumuladoDescuentoCobro)
+                : parte(descuentoTotalCobro, porcentaje);
+            descuento = descuento.min(comision).max(BigDecimal.ZERO);
+            descuentoCobro = descuentoCobro.min(comisionCobro).max(BigDecimal.ZERO);
+
+            BigDecimal montoCliente = monto.subtract(descuento);
+            BigDecimal montoCobroCliente = montoCobro.subtract(descuentoCobro);
+            BigDecimal comisionCliente = comision.subtract(descuento);
+            BigDecimal comisionCobroCliente = comisionCobro.subtract(descuentoCobro);
+            if (montoCliente.signum() < 0 || montoCobroCliente.signum() < 0) {
+                throw new IllegalArgumentException(
+                    "El descuento no puede superar el importe del hito.");
             }
 
             if (porcentajes.size() > 1 && limites != null
@@ -143,14 +186,14 @@ public final class HitoCalculadora {
             hito.setDescripcion(descripcion);
             hito.setTipo(tipo);
             hito.setPorcentaje(porcentaje);
-            hito.setMonto(monto.setScale(2, RoundingMode.HALF_UP));
-            hito.setMontoCobro(montoCobro.setScale(2, RoundingMode.HALF_UP));
-            hito.setComisionMonto(comision.setScale(2, RoundingMode.HALF_UP));
+            hito.setMonto(montoCliente.setScale(2, RoundingMode.HALF_UP));
+            hito.setMontoCobro(montoCobroCliente.setScale(2, RoundingMode.HALF_UP));
+            hito.setComisionMonto(comisionCliente.setScale(2, RoundingMode.HALF_UP));
             hito.setComisionMontoCobro(
-                comisionCobro.setScale(2, RoundingMode.HALF_UP));
-            hito.setMontoNeto(monto.subtract(comision)
+                comisionCobroCliente.setScale(2, RoundingMode.HALF_UP));
+            hito.setMontoNeto(montoCliente.subtract(comisionCliente)
                 .setScale(2, RoundingMode.HALF_UP));
-            hito.setMontoNetoCobro(montoCobro.subtract(comisionCobro)
+            hito.setMontoNetoCobro(montoCobroCliente.subtract(comisionCobroCliente)
                 .setScale(2, RoundingMode.HALF_UP));
             hito.setRequiereEntrega(requiereEntrega);
             hitos.add(hito);
@@ -159,9 +202,25 @@ public final class HitoCalculadora {
             acumuladoCobro = acumuladoCobro.add(montoCobro);
             acumuladoComision = acumuladoComision.add(comision);
             acumuladoComisionCobro = acumuladoComisionCobro.add(comisionCobro);
+            acumuladoDescuento = acumuladoDescuento.add(descuento);
+            acumuladoDescuentoCobro = acumuladoDescuentoCobro.add(descuentoCobro);
         }
 
         return hitos;
+    }
+
+    private static BigDecimal calcularDescuento(
+            BigDecimal total,
+            BigDecimal comision,
+            BigDecimal porcentaje) {
+        if (total == null || comision == null || porcentaje == null
+                || porcentaje.signum() <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal limitado = porcentaje.min(CIEN);
+        BigDecimal descuento = parte(total, limitado);
+        return descuento.min(comision).max(BigDecimal.ZERO)
+            .setScale(2, RoundingMode.HALF_UP);
     }
 
     private static List<HitoPresupuestoRequest> normalizar(

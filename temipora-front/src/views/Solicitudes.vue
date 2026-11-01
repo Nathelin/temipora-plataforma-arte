@@ -257,11 +257,13 @@ onMounted(cargar)
                   {{ estadoDe(solicitud.estado).texto }}
                 </span>
                 <span
-                  v-if="(solicitud.precioFinalMostrado ?? solicitud.precioFinal) != null"
+                  v-if="(solicitud.precioFinalClienteMostrado ?? solicitud.precioFinalMostrado ?? solicitud.precioFinal) != null"
                   class="text-xs font-semibold text-coral"
                 >
                   Presupuesto: {{ formatearPrecio(
-                    solicitud.precioFinalMostrado ?? solicitud.precioFinal,
+                    solicitud.precioFinalClienteMostrado
+                      ?? solicitud.precioFinalMostrado
+                      ?? solicitud.precioFinal,
                     solicitud.monedaMostrada ?? solicitud.moneda,
                   ) }}
                 </span>

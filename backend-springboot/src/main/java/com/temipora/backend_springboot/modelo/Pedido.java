@@ -92,6 +92,25 @@ public class Pedido {
     @Column(name = "comision_porcentaje", nullable = false, precision = 5, scale = 2)
     private BigDecimal comisionPorcentaje;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_oferta_reactivacion")
+    private OfertaReactivacion ofertaReactivacion;
+
+    @Column(name = "descuento_porcentaje", nullable = false, precision = 5, scale = 2)
+    private BigDecimal descuentoPorcentaje = BigDecimal.ZERO.setScale(2);
+
+    @Column(name = "descuento_monto", nullable = false, precision = 12, scale = 2)
+    private BigDecimal descuentoMonto = BigDecimal.ZERO.setScale(2);
+
+    @Column(name = "descuento_monto_cobro", nullable = false, precision = 12, scale = 2)
+    private BigDecimal descuentoMontoCobro = BigDecimal.ZERO.setScale(2);
+
+    @Column(name = "precio_final_cliente", nullable = false, precision = 12, scale = 2)
+    private BigDecimal precioFinalCliente = BigDecimal.ZERO.setScale(2);
+
+    @Column(name = "precio_final_cliente_cobro", nullable = false, precision = 12, scale = 2)
+    private BigDecimal precioFinalClienteCobro = BigDecimal.ZERO.setScale(2);
+
     @Column(name = "terminos_plataforma_version")
     private Integer terminosPlataformaVersion;
 

@@ -63,6 +63,16 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
             @Param("ids") Collection<Long> ids,
             @Param("estados") Collection<EstadoSolicitud> estados);
 
+    @Query("""
+        SELECT DISTINCT s.servicio.idServicio
+        FROM Solicitud s
+        WHERE s.cliente.idUsuario = :idCliente
+          AND s.estado IN :estados
+        """)
+    List<Long> serviciosConSolicitudActiva(
+            @Param("idCliente") Long idCliente,
+            @Param("estados") Collection<EstadoSolicitud> estados);
+
     boolean existsByArtistaIdUsuarioAndClienteIdUsuario(
             Long idArtista, Long idCliente);
 

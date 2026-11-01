@@ -222,6 +222,13 @@ public class PedidoService {
         pedido.setMonedaCobro(presupuesto.getMonedaCobro());
         pedido.setCotizacionCobro(presupuesto.getCotizacionCobro());
         pedido.setComisionPorcentaje(presupuesto.getComisionPorcentaje());
+        pedido.setOfertaReactivacion(presupuesto.getOfertaReactivacion());
+        pedido.setDescuentoPorcentaje(presupuesto.getDescuentoPorcentaje());
+        pedido.setDescuentoMonto(presupuesto.getDescuentoMonto());
+        pedido.setDescuentoMontoCobro(presupuesto.getDescuentoMontoCobro());
+        pedido.setPrecioFinalCliente(presupuesto.getPrecioFinalCliente());
+        pedido.setPrecioFinalClienteCobro(
+            presupuesto.getPrecioFinalClienteCobro());
         if (terminos != null) {
             pedido.setTerminosPlataformaVersion(terminos.getVersion());
             pedido.setTerminosPlataformaSnapshot(terminos.getContenido());
@@ -1145,6 +1152,15 @@ public class PedidoService {
             netoCobro = sumar(netoCobro, hito.getMontoNetoCobro());
         }
 
+        BigDecimal finalCliente = pedido.getPrecioFinalCliente();
+        if (finalCliente == null || finalCliente.signum() == 0) {
+            finalCliente = pedido.getPrecioFinal();
+        }
+        BigDecimal finalClienteCobro = pedido.getPrecioFinalClienteCobro();
+        if (finalClienteCobro == null || finalClienteCobro.signum() == 0) {
+            finalClienteCobro = pedido.getPrecioFinalCobro();
+        }
+
         return PedidoDTO.builder()
             .idPedido(pedido.getIdPedido())
             .idSolicitud(pedido.getSolicitud().getIdSolicitud())
@@ -1166,6 +1182,25 @@ public class PedidoService {
             .precioFinalMostrado(PresupuestoDTO.totalMostrado(
                 pedido.getPrecioFinal(),
                 pedido.getPrecioFinalCobro(),
+                muestraOrigen,
+                muestraCobro,
+                factorCobro,
+                factorOrigen))
+            .descuentoPorcentaje(pedido.getDescuentoPorcentaje())
+            .descuentoMonto(pedido.getDescuentoMonto())
+            .descuentoMontoCobro(pedido.getDescuentoMontoCobro())
+            .descuentoMostrado(PresupuestoDTO.totalMostrado(
+                pedido.getDescuentoMonto(),
+                pedido.getDescuentoMontoCobro(),
+                muestraOrigen,
+                muestraCobro,
+                factorCobro,
+                factorOrigen))
+            .precioFinalCliente(finalCliente)
+            .precioFinalClienteCobro(finalClienteCobro)
+            .precioFinalClienteMostrado(PresupuestoDTO.totalMostrado(
+                finalCliente,
+                finalClienteCobro,
                 muestraOrigen,
                 muestraCobro,
                 factorCobro,

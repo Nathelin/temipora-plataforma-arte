@@ -116,6 +116,13 @@ public class Usuario {
     @Column(name = "banner", nullable = true)
     private String urlBanner;
 
+    @Column(name = "recibir_emails_promocionales", nullable = false)
+    @Builder.Default
+    private boolean recibirEmailsPromocionales = true;
+
+    @Column(name = "token_baja_email", length = 64, unique = true)
+    private String tokenBajaEmail;
+
     // TODO: Ver si manejo estadoCuenta con booleano o enum........
 
     public void activar() {

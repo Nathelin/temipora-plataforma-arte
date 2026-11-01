@@ -54,13 +54,17 @@ function manejarTecla(event) {
 function destinoDe(notificacion) {
   const tipo = notificacion?.tipoReferencia
   if (tipo !== 'SOLICITUD' && tipo !== 'PEDIDO' && tipo !== 'RESENIA'
-    && tipo !== 'CONVERSACION') return null
+    && tipo !== 'CONVERSACION' && tipo !== 'OFERTA_REACTIVACION') return null
 
   const rol = localStorage.getItem('rol')
   if (rol !== 'ARTISTA' && rol !== 'CLIENTE' && rol !== 'ADMIN') return null
 
   if (tipo === 'RESENIA') {
     return rol === 'ADMIN' ? { name: 'admin-resenias-reportadas' } : null
+  }
+
+  if (tipo === 'OFERTA_REACTIVACION') {
+    return rol === 'ADMIN' ? null : { name: 'ofertas' }
   }
 
   const id = Number(notificacion.idReferencia)
@@ -93,6 +97,7 @@ function textoDestino(notificacion) {
   if (notificacion?.tipoReferencia === 'SOLICITUD') return 'Ver solicitud →'
   if (notificacion?.tipoReferencia === 'RESENIA') return 'Ver reportes →'
   if (notificacion?.tipoReferencia === 'CONVERSACION') return 'Ver conversación →'
+  if (notificacion?.tipoReferencia === 'OFERTA_REACTIVACION') return 'Ver ofertas →'
   return ''
 }
 

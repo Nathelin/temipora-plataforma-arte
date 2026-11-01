@@ -281,6 +281,21 @@ public class ServicioService {
         return dtos;
     }
 
+    /**
+     * Servicios publicados que hoy pueden recibir una solicitud. Se usa una
+     * sola vez por corrida del proceso de reactivación para no repetir la
+     * consulta por cada usuario.
+     */
+    @Transactional(readOnly = true)
+    public List<Servicio> candidatosDisponibles() {
+        Specification<Servicio> spec = activos(false).and(disponibleAhora());
+        List<Long> ids = idsSegunSpec(spec);
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return servicioRepository.findByIdServicioIn(ids);
+    }
+
     @Transactional(readOnly = true)
     public List<RecomendacionArtistaDTO> artistasSimilares(
             Long idServicio,

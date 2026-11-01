@@ -55,6 +55,10 @@ public class Solicitud {
     @JoinColumn(name = "id_terminos")
     private Terminos terminos;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_oferta_reactivacion")
+    private OfertaReactivacion ofertaReactivacion;
+
     @Column(name = "terminos_version", nullable = false)
     private Integer terminosVersion;
 

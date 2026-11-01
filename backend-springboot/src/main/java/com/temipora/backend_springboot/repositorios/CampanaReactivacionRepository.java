@@ -1,0 +1,39 @@
+package com.temipora.backend_springboot.repositorios;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import com.temipora.backend_springboot.modelo.CampanaReactivacion;
+import com.temipora.backend_springboot.modelo.EstadoCampanaReactivacion;
+
+public interface CampanaReactivacionRepository
+        extends JpaRepository<CampanaReactivacion, Long> {
+
+    Optional<CampanaReactivacion> findByToken(String token);
+
+    @Query("""
+        SELECT DISTINCT c FROM CampanaReactivacion c
+        LEFT JOIN FETCH c.ofertas o
+        LEFT JOIN FETCH o.servicio s
+        LEFT JOIN FETCH s.artista
+        WHERE c.token = :token
+        """)
+    Optional<CampanaReactivacion> findByTokenConOfertas(@Param("token") String token);
+
+    @Query("""
+        SELECT DISTINCT c FROM CampanaReactivacion c
+        LEFT JOIN FETCH c.ofertas o
+        LEFT JOIN FETCH o.servicio s
+        LEFT JOIN FETCH s.artista
+        WHERE c.usuario.idUsuario = :idUsuario
+          AND c.estado = :estado
+        ORDER BY c.fechaCreacion DESC
+        """)
+    List<CampanaReactivacion> findConOfertasPorUsuario(
+        @Param("idUsuario") Long idUsuario,
+        @Param("estado") EstadoCampanaReactivacion estado);
+}

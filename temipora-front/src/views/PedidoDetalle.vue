@@ -119,9 +119,18 @@ const moneda = computed(
 )
 const monedaCobro = computed(() => pedido.value?.monedaCobro || 'ARS')
 const total = computed(() => formatearPrecio(
-  pedido.value?.precioFinalMostrado ?? pedido.value?.precioFinal,
+  esCliente.value
+    ? (pedido.value?.precioFinalClienteMostrado
+        ?? pedido.value?.precioFinalMostrado
+        ?? pedido.value?.precioFinal)
+    : (pedido.value?.precioFinalMostrado ?? pedido.value?.precioFinal),
   moneda.value,
 ))
+const descuentoMostrado = computed(
+  () => pedido.value?.descuentoMostrado
+    ?? pedido.value?.descuentoMonto
+    ?? 0,
+)
 const cobroDistinto = computed(
   () => pedido.value?.precioFinalCobro != null
     && moneda.value !== monedaCobro.value,
@@ -870,8 +879,20 @@ onMounted(async () => {
           <div class="rounded-xl bg-rosa/10 px-3 py-2">
             <dt class="text-xs text-cafe/50">Total</dt>
             <dd class="mt-0.5 text-xl font-bold text-granate">{{ total }}</dd>
+            <dd
+              v-if="esCliente && Number(descuentoMostrado) > 0"
+              class="mt-1 text-xs font-semibold text-coral"
+            >
+              Descuento ({{ Number(pedido.descuentoPorcentaje) }}%):
+              − {{ formatearPrecio(descuentoMostrado, moneda) }}
+            </dd>
             <dd v-if="cobroDistinto" class="text-xs text-cafe/50">
-              A pagar: {{ formatearPrecio(pedido.precioFinalCobro, monedaCobro) }}
+              A pagar: {{ formatearPrecio(
+                esCliente
+                  ? (pedido.precioFinalClienteCobro ?? pedido.precioFinalCobro)
+                  : pedido.precioFinalCobro,
+                monedaCobro,
+              ) }}
             </dd>
           </div>
           <div class="rounded-xl bg-rosa/10 px-3 py-2">

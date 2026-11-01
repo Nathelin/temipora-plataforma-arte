@@ -168,6 +168,33 @@ public class RecomendacionService {
             aplicarDiversidad(puntuados, config, monedaDestino), true);
     }
 
+    /**
+     * Fallback para usuarios sin señales (sin favoritos, compras ni visitas):
+     * ordena por calidad percibida y aplica la misma diversidad de precio.
+     */
+    @Transactional(readOnly = true)
+    public List<ServicioPuntuado> rankearPorCalidad(
+            List<Servicio> candidatos,
+            Moneda monedaDestino) {
+        if (candidatos == null || candidatos.isEmpty()) {
+            return List.of();
+        }
+        ConfiguracionRecomendacion config = configuracionService.obtener();
+        Map<Long, PromedioReseniasDTO> promedios =
+            reseniaPublicaService.promediosPorServicios(
+                candidatos.stream().map(Servicio::getIdServicio).toList());
+
+        List<ServicioPuntuado> puntuados = new ArrayList<>();
+        for (Servicio servicio : candidatos) {
+            puntuados.add(new ServicioPuntuado(
+                servicio,
+                ratingScore(promedios.get(servicio.getIdServicio())),
+                "Propuesta para retomar"));
+        }
+        puntuados.sort(Comparator.comparingDouble(ServicioPuntuado::score).reversed());
+        return aplicarDiversidad(puntuados, config, monedaDestino);
+    }
+
     @Transactional(readOnly = true)
     public List<ServicioPuntuado> similares(
             Servicio origen,

@@ -25,9 +25,20 @@ const moneda = computed(
   () => presupuesto.value?.monedaMostrada || presupuesto.value?.moneda || 'ARS',
 )
 const total = computed(() => formatearPrecio(
-  presupuesto.value?.precioFinalMostrado ?? presupuesto.value?.precioFinal,
+  presupuesto.value?.precioFinalClienteMostrado
+    ?? presupuesto.value?.precioFinalMostrado
+    ?? presupuesto.value?.precioFinal,
   moneda.value,
 ))
+const descuentoPorcentaje = computed(() => {
+  const valor = Number(presupuesto.value?.descuentoPorcentaje)
+  return Number.isFinite(valor) ? valor : 0
+})
+const descuentoMostrado = computed(
+  () => presupuesto.value?.descuentoMostrado
+    ?? presupuesto.value?.descuentoMonto
+    ?? 0,
+)
 const esArtista = computed(
   () => solicitud.value?.artista?.idUsuario === idActual,
 )
@@ -163,6 +174,13 @@ onMounted(cargar)
               Total del presupuesto
             </p>
             <p class="mt-1 text-3xl font-bold text-granate">{{ total }}</p>
+            <p
+              v-if="Number(descuentoMostrado) > 0"
+              class="mt-2 inline-flex items-center gap-2 rounded-full bg-mantequilla px-3 py-1 text-xs font-bold text-tinta"
+            >
+              Descuento de reactivación ({{ descuentoPorcentaje }}%):
+              − {{ formatearPrecio(descuentoMostrado, moneda) }}
+            </p>
           </div>
         </div>
 
