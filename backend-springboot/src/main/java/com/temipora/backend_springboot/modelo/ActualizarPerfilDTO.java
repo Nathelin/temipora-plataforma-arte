@@ -27,5 +27,7 @@ public class ActualizarPerfilDTO {
 
     private Boolean pedidosPublicos;
 
+    private Boolean recibirEmailsPromocionales;
+
     private Long idMonedaPreferida;
 }

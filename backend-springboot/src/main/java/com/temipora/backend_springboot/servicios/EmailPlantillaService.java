@@ -47,7 +47,7 @@ public class EmailPlantillaService {
                           <h1 style="margin:0 0 12px;font-size:26px;line-height:1.2;color:#4a1d2e;">Hola, %s</h1>
                           <p style="margin:0 0 8px;font-size:15px;line-height:1.6;color:#6e3b4d;">
                             Hace un tiempo no te vemos por Temipora. Preparamos algunas propuestas de artistas
-                            que pueden interesarte, con un descuento especial para que retomes.
+                            que pueden interesarte, con un descuento especial.
                           </p>
                           <p style="margin:0 0 22px;font-size:13px;line-height:1.6;color:#6e3b4d;">
                             El descuento lo aplica Temipora sobre el presupuesto final del servicio.
@@ -78,7 +78,8 @@ public class EmailPlantillaService {
             "Listo",
             "Damos de baja las promociones",
             "Hola, " + escapar(nombre) + ". No vas a recibir más correos promocionales de Temipora. "
-                + "Vas a seguir recibiendo los avisos importantes de tus pedidos.");
+                + "Vas a seguir recibiendo los avisos importantes de tus pedidos. "
+                + "Podés volver a activarlos desde Configuración → Privacidad y contenido.");
     }
 
     public String bajaInvalida() {
