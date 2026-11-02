@@ -144,6 +144,10 @@ public class UsuarioService {
         if (dto.getPedidosPublicos() != null) {
             usuario.setPedidosPublicos(dto.getPedidosPublicos());
         }
+        if (dto.getRecibirEmailsPromocionales() != null) {
+            usuario.setRecibirEmailsPromocionales(
+                dto.getRecibirEmailsPromocionales());
+        }
         if (dto.getIdMonedaPreferida() != null) {
             usuario.setMonedaPreferida(monedaService.obtener(dto.getIdMonedaPreferida()));
         }

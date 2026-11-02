@@ -1,15 +1,19 @@
 package com.temipora.backend_springboot.servicios;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 
 import org.springframework.data.domain.Sort;
@@ -27,13 +31,28 @@ import com.temipora.backend_springboot.modelo.FiltroServicioRequest;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.OrdenServicio;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.PromedioReseniasDTO;
+import com.temipora.backend_springboot.modelo.RecomendacionArtistaDTO;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
+import com.temipora.backend_springboot.modelo.ServicioEtiqueta;
 import com.temipora.backend_springboot.modelo.ServicioImagen;
 import com.temipora.backend_springboot.modelo.ServicioRequest;
+import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.TipoServicio;
 import com.temipora.backend_springboot.modelo.Usuario;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
@@ -66,6 +85,11 @@ public class ServicioService {
     private final ConversionMonedaService conversionMonedaService;
     private final MonedaService monedaService;
     private final ReseniaPublicaService reseniaPublicaService;
+    private final RecomendacionService recomendacionService;
+    private final OfertaReactivacionService ofertaReactivacionService;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public ServicioService(
             ServicioRepository servicioRepository,
@@ -78,7 +102,9 @@ public class ServicioService {
             TerminosService terminosService,
             ConversionMonedaService conversionMonedaService,
             MonedaService monedaService,
-            ReseniaPublicaService reseniaPublicaService) {
+            ReseniaPublicaService reseniaPublicaService,
+            RecomendacionService recomendacionService,
+            OfertaReactivacionService ofertaReactivacionService) {
         this.servicioRepository = servicioRepository;
         this.solicitudRepository = solicitudRepository;
         this.usuarioRepository = usuarioRepository;
@@ -90,6 +116,8 @@ public class ServicioService {
         this.conversionMonedaService = conversionMonedaService;
         this.monedaService = monedaService;
         this.reseniaPublicaService = reseniaPublicaService;
+        this.recomendacionService = recomendacionService;
+        this.ofertaReactivacionService = ofertaReactivacionService;
     }
 
     @Transactional(readOnly = true)
@@ -100,11 +128,15 @@ public class ServicioService {
                 idArtista, ESTADOS_ACTIVOS)) {
             activas.put((Long) fila[0], (Long) fila[1]);
         }
-        List<ServicioDTO> dtos = servicioRepository
-            .findByArtistaIdUsuarioAndEstadoNotOrderByNombreAsc(idArtista, EstadoServicio.ARCHIVADO)
-            .stream()
+        List<Servicio> servicios = servicioRepository
+            .findByArtistaIdUsuarioAndEstadoNotOrderByNombreAsc(
+                idArtista, EstadoServicio.ARCHIVADO);
+        Map<Long, Integer> ocupados = cuposOcupados(
+            servicios.stream().map(Servicio::getIdServicio).toList());
+        List<ServicioDTO> dtos = servicios.stream()
             .map(s -> {
-                ServicioDTO dto = aDTO(s, false, moneda);
+                ServicioDTO dto = aDTO(s, false, moneda,
+                    ocupados.getOrDefault(s.getIdServicio(), 0));
                 dto.setSolicitudesActivas(activas.getOrDefault(s.getIdServicio(), 0L));
                 return dto;
             })
@@ -119,18 +151,117 @@ public class ServicioService {
         boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
         Moneda moneda = monedaPreferidaDe(viewerId);
 
-        Specification<Servicio> spec = activos(ocultarSensibles);
+        Specification<Servicio> spec = conArtista(activos(ocultarSensibles));
         if (viewerId != null) {
             spec = spec.and((root, query, cb) ->
                 cb.notEqual(root.get("artista").get("idUsuario"), viewerId));
         }
         spec = aplicarFiltros(spec, filtro);
-        List<ServicioDTO> dtos = servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre")).stream()
+        List<Servicio> servicios = servicioRepository.findAll(
+                spec, Sort.by(Sort.Direction.ASC, "nombre"))
+            .stream()
             .filter(this::aceptaSolicitudesYPodriaPresupuestar)
+            .toList();
+        List<ServicioDTO> dtos = servicios.stream()
             .map(s -> aDTO(s, requiereAdvertencia(s, pref, viewerId), moneda))
             .toList();
         aplicarPromedios(dtos);
+        aplicarOfertas(dtos, viewerId);
         return dtos;
+    }
+
+    @Transactional(readOnly = true)
+    public PaginaDTO<ServicioDTO> listarActivosPaginado(
+            FiltroServicioRequest filtro,
+            Long viewerId,
+            int pagina,
+            int tamanio,
+            OrdenServicio orden) {
+        int paginaSegura = Math.max(0, pagina);
+        int tamanioSeguro = Math.min(48, Math.max(1, tamanio));
+        OrdenServicio ordenSeguro = orden != null ? orden : OrdenServicio.RELEVANCIA;
+
+        EPreferenciaContenidoSensible pref = preferenciaDe(viewerId);
+        boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
+        Moneda moneda = monedaPreferidaDe(viewerId);
+
+        Specification<Servicio> spec = activos(ocultarSensibles)
+            .and(disponibleAhora());
+        if (viewerId != null) {
+            spec = spec.and((root, query, cb) ->
+                cb.notEqual(root.get("artista").get("idUsuario"), viewerId));
+        }
+        spec = aplicarFiltros(spec, filtro);
+
+        List<Long> ids = idsSegunSpec(spec);
+        if (ids.isEmpty()) {
+            return paginaVacia(paginaSegura, tamanioSeguro);
+        }
+
+        List<Servicio> candidatos = servicioRepository.findByIdServicioIn(ids);
+        Map<Long, Servicio> porId = new HashMap<>();
+        for (Servicio servicio : candidatos) {
+            porId.put(servicio.getIdServicio(), servicio);
+        }
+        List<Servicio> ordenados = new ArrayList<>();
+        for (Long id : ids) {
+            Servicio servicio = porId.get(id);
+            if (servicio != null) {
+                ordenados.add(servicio);
+            }
+        }
+        ordenados.sort(Comparator.comparing(
+            Servicio::getNombre, String.CASE_INSENSITIVE_ORDER));
+
+        boolean personalizado = false;
+        if (ordenSeguro == OrdenServicio.RELEVANCIA) {
+            RecomendacionService.ResultadoRanking ranking =
+                recomendacionService.rankear(ordenados, viewerId, moneda);
+            ordenados = new ArrayList<>(ranking.items().stream()
+                .map(RecomendacionService.ServicioPuntuado::servicio)
+                .toList());
+            personalizado = ranking.personalizado();
+        } else if (ordenSeguro == OrdenServicio.PRECIO_ASC
+                || ordenSeguro == OrdenServicio.PRECIO_DESC) {
+            Map<Long, BigDecimal> precios = new HashMap<>();
+            for (Servicio servicio : ordenados) {
+                precios.put(
+                    servicio.getIdServicio(),
+                    precioConvertido(servicio, moneda));
+            }
+            Comparator<Servicio> comparator = Comparator.comparing(
+                s -> precios.getOrDefault(s.getIdServicio(), BigDecimal.ZERO));
+            if (ordenSeguro == OrdenServicio.PRECIO_DESC) {
+                comparator = comparator.reversed();
+            }
+            ordenados.sort(comparator.thenComparing(
+                Servicio::getNombre, String.CASE_INSENSITIVE_ORDER));
+        }
+
+        int total = ordenados.size();
+        int desde = Math.min(paginaSegura * tamanioSeguro, total);
+        int hasta = Math.min(desde + tamanioSeguro, total);
+        List<Servicio> paginaServicios = ordenados.subList(desde, hasta);
+
+        Map<Long, Integer> ocupados = cuposOcupados(
+            paginaServicios.stream().map(Servicio::getIdServicio).toList());
+        List<ServicioDTO> dtos = paginaServicios.stream()
+            .map(s -> aDTO(s, requiereAdvertencia(s, pref, viewerId), moneda,
+                ocupados.getOrDefault(s.getIdServicio(), 0)))
+            .toList();
+        aplicarPromedios(dtos);
+        aplicarOfertas(dtos, viewerId);
+
+        int totalPaginas = (int) Math.ceil(total / (double) tamanioSeguro);
+        return PaginaDTO.<ServicioDTO>builder()
+            .contenido(dtos)
+            .pagina(paginaSegura)
+            .tamanio(tamanioSeguro)
+            .totalElementos(total)
+            .totalPaginas(totalPaginas)
+            .hayMas(hasta < total)
+            .personalizado(personalizado)
+            .build();
     }
 
     @Transactional(readOnly = true)
@@ -139,15 +270,164 @@ public class ServicioService {
         boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
         Moneda moneda = monedaPreferidaDe(viewerId);
 
-        Specification<Servicio> spec = activos(ocultarSensibles)
+        Specification<Servicio> spec = conArtista(activos(ocultarSensibles))
             .and((root, query, cb) ->
                 cb.equal(cb.lower(root.get("artista").get("nombreUsuario")),
                     nombreUsuario.trim().toLowerCase()));
-        List<ServicioDTO> dtos = servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre")).stream()
-            .map(s -> aDTO(s, requiereAdvertencia(s, pref, viewerId), moneda))
+        List<Servicio> servicios = servicioRepository.findAll(
+            spec, Sort.by(Sort.Direction.ASC, "nombre"));
+        Map<Long, Integer> ocupados = cuposOcupados(
+            servicios.stream().map(Servicio::getIdServicio).toList());
+        List<ServicioDTO> dtos = servicios.stream()
+            .map(s -> aDTO(s, requiereAdvertencia(s, pref, viewerId), moneda,
+                ocupados.getOrDefault(s.getIdServicio(), 0)))
             .toList();
         aplicarPromedios(dtos);
+        aplicarOfertas(dtos, viewerId);
         return dtos;
+    }
+
+    /**
+     * Servicios publicados que hoy pueden recibir una solicitud. Se usa una
+     * sola vez por corrida del proceso de reactivación para no repetir la
+     * consulta por cada usuario.
+     */
+    @Transactional(readOnly = true)
+    public List<Servicio> candidatosDisponibles() {
+        Specification<Servicio> spec = activos(false).and(disponibleAhora());
+        List<Long> ids = idsSegunSpec(spec);
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return servicioRepository.findByIdServicioIn(ids);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RecomendacionArtistaDTO> artistasSimilares(
+            Long idServicio,
+            Long viewerId) {
+        Servicio origen = obtenerEntidad(idServicio);
+        if (origen.getEstado() != EstadoServicio.PUBLICADO) {
+            return List.of();
+        }
+        if (origen.getArtista() == null) {
+            return List.of();
+        }
+
+        EPreferenciaContenidoSensible pref = preferenciaDe(viewerId);
+        boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
+        Moneda moneda = monedaPreferidaDe(viewerId);
+        Long idArtistaOrigen = origen.getArtista().getIdUsuario();
+
+        Specification<Servicio> spec = activos(ocultarSensibles)
+            .and(disponibleAhora())
+            .and((root, query, cb) ->
+                cb.notEqual(root.get("artista").get("idUsuario"), idArtistaOrigen));
+        if (viewerId != null) {
+            spec = spec.and((root, query, cb) ->
+                cb.notEqual(root.get("artista").get("idUsuario"), viewerId));
+        }
+
+        List<Long> ids = idsSegunSpec(spec);
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        List<Servicio> candidatos = servicioRepository.findByIdServicioIn(ids);
+        List<RecomendacionService.ServicioPuntuado> ranked =
+            recomendacionService.similares(origen, candidatos, viewerId, moneda);
+        if (ranked.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, PromedioReseniasDTO> promedios =
+            reseniaPublicaService.promediosPorServicios(
+                ranked.stream()
+                    .map(item -> item.servicio().getIdServicio())
+                    .toList());
+
+        Map<Long, List<RecomendacionService.ServicioPuntuado>> porArtista =
+            new LinkedHashMap<>();
+        for (RecomendacionService.ServicioPuntuado item : ranked) {
+            Long idArtista = item.servicio().getArtista().getIdUsuario();
+            porArtista.computeIfAbsent(idArtista, clave -> new ArrayList<>())
+                .add(item);
+        }
+
+        List<RecomendacionArtistaDTO> resultado = new ArrayList<>();
+        for (Map.Entry<Long, List<RecomendacionService.ServicioPuntuado>> entrada
+                : porArtista.entrySet()) {
+            List<RecomendacionService.ServicioPuntuado> items = entrada.getValue();
+            RecomendacionService.ServicioPuntuado mejor = items.get(0);
+            Servicio servicio = mejor.servicio();
+            Usuario artista = servicio.getArtista();
+
+            BigDecimal precioDesde = items.stream()
+                .map(item -> precioConvertido(item.servicio(), moneda))
+                .filter(Objects::nonNull)
+                .min(BigDecimal::compareTo)
+                .orElse(null);
+
+            long cantidadResenias = 0;
+            double sumaPromedios = 0;
+            for (RecomendacionService.ServicioPuntuado item : items) {
+                PromedioReseniasDTO promedio = promedios.get(
+                    item.servicio().getIdServicio());
+                if (promedio != null && promedio.getCantidad() > 0
+                        && promedio.getPromedio() != null) {
+                    cantidadResenias += promedio.getCantidad();
+                    sumaPromedios += promedio.getPromedio().doubleValue()
+                        * promedio.getCantidad();
+                }
+            }
+            BigDecimal calificacion = cantidadResenias > 0
+                ? BigDecimal.valueOf(sumaPromedios / cantidadResenias)
+                    .setScale(2, RoundingMode.HALF_UP)
+                : null;
+
+            Map<String, Integer> frecuenciaEtiquetas = new HashMap<>();
+            for (RecomendacionService.ServicioPuntuado item : items) {
+                if (item.servicio().getEtiquetas() == null) {
+                    continue;
+                }
+                for (ServicioEtiqueta asignacion : item.servicio().getEtiquetas()) {
+                    if (asignacion.getEtiqueta() != null
+                            && asignacion.getEtiqueta().getNombre() != null) {
+                        frecuenciaEtiquetas.merge(
+                            asignacion.getEtiqueta().getNombre(), 1, Integer::sum);
+                    }
+                }
+            }
+            List<String> etiquetas = frecuenciaEtiquetas.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(3)
+                .map(Map.Entry::getKey)
+                .toList();
+
+            String imagen = servicio.getImagenPortada();
+            if ((imagen == null || imagen.isBlank())
+                    && servicio.getImagenes() != null
+                    && !servicio.getImagenes().isEmpty()) {
+                imagen = servicio.getImagenes().get(0).getUrl();
+            }
+
+            resultado.add(RecomendacionArtistaDTO.builder()
+                .idArtista(entrada.getKey())
+                .nombreUsuario(artista.getNombreUsuario())
+                .nombreDisplay(artista.getNombreDisplay())
+                .urlFotoPerfil(artista.getUrlFotoPerfil())
+                .imagenRepresentativa(imagen)
+                .nombreServicio(servicio.getNombre())
+                .idServicio(servicio.getIdServicio())
+                .precioDesde(precioDesde)
+                .moneda(moneda != null ? moneda.getCodigo() : null)
+                .calificacionPromedio(calificacion)
+                .cantidadResenias(cantidadResenias)
+                .etiquetasDestacadas(etiquetas)
+                .motivo(mejor.motivo())
+                .score(mejor.score())
+                .build());
+        }
+        return resultado.stream().limit(6).toList();
     }
 
     @Transactional(readOnly = true)
@@ -164,7 +444,34 @@ public class ServicioService {
                 aDTO(servicio, requiereAdvertencia(servicio, pref, viewerId), moneda));
         }
         aplicarPromedios(resultado.values());
+        aplicarOfertas(resultado.values(), viewerId);
         return resultado;
+    }
+
+    private void aplicarOfertas(Collection<ServicioDTO> dtos, Long viewerId) {
+        if (viewerId == null || dtos == null || dtos.isEmpty()) {
+            return;
+        }
+        List<Long> ids = dtos.stream()
+            .map(ServicioDTO::getIdServicio)
+            .filter(Objects::nonNull)
+            .toList();
+        if (ids.isEmpty()) {
+            return;
+        }
+        Map<Long, OfertaReactivacionService.OfertaVigente> ofertas =
+            ofertaReactivacionService.ofertasVigentesPorServicios(viewerId, ids);
+        if (ofertas == null || ofertas.isEmpty()) {
+            return;
+        }
+        for (ServicioDTO dto : dtos) {
+            OfertaReactivacionService.OfertaVigente oferta =
+                ofertas.get(dto.getIdServicio());
+            if (oferta != null) {
+                dto.setIdOferta(oferta.idOferta());
+                dto.setDescuentoOfertaPorcentaje(oferta.porcentajeDescuento());
+            }
+        }
     }
 
     private void aplicarPromedios(Collection<ServicioDTO> dtos) {
@@ -193,7 +500,6 @@ public class ServicioService {
 
     private Specification<Servicio> activos(boolean ocultarSensibles) {
         return (root, query, cb) -> {
-            root.fetch("artista");
             if (ocultarSensibles) {
                 return cb.and(
                     cb.equal(root.get("estado"), EstadoServicio.PUBLICADO),
@@ -201,6 +507,91 @@ public class ServicioService {
             }
             return cb.equal(root.get("estado"), EstadoServicio.PUBLICADO);
         };
+    }
+
+    private Specification<Servicio> conArtista(Specification<Servicio> spec) {
+        return (root, query, cb) -> {
+            root.fetch("artista", JoinType.LEFT);
+            return spec.toPredicate(root, query, cb);
+        };
+    }
+
+    /**
+     * Sólo servicios que pueden recibir una solicitud ahora: recepción abierta
+     * y al menos un cupo libre. Se resuelve en SQL para poder paginar sin
+     * traer todo el catálogo a memoria.
+     */
+    private Specification<Servicio> disponibleAhora() {
+        return (root, query, cb) -> {
+            Subquery<Long> ocupados = query.subquery(Long.class);
+            Root<Solicitud> solicitud = ocupados.from(Solicitud.class);
+            ocupados.select(cb.count(solicitud));
+            ocupados.where(
+                cb.equal(solicitud.get("servicio").get("idServicio"),
+                    root.get("idServicio")),
+                solicitud.get("estado").in(ESTADOS_QUE_OCUPAN_CUPO));
+
+            Path<Integer> cupos = root.get("cupos");
+            return cb.and(
+                cb.equal(root.get("modoRecepcion"), ModoRecepcionSolicitud.ABIERTA),
+                cb.greaterThan(cupos.as(Long.class), ocupados));
+        };
+    }
+
+    private List<Long> idsSegunSpec(Specification<Servicio> spec) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Long> query = cb.createQuery(Long.class);
+        Root<Servicio> root = query.from(Servicio.class);
+        Predicate predicate = spec != null
+            ? spec.toPredicate(root, query, cb)
+            : null;
+        query.select(root.get("idServicio"));
+        if (predicate != null) {
+            query.where(predicate);
+        }
+        return entityManager.createQuery(query).getResultList();
+    }
+
+    private Map<Long, Integer> cuposOcupados(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Integer> resultado = new HashMap<>();
+        for (Object[] fila : solicitudRepository.contarOcupadosPorServicios(
+                ids, ESTADOS_QUE_OCUPAN_CUPO)) {
+            Long id = ((Number) fila[0]).longValue();
+            long ocupados = ((Number) fila[1]).longValue();
+            resultado.put(id, (int) Math.min(ocupados, Integer.MAX_VALUE));
+        }
+        return resultado;
+    }
+
+    private PaginaDTO<ServicioDTO> paginaVacia(int pagina, int tamanio) {
+        return PaginaDTO.<ServicioDTO>builder()
+            .contenido(List.of())
+            .pagina(pagina)
+            .tamanio(tamanio)
+            .totalElementos(0)
+            .totalPaginas(0)
+            .hayMas(false)
+            .personalizado(false)
+            .build();
+    }
+
+    private BigDecimal precioConvertido(Servicio servicio, Moneda monedaDestino) {
+        if (servicio == null || servicio.getPrecioBase() == null) {
+            return null;
+        }
+        if (monedaDestino == null) {
+            return servicio.getPrecioBase();
+        }
+        BigDecimal factor = conversionMonedaService.factor(
+            servicio.getMoneda(), monedaDestino, LocalDateTime.now());
+        if (factor == null) {
+            return servicio.getPrecioBase();
+        }
+        return servicio.getPrecioBase().multiply(factor)
+            .setScale(2, RoundingMode.HALF_UP);
     }
 
     private EPreferenciaContenidoSensible preferenciaDe(Long viewerId) {
@@ -225,13 +616,22 @@ public class ServicioService {
     }
 
     private ServicioDTO aDTO(Servicio s, boolean requiereAdvertencia, Moneda monedaDestino) {
+        return aDTO(s, requiereAdvertencia, monedaDestino,
+            calcularCuposOcupados(s.getIdServicio()));
+    }
+
+    private ServicioDTO aDTO(
+            Servicio s,
+            boolean requiereAdvertencia,
+            Moneda monedaDestino,
+            int ocupados) {
         BigDecimal factor = monedaDestino != null
             ? conversionMonedaService.factor(s.getMoneda(), monedaDestino, LocalDateTime.now())
             : null;
         ServicioDTO dto = ServicioDTO.desdeServicio(s, requiereAdvertencia, monedaDestino, factor);
-        int ocupados = calcularCuposOcupados(s.getIdServicio());
         dto.setCuposOcupados(ocupados);
-        dto.setCuposDisponibles(Math.max(0, (s.getCupos() == null ? 0 : s.getCupos()) - ocupados));
+        dto.setCuposDisponibles(Math.max(0,
+            (s.getCupos() == null ? 0 : s.getCupos()) - ocupados));
         return dto;
     }
 
@@ -322,6 +722,7 @@ public class ServicioService {
         }
         ServicioDTO dto = aDTO(servicio, requiereAdvertencia(servicio, pref, viewerId), monedaPreferidaDe(viewerId));
         aplicarPromedios(List.of(dto));
+        aplicarOfertas(List.of(dto), viewerId);
         return dto;
     }
 

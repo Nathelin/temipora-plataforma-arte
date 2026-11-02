@@ -16,12 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
 import com.temipora.backend_springboot.modelo.ConfiguracionPresupuesto;
 import com.temipora.backend_springboot.modelo.ConfiguracionComision;
 import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
+import com.temipora.backend_springboot.modelo.EstadoOfertaReactivacion;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
+import com.temipora.backend_springboot.modelo.HitoPresupuesto;
 import com.temipora.backend_springboot.modelo.ItemPresupuesto;
 import com.temipora.backend_springboot.modelo.ItemPresupuestoRequest;
 import com.temipora.backend_springboot.modelo.ItemSolicitud;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.OfertaReactivacion;
 import com.temipora.backend_springboot.modelo.Presupuesto;
 import com.temipora.backend_springboot.modelo.PresupuestoRequest;
 import com.temipora.backend_springboot.modelo.RecargoItemPresupuesto;
@@ -60,6 +63,7 @@ public class PresupuestoService {
     private final ComisionService comisionService;
     private final ConfiguracionPedidoService configuracionPedidoService;
     private final MonedaVistaService monedaVistaService;
+    private final OfertaReactivacionService ofertaReactivacionService;
 
     public PresupuestoService(
             SolicitudRepository solicitudRepository,
@@ -71,7 +75,8 @@ public class PresupuestoService {
             ConfiguracionPresupuestoService configuracionPresupuestoService,
             ComisionService comisionService,
             ConfiguracionPedidoService configuracionPedidoService,
-            MonedaVistaService monedaVistaService) {
+            MonedaVistaService monedaVistaService,
+            OfertaReactivacionService ofertaReactivacionService) {
         this.solicitudRepository = solicitudRepository;
         this.servicioRepository = servicioRepository;
         this.presupuestoRepository = presupuestoRepository;
@@ -82,6 +87,7 @@ public class PresupuestoService {
         this.comisionService = comisionService;
         this.configuracionPedidoService = configuracionPedidoService;
         this.monedaVistaService = monedaVistaService;
+        this.ofertaReactivacionService = ofertaReactivacionService;
     }
 
     @Transactional
@@ -272,35 +278,116 @@ public class PresupuestoService {
             presupuesto.getPrecioFinalCobro().subtract(comisionMontoCobro)
                 .setScale(2, RoundingMode.HALF_UP));
 
+        OfertaReactivacion oferta = solicitud.getOfertaReactivacion();
+        BigDecimal descuentoPorcentaje = BigDecimal.ZERO
+            .setScale(2, RoundingMode.HALF_UP);
+        if (oferta != null) {
+            if (oferta.getEstado() != EstadoOfertaReactivacion.OFRECIDA
+                    && oferta.getEstado() != EstadoOfertaReactivacion.RESERVADA) {
+                throw new ConflictoException(
+                    "La oferta ya fue utilizada o venció.");
+            }
+            if (oferta.getFechaVencimiento() == null
+                    || !oferta.getFechaVencimiento().isAfter(ahora)
+                    || oferta.getCampana() == null
+                    || oferta.getCampana().getEstado()
+                        != com.temipora.backend_springboot.modelo
+                            .EstadoCampanaReactivacion.ACTIVA
+                    || oferta.getCampana().getFechaVencimiento() == null
+                    || !oferta.getCampana().getFechaVencimiento().isAfter(ahora)) {
+                throw new ConflictoException(
+                    "La oferta venció. Pedile al artista un presupuesto sin descuento.");
+            }
+            if (oferta.getCampana().getUsuario() == null
+                    || !oferta.getCampana().getUsuario().getIdUsuario()
+                        .equals(solicitud.getCliente().getIdUsuario())) {
+                throw new AccesoDenegadoException(
+                    "La oferta no pertenece a tu cuenta.");
+            }
+            if (oferta.getServicio() == null
+                    || !oferta.getServicio().getIdServicio()
+                        .equals(servicio.getIdServicio())) {
+                throw new ConflictoException(
+                    "La oferta no corresponde a este servicio.");
+            }
+            descuentoPorcentaje = oferta.getPorcentajeDescuento()
+                .min(comisionPorcentaje)
+                .max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+        }
+        presupuesto.setOfertaReactivacion(oferta);
+        presupuesto.setDescuentoPorcentaje(descuentoPorcentaje);
+
         ConfiguracionPedido configuracionPedido = configuracionPedidoService.obtener();
-        HitoCalculadora.construir(
+        List<HitoPresupuesto> hitos = HitoCalculadora.construir(
             request.getHitos(),
             presupuesto.getPrecioFinal(),
             presupuesto.getPrecioFinalCobro(),
             presupuesto.getComisionMonto(),
             presupuesto.getComisionMontoCobro(),
+            descuentoPorcentaje,
             new HitoCalculadora.Limites(
                 configuracionPedido.getMaxHitos(),
                 configuracionPedido.getPorcentajeMaxPrimerHito(),
-                configuracionPedido.getMontoMinimoCuota()))
-            .forEach(presupuesto::agregarHito);
+                configuracionPedido.getMontoMinimoCuota()));
+        hitos.forEach(presupuesto::agregarHito);
+
+        BigDecimal totalCliente = hitos.stream()
+            .map(HitoPresupuesto::getMonto)
+            .reduce(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalClienteCobro = hitos.stream()
+            .map(HitoPresupuesto::getMontoCobro)
+            .reduce(BigDecimal.ZERO, BigDecimal::add)
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal descuentoMonto = presupuesto.getPrecioFinal()
+            .subtract(totalCliente)
+            .max(BigDecimal.ZERO)
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal descuentoMontoCobro = presupuesto.getPrecioFinalCobro()
+            .subtract(totalClienteCobro)
+            .max(BigDecimal.ZERO)
+            .setScale(2, RoundingMode.HALF_UP);
+
+        presupuesto.setDescuentoMonto(descuentoMonto);
+        presupuesto.setDescuentoMontoCobro(descuentoMontoCobro);
+        presupuesto.setPrecioFinalCliente(totalCliente);
+        presupuesto.setPrecioFinalClienteCobro(totalClienteCobro);
+        presupuesto.setComisionMonto(
+            presupuesto.getComisionMonto().subtract(descuentoMonto)
+                .max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP));
+        presupuesto.setComisionMontoCobro(
+            presupuesto.getComisionMontoCobro().subtract(descuentoMontoCobro)
+                .max(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP));
 
         solicitud.setPresupuesto(presupuesto);
         presupuestoRepository.save(presupuesto);
+
+        if (oferta != null) {
+            ofertaReactivacionService.marcarUtilizada(oferta);
+        }
 
         solicitud.setEstado(EstadoSolicitud.PRESUPUESTADA);
         solicitud.setFechaActualizacion(ahora);
         listaEsperaService.marcarConvertida(solicitud);
 
+        String importeCliente = detalleImporte(
+            presupuesto.getPrecioFinalCliente(),
+            moneda.getCodigo(),
+            presupuesto.getPrecioFinalClienteCobro(),
+            monedaCobro.getCodigo());
+        String notaDescuento = descuentoMonto.signum() > 0
+            ? " (con " + descuentoPorcentaje.stripTrailingZeros().toPlainString()
+                + "% de descuento)"
+            : "";
         notificacionService.crearParaUsuario(
             solicitud.getCliente().getIdUsuario(),
             NOTIFICACION_PRESUPUESTO_RECIBIDO,
             "Recibiste un presupuesto",
-            "El artista envió un presupuesto de " + detalleImporte(
-                presupuesto.getPrecioFinal(),
-                moneda.getCodigo(),
-                presupuesto.getPrecioFinalCobro(),
-                monedaCobro.getCodigo())
+            "El artista envió un presupuesto de " + importeCliente
+                + notaDescuento
                 + " para '" + nombreServicio(servicio) + "'.",
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);

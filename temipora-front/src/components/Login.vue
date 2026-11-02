@@ -1,11 +1,14 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
+import { useSesion } from '../composables/useSesion'
 import fondo from '../assets/fondos/prueba.png'
 import welcomeLogo from '../assets/welcome logo.png'
 
 const router = useRouter()
+const route = useRoute()
+const { guardarSesion } = useSesion()
 const nombreUsuario = ref('')
 const contrasenia = ref('')
 const error = ref('')
@@ -21,17 +24,13 @@ async function iniciarSesion() {
       contrasenia: contrasenia.value,
     })
 
-    const token = res.data.token
     const rol = res.data.rol
-    const usuario = res.data.NombreUsuario
+    guardarSesion(res.data)
 
-    localStorage.setItem('token', token)
-    localStorage.setItem('rol', rol)
-    localStorage.setItem('nombreUsuario', usuario)
-    localStorage.setItem('idUsuario', res.data.idUsuario ?? '')
-    localStorage.setItem('urlFotoPerfil', res.data.urlFotoPerfil ?? '')
-
-    if (rol === 'ADMIN') {
+    const redirect = route.query.redirect
+    if (redirect) {
+      router.push(String(redirect))
+    } else if (rol === 'ADMIN') {
       router.push({ name: 'usuarios' })
     } else {
       router.push({ name: 'servicios' })

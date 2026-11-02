@@ -230,6 +230,82 @@ class HitoCalculadoraTest {
             .hasMessageContaining("descripción");
     }
 
+    @Test
+    void descuento_bajaMontoYComisionYConservaElNetoDelArtista() {
+        List<HitoPresupuesto> hitos = construirConDescuento(
+            List.of(hito("50"), hito("50")),
+            "200.00", "200.00", "20.00", "20.00", "10.00");
+
+        assertThat(hitos).hasSize(2);
+        assertThat(hitos.get(0).getMonto()).isEqualByComparingTo("90.00");
+        assertThat(hitos.get(0).getComisionMonto()).isEqualByComparingTo("0.00");
+        assertThat(hitos.get(0).getMontoNeto()).isEqualByComparingTo("90.00");
+        assertThat(hitos.get(1).getMonto()).isEqualByComparingTo("90.00");
+
+        BigDecimal sumaMontos = hitos.stream()
+            .map(HitoPresupuesto::getMonto)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sumaNetos = hitos.stream()
+            .map(HitoPresupuesto::getMontoNeto)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        assertThat(sumaMontos).isEqualByComparingTo("180.00");
+        assertThat(sumaNetos).isEqualByComparingTo("180.00");
+    }
+
+    @Test
+    void descuento_seLimitaALaComisionDisponible() {
+        List<HitoPresupuesto> hitos = construirConDescuento(
+            List.of(hito("50"), hito("50")),
+            "200.00", "200.00", "20.00", "20.00", "50.00");
+
+        assertThat(hitos.get(0).getMonto()).isEqualByComparingTo("90.00");
+        assertThat(hitos.get(0).getComisionMonto()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void descuento_sinComisionNoDescuenta() {
+        List<HitoPresupuesto> hitos = construirConDescuento(
+            List.of(hito("100")),
+            "200.00", "200.00", "0.00", "0.00", "10.00");
+
+        assertThat(hitos.get(0).getMonto()).isEqualByComparingTo("200.00");
+        assertThat(hitos.get(0).getMontoNeto()).isEqualByComparingTo("200.00");
+    }
+
+    @Test
+    void descuento_conTresHitosCierraExacto() {
+        List<HitoPresupuesto> hitos = construirConDescuento(
+            List.of(hito("33.33"), hito("33.33"), hito("33.34")),
+            "100.00", "100.00", "10.00", "10.00", "10.00");
+
+        BigDecimal sumaMontos = hitos.stream()
+            .map(HitoPresupuesto::getMonto)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        assertThat(sumaMontos).isEqualByComparingTo("90.00");
+        assertThat(hitos.get(0).getMonto()).isEqualByComparingTo("30.00");
+        assertThat(hitos.get(1).getMonto()).isEqualByComparingTo("30.00");
+        assertThat(hitos.get(2).getMonto()).isEqualByComparingTo("30.00");
+    }
+
+    private List<HitoPresupuesto> construirConDescuento(
+            List<HitoPresupuestoRequest> requests,
+            String precioFinal,
+            String precioFinalCobro,
+            String comision,
+            String comisionCobro,
+            String descuento) {
+        return HitoCalculadora.construir(
+            requests,
+            new BigDecimal(precioFinal),
+            new BigDecimal(precioFinalCobro),
+            new BigDecimal(comision),
+            new BigDecimal(comisionCobro),
+            new BigDecimal(descuento),
+            LIMITES);
+    }
+
     private List<HitoPresupuesto> construir(
             List<HitoPresupuestoRequest> requests,
             String precioFinal,

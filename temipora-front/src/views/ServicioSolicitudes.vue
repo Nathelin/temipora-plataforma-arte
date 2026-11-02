@@ -266,7 +266,7 @@ onMounted(cargar)
           >
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <router-link
-                :to="{ name: 'solicitud-detalle', params: { idSolicitud: solicitud.idSolicitud } }"
+                :to="{ name: 'panel-solicitud-detalle', params: { idSolicitud: solicitud.idSolicitud } }"
                 class="group flex min-w-0 items-start gap-3"
               >
                 <img

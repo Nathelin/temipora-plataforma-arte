@@ -26,6 +26,19 @@ const aceptaEspera = ref(false)
 const prioridadDefinida = ref(false)
 const items = ref([crearItem()])
 const urlsSubidas = new Set()
+const oferta = ref(null)
+
+const idOferta = computed(() => {
+  const valor = Number(route.query.oferta)
+  return Number.isFinite(valor) && valor > 0 ? valor : null
+})
+const ofertaAplicable = computed(() =>
+  oferta.value?.vigente ? oferta.value : null,
+)
+const descuentoOferta = computed(() => {
+  const valor = Number(ofertaAplicable.value?.porcentajeDescuento)
+  return Number.isFinite(valor) ? valor : 0
+})
 
 const PASOS = [
   { n: 1, label: 'Términos' },
@@ -139,6 +152,27 @@ async function cargar() {
   try {
     const res = await api.get(`/servicios/${idServicio.value}/solicitud-publica`)
     solicitudPublica.value = res.data
+    if (idOferta.value) {
+      try {
+        const ofertaRes = await api.get(`/ofertas/${idOferta.value}`)
+        oferta.value = ofertaRes.data
+      } catch (e) {
+        oferta.value = null
+        const status = e.response?.status
+        if (status === 403) {
+          errorCarga.value =
+            'Esta oferta no pertenece a tu cuenta. Iniciá sesión con la cuenta correcta para usarla.'
+          return
+        }
+        if (status === 404) {
+          errorCarga.value = 'La oferta no existe o ya no está disponible.'
+          return
+        }
+        errorCarga.value =
+          'No pudimos validar la oferta de este link. Probá de nuevo en un rato.'
+        return
+      }
+    }
     ajustarCantidad()
   } catch (e) {
     errorCarga.value =
@@ -314,6 +348,7 @@ async function enviar() {
     const definirPrioridad = items.value.length > 1 && prioridadDefinida.value
     const payload = {
       idServicio: idServicio.value,
+      idOferta: ofertaAplicable.value?.idOferta ?? null,
       idTerminos: terminos.value.idTerminos,
       terminosVersion: terminos.value.version,
       aceptaTerminos: true,
@@ -384,6 +419,25 @@ onBeforeUnmount(() => {
         <p v-if="servicio" class="mt-1 text-sm text-cafe/60">
           {{ servicio.nombre }} · por @{{ servicio.nombreArtista }}
         </p>
+
+        <div
+          v-if="oferta"
+          class="mt-4 rounded-2xl border px-4 py-3 text-sm"
+          :class="ofertaAplicable
+            ? 'border-coral/30 bg-coral/5 text-granate'
+            : 'border-rojizo/30 bg-rojizo/5 text-rojizo'"
+        >
+          <template v-if="ofertaAplicable">
+            <p class="font-bold">Descuento del {{ descuentoOferta }}% aplicado</p>
+            <p class="mt-1 text-cafe/75">
+              Temipora financia el descuento. Se va a aplicar sobre el presupuesto que envíe el artista.
+            </p>
+          </template>
+          <template v-else>
+            <p class="font-bold">La oferta venció</p>
+            <p class="mt-1 text-cafe/75">Podés enviar la solicitud sin descuento.</p>
+          </template>
+        </div>
 
         <nav aria-label="Pasos de la solicitud" class="mt-6">
           <ol class="mx-auto flex w-full max-w-3xl items-start">

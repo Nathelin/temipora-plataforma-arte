@@ -26,6 +26,7 @@ import com.temipora.backend_springboot.modelo.QuitarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
 import com.temipora.backend_springboot.servicios.UsuarioService;
+import com.temipora.backend_springboot.servicios.VisitaService;
 
 import jakarta.validation.Valid;
 
@@ -34,9 +35,13 @@ import jakarta.validation.Valid;
 public class UsuarioController {
 
 	private final UsuarioService usuarioService;
+	private final VisitaService visitaService;
 
-	public UsuarioController(UsuarioService usuarioService) {
+	public UsuarioController(
+			UsuarioService usuarioService,
+			VisitaService visitaService) {
 		this.usuarioService = usuarioService;
+		this.visitaService = visitaService;
 	}
 
 	@GetMapping("/usuarios")
@@ -52,9 +57,28 @@ public class UsuarioController {
 	}
 
 	@GetMapping("/perfil/{nombreUsuario}")
-	public UsuarioDTO obtenerPerfil(@PathVariable String nombreUsuario) {
+	public UsuarioDTO obtenerPerfil(
+			@PathVariable String nombreUsuario,
+			Authentication authentication) {
 		Usuario usuario = usuarioService.getByNombreUsuario(nombreUsuario);
+		Long viewerId = idAutenticado(authentication);
+		if (viewerId != null
+				&& usuario.getRol() != null
+				&& usuario.getRol().getNombre() == ERol.ARTISTA) {
+			visitaService.registrarArtista(viewerId, usuario.getIdUsuario());
+		}
 		return UsuarioDTO.desdeUsuario(usuario);
+	}
+
+	private Long idAutenticado(Authentication authentication) {
+		if (authentication == null
+				|| !authentication.isAuthenticated()
+				|| authentication.getName() == null
+				|| "anonymousUser".equals(authentication.getName())) {
+			return null;
+		}
+		return usuarioService.getByNombreUsuario(authentication.getName())
+			.getIdUsuario();
 	}
 
     @PutMapping("/usuarios/{idUsuario}/perfil")

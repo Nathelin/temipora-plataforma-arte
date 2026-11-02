@@ -17,6 +17,7 @@ const errorEdicion = ref('')
 const form = ref({
   preferenciaSensible: 'ADVERTIR',
   pedidosPublicos: false,
+  recibirEmailsPromocionales: true,
 })
 
 const idUsuario = ref(null)
@@ -25,7 +26,8 @@ const estadoGuardado = ref(null)
 const hayCambios = computed(
   () => estadoGuardado.value !== null
     && (estadoGuardado.value.preferenciaSensible !== form.value.preferenciaSensible
-      || estadoGuardado.value.pedidosPublicos !== form.value.pedidosPublicos),
+      || estadoGuardado.value.pedidosPublicos !== form.value.pedidosPublicos
+      || estadoGuardado.value.recibirEmailsPromocionales !== form.value.recibirEmailsPromocionales),
 )
 
 const { actualizar: marcarCambios, limpiar: limpiarCambios } = useCambiosSinGuardar()
@@ -49,6 +51,8 @@ async function cargar() {
     idUsuario.value = d.idUsuario
     form.value.preferenciaSensible = d.preferenciaSensible || 'ADVERTIR'
     form.value.pedidosPublicos = Boolean(d.pedidosPublicos)
+    form.value.recibirEmailsPromocionales =
+      d.recibirEmailsPromocionales ?? true
     estadoGuardado.value = { ...form.value }
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo cargar la configuración.'
@@ -65,12 +69,15 @@ async function guardar() {
     const payload = {
       preferenciaSensible: form.value.preferenciaSensible,
       pedidosPublicos: form.value.pedidosPublicos,
+      recibirEmailsPromocionales: form.value.recibirEmailsPromocionales,
     }
 
     const r = await api.put(`/usuarios/${idUsuario.value}/perfil`, payload)
 
     form.value.preferenciaSensible = r.data.preferenciaSensible
     form.value.pedidosPublicos = Boolean(r.data.pedidosPublicos)
+    form.value.recibirEmailsPromocionales =
+      Boolean(r.data.recibirEmailsPromocionales)
     estadoGuardado.value = { ...form.value }
     mensaje.value = 'Cambios guardados correctamente.'
   } catch (e) {
@@ -93,6 +100,45 @@ onBeforeUnmount(limpiarCambios)
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
 
     <div v-else class="space-y-6">
+      <div>
+        <h3 class="text-base text-granate pt-2">Comunicaciones</h3>
+        <p class="text-sm text-cafe/70">
+          Elegí si querés recibir correos con ofertas y promociones de Temipora.
+        </p>
+
+        <div
+          class="mt-3 rounded-xl border-2 p-4 transition"
+          :class="form.recibirEmailsPromocionales ? 'border-coral bg-coral/10' : 'border-rosa/30'"
+        >
+          <div class="flex items-start gap-3">
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="form.recibirEmailsPromocionales"
+              class="relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema"
+              :class="form.recibirEmailsPromocionales ? 'bg-coral' : 'bg-rosa/70'"
+              @click="form.recibirEmailsPromocionales = !form.recibirEmailsPromocionales"
+            >
+              <span
+                class="inline-block h-4 w-4 rounded-full bg-white shadow transition"
+                :class="form.recibirEmailsPromocionales ? 'translate-x-6' : 'translate-x-1'"
+              ></span>
+            </button>
+            <div class="min-w-0">
+              <p class="text-base font-medium text-granate">
+                {{ form.recibirEmailsPromocionales ? 'Recibí correos con ofertas' : 'No recibir correos con ofertas' }}
+              </p>
+              <p class="mt-1 text-sm leading-relaxed text-cafe/70">
+                Si lo desactivás, vas a seguir viendo las ofertas dentro de la app, pero no te vamos a enviar correos promocionales.
+              </p>
+              <p class="mt-1 text-sm leading-relaxed text-cafe/70">
+                Podés volver a activarlo cuando quieras.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div>
         <h3 class="text-base text-granate pt-2">Galería de pedidos</h3>
         <p class="text-sm text-cafe/70">

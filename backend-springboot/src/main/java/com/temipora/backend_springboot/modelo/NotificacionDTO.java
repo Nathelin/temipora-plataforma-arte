@@ -23,6 +23,7 @@ public class NotificacionDTO {
     private String codigoTipo;
     private Long idReferencia;
     private String tipoReferencia;
+    private String rolReferencia;
     private boolean leida;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaLectura;

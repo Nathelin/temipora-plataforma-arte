@@ -28,6 +28,7 @@ import com.temipora.backend_springboot.modelo.ItemSolicitudRequest;
 import com.temipora.backend_springboot.modelo.ListaEspera;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.OfertaReactivacion;
 import com.temipora.backend_springboot.modelo.Pregunta;
 import com.temipora.backend_springboot.modelo.PreguntaDTO;
 import com.temipora.backend_springboot.modelo.Respuesta;
@@ -108,6 +109,7 @@ public class SolicitudServicioService {
     private final ReseniaPublicaService reseniaPublicaService;
     private final ConversacionService conversacionService;
     private final ConversacionRepository conversacionRepository;
+    private final OfertaReactivacionService ofertaReactivacionService;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -125,7 +127,8 @@ public class SolicitudServicioService {
             MonedaVistaService monedaVistaService,
             ReseniaPublicaService reseniaPublicaService,
             ConversacionService conversacionService,
-            ConversacionRepository conversacionRepository) {
+            ConversacionRepository conversacionRepository,
+            OfertaReactivacionService ofertaReactivacionService) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -142,6 +145,7 @@ public class SolicitudServicioService {
         this.reseniaPublicaService = reseniaPublicaService;
         this.conversacionService = conversacionService;
         this.conversacionRepository = conversacionRepository;
+        this.ofertaReactivacionService = ofertaReactivacionService;
     }
 
     @Transactional(readOnly = true)
@@ -303,6 +307,12 @@ public class SolicitudServicioService {
                 "Aceptá la lista de espera para enviar la solicitud.");
         }
 
+        OfertaReactivacion oferta = null;
+        if (request.getIdOferta() != null) {
+            oferta = ofertaReactivacionService.validarParaSolicitud(
+                request.getIdOferta(), idCliente, servicio.getIdServicio());
+        }
+
         List<ItemPreparado> ordenados = new ArrayList<>(preparados);
         if (request.isPrioridadDefinida()) {
             validarPrioridades(ordenados);
@@ -327,6 +337,10 @@ public class SolicitudServicioService {
             request.isPrioridadDefinida(),
             estado,
             ordenados);
+        if (oferta != null) {
+            solicitud.setOfertaReactivacion(oferta);
+            oferta.setSolicitud(solicitud);
+        }
         solicitudRepository.save(solicitud);
 
         conversacionService.asegurarPorSolicitud(

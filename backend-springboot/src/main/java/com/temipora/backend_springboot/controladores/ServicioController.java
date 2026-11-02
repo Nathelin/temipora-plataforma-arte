@@ -17,12 +17,16 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.temipora.backend_springboot.modelo.FiltroServicioRequest;
+import com.temipora.backend_springboot.modelo.OrdenServicio;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
+import com.temipora.backend_springboot.modelo.RecomendacionArtistaDTO;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.ServicioRequest;
 import com.temipora.backend_springboot.modelo.ServicioResumenEstadoDTO;
 import com.temipora.backend_springboot.servicios.ServicioBajaService;
 import com.temipora.backend_springboot.servicios.ServicioService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
+import com.temipora.backend_springboot.servicios.VisitaService;
 
 import jakarta.validation.Valid;
 
@@ -33,14 +37,17 @@ public class ServicioController {
     private final ServicioService servicioService;
     private final ServicioBajaService servicioBajaService;
     private final UsuarioService usuarioService;
+    private final VisitaService visitaService;
 
     public ServicioController(
             ServicioService servicioService,
             ServicioBajaService servicioBajaService,
-            UsuarioService usuarioService) {
+            UsuarioService usuarioService,
+            VisitaService visitaService) {
         this.servicioService = servicioService;
         this.servicioBajaService = servicioBajaService;
         this.usuarioService = usuarioService;
+        this.visitaService = visitaService;
     }
 
     @GetMapping("/mis-servicios")
@@ -50,7 +57,7 @@ public class ServicioController {
     }
 
     @GetMapping("/servicios")
-    public List<ServicioDTO> listar(
+    public PaginaDTO<ServicioDTO> listar(
             @RequestParam(required = false) String nombre,
             @RequestParam(required = false) String nombreArtista,
             @RequestParam(required = false) Long idTipoServicio,
@@ -58,6 +65,9 @@ public class ServicioController {
             @RequestParam(required = false) BigDecimal precioMin,
             @RequestParam(required = false) BigDecimal precioMax,
             @RequestParam(required = false) Integer tiempoMaxDias,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "24") int tamanio,
+            @RequestParam(defaultValue = "RELEVANCIA") OrdenServicio orden,
             Authentication authentication) {
         FiltroServicioRequest filtro = new FiltroServicioRequest();
         filtro.setNombre(nombre);
@@ -67,7 +77,8 @@ public class ServicioController {
         filtro.setPrecioMin(precioMin);
         filtro.setPrecioMax(precioMax);
         filtro.setTiempoMaxDias(tiempoMaxDias);
-        return servicioService.listarActivos(filtro, idVisor(authentication));
+        return servicioService.listarActivosPaginado(
+            filtro, idVisor(authentication), pagina, tamanio, orden);
     }
 
     @GetMapping("/servicios/artista/{nombreUsuario}")
@@ -79,7 +90,22 @@ public class ServicioController {
 
     @GetMapping("/servicios/{id}")
     public ServicioDTO obtener(@PathVariable Long id, Authentication authentication) {
-        return servicioService.obtener(id, idVisor(authentication));
+        Long viewerId = idVisor(authentication);
+        ServicioDTO servicio = servicioService.obtener(id, viewerId);
+        if (viewerId != null
+                && servicio.getIdArtista() != null
+                && !viewerId.equals(servicio.getIdArtista())) {
+            visitaService.registrarServicio(viewerId, id);
+            visitaService.registrarArtista(viewerId, servicio.getIdArtista());
+        }
+        return servicio;
+    }
+
+    @GetMapping("/servicios/{id}/similares")
+    public List<RecomendacionArtistaDTO> similares(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return servicioService.artistasSimilares(id, idVisor(authentication));
     }
 
     @PostMapping("/servicios")

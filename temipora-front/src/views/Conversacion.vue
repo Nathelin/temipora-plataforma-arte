@@ -96,7 +96,7 @@ function volver() {
   }
   if (idSolicitudOrigen.value) {
     router.push({
-      name: 'solicitud-detalle',
+      name: enPanel.value ? 'panel-solicitud-detalle' : 'solicitud-detalle',
       params: { idSolicitud: idSolicitudOrigen.value },
     })
     return

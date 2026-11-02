@@ -8,6 +8,7 @@ import ResumenResenias from '../components/ResumenResenias.vue'
 import TarjetaReseniaPublica from '../components/TarjetaReseniaPublica.vue'
 import ModalResenias from '../components/ModalResenias.vue'
 import VisorImagenes from '../components/VisorImagenes.vue'
+import TarjetaArtistaRecomendado from '../components/TarjetaArtistaRecomendado.vue'
 import {
   cargarReseniasServicio,
   cargarResumenReseniasArtista,
@@ -34,6 +35,7 @@ const actualizandoFavorito = ref(false)
 
 const artista = ref(null)
 const resumenArtista = ref(null)
+const artistasSimilares = ref([])
 
 const resumenResenias = ref(null)
 const reseniasPreview = ref([])
@@ -265,7 +267,12 @@ function irASolicitar() {
     router.push({ name: 'login' })
     return
   }
-  router.push({ name: 'solicitud-servicio', params: { id: servicio.value.idServicio } })
+  const idOferta = servicio.value?.idOferta ?? route.query.oferta
+  router.push({
+    name: 'solicitud-servicio',
+    params: { id: servicio.value.idServicio },
+    query: idOferta ? { oferta: idOferta } : {},
+  })
 }
 
 function irAResenias() {
@@ -281,6 +288,15 @@ function aplicarSolicitudPublica(data) {
   terminos.value = data.terminos
   disponibilidad.value = data.disponibilidad
   terminosValidos.value = !!data.terminosValidos
+}
+
+async function cargarSimilares() {
+  try {
+    const res = await api.get(`/servicios/${route.params.id}/similares`)
+    artistasSimilares.value = Array.isArray(res.data) ? res.data : []
+  } catch {
+    artistasSimilares.value = []
+  }
 }
 
 async function cargarEstadoFavorito() {
@@ -465,6 +481,7 @@ onMounted(async () => {
   await cargar()
   if (servicio.value) {
     void cargarArtista()
+    void cargarSimilares()
     await cargarReseniasPreview()
   }
   void cargarEstadoFavorito()
@@ -494,6 +511,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
         <span aria-hidden="true">›</span>
         <span class="font-semibold text-granate">{{ servicio.nombre }}</span>
       </nav>
+
+      <div
+        v-if="Number(servicio.descuentoOfertaPorcentaje) > 0"
+        class="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-coral/30 bg-coral/5 px-4 py-3 text-sm text-granate"
+      >
+        <span class="rounded-full bg-coral px-2.5 py-1 text-xs font-extrabold text-white">
+          -{{ Number(servicio.descuentoOfertaPorcentaje) }}%
+        </span>
+        <span>
+          Tenés un descuento para este servicio. Se aplica sobre el presupuesto
+          final que envíe el artista.
+        </span>
+      </div>
 
       <div class="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] lg:items-start">
         <section aria-label="Galería del servicio" class="order-1 min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
@@ -968,6 +998,36 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
               :ocultar-vacios="true"
             />
           </div>
+        </div>
+      </section>
+
+      <section v-if="artistasSimilares.length" class="mt-12">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p class="text-xs font-bold uppercase tracking-[0.18em] text-coral">
+              Para seguir explorando
+            </p>
+            <h2 class="mt-2 font-display text-3xl font-extrabold text-granate sm:text-4xl">
+              Artistas similares
+            </h2>
+            <p class="mt-1 text-sm text-cafe/60">
+              Mismo estilo o rango de precio, con cupos disponibles.
+            </p>
+          </div>
+          <router-link
+            to="/servicios"
+            class="text-sm font-bold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
+          >
+            Ver todos →
+          </router-link>
+        </div>
+
+        <div class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          <TarjetaArtistaRecomendado
+            v-for="recomendado in artistasSimilares"
+            :key="recomendado.idArtista"
+            :artista="recomendado"
+          />
         </div>
       </section>
 

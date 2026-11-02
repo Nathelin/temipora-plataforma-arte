@@ -31,6 +31,8 @@ public class SolicitudResumenDTO {
     // Importes listos para mostrar según la preferencia del usuario.
     private BigDecimal precioBaseMostrado;
     private BigDecimal precioFinalMostrado;
+    private BigDecimal precioFinalClienteMostrado;
+    private BigDecimal descuentoMostrado;
     private String monedaMostrada;
     private boolean prioridadDefinidaPorCliente;
     private LocalDateTime fechaCreacion;
@@ -90,6 +92,12 @@ public class SolicitudResumenDTO {
             .precioBaseMostrado(precioBaseMostrado)
             .precioFinalMostrado(presupuesto != null
                 ? presupuesto.getPrecioFinalMostrado()
+                : null)
+            .precioFinalClienteMostrado(presupuesto != null
+                ? presupuesto.getPrecioFinalClienteMostrado()
+                : null)
+            .descuentoMostrado(presupuesto != null
+                ? presupuesto.getDescuentoMostrado()
                 : null)
             .monedaMostrada(presupuesto != null
                 ? presupuesto.getMonedaMostrada()

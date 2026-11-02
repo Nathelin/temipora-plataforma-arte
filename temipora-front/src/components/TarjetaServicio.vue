@@ -40,13 +40,24 @@ const precioMostrado = computed(() =>
 const precioConvertido = computed(
   () => !!props.servicio.monedaMostrada && props.servicio.monedaMostrada !== props.servicio.moneda,
 )
+const descuentoOferta = computed(() => {
+  const valor = Number(props.servicio.descuentoOfertaPorcentaje)
+  return Number.isFinite(valor) && valor > 0 ? valor : 0
+})
 
 function textoEntrega(s) {
   return `${s.tiempoEntregaValor} ${(s.tiempoEntregaUnidad || '').toLowerCase()}`
 }
 
 function irAlServicio() {
-  router.push({ name: 'servicio-detalle', params: { id: props.servicio.idServicio } })
+  const query = props.servicio.idOferta
+    ? { oferta: props.servicio.idOferta }
+    : {}
+  router.push({
+    name: 'servicio-detalle',
+    params: { id: props.servicio.idServicio },
+    query,
+  })
 }
 
 function irAlArtista() {
@@ -81,6 +92,12 @@ function irAlArtista() {
           class="absolute right-4 top-4 rounded-full bg-granate/80 px-3 py-1 text-xs font-semibold text-inverso-contraste backdrop-blur-sm"
         >
           Sensible
+        </span>
+        <span
+          v-if="descuentoOferta"
+          class="absolute bottom-3 left-3 rounded-full bg-coral px-3 py-1 text-xs font-extrabold text-white shadow-sm"
+        >
+          -{{ descuentoOferta }}%
         </span>
       </button>
 
@@ -180,6 +197,12 @@ function irAlArtista() {
             {{ precioMostrado }}
             <span v-if="precioConvertido" class="text-sm text-cafe/40" :title="`Precio original: ${formatearPrecio(servicio.precioBase, servicio.moneda)}`">≈</span>
           </p>
+          <span
+            v-if="descuentoOferta"
+            class="mt-1 inline-flex items-center gap-1 rounded-full bg-mantequilla px-2.5 py-1 text-[11px] font-bold text-tinta"
+          >
+            {{ descuentoOferta }}% en tu presupuesto final
+          </span>
         </div>
         <div class="flex flex-wrap justify-end gap-1.5 text-[11px] font-medium text-cafe/60">
           <span class="rounded-full bg-crema px-2.5 py-1">{{ textoEntrega(servicio) }}</span>

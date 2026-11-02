@@ -12,6 +12,7 @@ import CotizacionAdmin from '../components/CotizacionAdmin.vue'
 import MonedasAdmin from '../components/MonedasAdmin.vue'
 import PresupuestoAdmin from '../components/PresupuestoAdmin.vue'
 import ComisionAdmin from '../components/ComisionAdmin.vue'
+import PromocionesAdmin from '../components/PromocionesAdmin.vue'
 import PedidoConfigAdmin from '../components/PedidoConfigAdmin.vue'
 import ConfiguracionMensajeriaAdmin from '../components/ConfiguracionMensajeriaAdmin.vue'
 import TerminosPlataformaAdmin from '../components/TerminosPlataformaAdmin.vue'
@@ -42,6 +43,7 @@ import PagoPresupuesto from '../views/PagoPresupuesto.vue'
 import Pedidos from '../views/Pedidos.vue'
 import PedidoDetalle from '../views/PedidoDetalle.vue'
 import Notificaciones from '../views/Notificaciones.vue'
+import Ofertas from '../views/Ofertas.vue'
 import Mensajes from '../views/Mensajes.vue'
 import Conversacion from '../views/Conversacion.vue'
 import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
@@ -83,6 +85,18 @@ const routes = [
         name: 'solicitud-servicio',
         component: SolicitudServicio,
         meta: { title: 'Solicitar servicio', requiresAuth: true, requiresComprador: true },
+      },
+      {
+        path: 'ofertas',
+        name: 'ofertas',
+        component: Ofertas,
+        meta: { title: 'Ofertas para vos', requiresAuth: true, requiresComprador: true },
+      },
+      {
+        path: 'ofertas/:token',
+        name: 'oferta-campana',
+        component: Ofertas,
+        meta: { title: 'Ofertas para vos' },
       },
       { path: 'perfil/:nombreUsuario', name: 'perfil', component: Perfil,
         meta: { title: (route) => `Perfil de @${route.params.nombreUsuario}` }
@@ -359,6 +373,12 @@ const routes = [
         meta: { title: 'Comisión de la plataforma' },
       },
       {
+        path: 'campanas/promociones',
+        name: 'admin-promociones',
+        component: PromocionesAdmin,
+        meta: { title: 'Promociones' },
+      },
+      {
         path: 'ajustes/pedidos',
         name: 'pedidos-admin',
         component: PedidoConfigAdmin,
@@ -455,7 +475,7 @@ router.beforeEach((to, from, next) => {
   }
 
   if (to.matched.some((r) => r.meta.requiresAuth) && !token) {
-    next({ name: 'login' })
+    next({ name: 'login', query: { redirect: to.fullPath } })
     return
   }
 

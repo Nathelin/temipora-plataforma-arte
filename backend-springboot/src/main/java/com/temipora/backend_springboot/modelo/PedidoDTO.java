@@ -34,6 +34,13 @@ public class PedidoDTO {
     private BigDecimal precioFinal;
     private BigDecimal precioFinalCobro;
     private BigDecimal precioFinalMostrado;
+    private BigDecimal descuentoPorcentaje;
+    private BigDecimal descuentoMonto;
+    private BigDecimal descuentoMontoCobro;
+    private BigDecimal descuentoMostrado;
+    private BigDecimal precioFinalCliente;
+    private BigDecimal precioFinalClienteCobro;
+    private BigDecimal precioFinalClienteMostrado;
     private String moneda;
     private String monedaCobro;
     private String monedaMostrada;

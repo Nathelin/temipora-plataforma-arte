@@ -16,6 +16,12 @@ public class SolicitudServicioRequest {
     @NotNull(message = "El servicio es obligatorio.")
     private Long idServicio;
 
+    /**
+     * Oferta de reactivación elegida por el cliente, si la solicitud viene
+     * desde una campaña. Es opcional.
+     */
+    private Long idOferta;
+
     @NotNull(message = "Los términos aceptados son obligatorios.")
     private Long idTerminos;
 

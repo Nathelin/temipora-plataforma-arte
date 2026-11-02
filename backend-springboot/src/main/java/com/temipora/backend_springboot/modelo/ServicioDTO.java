@@ -56,6 +56,8 @@ public class ServicioDTO {
     private Long solicitudesActivas;
     private BigDecimal calificacionPromedio;
     private Long cantidadResenias;
+    private Long idOferta;
+    private BigDecimal descuentoOfertaPorcentaje;
     private LocalDateTime pausadoEn;
     private LocalDateTime archivadoEn;
 

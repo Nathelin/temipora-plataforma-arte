@@ -57,8 +57,31 @@ const hitos = computed(() => props.presupuesto?.hitos || [])
 const monedaMostrada = computed(
   () => props.presupuesto?.monedaMostrada || props.presupuesto?.moneda,
 )
-const totalMostrado = computed(
-  () => props.presupuesto?.precioFinalMostrado ?? props.presupuesto?.precioFinal,
+const totalMostrado = computed(() => {
+  const presupuesto = props.presupuesto
+  if (!presupuesto) return null
+  if (props.esArtista) {
+    return presupuesto.precioFinalMostrado ?? presupuesto.precioFinal
+  }
+  return presupuesto.precioFinalClienteMostrado
+    ?? presupuesto.precioFinalMostrado
+    ?? presupuesto.precioFinal
+})
+const totalCobroMostrado = computed(() => {
+  const presupuesto = props.presupuesto
+  if (!presupuesto) return null
+  return props.esArtista
+    ? presupuesto.precioFinalCobro
+    : (presupuesto.precioFinalClienteCobro ?? presupuesto.precioFinalCobro)
+})
+const descuentoPorcentaje = computed(() => {
+  const valor = Number(props.presupuesto?.descuentoPorcentaje)
+  return Number.isFinite(valor) ? valor : 0
+})
+const descuentoMostrado = computed(
+  () => props.presupuesto?.descuentoMostrado
+    ?? props.presupuesto?.descuentoMonto
+    ?? 0,
 )
 const baseMostrada = computed(
   () => props.presupuesto?.precioBaseTotalMostrado ?? props.presupuesto?.precioBaseTotal,
@@ -139,10 +162,17 @@ function formatearRecargo(recargo) {
       Precio base {{ formatearMoneda(baseMostrada) }} + recargos
     </p>
     <p
+      v-if="!esArtista && Number(descuentoMostrado) > 0"
+      class="mt-2 inline-flex items-center gap-2 rounded-full bg-mantequilla px-3 py-1 text-xs font-bold text-tinta"
+    >
+      Descuento de reactivación ({{ descuentoPorcentaje }}%):
+      − {{ formatearMoneda(descuentoMostrado) }}
+    </p>
+    <p
       v-if="cobroDistinto"
       class="mt-2 text-sm font-semibold text-granate"
     >
-      Total a pagar: {{ formatearPrecio(presupuesto.precioFinalCobro, presupuesto.monedaCobro) }}
+      Total a pagar: {{ formatearPrecio(totalCobroMostrado, presupuesto.monedaCobro) }}
     </p>
     <p
       v-if="cotizacionAlEmitir"
@@ -176,7 +206,9 @@ function formatearRecargo(recargo) {
         </div>
       </dl>
       <p class="mt-2 text-xs leading-relaxed text-cafe/50">
-        La comisión se descuenta de tu precio. El cliente paga el total sin cambios.
+        {{ Number(descuentoMostrado) > 0
+          ? 'El descuento de reactivación lo absorbe la plataforma: tu neto no cambia.'
+          : 'La comisión se descuenta de tu precio. El cliente paga el total sin cambios.' }}
       </p>
     </div>
 

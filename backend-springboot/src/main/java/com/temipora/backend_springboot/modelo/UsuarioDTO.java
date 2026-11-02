@@ -39,6 +39,7 @@ public class UsuarioDTO {
     private String urlBanner;
     private EPreferenciaContenidoSensible preferenciaSensible;
     private boolean pedidosPublicos;
+    private boolean recibirEmailsPromocionales;
     private Long idMonedaPreferida;
     private String monedaPreferida;
     private String rol;
@@ -68,6 +69,7 @@ public class UsuarioDTO {
             .urlBanner(usuario.getUrlBanner())
             .preferenciaSensible(usuario.getPreferenciaSensible())
             .pedidosPublicos(usuario.isPedidosPublicos())
+            .recibirEmailsPromocionales(usuario.isRecibirEmailsPromocionales())
             .idMonedaPreferida(usuario.getMonedaPreferida() != null
                 ? usuario.getMonedaPreferida().getIdMoneda() : null)
             .monedaPreferida(usuario.getMonedaPreferida() != null
