@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -36,6 +38,7 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class AuditoriaService {
 
+    private static final Logger log = LoggerFactory.getLogger(AuditoriaService.class);
     private static final int TAMANIO_MAXIMO = 100;
     private static final int RESUMEN_MAXIMO = 500;
     private static final int MOTIVO_MAXIMO = 500;
@@ -90,7 +93,11 @@ public class AuditoriaService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void registrarSistema(String accion, String entidad, Object entidadId, String resumen) {
-        guardar(accion, entidad, entidadId, resumen, List.of(), null);
+        try {
+            guardar(accion, entidad, entidadId, resumen, List.of(), null);
+        } catch (RuntimeException e) {
+            log.warn("No se pudo registrar la auditoría de {}: {}", accion, e.getMessage());
+        }
     }
 
     @Transactional(readOnly = true)

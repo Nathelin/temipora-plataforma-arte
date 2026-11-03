@@ -66,6 +66,15 @@ public final class AccionesAdmin {
     public static final String SERVICIO_RESTAURAR = "SERVICIO_RESTAURAR";
     public static final String PEDIDO_PROCESAR = "PEDIDO_PROCESAR";
 
+    public static final String CRITERIO_CREAR = "CRITERIO_CREAR";
+    public static final String CRITERIO_MODIFICAR = "CRITERIO_MODIFICAR";
+    public static final String CRITERIO_BAJA = "CRITERIO_BAJA";
+    public static final String CRITERIO_REACTIVAR = "CRITERIO_REACTIVAR";
+    public static final String CRITERIO_OPCION_CREAR = "CRITERIO_OPCION_CREAR";
+    public static final String CRITERIO_OPCION_MODIFICAR = "CRITERIO_OPCION_MODIFICAR";
+    public static final String CRITERIO_OPCION_BAJA = "CRITERIO_OPCION_BAJA";
+    public static final String CRITERIO_OPCION_REACTIVAR = "CRITERIO_OPCION_REACTIVAR";
+
     private AccionesAdmin() {
     }
 }

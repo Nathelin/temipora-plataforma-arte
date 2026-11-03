@@ -24,20 +24,39 @@ import com.temipora.backend_springboot.repositorios.ReseniaValorRepository;
 @Validated
 public class CriterioReseniaService {
 
+    private static final String ENTIDAD = "CriterioResenia";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("nombre", "Nombre"),
+        CampoAuditado.de("descripcion", "Descripción"),
+        CampoAuditado.de("observaciones", "Observaciones"),
+        CampoAuditado.de("ambito", "Ámbito"),
+        CampoAuditado.de("escala", "Escala"),
+        CampoAuditado.de("obligatorio", "Obligatorio"),
+        CampoAuditado.de("orden", "Orden"),
+        CampoAuditado.de("activo", "Activo"));
+    private static final List<CampoAuditado> CAMPOS_OPCION = List.of(
+        CampoAuditado.de("etiqueta", "Etiqueta"),
+        CampoAuditado.de("polaridad", "Polaridad"),
+        CampoAuditado.de("orden", "Orden"),
+        CampoAuditado.de("activo", "Activa"));
+
     private final CriterioReseniaRepository criterioRepository;
     private final OpcionCriterioRepository opcionRepository;
     private final ReseniaValorRepository valorRepository;
     private final ReseniaOpcionRepository reseniaOpcionRepository;
+    private final AuditoriaService auditoria;
 
     public CriterioReseniaService(
             CriterioReseniaRepository criterioRepository,
             OpcionCriterioRepository opcionRepository,
             ReseniaValorRepository valorRepository,
-            ReseniaOpcionRepository reseniaOpcionRepository) {
+            ReseniaOpcionRepository reseniaOpcionRepository,
+            AuditoriaService auditoria) {
         this.criterioRepository = criterioRepository;
         this.opcionRepository = opcionRepository;
         this.valorRepository = valorRepository;
         this.reseniaOpcionRepository = reseniaOpcionRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional(readOnly = true)
@@ -78,12 +97,17 @@ public class CriterioReseniaService {
             .activo(true)
             .build();
 
-        return aDto(criterioRepository.save(criterio));
+        CriterioResenia guardado = criterioRepository.save(criterio);
+        auditoria.registrar(
+            AccionesAdmin.CRITERIO_CREAR, ENTIDAD, guardado.getIdCriterioResenia(),
+            "Creó el criterio “" + guardado.getNombre() + "”", null, guardado, CAMPOS);
+        return aDto(guardado);
     }
 
     @Transactional
     public CriterioReseniaDTO modificar(Long id, CriterioReseniaRequest request) {
         CriterioResenia criterio = obtener(id);
+        Snapshot antes = Snapshot.de(criterio, CAMPOS);
         boolean tieneResenias = contarResenias(criterio) > 0;
         boolean cambiaAmbito = criterio.getAmbito() != request.getAmbito();
 
@@ -103,21 +127,35 @@ public class CriterioReseniaService {
         criterio.setObligatorio(request.isObligatorio());
         criterio.setOrden(request.getOrden() != null ? request.getOrden() : 0);
 
-        return aDto(criterioRepository.save(criterio));
+        CriterioResenia guardado = criterioRepository.save(criterio);
+        auditoria.registrar(
+            AccionesAdmin.CRITERIO_MODIFICAR, ENTIDAD, guardado.getIdCriterioResenia(),
+            "Modificó el criterio “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return aDto(guardado);
     }
 
     @Transactional
     public CriterioReseniaDTO darDeBaja(Long id) {
         CriterioResenia criterio = obtener(id);
+        Snapshot antes = Snapshot.de(criterio, CAMPOS);
         criterio.setActivo(false);
-        return aDto(criterioRepository.save(criterio));
+        CriterioResenia guardado = criterioRepository.save(criterio);
+        auditoria.registrar(
+            AccionesAdmin.CRITERIO_BAJA, ENTIDAD, guardado.getIdCriterioResenia(),
+            "Dio de baja el criterio “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return aDto(guardado);
     }
 
     @Transactional
     public CriterioReseniaDTO darDeAlta(Long id) {
         CriterioResenia criterio = obtener(id);
+        Snapshot antes = Snapshot.de(criterio, CAMPOS);
         criterio.setActivo(true);
-        return aDto(criterioRepository.save(criterio));
+        CriterioResenia guardado = criterioRepository.save(criterio);
+        auditoria.registrar(
+            AccionesAdmin.CRITERIO_REACTIVAR, ENTIDAD, guardado.getIdCriterioResenia(),
+            "Reactivó el criterio “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return aDto(guardado);
     }
 
     @Transactional
@@ -140,14 +178,22 @@ public class CriterioReseniaService {
             .build();
         criterio.agregarOpcion(opcion);
 
-        return aDto(criterioRepository.save(criterio));
+        CriterioResenia guardado = criterioRepository.save(criterio);
+        auditoria.registrar(
+            AccionesAdmin.CRITERIO_OPCION_CREAR, ENTIDAD, guardado.getIdCriterioResenia(),
+            "Agregó la opción “" + opcion.getEtiqueta() + "” al criterio “"
+                + guardado.getNombre() + "”",
+            null, opcion, CAMPOS_OPCION);
+        return aDto(guardado);
     }
 
     @Transactional
     public CriterioReseniaDTO modificarOpcion(
             Long idCriterio, Long idOpcion, OpcionCriterioRequest request) {
+        CriterioResenia criterio = obtener(idCriterio);
         OpcionCriterio opcion = obtenerOpcion(idCriterio, idOpcion);
         validarEtiquetaUnica(idCriterio, request.getEtiqueta(), idOpcion);
+        Snapshot antes = Snapshot.de(opcion, CAMPOS_OPCION);
 
         opcion.setEtiqueta(request.getEtiqueta().trim());
         if (request.getPolaridad() != null) {
@@ -156,6 +202,11 @@ public class CriterioReseniaService {
         opcion.setOrden(request.getOrden() != null ? request.getOrden() : 0);
         opcionRepository.save(opcion);
 
+        auditoria.registrar(
+            AccionesAdmin.CRITERIO_OPCION_MODIFICAR, ENTIDAD, criterio.getIdCriterioResenia(),
+            "Modificó la opción “" + opcion.getEtiqueta() + "” del criterio “"
+                + criterio.getNombre() + "”",
+            antes, opcion, CAMPOS_OPCION);
         return aDto(obtener(idCriterio));
     }
 
@@ -172,18 +223,32 @@ public class CriterioReseniaService {
                 "No podés dar de baja la última opción activa de un criterio que ya tiene reseñas.");
         }
 
+        CriterioResenia criterio = obtener(idCriterio);
+        Snapshot antes = Snapshot.de(opcion, CAMPOS_OPCION);
         opcion.setActivo(false);
         opcionRepository.save(opcion);
 
+        auditoria.registrar(
+            AccionesAdmin.CRITERIO_OPCION_BAJA, ENTIDAD, criterio.getIdCriterioResenia(),
+            "Dio de baja la opción “" + opcion.getEtiqueta() + "” del criterio “"
+                + criterio.getNombre() + "”",
+            antes, opcion, CAMPOS_OPCION);
         return aDto(obtener(idCriterio));
     }
 
     @Transactional
     public CriterioReseniaDTO darDeAltaOpcion(Long idCriterio, Long idOpcion) {
+        CriterioResenia criterio = obtener(idCriterio);
         OpcionCriterio opcion = obtenerOpcion(idCriterio, idOpcion);
+        Snapshot antes = Snapshot.de(opcion, CAMPOS_OPCION);
         opcion.setActivo(true);
         opcionRepository.save(opcion);
 
+        auditoria.registrar(
+            AccionesAdmin.CRITERIO_OPCION_REACTIVAR, ENTIDAD, criterio.getIdCriterioResenia(),
+            "Reactivó la opción “" + opcion.getEtiqueta() + "” del criterio “"
+                + criterio.getNombre() + "”",
+            antes, opcion, CAMPOS_OPCION);
         return aDto(obtener(idCriterio));
     }
 

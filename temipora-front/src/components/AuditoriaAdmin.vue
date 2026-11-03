@@ -57,6 +57,14 @@ const ETIQUETAS_ACCION = {
   TERMINOS_PUBLICAR: 'Publicó una versión de los términos',
   SERVICIO_RESTAURAR: 'Restauró un servicio archivado',
   PEDIDO_PROCESAR: 'Procesó hitos de pedidos',
+  CRITERIO_CREAR: 'Creó un criterio de evaluación',
+  CRITERIO_MODIFICAR: 'Modificó un criterio de evaluación',
+  CRITERIO_BAJA: 'Dio de baja un criterio de evaluación',
+  CRITERIO_REACTIVAR: 'Reactivó un criterio de evaluación',
+  CRITERIO_OPCION_CREAR: 'Agregó una opción a un criterio',
+  CRITERIO_OPCION_MODIFICAR: 'Modificó una opción de un criterio',
+  CRITERIO_OPCION_BAJA: 'Dio de baja una opción de un criterio',
+  CRITERIO_OPCION_REACTIVAR: 'Reactivó una opción de un criterio',
 }
 
 const ETIQUETAS_ENTIDAD = {
@@ -78,6 +86,9 @@ const ETIQUETAS_ENTIDAD = {
   Resenia: 'Reseña',
   TerminosPlataforma: 'Términos de la plataforma',
   Servicio: 'Servicio',
+  CriterioResenia: 'Criterio de evaluación',
+  ConfiguracionCotizacion: 'Cotización',
+  Pedido: 'Pedido',
 }
 
 const eventos = ref([])
