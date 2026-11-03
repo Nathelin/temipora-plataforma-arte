@@ -12,7 +12,11 @@ let intervalo = null
 let cargaEnCurso = null
 
 function haySesion() {
-  return Boolean(localStorage.getItem('token'))
+  if (!localStorage.getItem('token')) {
+    return false
+  }
+  const rol = localStorage.getItem('rol')
+  return !rol || rol === 'CLIENTE' || rol === 'ARTISTA'
 }
 
 async function cargarContador({ silencioso = false } = {}) {

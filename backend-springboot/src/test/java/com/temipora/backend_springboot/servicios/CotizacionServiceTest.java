@@ -43,6 +43,9 @@ class CotizacionServiceTest {
     @Mock
     private CotizacionApiClient apiClient;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private CotizacionService service;
 

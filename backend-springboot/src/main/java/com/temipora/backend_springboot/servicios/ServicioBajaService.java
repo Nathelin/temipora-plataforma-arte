@@ -26,6 +26,11 @@ public class ServicioBajaService {
     private final UsuarioRepository usuarioRepository;
     private final ServicioService servicioService;
     private final SolicitudServicioService solicitudServicioService;
+    private final AuditoriaService auditoria;
+
+    private static final String ENTIDAD = "Servicio";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("estado", "Estado"));
 
     public ServicioBajaService(
             ServicioRepository servicioRepository,
@@ -33,13 +38,15 @@ public class ServicioBajaService {
             ListaEsperaRepository listaEsperaRepository,
             UsuarioRepository usuarioRepository,
             ServicioService servicioService,
-            SolicitudServicioService solicitudServicioService) {
+            SolicitudServicioService solicitudServicioService,
+            AuditoriaService auditoria) {
         this.servicioRepository = servicioRepository;
         this.solicitudRepository = solicitudRepository;
         this.listaEsperaRepository = listaEsperaRepository;
         this.usuarioRepository = usuarioRepository;
         this.servicioService = servicioService;
         this.solicitudServicioService = solicitudServicioService;
+        this.auditoria = auditoria;
     }
 
     @Transactional(readOnly = true)
@@ -104,12 +111,17 @@ public class ServicioBajaService {
 
         solicitudServicioService.cerrarPorBajaServicio(idServicio);
 
+        Snapshot antes = Snapshot.de(servicio, CAMPOS);
         servicio.setEstado(EstadoServicio.ARCHIVADO);
         servicio.setArchivadoEn(LocalDateTime.now());
         servicio.setArchivadoPor(usuarioRepository.findByIdUsuario(idArtista)
             .orElseThrow(() -> new NoSuchElementException(
                 "Usuario no encontrado: " + idArtista)));
         servicioRepository.save(servicio);
+        auditoria.registrar(
+            AccionesAdmin.SERVICIO_ARCHIVAR, ENTIDAD, servicio.getIdServicio(),
+            "Dio de baja definitiva el servicio “" + servicio.getNombre() + "”",
+            antes, servicio, CAMPOS);
 
         return ServicioDTO.desdeServicio(servicio);
     }

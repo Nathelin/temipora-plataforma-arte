@@ -46,6 +46,9 @@ class CriterioReseniaServiceTest {
     @Mock
     private ReseniaOpcionRepository reseniaOpcionRepository;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private CriterioReseniaService criterioReseniaService;
 

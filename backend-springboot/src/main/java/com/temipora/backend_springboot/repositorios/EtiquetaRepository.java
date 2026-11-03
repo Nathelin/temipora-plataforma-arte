@@ -4,6 +4,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,8 +14,6 @@ import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 
 public interface EtiquetaRepository extends JpaRepository<Etiqueta, Long> {
-
-    List<Etiqueta> findAllByOrderByNombreAsc();
 
     Optional<Etiqueta> findByIdEtiqueta(Long idEtiqueta);
 
@@ -25,19 +25,20 @@ public interface EtiquetaRepository extends JpaRepository<Etiqueta, Long> {
 
     boolean existsByNombreIgnoreCaseAndEstadoAndIdEtiquetaNot(String nombre, EtiquetaEstado estado, Long idEtiqueta);
 
+    Page<Etiqueta> findByEstado(EtiquetaEstado estado, Pageable pageable);
+
+    Page<Etiqueta> findByCategoriaIdCategoriaEtiqueta(Long idCategoria, Pageable pageable);
+
+    Page<Etiqueta> findByEstadoAndCategoriaIdCategoriaEtiqueta(
+            EtiquetaEstado estado, Long idCategoria, Pageable pageable);
+
+    long countByEstado(EtiquetaEstado estado);
+
     List<Etiqueta> findByEstadoOrderByNombreAsc(EtiquetaEstado estado);
-
-    List<Etiqueta> findByEstadoOrderByFechaCreacionAsc(EtiquetaEstado estado);
-
-    List<Etiqueta> findByEstadoOrderByVecesSolicitadaDesc(EtiquetaEstado estado);
 
     List<Etiqueta> findByEstadoAndCreadoPorIdUsuario(EtiquetaEstado estado, Long idUsuario);
 
     List<Etiqueta> findByCreadoPorIdUsuarioOrderByFechaCreacionDesc(Long idUsuario);
-
-    List<Etiqueta> findByEstadoAndCategoriaIdCategoriaEtiquetaOrderByNombreAsc(EtiquetaEstado estado, Long idCategoria);
-
-    List<Etiqueta> findByCategoriaIdCategoriaEtiquetaOrderByNombreAsc(Long idCategoria);
 
     long countByCategoriaIdCategoriaEtiquetaAndEstadoIn(Long idCategoria, Collection<EtiquetaEstado> estados);
 

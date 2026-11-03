@@ -29,6 +29,9 @@ class TipoProductoServiceTest {
     @Mock
     private TipoProductoRepository tipoProductoRepository;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private TipoProductoService tipoProductoService;
 

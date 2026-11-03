@@ -22,20 +22,31 @@ import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 @Service
 public class TerminosPlataformaService {
 
+    private static final String ENTIDAD = "TerminosPlataforma";
+    private static final String ENTIDAD_USUARIO = "Usuario";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("version", "Versión"),
+        CampoAuditado.de("titulo", "Título"),
+        CampoAuditado.de("comisionServicio", "Comisión de servicios"),
+        CampoAuditado.de("comisionProducto", "Comisión de productos"));
+
     private final TerminosPlataformaRepository terminosRepository;
     private final AceptacionTerminosPlataformaRepository aceptacionRepository;
     private final UsuarioRepository usuarioRepository;
     private final ComisionService comisionService;
+    private final AuditoriaService auditoria;
 
     public TerminosPlataformaService(
             TerminosPlataformaRepository terminosRepository,
             AceptacionTerminosPlataformaRepository aceptacionRepository,
             UsuarioRepository usuarioRepository,
-            ComisionService comisionService) {
+            ComisionService comisionService,
+            AuditoriaService auditoria) {
         this.terminosRepository = terminosRepository;
         this.aceptacionRepository = aceptacionRepository;
         this.usuarioRepository = usuarioRepository;
         this.comisionService = comisionService;
+        this.auditoria = auditoria;
     }
 
     @Transactional(readOnly = true)
@@ -101,6 +112,10 @@ public class TerminosPlataformaService {
             aceptacion.setSnapshot(actual.getContenido());
             aceptacion.setFechaAceptacion(LocalDateTime.now());
             aceptacionRepository.save(aceptacion);
+            auditoria.registrar(
+                AccionesAdmin.TERMINOS_ACEPTAR, ENTIDAD_USUARIO, idUsuario,
+                "Aceptó los términos de la plataforma (versión " + version + ")",
+                "Aceptación registrada");
         }
         return obtenerEstadoUsuario(idUsuario);
     }
@@ -142,7 +157,13 @@ public class TerminosPlataformaService {
         terminos.setComisionProducto(comision.getPorcentajeProducto());
         terminos.setFechaPublicacion(LocalDateTime.now());
         terminos.setVigente(true);
-        return TerminosPlataformaDTO.desdeTerminos(terminosRepository.save(terminos));
+        TerminosPlataforma guardada = terminosRepository.save(terminos);
+        auditoria.registrar(
+            AccionesAdmin.TERMINOS_PUBLICAR, ENTIDAD, guardada.getIdTerminosPlataforma(),
+            "Publicó la versión " + guardada.getVersion() + " de los términos ("
+                + contenido.length() + " caracteres)",
+            null, guardada, CAMPOS);
+        return TerminosPlataformaDTO.desdeTerminos(guardada);
     }
 
     private TerminosPlataformaEstadoDTO estado(

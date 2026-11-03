@@ -36,6 +36,17 @@ public class PagoService {
     private static final String NOTIFICACION_PAGO_RECIBIDO = "PAGO_RECIBIDO";
     private static final String NOTIFICACION_PAGO_RECHAZADO = "PAGO_RECHAZADO";
 
+    private static final String ENTIDAD_PAGO = "Pago";
+    private static final String ENTIDAD_PEDIDO = "Pedido";
+    private static final List<CampoAuditado> CAMPOS_PAGO = List.of(
+        CampoAuditado.de("estado", "Estado"),
+        CampoAuditado.de("monto", "Monto"),
+        CampoAuditado.de("moneda", "Moneda"),
+        CampoAuditado.de("montoCobro", "Monto de cobro"),
+        CampoAuditado.de("monedaCobro", "Moneda de cobro"),
+        CampoAuditado.de("idPagoExterno", "ID en el proveedor"),
+        CampoAuditado.de("estadoExterno", "Estado del proveedor"));
+
     private final PagoRepository pagoRepository;
     private final HitoPedidoRepository hitoPedidoRepository;
     private final PedidoRepository pedidoRepository;
@@ -44,6 +55,7 @@ public class PagoService {
     private final HitoFlujoService hitoFlujoService;
     private final PedidoCierreService pedidoCierreService;
     private final ProveedorPago proveedorPago;
+    private final AuditoriaService auditoria;
 
     public PagoService(
             PagoRepository pagoRepository,
@@ -53,7 +65,8 @@ public class PagoService {
             NotificacionService notificacionService,
             HitoFlujoService hitoFlujoService,
             PedidoCierreService pedidoCierreService,
-            ProveedorPago proveedorPago) {
+            ProveedorPago proveedorPago,
+            AuditoriaService auditoria) {
         this.pagoRepository = pagoRepository;
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.pedidoRepository = pedidoRepository;
@@ -62,6 +75,7 @@ public class PagoService {
         this.hitoFlujoService = hitoFlujoService;
         this.pedidoCierreService = pedidoCierreService;
         this.proveedorPago = proveedorPago;
+        this.auditoria = auditoria;
     }
 
     @Transactional
@@ -112,7 +126,13 @@ public class PagoService {
     private Pago crearCobro(HitoPedido hito, Pedido pedido) {
         Pago pago = nuevoPago(hito, pedido);
         aplicarCobro(pago);
-        return pagoRepository.save(pago);
+        Pago guardado = pagoRepository.save(pago);
+        auditoria.registrar(
+            AccionesAdmin.PAGO_INICIAR, ENTIDAD_PAGO, guardado.getIdPago(),
+            "Inició el pago del hito '" + hito.getNombre()
+                + "' del pedido #" + pedido.getIdPedido(),
+            null, guardado, CAMPOS_PAGO);
+        return guardado;
     }
 
     private Pago nuevoPago(HitoPedido hito, Pedido pedido) {
@@ -157,7 +177,13 @@ public class PagoService {
             .orElseThrow(() -> new NoSuchElementException(
                 "Pago no encontrado: " + idPago));
         validarPagador(pago, idUsuario);
-        return aplicarAprobacion(pago, payload);
+        Snapshot antes = Snapshot.de(pago, CAMPOS_PAGO);
+        Pedido pedido = aplicarAprobacion(pago, payload);
+        auditoria.registrar(
+            AccionesAdmin.PAGO_CONFIRMAR, ENTIDAD_PAGO, pago.getIdPago(),
+            "Confirmó el pago del hito '" + pago.getHitoPedido().getNombre() + "'",
+            antes, pago, CAMPOS_PAGO);
+        return pedido;
     }
 
     /**
@@ -193,6 +219,7 @@ public class PagoService {
         Pago pago = pagoRepository.findByIdPagoForUpdate(idPago)
             .orElseThrow(() -> new NoSuchElementException(
                 "Pago no encontrado: " + idPago));
+        Snapshot antes = Snapshot.de(pago, CAMPOS_PAGO);
         pago.setIdPagoExterno(idPagoExterno);
         pago.setEstadoExterno(detalle != null && !detalle.isBlank()
             ? estadoExterno + " / " + detalle
@@ -204,12 +231,14 @@ public class PagoService {
                 pago.setEstado(EstadoPago.REEMBOLSADO);
             }
             pagoRepository.save(pago);
+            auditarEstadoProveedor(pago, antes, estadoExterno);
             return;
         }
         if (estado == EstadoPago.APROBADO) {
             // El payload conserva la URL del checkout; el detalle del
             // proveedor queda en estadoExterno.
             aplicarAprobacion(pago, null);
+            auditarEstadoProveedor(pago, antes, estadoExterno);
             return;
         }
         if (pago.getEstado() == EstadoPago.PENDIENTE) {
@@ -224,6 +253,15 @@ public class PagoService {
             }
         }
         pagoRepository.save(pago);
+        auditarEstadoProveedor(pago, antes, estadoExterno);
+    }
+
+    private void auditarEstadoProveedor(
+            Pago pago, Snapshot antes, String estadoExterno) {
+        auditoria.registrar(
+            AccionesAdmin.PAGO_ESTADO_ACTUALIZAR, ENTIDAD_PAGO, pago.getIdPago(),
+            "Actualizó el pago desde el proveedor (" + estadoExterno + ")",
+            antes, pago, CAMPOS_PAGO);
     }
 
     private Pedido aplicarAprobacion(Pago pago, String payload) {
@@ -296,6 +334,10 @@ public class PagoService {
         if (hito.getTipo() == TipoHito.ENTREGA
                 || (!hito.isRequiereEntrega() && siguiente == null)) {
             pedidoCierreService.finalizar(pedido, ahora);
+            auditoria.registrar(
+                AccionesAdmin.PEDIDO_FINALIZAR, ENTIDAD_PEDIDO, pedido.getIdPedido(),
+                "Finalizó el pedido al acreditarse el último hito",
+                "Finalización automática por pago");
         }
         return pedido;
     }
@@ -314,9 +356,16 @@ public class PagoService {
         if (pago.getEstado() != EstadoPago.PENDIENTE) {
             throw new ConflictoException("El pago ya no está pendiente.");
         }
+        Snapshot antes = Snapshot.de(pago, CAMPOS_PAGO);
         pago.setEstado(EstadoPago.RECHAZADO);
         pagoRepository.save(pago);
         notificarRechazo(pago, pedido, motivo);
+        auditoria.registrar(
+            AccionesAdmin.PAGO_RECHAZAR, ENTIDAD_PAGO, pago.getIdPago(),
+            motivo != null && !motivo.isBlank()
+                ? "Rechazó el pago. Motivo: " + motivo.trim()
+                : "Rechazó el pago",
+            antes, pago, CAMPOS_PAGO);
         return pedido;
     }
 

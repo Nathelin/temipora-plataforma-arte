@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.temipora.backend_springboot.servicios.AccionesAdmin;
+import com.temipora.backend_springboot.servicios.AuditoriaService;
 import com.temipora.backend_springboot.servicios.PedidoService;
 
 /**
@@ -19,15 +21,22 @@ import com.temipora.backend_springboot.servicios.PedidoService;
 public class PedidoProcesoAdminController {
 
     private final PedidoService pedidoService;
+    private final AuditoriaService auditoria;
 
-    public PedidoProcesoAdminController(PedidoService pedidoService) {
+    public PedidoProcesoAdminController(
+            PedidoService pedidoService,
+            AuditoriaService auditoria) {
         this.pedidoService = pedidoService;
+        this.auditoria = auditoria;
     }
 
     @PostMapping("/procesar")
     public Map<String, Integer> procesar() {
         int aprobados = pedidoService.aprobarAutomaticamente();
         int expirados = pedidoService.expirarHitos();
+        auditoria.registrarSistema(
+            AccionesAdmin.PEDIDO_PROCESAR, "Pedido", null,
+            "Procesó hitos: " + aprobados + " aprobado(s), " + expirados + " expirado(s).");
         return Map.of(
             "aprobados", aprobados,
             "expirados", expirados);

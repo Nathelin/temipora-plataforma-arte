@@ -47,17 +47,12 @@ onMounted(cargar)
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
-    <header>
-      <p class="text-sm font-semibold uppercase tracking-[0.18em] text-coral">Administración</p>
-      <h1 class="mt-1 font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">
-        Servicios archivados
-      </h1>
-      <p class="mt-2 max-w-2xl text-sm leading-relaxed text-cafe/65">
-        Los servicios que los artistas dieron de baja definitiva. No son visibles para el artista ni
-        para los clientes, pero se conservan por auditoría. Al restaurarlos vuelven como pausados.
-      </p>
-    </header>
+  <div class="mx-auto w-full flex-1 px-4 py-8 sm:px-8">
+    <AdminPageHeader
+      eyebrow="Catálogo"
+      titulo="Servicios archivados"
+      descripcion="Los servicios que los artistas dieron de baja definitiva. No son visibles para el artista ni para los clientes, pero se conservan por auditoría. Al restaurarlos vuelven como pausados."
+    />
 
     <div v-if="cargando" class="mt-8 space-y-3" role="status" aria-live="polite">
       <span class="sr-only">Cargando servicios archivados...</span>
@@ -73,7 +68,7 @@ onMounted(cargar)
       <p class="text-sm text-cafe/70">{{ errorCarga }}</p>
       <button
         type="button"
-        class="mt-4 rounded-full border border-rosa bg-blanco px-4 py-2 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+        class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
         @click="cargar"
       >
         Reintentar
@@ -124,7 +119,7 @@ onMounted(cargar)
 
         <button
           type="button"
-          class="self-start rounded-full border border-rosa bg-blanco px-4 py-2 text-sm font-semibold text-granate transition hover:bg-rosa/20 sm:self-auto"
+          class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none self-start sm:self-auto"
           @click="servicioARestaurar = servicio"
         >
           Restaurar

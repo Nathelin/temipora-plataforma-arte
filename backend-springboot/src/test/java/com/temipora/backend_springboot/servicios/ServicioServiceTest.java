@@ -88,6 +88,9 @@ class ServicioServiceTest {
     @Mock
     private OfertaReactivacionService ofertaReactivacionService;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private ServicioService servicioService;
 

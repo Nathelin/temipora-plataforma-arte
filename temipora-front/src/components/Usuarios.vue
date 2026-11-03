@@ -119,12 +119,17 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
   <div>
     <main class="flex-1 w-full mx-auto px-4 sm:px-8 py-8 overflow-auto">
       <div class="flex flex-col gap-4 mb-6">
-        <div class="flex items-center justify-between gap-4">
-          <h1 class="text-xl font-normal text-granate">Usuarios registrados</h1>
-          <span class="text-sm text-cafe/60">
-            {{ usuarios.length }} de {{ totalElements }} mostrados
-          </span>
-        </div>
+        <AdminPageHeader
+          eyebrow="Comunidad"
+          titulo="Usuarios registrados"
+          descripcion="Buscá cuentas por nombre o correo, filtrá por rol y estado."
+        >
+          <template #acciones>
+            <span class="text-sm text-cafe/60 tabular-nums">
+              {{ usuarios.length }} de {{ totalElements }} mostrados
+            </span>
+          </template>
+        </AdminPageHeader>
 
         <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto] gap-3">
           <input
@@ -162,7 +167,7 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
           </select>
 
           <button
-            class="rounded-lg border border-rosa px-4 py-2.5 text-sm text-cafe hover:bg-rosa/20 transition"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
             @click="limpiarFiltros"
           >
             Limpiar
@@ -271,14 +276,14 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
           <div class="flex gap-2">
             <button
               :disabled="currentPage === 0"
-              class="rounded-lg border border-rosa px-3 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
+              class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-[13px] font-semibold text-cafe transition-colors hover:bg-rosa/20 disabled:opacity-40 motion-reduce:transition-none"
               @click="anteriorPagina"
             >
               Anterior
             </button>
             <button
               :disabled="currentPage >= totalPages - 1 || totalPages === 0"
-              class="rounded-lg border border-rosa px-3 py-2 text-sm text-cafe hover:bg-rosa/20 transition"
+              class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-[13px] font-semibold text-cafe transition-colors hover:bg-rosa/20 disabled:opacity-40 motion-reduce:transition-none"
               @click="siguientePagina"
             >
               Siguiente

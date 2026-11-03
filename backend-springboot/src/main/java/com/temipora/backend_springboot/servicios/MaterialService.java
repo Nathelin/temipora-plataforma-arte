@@ -18,14 +18,25 @@ import com.temipora.backend_springboot.repositorios.TipoArteRepository;
 @Validated
 public class MaterialService {
 
+    private static final String ENTIDAD = "Material";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("nombre", "Nombre"),
+        CampoAuditado.de("descripcion", "Descripción"),
+        CampoAuditado.de("observaciones", "Observaciones"),
+        CampoAuditado.de("tipoArte", "Tipo de arte"),
+        CampoAuditado.de("activo", "Activo"));
+
     private final MaterialRepository materialRepository;
     private final TipoArteRepository tipoArteRepository;
+    private final AuditoriaService auditoria;
 
     public MaterialService(
             MaterialRepository materialRepository,
-            TipoArteRepository tipoArteRepository) {
+            TipoArteRepository tipoArteRepository,
+            AuditoriaService auditoria) {
         this.materialRepository = materialRepository;
         this.tipoArteRepository = tipoArteRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional(readOnly = true)
@@ -55,12 +66,17 @@ public class MaterialService {
             .activo(true)
             .build();
 
-        return MaterialDTO.desdeMaterial(materialRepository.save(material));
+        Material guardado = materialRepository.save(material);
+        auditoria.registrar(
+            AccionesAdmin.MATERIAL_CREAR, ENTIDAD, guardado.getIdMaterial(),
+            "Creó el material “" + guardado.getNombre() + "”", null, guardado, CAMPOS);
+        return MaterialDTO.desdeMaterial(guardado);
     }
 
     @Transactional
     public MaterialDTO modificar(Long id, MaterialRequest request) {
         Material material = obtener(id);
+        Snapshot antes = Snapshot.de(material, CAMPOS);
         validarNombreUnico(request.getNombre(), id);
 
         TipoArte tipoArte = cargarTipo(request.getIdTipoArte());
@@ -76,14 +92,23 @@ public class MaterialService {
         material.setTipoArte(tipoArte);
         material.setObservaciones(request.getObservaciones() != null ? request.getObservaciones().trim() : null);
 
-        return MaterialDTO.desdeMaterial(materialRepository.save(material));
+        Material guardado = materialRepository.save(material);
+        auditoria.registrar(
+            AccionesAdmin.MATERIAL_MODIFICAR, ENTIDAD, guardado.getIdMaterial(),
+            "Modificó el material “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return MaterialDTO.desdeMaterial(guardado);
     }
 
     @Transactional
     public MaterialDTO darDeBaja(Long id) {
         Material material = obtener(id);
+        Snapshot antes = Snapshot.de(material, CAMPOS);
         material.setActivo(false);
-        return MaterialDTO.desdeMaterial(materialRepository.save(material));
+        Material guardado = materialRepository.save(material);
+        auditoria.registrar(
+            AccionesAdmin.MATERIAL_BAJA, ENTIDAD, guardado.getIdMaterial(),
+            "Dio de baja el material “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return MaterialDTO.desdeMaterial(guardado);
     }
 
     @Transactional
@@ -95,8 +120,13 @@ public class MaterialService {
             throw new IllegalArgumentException(
                 "El tipo de arte '" + nombreTipo + "' está dado de baja; reactívalo antes de dar de alta el material.");
         }
+        Snapshot antes = Snapshot.de(material, CAMPOS);
         material.setActivo(true);
-        return MaterialDTO.desdeMaterial(materialRepository.save(material));
+        Material guardado = materialRepository.save(material);
+        auditoria.registrar(
+            AccionesAdmin.MATERIAL_REACTIVAR, ENTIDAD, guardado.getIdMaterial(),
+            "Reactivó el material “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return MaterialDTO.desdeMaterial(guardado);
     }
 
     private Material obtener(Long id) {

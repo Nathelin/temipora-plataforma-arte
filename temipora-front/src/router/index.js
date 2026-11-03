@@ -18,6 +18,7 @@ import ConfiguracionMensajeriaAdmin from '../components/ConfiguracionMensajeriaA
 import TerminosPlataformaAdmin from '../components/TerminosPlataformaAdmin.vue'
 import CriteriosReseniaAdmin from '../components/CriteriosReseniaAdmin.vue'
 import ConfiguracionReseniaAdmin from '../components/ConfiguracionReseniaAdmin.vue'
+import AuditoriaAdmin from '../components/AuditoriaAdmin.vue'
 import ReseniasReportadasAdmin from '../components/ReseniasReportadasAdmin.vue'
 import HistorialReportesAdmin from '../components/HistorialReportesAdmin.vue'
 import Registro from '../components/Registro.vue'
@@ -28,6 +29,7 @@ import ConfiguracionLayout from '../layouts/ConfiguracionLayout.vue'
 import ArtistLayout from '../layouts/ArtistLayout.vue'
 import ClientLayout from '../layouts/ClientLayout.vue'
 import Inicio from '../views/Inicio.vue'
+import AdminResumen from '../views/AdminResumen.vue'
 import PanelResumen from '../views/PanelResumen.vue'
 import Perfil from '../views/Perfil.vue'
 import Favoritos from '../views/Favoritos.vue'
@@ -263,6 +265,12 @@ const routes = [
     meta: { requiresAdmin: true },
     children: [
       {
+        path: '',
+        name: 'admin-resumen',
+        component: AdminResumen,
+        meta: { title: 'Resumen de administración' },
+      },
+      {
         path: 'usuarios',
         name: 'usuarios',
         component: Usuarios,
@@ -401,6 +409,12 @@ const routes = [
         name: 'terminos-plataforma-admin',
         component: TerminosPlataformaAdmin,
         meta: { title: 'Términos de la plataforma' },
+      },
+      {
+        path: 'auditoria',
+        name: 'admin-auditoria',
+        component: AuditoriaAdmin,
+        meta: { title: 'Auditoría' },
       },
       {
         path: 'notificaciones',

@@ -29,6 +29,9 @@ class PaisServiceTest {
     @Mock
     private PaisRepository paisRepository;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private PaisService paisService;
 

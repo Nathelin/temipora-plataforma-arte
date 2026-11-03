@@ -24,20 +24,30 @@ public class CotizacionService {
     private static final String ORIGEN_MANUAL = "MANUAL";
     private static final String CODIGO_ORIGEN_PREFERIDO = "USD";
 
+    private static final String ENTIDAD = "ConfiguracionCotizacion";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("apiHabilitada", "Actualización por API"),
+        CampoAuditado.de("monedaOrigen", "Moneda de origen"),
+        CampoAuditado.de("monedaDestino", "Moneda de destino"),
+        CampoAuditado.de("factorManual", "Factor manual"));
+
     private final ConfiguracionCotizacionRepository configuracionRepository;
     private final ConversionMonedaService conversionMonedaService;
     private final MonedaService monedaService;
     private final CotizacionApiClient apiClient;
+    private final AuditoriaService auditoria;
 
     public CotizacionService(
             ConfiguracionCotizacionRepository configuracionRepository,
             ConversionMonedaService conversionMonedaService,
             MonedaService monedaService,
-            CotizacionApiClient apiClient) {
+            CotizacionApiClient apiClient,
+            AuditoriaService auditoria) {
         this.configuracionRepository = configuracionRepository;
         this.conversionMonedaService = conversionMonedaService;
         this.monedaService = monedaService;
         this.apiClient = apiClient;
+        this.auditoria = auditoria;
     }
 
     @Transactional
@@ -66,6 +76,7 @@ public class CotizacionService {
         }
 
         ConfiguracionCotizacion config = obtenerConfiguracion();
+        Snapshot antes = Snapshot.de(config, CAMPOS);
         config.setApiHabilitada(Boolean.TRUE.equals(request.getApiHabilitada()));
         config.setMonedaOrigen(origen);
         config.setMonedaDestino(destino);
@@ -81,7 +92,11 @@ public class CotizacionService {
         }
 
         config.setFechaActualizacion(LocalDateTime.now());
-        return aDTO(configuracionRepository.save(config));
+        ConfiguracionCotizacion guardada = configuracionRepository.save(config);
+        auditoria.registrar(
+            AccionesAdmin.COTIZACION_ACTUALIZAR, ENTIDAD, guardada.getIdConfiguracion(),
+            "Actualizó la cotización", antes, guardada, CAMPOS);
+        return aDTO(guardada);
     }
 
     @Transactional
@@ -101,7 +116,12 @@ public class CotizacionService {
             LocalDateTime.now());
 
         config.setFechaActualizacion(LocalDateTime.now());
-        return aDTO(configuracionRepository.save(config));
+        ConfiguracionCotizacion guardada = configuracionRepository.save(config);
+        auditoria.registrar(
+            AccionesAdmin.COTIZACION_REFRESCAR, ENTIDAD, guardada.getIdConfiguracion(),
+            "Actualizó la cotización desde la API (factor " + factor + ")",
+            "Actualización desde la API");
+        return aDTO(guardada);
     }
 
     public BigDecimal consultarFactorApi() {

@@ -3,6 +3,7 @@ package com.temipora.backend_springboot.servicios;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,6 +19,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import com.temipora.backend_springboot.modelo.CategoriaEtiqueta;
 import com.temipora.backend_springboot.modelo.CategoriaEtiquetaDTO;
@@ -25,6 +29,7 @@ import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaDTO;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 import com.temipora.backend_springboot.modelo.EtiquetaRequest;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.CategoriaEtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
@@ -42,6 +47,9 @@ class EtiquetaServiceTest {
     @Mock
     private ImagenEtiquetaRepository imagenEtiquetaRepository;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private EtiquetaService etiquetaService;
 
@@ -55,67 +63,102 @@ class EtiquetaServiceTest {
 
     @Test
     void listarAdmin_sinFiltros_devuelveTodasOrdenadasPorNombre() {
-        when(etiquetaRepository.findAllByOrderByNombreAsc())
-                .thenReturn(List.of(etiqueta(1L, "Acuarela", EtiquetaEstado.VALIDA, estilo, admin, 0)));
+        when(etiquetaRepository.findAll(any(Pageable.class)))
+                .thenReturn(pagina(List.of(etiqueta(1L, "Acuarela", EtiquetaEstado.VALIDA, estilo, admin, 0))));
 
-        List<EtiquetaDTO> resultado = etiquetaService.listarAdmin(null, null);
+        PaginaDTO<EtiquetaDTO> resultado = etiquetaService.listarAdmin(null, null, 0, 10);
 
-        assertThat(resultado).hasSize(1);
-        assertThat(resultado.get(0).getNombre()).isEqualTo("Acuarela");
-        assertThat(resultado.get(0).getNombreCategoria()).isEqualTo("Estilo");
+        assertThat(resultado.getContenido()).hasSize(1);
+        assertThat(resultado.getContenido().get(0).getNombre()).isEqualTo("Acuarela");
+        assertThat(resultado.getContenido().get(0).getNombreCategoria()).isEqualTo("Estilo");
+        assertThat(resultado.getTotalElementos()).isEqualTo(1);
     }
 
     @Test
     void listarAdmin_pendientes_consultaOrdenadasPorFecha() {
-        when(etiquetaRepository.findByEstadoOrderByFechaCreacionAsc(EtiquetaEstado.PENDIENTE))
-                .thenReturn(List.of(etiqueta(1L, "Pixel", EtiquetaEstado.PENDIENTE, estilo, artista, 1)));
+        when(etiquetaRepository.findByEstado(eq(EtiquetaEstado.PENDIENTE), any(Pageable.class)))
+                .thenReturn(pagina(List.of(etiqueta(1L, "Pixel", EtiquetaEstado.PENDIENTE, estilo, artista, 1))));
 
-        List<EtiquetaDTO> resultado = etiquetaService.listarAdmin(EtiquetaEstado.PENDIENTE, null);
+        PaginaDTO<EtiquetaDTO> resultado = etiquetaService.listarAdmin(EtiquetaEstado.PENDIENTE, null, 0, 10);
 
-        assertThat(resultado).extracting(EtiquetaDTO::getEstado)
+        assertThat(resultado.getContenido()).extracting(EtiquetaDTO::getEstado)
                 .containsExactly(EtiquetaEstado.PENDIENTE);
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(etiquetaRepository).findByEstado(eq(EtiquetaEstado.PENDIENTE), captor.capture());
+        assertThat(captor.getValue().getSort())
+                .isEqualTo(Sort.by(Sort.Direction.ASC, "fechaCreacion"));
     }
 
     @Test
     void listarAdmin_rechazadas_consultaOrdenadasPorDemanda() {
-        when(etiquetaRepository.findByEstadoOrderByVecesSolicitadaDesc(EtiquetaEstado.RECHAZADA))
-                .thenReturn(List.of(etiqueta(1L, "Manga", EtiquetaEstado.RECHAZADA, estilo, artista, 5)));
+        when(etiquetaRepository.findByEstado(eq(EtiquetaEstado.RECHAZADA), any(Pageable.class)))
+                .thenReturn(pagina(List.of(etiqueta(1L, "Manga", EtiquetaEstado.RECHAZADA, estilo, artista, 5))));
 
-        List<EtiquetaDTO> resultado = etiquetaService.listarAdmin(EtiquetaEstado.RECHAZADA, null);
+        PaginaDTO<EtiquetaDTO> resultado = etiquetaService.listarAdmin(EtiquetaEstado.RECHAZADA, null, 0, 10);
 
-        assertThat(resultado.get(0).getVecesSolicitada()).isEqualTo(5);
+        assertThat(resultado.getContenido().get(0).getVecesSolicitada()).isEqualTo(5);
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(etiquetaRepository).findByEstado(eq(EtiquetaEstado.RECHAZADA), captor.capture());
+        assertThat(captor.getValue().getSort())
+                .isEqualTo(Sort.by(Sort.Direction.DESC, "vecesSolicitada"));
     }
 
     @Test
     void listarAdmin_conEstadoYCategoria_filtraPorAmbos() {
-        when(etiquetaRepository.findByEstadoAndCategoriaIdCategoriaEtiquetaOrderByNombreAsc(
-                EtiquetaEstado.VALIDA, 1L))
-                .thenReturn(List.of(etiqueta(1L, "Lienzo", EtiquetaEstado.VALIDA, estilo, admin, 0)));
+        when(etiquetaRepository.findByEstadoAndCategoriaIdCategoriaEtiqueta(
+                eq(EtiquetaEstado.VALIDA), eq(1L), any(Pageable.class)))
+                .thenReturn(pagina(List.of(etiqueta(1L, "Lienzo", EtiquetaEstado.VALIDA, estilo, admin, 0))));
 
-        List<EtiquetaDTO> resultado = etiquetaService.listarAdmin(EtiquetaEstado.VALIDA, 1L);
+        PaginaDTO<EtiquetaDTO> resultado = etiquetaService.listarAdmin(EtiquetaEstado.VALIDA, 1L, 0, 10);
 
-        assertThat(resultado).hasSize(1);
+        assertThat(resultado.getContenido()).hasSize(1);
     }
 
     @Test
     void listarAdmin_soloConCategoria_consultaPorCategoria() {
-        when(etiquetaRepository.findByCategoriaIdCategoriaEtiquetaOrderByNombreAsc(1L))
-                .thenReturn(List.of(etiqueta(1L, "Lienzo", EtiquetaEstado.VALIDA, estilo, admin, 0)));
+        when(etiquetaRepository.findByCategoriaIdCategoriaEtiqueta(eq(1L), any(Pageable.class)))
+                .thenReturn(pagina(List.of(etiqueta(1L, "Lienzo", EtiquetaEstado.VALIDA, estilo, admin, 0))));
 
-        List<EtiquetaDTO> resultado = etiquetaService.listarAdmin(null, 1L);
+        PaginaDTO<EtiquetaDTO> resultado = etiquetaService.listarAdmin(null, 1L, 0, 10);
 
-        assertThat(resultado).hasSize(1);
+        assertThat(resultado.getContenido()).hasSize(1);
     }
 
     @Test
     void listarAdmin_validadas_consultaOrdenadasPorNombre() {
-        when(etiquetaRepository.findByEstadoOrderByNombreAsc(EtiquetaEstado.VALIDA))
-                .thenReturn(List.of(etiqueta(1L, "Acuarela", EtiquetaEstado.VALIDA, estilo, admin, 0)));
+        when(etiquetaRepository.findByEstado(eq(EtiquetaEstado.VALIDA), any(Pageable.class)))
+                .thenReturn(pagina(List.of(etiqueta(1L, "Acuarela", EtiquetaEstado.VALIDA, estilo, admin, 0))));
 
-        List<EtiquetaDTO> resultado = etiquetaService.listarAdmin(EtiquetaEstado.VALIDA, null);
+        PaginaDTO<EtiquetaDTO> resultado = etiquetaService.listarAdmin(EtiquetaEstado.VALIDA, null, 0, 10);
 
-        assertThat(resultado).hasSize(1);
-        verify(etiquetaRepository).findByEstadoOrderByNombreAsc(EtiquetaEstado.VALIDA);
+        assertThat(resultado.getContenido()).hasSize(1);
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(etiquetaRepository).findByEstado(eq(EtiquetaEstado.VALIDA), captor.capture());
+        assertThat(captor.getValue().getSort())
+                .isEqualTo(Sort.by(Sort.Direction.ASC, "nombre"));
+    }
+
+    @Test
+    void listarAdmin_acotaPaginaYTamanio() {
+        when(etiquetaRepository.findAll(any(Pageable.class)))
+                .thenReturn(pagina(List.of()));
+
+        etiquetaService.listarAdmin(null, null, -5, 5000);
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(etiquetaRepository).findAll(captor.capture());
+        assertThat(captor.getValue().getPageNumber()).isZero();
+        assertThat(captor.getValue().getPageSize()).isEqualTo(100);
+    }
+
+    @Test
+    void contarPendientes_delegaEnElRepositorio() {
+        when(etiquetaRepository.countByEstado(EtiquetaEstado.PENDIENTE)).thenReturn(7L);
+
+        assertThat(etiquetaService.contarPendientes()).isEqualTo(7);
     }
 
     // ---------------------------------------------------------------
@@ -727,6 +770,10 @@ class EtiquetaServiceTest {
                 .vecesSolicitada(demanda)
                 .fechaCreacion(LocalDateTime.now())
                 .build();
+    }
+
+    private PageImpl<Etiqueta> pagina(List<Etiqueta> etiquetas) {
+        return new PageImpl<>(etiquetas);
     }
 
     private EtiquetaRequest request(String nombre, Long idCategoria) {

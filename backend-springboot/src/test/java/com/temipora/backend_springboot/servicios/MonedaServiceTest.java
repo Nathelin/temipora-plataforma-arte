@@ -28,6 +28,9 @@ class MonedaServiceTest {
     @Mock
     private MonedaRepository monedaRepository;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private MonedaService service;
 

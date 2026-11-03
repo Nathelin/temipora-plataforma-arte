@@ -87,6 +87,25 @@ public class ServicioService {
     private final ReseniaPublicaService reseniaPublicaService;
     private final RecomendacionService recomendacionService;
     private final OfertaReactivacionService ofertaReactivacionService;
+    private final AuditoriaService auditoria;
+
+    private static final String ENTIDAD = "Servicio";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("nombre", "Nombre"),
+        CampoAuditado.de("descripcion", "Descripción"),
+        CampoAuditado.de("precioBase", "Precio base"),
+        CampoAuditado.de("moneda", "Moneda"),
+        CampoAuditado.de("tipoServicio", "Tipo de servicio"),
+        CampoAuditado.de("medio", "Medio"),
+        CampoAuditado.de("cupos", "Cupos"),
+        CampoAuditado.de("tiempoEntregaValor", "Tiempo de entrega"),
+        CampoAuditado.de("tiempoEntregaUnidad", "Unidad de entrega"),
+        CampoAuditado.de("modoRecepcion", "Modo de recepción"),
+        CampoAuditado.de("maxDibujosPorSolicitud", "Máximo de dibujos por solicitud"),
+        CampoAuditado.de("permiteListaEspera", "Lista de espera"),
+        CampoAuditado.de("habilitarCuposTrasEntrega", "Cupos tras la entrega"),
+        CampoAuditado.de("contenidoSensible", "Contenido sensible"),
+        CampoAuditado.de("estado", "Estado"));
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -104,7 +123,8 @@ public class ServicioService {
             MonedaService monedaService,
             ReseniaPublicaService reseniaPublicaService,
             RecomendacionService recomendacionService,
-            OfertaReactivacionService ofertaReactivacionService) {
+            OfertaReactivacionService ofertaReactivacionService,
+            AuditoriaService auditoria) {
         this.servicioRepository = servicioRepository;
         this.solicitudRepository = solicitudRepository;
         this.usuarioRepository = usuarioRepository;
@@ -118,6 +138,7 @@ public class ServicioService {
         this.reseniaPublicaService = reseniaPublicaService;
         this.recomendacionService = recomendacionService;
         this.ofertaReactivacionService = ofertaReactivacionService;
+        this.auditoria = auditoria;
     }
 
     @Transactional(readOnly = true)
@@ -741,6 +762,9 @@ public class ServicioService {
 
         Servicio guardado = servicioRepository.save(servicio);
         guardarConfiguracion(guardado.getIdServicio(), idArtista, request);
+        auditoria.registrar(
+            AccionesAdmin.SERVICIO_CREAR, ENTIDAD, guardado.getIdServicio(),
+            "Creó el servicio “" + guardado.getNombre() + "”", null, guardado, CAMPOS);
         return ServicioDTO.desdeServicio(guardado);
     }
 
@@ -748,6 +772,7 @@ public class ServicioService {
     public ServicioDTO modificar(Long idServicio, Long idArtista, ServicioRequest request) {
         Servicio servicio = obtenerEntidad(idServicio);
         verificarDuenio(servicio, idArtista);
+        Snapshot antes = Snapshot.de(servicio, CAMPOS);
         validarUnico(idArtista, request.getIdTipoServicio(), request.getNombre(), idServicio);
         int cuposOcupados = calcularCuposOcupados(idServicio);
         if (request.getCupos() != null && request.getCupos() < cuposOcupados) {
@@ -759,6 +784,9 @@ public class ServicioService {
         validarTerminos(idArtista, idServicio, request);
         Servicio guardado = servicioRepository.save(servicio);
         guardarConfiguracion(idServicio, idArtista, request);
+        auditoria.registrar(
+            AccionesAdmin.SERVICIO_MODIFICAR, ENTIDAD, guardado.getIdServicio(),
+            "Modificó el servicio “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
         return ServicioDTO.desdeServicio(guardado);
     }
 
@@ -769,9 +797,13 @@ public class ServicioService {
             throw new ConflictoException("El servicio está archivado y no se puede pausar.");
         }
         if (servicio.getEstado() != EstadoServicio.PAUSADO) {
+            Snapshot antes = Snapshot.de(servicio, CAMPOS);
             servicio.setEstado(EstadoServicio.PAUSADO);
             servicio.setPausadoEn(LocalDateTime.now());
             servicioRepository.save(servicio);
+            auditoria.registrar(
+                AccionesAdmin.SERVICIO_PAUSAR, ENTIDAD, servicio.getIdServicio(),
+                "Pausó el servicio “" + servicio.getNombre() + "”", antes, servicio, CAMPOS);
         }
         return ServicioDTO.desdeServicio(servicio);
     }
@@ -790,9 +822,13 @@ public class ServicioService {
             throw new IllegalArgumentException(
                 "Completá tus términos de uso y servicio antes de publicar el servicio.");
         }
+        Snapshot antes = Snapshot.de(servicio, CAMPOS);
         servicio.setEstado(EstadoServicio.PUBLICADO);
         servicio.setPausadoEn(null);
         servicioRepository.save(servicio);
+        auditoria.registrar(
+            AccionesAdmin.SERVICIO_REACTIVAR, ENTIDAD, servicio.getIdServicio(),
+            "Reactivó el servicio “" + servicio.getNombre() + "”", antes, servicio, CAMPOS);
         return ServicioDTO.desdeServicio(servicio);
     }
 

@@ -36,6 +36,9 @@ class MaterialServiceTest {
     @Mock
     private TipoArteRepository tipoArteRepository;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private MaterialService materialService;
 

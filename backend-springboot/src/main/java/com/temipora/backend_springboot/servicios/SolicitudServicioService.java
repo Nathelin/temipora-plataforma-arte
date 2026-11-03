@@ -87,6 +87,14 @@ public class SolicitudServicioService {
     private static final String NOTIFICACION_CANCELACION = "SOLICITUD_CANCELADA";
     private static final String TIPO_REFERENCIA_SOLICITUD = "SOLICITUD";
 
+    private static final String ENTIDAD_SOLICITUD = "Solicitud";
+    private static final List<CampoAuditado> CAMPOS_SOLICITUD = List.of(
+        CampoAuditado.de("estado", "Estado"),
+        CampoAuditado.de("cantidadDibujos", "Cantidad de dibujos"),
+        CampoAuditado.de("precioBase", "Precio base"),
+        CampoAuditado.de("moneda", "Moneda"),
+        CampoAuditado.de("prioridadDefinidaPorCliente", "Prioridad definida"));
+
     private static final String TEXTO = "TEXTO";
     private static final String CASILLAS = "CASILLAS";
     private static final String OPCIONES = "OPCIONES";
@@ -110,6 +118,7 @@ public class SolicitudServicioService {
     private final ConversacionService conversacionService;
     private final ConversacionRepository conversacionRepository;
     private final OfertaReactivacionService ofertaReactivacionService;
+    private final AuditoriaService auditoria;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -128,7 +137,8 @@ public class SolicitudServicioService {
             ReseniaPublicaService reseniaPublicaService,
             ConversacionService conversacionService,
             ConversacionRepository conversacionRepository,
-            OfertaReactivacionService ofertaReactivacionService) {
+            OfertaReactivacionService ofertaReactivacionService,
+            AuditoriaService auditoria) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -146,6 +156,7 @@ public class SolicitudServicioService {
         this.conversacionService = conversacionService;
         this.conversacionRepository = conversacionRepository;
         this.ofertaReactivacionService = ofertaReactivacionService;
+        this.auditoria = auditoria;
     }
 
     @Transactional(readOnly = true)
@@ -343,6 +354,11 @@ public class SolicitudServicioService {
         }
         solicitudRepository.save(solicitud);
 
+        auditoria.registrar(
+            AccionesAdmin.SOLICITUD_CREAR, ENTIDAD_SOLICITUD, solicitud.getIdSolicitud(),
+            "Envió una solicitud para '" + servicio.getNombre() + "'",
+            null, solicitud, CAMPOS_SOLICITUD);
+
         conversacionService.asegurarPorSolicitud(
             cliente, artista, solicitud.getIdSolicitud(), servicio.getNombre());
 
@@ -431,8 +447,16 @@ public class SolicitudServicioService {
                 "No podés rechazar una solicitud en estado " + solicitud.getEstado() + ".");
         }
 
+        Snapshot antes = Snapshot.de(solicitud, CAMPOS_SOLICITUD);
         String motivoLimpio = limpiarMotivo(motivo);
         LocalDateTime ahora = registrarRechazo(solicitud, motivoLimpio, ORIGEN_ARTISTA);
+
+        auditoria.registrar(
+            AccionesAdmin.SOLICITUD_RECHAZAR, ENTIDAD_SOLICITUD, solicitud.getIdSolicitud(),
+            motivoLimpio != null
+                ? "Rechazó la solicitud. Motivo: " + motivoLimpio
+                : "Rechazó la solicitud",
+            antes, solicitud, CAMPOS_SOLICITUD);
 
         SolicitudDTO dto = aDTO(solicitud, idArtista);
         dto.setMotivoRechazo(motivoLimpio);
@@ -459,6 +483,7 @@ public class SolicitudServicioService {
         }
 
         EstadoSolicitud estadoAnterior = solicitud.getEstado();
+        Snapshot antes = Snapshot.de(solicitud, CAMPOS_SOLICITUD);
         String motivoLimpio = limpiarMotivo(motivo);
         LocalDateTime ahora = LocalDateTime.now();
 
@@ -479,6 +504,13 @@ public class SolicitudServicioService {
         accionSolicitudRepository.save(accion);
 
         notificarCancelacion(solicitud, motivoLimpio, estadoAnterior);
+
+        auditoria.registrar(
+            AccionesAdmin.SOLICITUD_CANCELAR, ENTIDAD_SOLICITUD, solicitud.getIdSolicitud(),
+            motivoLimpio != null
+                ? "Canceló la solicitud. Motivo: " + motivoLimpio
+                : "Canceló la solicitud",
+            antes, solicitud, CAMPOS_SOLICITUD);
 
         SolicitudDTO dto = aDTO(solicitud, idCliente);
         dto.setMotivoCancelacion(motivoLimpio);
@@ -503,6 +535,7 @@ public class SolicitudServicioService {
                 "Solo podés retirar el presupuesto de una solicitud presupuestada.");
         }
 
+        Snapshot antes = Snapshot.de(solicitud, CAMPOS_SOLICITUD);
         LocalDateTime ahora = LocalDateTime.now();
         solicitud.setEstado(EstadoSolicitud.RECHAZADA);
         solicitud.setFechaActualizacion(ahora);
@@ -523,6 +556,11 @@ public class SolicitudServicioService {
                 + "'. Podés volver a enviar tu solicitud.",
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
+
+        auditoria.registrar(
+            AccionesAdmin.SOLICITUD_RETIRAR_PRESUPUESTO, ENTIDAD_SOLICITUD,
+            solicitud.getIdSolicitud(), "Retiró el presupuesto de la solicitud",
+            antes, solicitud, CAMPOS_SOLICITUD);
 
         SolicitudDTO dto = aDTO(solicitud, idArtista);
         dto.setFechaRechazo(ahora);

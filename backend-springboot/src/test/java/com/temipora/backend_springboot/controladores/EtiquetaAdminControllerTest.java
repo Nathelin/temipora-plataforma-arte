@@ -2,6 +2,7 @@ package com.temipora.backend_springboot.controladores;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -31,6 +32,7 @@ import com.temipora.backend_springboot.config.SecurityConfig;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EtiquetaDTO;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 import com.temipora.backend_springboot.servicios.EtiquetaService;
@@ -71,7 +73,7 @@ class EtiquetaAdminControllerTest {
     void listar_sinToken_devuelve401() throws Exception {
         mockMvc.perform(get(BASE)).andExpect(status().isUnauthorized());
 
-        verify(etiquetaService, never()).listarAdmin(any(), any());
+        verify(etiquetaService, never()).listarAdmin(any(), any(), anyInt(), anyInt());
     }
 
     @Test
@@ -82,33 +84,72 @@ class EtiquetaAdminControllerTest {
                 .header("Authorization", "Bearer " + token("cliente42", ERol.CLIENTE)))
                 .andExpect(status().isForbidden());
 
-        verify(etiquetaService, never()).listarAdmin(any(), any());
+        verify(etiquetaService, never()).listarAdmin(any(), any(), anyInt(), anyInt());
     }
 
     @Test
     void listar_tokenDeAdmin_devuelve200() throws Exception {
         stubUsuarioConRol("admin", ERol.ADMIN);
-        when(etiquetaService.listarAdmin(null, null))
-                .thenReturn(List.of(dto(1L, "Acuarela", EtiquetaEstado.VALIDA, 0)));
+        when(etiquetaService.listarAdmin(null, null, 0, 10))
+                .thenReturn(pagina(dto(1L, "Acuarela", EtiquetaEstado.VALIDA, 0)));
 
         mockMvc.perform(get(BASE)
                 .header("Authorization", "Bearer " + token("admin", ERol.ADMIN)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].nombre").value("Acuarela"))
-                .andExpect(jsonPath("$[0].estado").value("VALIDA"));
+                .andExpect(jsonPath("$.contenido[0].nombre").value("Acuarela"))
+                .andExpect(jsonPath("$.contenido[0].estado").value("VALIDA"))
+                .andExpect(jsonPath("$.totalElementos").value(1));
     }
 
     @Test
     void listar_conFiltroDeEstado_loPasaAlServicio() throws Exception {
         stubUsuarioConRol("admin", ERol.ADMIN);
-        when(etiquetaService.listarAdmin(EtiquetaEstado.PENDIENTE, null)).thenReturn(List.of());
+        when(etiquetaService.listarAdmin(EtiquetaEstado.PENDIENTE, null, 0, 10))
+                .thenReturn(pagina());
 
         mockMvc.perform(get(BASE)
                 .param("estado", "PENDIENTE")
                 .header("Authorization", "Bearer " + token("admin", ERol.ADMIN)))
                 .andExpect(status().isOk());
 
-        verify(etiquetaService).listarAdmin(EtiquetaEstado.PENDIENTE, null);
+        verify(etiquetaService).listarAdmin(EtiquetaEstado.PENDIENTE, null, 0, 10);
+    }
+
+    @Test
+    void listar_conPaginacion_laPasaAlServicio() throws Exception {
+        stubUsuarioConRol("admin", ERol.ADMIN);
+        when(etiquetaService.listarAdmin(null, null, 2, 25))
+                .thenReturn(pagina());
+
+        mockMvc.perform(get(BASE)
+                .param("pagina", "2")
+                .param("tamanio", "25")
+                .header("Authorization", "Bearer " + token("admin", ERol.ADMIN)))
+                .andExpect(status().isOk());
+
+        verify(etiquetaService).listarAdmin(null, null, 2, 25);
+    }
+
+    @Test
+    void conteoPendientes_tokenDeAdmin_devuelveTotal() throws Exception {
+        stubUsuarioConRol("admin", ERol.ADMIN);
+        when(etiquetaService.contarPendientes()).thenReturn(4L);
+
+        mockMvc.perform(get(BASE + "/conteo-pendientes")
+                .header("Authorization", "Bearer " + token("admin", ERol.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pendientes").value(4));
+    }
+
+    @Test
+    void conteoPendientes_tokenDeCliente_devuelve403() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+
+        mockMvc.perform(get(BASE + "/conteo-pendientes")
+                .header("Authorization", "Bearer " + token("cliente42", ERol.CLIENTE)))
+                .andExpect(status().isForbidden());
+
+        verify(etiquetaService, never()).contarPendientes();
     }
 
     @Test
@@ -262,6 +303,17 @@ class EtiquetaAdminControllerTest {
 
     private String token(String nombreUsuario, ERol rol) {
         return jwtUtils.generarTokenAcceso(nombreUsuario, rol.name());
+    }
+
+    private PaginaDTO<EtiquetaDTO> pagina(EtiquetaDTO... contenido) {
+        return PaginaDTO.<EtiquetaDTO>builder()
+                .contenido(List.of(contenido))
+                .pagina(0)
+                .tamanio(10)
+                .totalElementos(contenido.length)
+                .totalPaginas(contenido.length == 0 ? 0 : 1)
+                .hayMas(false)
+                .build();
     }
 
     private EtiquetaDTO dto(Long id, String nombre, EtiquetaEstado estado, int demanda) {

@@ -89,6 +89,9 @@ class PresupuestoServiceTest {
     @Mock
     private MonedaVistaService monedaVistaService;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private PresupuestoService presupuestoService;
 

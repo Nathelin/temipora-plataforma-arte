@@ -151,15 +151,24 @@ onMounted(cargar)
 
 <template>
   <div class="flex-1 w-full mx-auto px-4 sm:px-8 py-8">
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-normal text-granate">Materiales</h1>
-      <button
-        class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
-        @click="abrirAlta"
-      >
-        Dar de alta
-      </button>
-    </div>
+    <AdminPageHeader
+      class="mb-6"
+      eyebrow="Catálogo"
+      titulo="Materiales"
+      descripcion="Materiales disponibles según el tipo de arte de cada obra."
+    >
+      <template #acciones>
+        <button
+          type="button"
+          class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rojizo disabled:opacity-50 motion-reduce:transition-none"
+          @click="abrirAlta"
+        >
+          Dar de alta
+        </button>
+      </template>
+    </AdminPageHeader>
+
+    <AdminTabs />
 
     <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
@@ -281,14 +290,14 @@ onMounted(cargar)
 
         <div class="flex items-center justify-end gap-3 mt-6">
           <button
-            class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
             @click="cerrarModal"
           >
             Cancelar
           </button>
           <button
             :disabled="guardando"
-            class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rojizo disabled:opacity-50 motion-reduce:transition-none"
             @click="guardar"
           >
             {{ guardando ? 'Guardando...' : 'Guardar' }}
@@ -315,7 +324,7 @@ onMounted(cargar)
           <button
             type="button"
             :disabled="modalConfirmacion.confirmando"
-            class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 disabled:opacity-50 transition"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
             @click="cerrarConfirmacion"
           >
             Cancelar
@@ -323,7 +332,7 @@ onMounted(cargar)
           <button
             type="button"
             :disabled="modalConfirmacion.confirmando"
-            class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rojizo disabled:opacity-50 motion-reduce:transition-none"
             @click="confirmarAccion"
           >
             {{ modalConfirmacion.confirmando ? 'Procesando...' : modalConfirmacion.boton }}

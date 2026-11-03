@@ -121,6 +121,9 @@ class SolicitudServicioServiceTest {
     @Mock
     private ConversacionRepository conversacionRepository;
 
+    @Mock
+    private AuditoriaService auditoria;
+
     @InjectMocks
     private SolicitudServicioService solicitudServicioService;
 

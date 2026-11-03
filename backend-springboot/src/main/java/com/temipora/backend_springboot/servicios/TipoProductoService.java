@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import com.temipora.backend_springboot.modelo.TipoProducto;
@@ -15,10 +16,21 @@ import com.temipora.backend_springboot.repositorios.TipoProductoRepository;
 @Validated
 public class TipoProductoService {
 
-    private final TipoProductoRepository tipoProductoRepository;
+    private static final String ENTIDAD = "TipoProducto";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("nombre", "Nombre"),
+        CampoAuditado.de("descripcion", "Descripción"),
+        CampoAuditado.de("observaciones", "Observaciones"),
+        CampoAuditado.de("activo", "Activo"));
 
-    public TipoProductoService(TipoProductoRepository tipoProductoRepository) {
+    private final TipoProductoRepository tipoProductoRepository;
+    private final AuditoriaService auditoria;
+
+    public TipoProductoService(
+            TipoProductoRepository tipoProductoRepository,
+            AuditoriaService auditoria) {
         this.tipoProductoRepository = tipoProductoRepository;
+        this.auditoria = auditoria;
     }
 
     public List<TipoProductoDTO> listar() {
@@ -27,6 +39,7 @@ public class TipoProductoService {
             .toList();
     }
 
+    @Transactional
     public TipoProductoDTO crear(TipoProductoRequest request) {
         validarNombreUnico(request.getNombre(), null);
 
@@ -37,11 +50,17 @@ public class TipoProductoService {
             .activo(true)
             .build();
 
-        return TipoProductoDTO.desdeTipoProducto(tipoProductoRepository.save(tipo));
+        TipoProducto guardado = tipoProductoRepository.save(tipo);
+        auditoria.registrar(
+            AccionesAdmin.TIPO_PRODUCTO_CREAR, ENTIDAD, guardado.getIdTipoProducto(),
+            "Creó el tipo de producto “" + guardado.getNombre() + "”", null, guardado, CAMPOS);
+        return TipoProductoDTO.desdeTipoProducto(guardado);
     }
 
+    @Transactional
     public TipoProductoDTO modificar(Long id, TipoProductoRequest request) {
         TipoProducto tipo = obtener(id);
+        Snapshot antes = Snapshot.de(tipo, CAMPOS);
 
         validarNombreUnico(request.getNombre(), id);
 
@@ -49,19 +68,35 @@ public class TipoProductoService {
         tipo.setDescripcion(request.getDescripcion().trim());
         tipo.setObservaciones(request.getObservaciones() != null ? request.getObservaciones().trim() : null);
 
-        return TipoProductoDTO.desdeTipoProducto(tipoProductoRepository.save(tipo));
+        TipoProducto guardado = tipoProductoRepository.save(tipo);
+        auditoria.registrar(
+            AccionesAdmin.TIPO_PRODUCTO_MODIFICAR, ENTIDAD, guardado.getIdTipoProducto(),
+            "Modificó el tipo de producto “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return TipoProductoDTO.desdeTipoProducto(guardado);
     }
 
+    @Transactional
     public TipoProductoDTO darDeBaja(Long id) {
         TipoProducto tipo = obtener(id);
+        Snapshot antes = Snapshot.de(tipo, CAMPOS);
         tipo.setActivo(false);
-        return TipoProductoDTO.desdeTipoProducto(tipoProductoRepository.save(tipo));
+        TipoProducto guardado = tipoProductoRepository.save(tipo);
+        auditoria.registrar(
+            AccionesAdmin.TIPO_PRODUCTO_BAJA, ENTIDAD, guardado.getIdTipoProducto(),
+            "Dio de baja el tipo de producto “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return TipoProductoDTO.desdeTipoProducto(guardado);
     }
 
+    @Transactional
     public TipoProductoDTO darDeAlta(Long id) {
         TipoProducto tipo = obtener(id);
+        Snapshot antes = Snapshot.de(tipo, CAMPOS);
         tipo.setActivo(true);
-        return TipoProductoDTO.desdeTipoProducto(tipoProductoRepository.save(tipo));
+        TipoProducto guardado = tipoProductoRepository.save(tipo);
+        auditoria.registrar(
+            AccionesAdmin.TIPO_PRODUCTO_REACTIVAR, ENTIDAD, guardado.getIdTipoProducto(),
+            "Reactivó el tipo de producto “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return TipoProductoDTO.desdeTipoProducto(guardado);
     }
 
     private TipoProducto obtener(Long id) {

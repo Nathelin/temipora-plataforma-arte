@@ -16,10 +16,20 @@ import com.temipora.backend_springboot.repositorios.MonedaRepository;
 @Validated
 public class MonedaService {
 
-    private final MonedaRepository monedaRepository;
+    private static final String ENTIDAD = "Moneda";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("codigo", "Código"),
+        CampoAuditado.de("nombre", "Nombre"),
+        CampoAuditado.de("simbolo", "Símbolo"),
+        CampoAuditado.de("predeterminada", "Predeterminada"),
+        CampoAuditado.de("estado", "Activa"));
 
-    public MonedaService(MonedaRepository monedaRepository) {
+    private final MonedaRepository monedaRepository;
+    private final AuditoriaService auditoria;
+
+    public MonedaService(MonedaRepository monedaRepository, AuditoriaService auditoria) {
         this.monedaRepository = monedaRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional(readOnly = true)
@@ -80,12 +90,16 @@ public class MonedaService {
         if (request.isPredeterminada()) {
             marcarPredeterminada(guardada.getIdMoneda());
         }
+        auditoria.registrar(
+            AccionesAdmin.MONEDA_CREAR, ENTIDAD, guardada.getIdMoneda(),
+            "Creó la moneda “" + guardada.getCodigo() + "”", null, guardada, CAMPOS);
         return MonedaDTO.desdeMoneda(guardada);
     }
 
     @Transactional
     public MonedaDTO modificar(Long id, MonedaRequest request) {
         Moneda moneda = obtener(id);
+        Snapshot antes = Snapshot.de(moneda, CAMPOS);
         String codigo = request.getCodigo().trim().toUpperCase();
         validarCodigoUnico(codigo, id);
 
@@ -96,7 +110,11 @@ public class MonedaService {
         if (request.isPredeterminada()) {
             marcarPredeterminada(id);
         }
-        return MonedaDTO.desdeMoneda(monedaRepository.save(moneda));
+        Moneda guardada = monedaRepository.save(moneda);
+        auditoria.registrar(
+            AccionesAdmin.MONEDA_MODIFICAR, ENTIDAD, guardada.getIdMoneda(),
+            "Modificó la moneda “" + guardada.getCodigo() + "”", antes, guardada, CAMPOS);
+        return MonedaDTO.desdeMoneda(guardada);
     }
 
     @Transactional
@@ -105,11 +123,15 @@ public class MonedaService {
         if (!moneda.isEstado()) {
             throw new IllegalArgumentException("No podés marcar como predeterminada una moneda dada de baja.");
         }
+        Snapshot antes = Snapshot.de(moneda, CAMPOS);
         List<Moneda> todas = monedaRepository.findAll();
         for (Moneda otra : todas) {
             otra.setPredeterminada(otra.getIdMoneda().equals(id));
         }
         monedaRepository.saveAll(todas);
+        auditoria.registrar(
+            AccionesAdmin.MONEDA_PREDETERMINADA, ENTIDAD, moneda.getIdMoneda(),
+            "Marcó la moneda “" + moneda.getCodigo() + "” como predeterminada", antes, moneda, CAMPOS);
         return MonedaDTO.desdeMoneda(moneda);
     }
 
@@ -123,15 +145,25 @@ public class MonedaService {
         if (moneda.isEstado() && monedaRepository.countByEstadoTrue() <= 1) {
             throw new IllegalArgumentException("Debe quedar al menos una moneda activa.");
         }
+        Snapshot antes = Snapshot.de(moneda, CAMPOS);
         moneda.setEstado(false);
-        return MonedaDTO.desdeMoneda(monedaRepository.save(moneda));
+        Moneda guardada = monedaRepository.save(moneda);
+        auditoria.registrar(
+            AccionesAdmin.MONEDA_BAJA, ENTIDAD, guardada.getIdMoneda(),
+            "Dio de baja la moneda “" + guardada.getCodigo() + "”", antes, guardada, CAMPOS);
+        return MonedaDTO.desdeMoneda(guardada);
     }
 
     @Transactional
     public MonedaDTO darDeAlta(Long id) {
         Moneda moneda = obtener(id);
+        Snapshot antes = Snapshot.de(moneda, CAMPOS);
         moneda.setEstado(true);
-        return MonedaDTO.desdeMoneda(monedaRepository.save(moneda));
+        Moneda guardada = monedaRepository.save(moneda);
+        auditoria.registrar(
+            AccionesAdmin.MONEDA_REACTIVAR, ENTIDAD, guardada.getIdMoneda(),
+            "Reactivó la moneda “" + guardada.getCodigo() + "”", antes, guardada, CAMPOS);
+        return MonedaDTO.desdeMoneda(guardada);
     }
 
     private void validarCodigoUnico(String codigo, Long idExcluido) {

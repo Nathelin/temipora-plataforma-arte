@@ -14,10 +14,18 @@ import com.temipora.backend_springboot.repositorios.ServicioRepository;
 @Service
 public class ServicioAdminService {
 
-    private final ServicioRepository servicioRepository;
+    private static final String ENTIDAD = "Servicio";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("estado", "Estado"));
 
-    public ServicioAdminService(ServicioRepository servicioRepository) {
+    private final ServicioRepository servicioRepository;
+    private final AuditoriaService auditoria;
+
+    public ServicioAdminService(
+            ServicioRepository servicioRepository,
+            AuditoriaService auditoria) {
         this.servicioRepository = servicioRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional(readOnly = true)
@@ -36,9 +44,13 @@ public class ServicioAdminService {
         if (servicio.getEstado() != EstadoServicio.ARCHIVADO) {
             throw new ConflictoException("El servicio no está archivado.");
         }
+        Snapshot antes = Snapshot.de(servicio, CAMPOS);
         servicio.setEstado(EstadoServicio.PAUSADO);
         servicio.setPausadoEn(null);
         servicioRepository.save(servicio);
+        auditoria.registrar(
+            AccionesAdmin.SERVICIO_RESTAURAR, ENTIDAD, servicio.getIdServicio(),
+            "Restauró el servicio “" + servicio.getNombre() + "”", antes, servicio, CAMPOS);
         return ServicioDTO.desdeServicio(servicio);
     }
 }

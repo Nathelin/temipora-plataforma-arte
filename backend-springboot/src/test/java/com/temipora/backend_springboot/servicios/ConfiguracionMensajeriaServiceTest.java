@@ -24,6 +24,9 @@ class ConfiguracionMensajeriaServiceTest {
     @Mock
     private ConfiguracionMensajeriaRepository configuracionRepository;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private ConfiguracionMensajeriaService configuracionService;
 
