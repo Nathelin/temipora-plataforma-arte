@@ -5,6 +5,26 @@ import BrandLogo from '../components/BrandLogo.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 import api from '../servicios/api'
+import {
+  Archive,
+  Ban,
+  Clock,
+  Coins,
+  FileText,
+  Globe,
+  LayoutDashboard,
+  Megaphone,
+  MessageSquare,
+  Package,
+  Palette,
+  Percent,
+  Receipt,
+  ShieldAlert,
+  Star,
+  Tags,
+  Users,
+  Wrench,
+} from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,9 +42,10 @@ const grupos = [
     id: 'comunidad',
     nombre: 'Comunidad',
     items: [
-      { nombre: 'Usuarios', to: '/admin/usuarios' },
+      { nombre: 'Usuarios', to: '/admin/usuarios', icono: Users },
       {
         nombre: 'Reseñas',
+        icono: Star,
         items: [
           { nombre: 'Criterios de evaluación', to: '/admin/resenas/criterios' },
           { nombre: 'Configuración de reseñas', to: '/admin/resenas/configuracion' },
@@ -32,24 +53,26 @@ const grupos = [
       },
       {
         nombre: 'Moderación',
+        icono: ShieldAlert,
         badge: 'reportes',
         items: [
           { nombre: 'Reseñas reportadas', to: '/admin/resenas/reportadas' },
           { nombre: 'Historial de reportes', to: '/admin/resenas/historial' },
         ],
       },
-      { nombre: 'Sanciones', disponible: false },
+      { nombre: 'Sanciones', icono: Ban, disponible: false },
     ],
   },
   {
     id: 'catalogo',
     nombre: 'Catálogo',
     items: [
-      { nombre: 'Tipos de producto', to: '/admin/tipos/producto' },
-      { nombre: 'Tipos de servicio', to: '/admin/tipos/servicio' },
-      { nombre: 'Servicios archivados', to: '/admin/servicios/archivados' },
+      { nombre: 'Tipos de producto', to: '/admin/tipos/producto', icono: Package },
+      { nombre: 'Tipos de servicio', to: '/admin/tipos/servicio', icono: Wrench },
+      { nombre: 'Servicios archivados', to: '/admin/servicios/archivados', icono: Archive },
       {
         nombre: 'Arte',
+        icono: Palette,
         items: [
           { nombre: 'Medios', to: '/admin/arte/medios' },
           { nombre: 'Tipos de arte', to: '/admin/arte/tipos' },
@@ -58,6 +81,7 @@ const grupos = [
       },
       {
         nombre: 'Etiquetas y categorías',
+        icono: Tags,
         badge: 'etiquetas',
         items: [
           { nombre: 'Etiquetas', to: '/admin/etiquetas' },
@@ -71,16 +95,18 @@ const grupos = [
     nombre: 'Comercio',
     items: [
       {
-        nombre: 'Presupuestos y hitos',
+        nombre: 'Presupuestos e hitos',
+        icono: Receipt,
         items: [
           { nombre: 'Vigencia de presupuestos', to: '/admin/ajustes/presupuestos' },
           { nombre: 'Reglas de pedidos e hitos', to: '/admin/ajustes/pedidos' },
         ],
       },
-      { nombre: 'Promociones y reactivación', to: '/admin/campanas/promociones' },
-      { nombre: 'Comisiones', to: '/admin/ajustes/comisiones' },
+      { nombre: 'Promociones y reactivación', to: '/admin/campanas/promociones', icono: Megaphone },
+      { nombre: 'Comisiones', to: '/admin/ajustes/comisiones', icono: Percent },
       {
         nombre: 'Monedas y cotización',
+        icono: Coins,
         items: [
           { nombre: 'Monedas', to: '/admin/ajustes/monedas' },
           { nombre: 'Cotización', to: '/admin/ajustes/cotizacion' },
@@ -92,13 +118,18 @@ const grupos = [
     id: 'sistema',
     nombre: 'Sistema',
     items: [
-      { nombre: 'Países', to: '/admin/ajustes/paises' },
-      { nombre: 'Mensajería', to: '/admin/ajustes/mensajeria' },
-      { nombre: 'Términos de la plataforma', to: '/admin/ajustes/terminos-plataforma' },
-      { nombre: 'Auditoría', disponible: false },
+      { nombre: 'Países', to: '/admin/ajustes/paises', icono: Globe },
+      { nombre: 'Mensajería', to: '/admin/ajustes/mensajeria', icono: MessageSquare },
+      { nombre: 'Términos de la plataforma', to: '/admin/ajustes/terminos-plataforma', icono: FileText },
     ],
   },
 ]
+
+const utilidades = [
+  { nombre: 'Auditoría', icono: Clock, disponible: false },
+]
+
+const resumen = { nombre: 'Resumen', to: '/admin', icono: LayoutDashboard }
 
 const esActiva = (to) => Boolean(to) && route.path === to
 const grupoActivo = (item) => Boolean(item.items?.some((sub) => esActiva(sub.to)))
@@ -371,14 +402,28 @@ function cerrarSesion() {
           />
         </div>
 
-        <nav class="flex-1 py-3" aria-label="Secciones de administración">
+        <nav
+          class="min-h-0 flex-1 overflow-y-auto py-3"
+          aria-label="Secciones de administración"
+        >
           <router-link
-            :to="{ name: 'admin-resumen' }"
-            class="flex items-center gap-3 px-5 py-2 text-sm transition"
-            :class="esActiva('/admin') ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
-            :aria-current="esActiva('/admin') ? 'page' : null"
+            :to="resumen.to"
+            class="relative flex min-h-10 items-center gap-3 px-5 py-2 text-sm transition-colors motion-reduce:transition-none"
+            :class="esActiva(resumen.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
+            :aria-current="esActiva(resumen.to) ? 'page' : null"
           >
-            <span>Resumen</span>
+            <span
+              v-if="esActiva(resumen.to)"
+              class="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-coral-vivo"
+              aria-hidden="true"
+            ></span>
+            <component
+              :is="resumen.icono"
+              class="h-5 w-5 shrink-0"
+              :stroke-width="esActiva(resumen.to) ? 2.2 : 1.75"
+              aria-hidden="true"
+            />
+            <span>{{ resumen.nombre }}</span>
           </router-link>
 
           <div
@@ -386,37 +431,48 @@ function cerrarSesion() {
             :key="grupo.id"
             role="group"
             :aria-labelledby="`grupo-${grupo.id}`"
-            class="mt-3"
+            class="mt-4"
           >
             <p
               :id="`grupo-${grupo.id}`"
-              class="px-5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-inverso-contraste/40"
+              class="px-5 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-inverso-contraste/40"
             >
               {{ grupo.nombre }}
             </p>
 
-            <div class="space-y-1">
+            <div class="space-y-0.5">
               <template v-for="item in grupo.items" :key="item.nombre">
                 <template v-if="item.items">
                   <button
                     type="button"
-                    class="w-full flex items-center justify-between gap-2 px-5 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60"
+                    class="relative flex min-h-10 w-full items-center justify-between gap-2 px-5 py-2 text-sm transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60"
                     :class="grupoActivo(item) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
                     :aria-expanded="filtrando || !!abiertos[item.nombre]"
                     @click="alternar(item.nombre)"
                   >
-                    <span class="flex items-center gap-2">
-                      <span>{{ item.nombre }}</span>
+                    <span
+                      v-if="grupoActivo(item)"
+                      class="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-coral-vivo"
+                      aria-hidden="true"
+                    ></span>
+                    <span class="flex min-w-0 items-center gap-3">
+                      <component
+                        :is="item.icono"
+                        class="h-5 w-5 shrink-0"
+                        :stroke-width="grupoActivo(item) ? 2.2 : 1.75"
+                        aria-hidden="true"
+                      />
+                      <span class="truncate">{{ item.nombre }}</span>
                       <span
                         v-if="badgeDe(item)"
-                        class="inline-flex min-w-5 items-center justify-center rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white"
+                        class="inline-flex min-w-5 items-center justify-center rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white tabular-nums"
                         :aria-label="`${badgeDe(item)} pendientes`"
                       >
                         {{ badgeDe(item) }}
                       </span>
                     </span>
                     <svg
-                      class="w-4 h-4 shrink-0 transition-transform"
+                      class="h-4 w-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none"
                       :class="(filtrando || abiertos[item.nombre]) ? 'rotate-90' : ''"
                       viewBox="0 0 20 20"
                       fill="currentColor"
@@ -429,16 +485,21 @@ function cerrarSesion() {
                       />
                     </svg>
                   </button>
-                  <div v-if="filtrando || abiertos[item.nombre]" class="space-y-1 pb-1">
+                  <div v-if="filtrando || abiertos[item.nombre]" class="space-y-0.5 pb-1">
                     <router-link
                       v-for="sub in item.items"
                       :key="sub.to"
                       :to="sub.to"
-                      class="flex items-center gap-3 pl-9 pr-5 py-2 text-sm transition"
-                      :class="esActiva(sub.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
+                      class="relative flex min-h-9 items-center py-2 pl-[3.25rem] pr-5 text-[13px] transition-colors motion-reduce:transition-none"
+                      :class="esActiva(sub.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/60 hover:bg-white/10 hover:text-inverso-contraste'"
                       :aria-current="esActiva(sub.to) ? 'page' : null"
                     >
-                      <span>{{ sub.nombre }}</span>
+                      <span
+                        v-if="esActiva(sub.to)"
+                        class="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-coral-vivo"
+                        aria-hidden="true"
+                      ></span>
+                      <span class="truncate">{{ sub.nombre }}</span>
                     </router-link>
                   </div>
                 </template>
@@ -446,15 +507,26 @@ function cerrarSesion() {
                 <router-link
                   v-else-if="item.disponible !== false"
                   :to="item.to"
-                  class="flex items-center gap-3 px-5 py-2 text-sm transition"
+                  class="relative flex min-h-10 items-center gap-3 px-5 py-2 text-sm transition-colors motion-reduce:transition-none"
                   :class="esActiva(item.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
                   :aria-current="esActiva(item.to) ? 'page' : null"
                 >
-                  <span class="flex items-center gap-2">
-                    <span>{{ item.nombre }}</span>
+                  <span
+                    v-if="esActiva(item.to)"
+                    class="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-coral-vivo"
+                    aria-hidden="true"
+                  ></span>
+                  <component
+                    :is="item.icono"
+                    class="h-5 w-5 shrink-0"
+                    :stroke-width="esActiva(item.to) ? 2.2 : 1.75"
+                    aria-hidden="true"
+                  />
+                  <span class="flex min-w-0 items-center gap-2">
+                    <span class="truncate">{{ item.nombre }}</span>
                     <span
                       v-if="badgeDe(item)"
-                      class="inline-flex min-w-5 items-center justify-center rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white"
+                      class="inline-flex min-w-5 items-center justify-center rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white tabular-nums"
                       :aria-label="`${badgeDe(item)} pendientes`"
                     >
                       {{ badgeDe(item) }}
@@ -464,10 +536,11 @@ function cerrarSesion() {
 
                 <div
                   v-else
-                  class="flex items-center justify-between gap-2 px-5 py-2 text-sm text-inverso-contraste/30 cursor-not-allowed select-none"
+                  class="flex min-h-10 items-center gap-3 px-5 py-2 text-sm text-inverso-contraste/35 cursor-not-allowed select-none"
                   aria-disabled="true"
                 >
-                  <span>{{ item.nombre }}</span>
+                  <component :is="item.icono" class="h-5 w-5 shrink-0" :stroke-width="1.75" aria-hidden="true" />
+                  <span class="min-w-0 flex-1 truncate">{{ item.nombre }}</span>
                   <span class="text-[10px] uppercase tracking-wide text-inverso-contraste/30">Próximamente</span>
                 </div>
               </template>
@@ -478,6 +551,19 @@ function cerrarSesion() {
             No hay secciones que coincidan con “{{ filtro.trim() }}”.
           </p>
         </nav>
+
+        <div v-if="!filtrando" class="border-t border-blanco/10 px-2 py-3">
+          <div
+            v-for="item in utilidades"
+            :key="item.nombre"
+            class="flex min-h-10 items-center gap-3 px-3 py-2 text-sm text-inverso-contraste/35 cursor-not-allowed select-none"
+            aria-disabled="true"
+          >
+            <component :is="item.icono" class="h-5 w-5 shrink-0" :stroke-width="1.75" aria-hidden="true" />
+            <span class="min-w-0 flex-1 truncate">{{ item.nombre }}</span>
+            <span class="text-[10px] uppercase tracking-wide text-inverso-contraste/30">Próximamente</span>
+          </div>
+        </div>
       </aside>
 
       <!-- Contenido -->
