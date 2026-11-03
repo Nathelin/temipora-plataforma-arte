@@ -20,15 +20,24 @@ public class CategoriaEtiquetaService {
 
     private static final List<EtiquetaEstado> ESTADOS_QUE_BLOQUEAN_BAJA =
             List.of(EtiquetaEstado.VALIDA, EtiquetaEstado.PENDIENTE);
+    private static final String ENTIDAD = "CategoriaEtiqueta";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("nombre", "Nombre"),
+        CampoAuditado.de("descripcion", "Descripción"),
+        CampoAuditado.de("observaciones", "Observaciones"),
+        CampoAuditado.de("activo", "Activa"));
 
     private final CategoriaEtiquetaRepository categoriaEtiquetaRepository;
     private final EtiquetaRepository etiquetaRepository;
+    private final AuditoriaService auditoria;
 
     public CategoriaEtiquetaService(
             CategoriaEtiquetaRepository categoriaEtiquetaRepository,
-            EtiquetaRepository etiquetaRepository) {
+            EtiquetaRepository etiquetaRepository,
+            AuditoriaService auditoria) {
         this.categoriaEtiquetaRepository = categoriaEtiquetaRepository;
         this.etiquetaRepository = etiquetaRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional(readOnly = true)
@@ -56,19 +65,28 @@ public class CategoriaEtiquetaService {
             .activo(true)
             .build();
 
-        return CategoriaEtiquetaDTO.desdeCategoria(categoriaEtiquetaRepository.save(categoria));
+        CategoriaEtiqueta guardada = categoriaEtiquetaRepository.save(categoria);
+        auditoria.registrar(
+            AccionesAdmin.CATEGORIA_CREAR, ENTIDAD, guardada.getIdCategoriaEtiqueta(),
+            "Creó la categoría “" + guardada.getNombre() + "”", null, guardada, CAMPOS);
+        return CategoriaEtiquetaDTO.desdeCategoria(guardada);
     }
 
     @Transactional
     public CategoriaEtiquetaDTO modificar(Long id, CategoriaEtiquetaRequest request) {
         CategoriaEtiqueta categoria = obtener(id);
+        Snapshot antes = Snapshot.de(categoria, CAMPOS);
         validarNombreUnico(request.getNombre(), id);
 
         categoria.setNombre(request.getNombre().trim());
         categoria.setDescripcion(request.getDescripcion().trim());
         categoria.setObservaciones(request.getObservaciones() != null ? request.getObservaciones().trim() : null);
 
-        return CategoriaEtiquetaDTO.desdeCategoria(categoriaEtiquetaRepository.save(categoria));
+        CategoriaEtiqueta guardada = categoriaEtiquetaRepository.save(categoria);
+        auditoria.registrar(
+            AccionesAdmin.CATEGORIA_MODIFICAR, ENTIDAD, guardada.getIdCategoriaEtiqueta(),
+            "Modificó la categoría “" + guardada.getNombre() + "”", antes, guardada, CAMPOS);
+        return CategoriaEtiquetaDTO.desdeCategoria(guardada);
     }
 
     @Transactional
@@ -83,15 +101,25 @@ public class CategoriaEtiquetaService {
                     + " etiqueta(s) en estado válida o pendiente.");
         }
 
+        Snapshot antes = Snapshot.de(categoria, CAMPOS);
         categoria.setActivo(false);
-        return CategoriaEtiquetaDTO.desdeCategoria(categoriaEtiquetaRepository.save(categoria));
+        CategoriaEtiqueta guardada = categoriaEtiquetaRepository.save(categoria);
+        auditoria.registrar(
+            AccionesAdmin.CATEGORIA_BAJA, ENTIDAD, guardada.getIdCategoriaEtiqueta(),
+            "Dio de baja la categoría “" + guardada.getNombre() + "”", antes, guardada, CAMPOS);
+        return CategoriaEtiquetaDTO.desdeCategoria(guardada);
     }
 
     @Transactional
     public CategoriaEtiquetaDTO darDeAlta(Long id) {
         CategoriaEtiqueta categoria = obtener(id);
+        Snapshot antes = Snapshot.de(categoria, CAMPOS);
         categoria.setActivo(true);
-        return CategoriaEtiquetaDTO.desdeCategoria(categoriaEtiquetaRepository.save(categoria));
+        CategoriaEtiqueta guardada = categoriaEtiquetaRepository.save(categoria);
+        auditoria.registrar(
+            AccionesAdmin.CATEGORIA_REACTIVAR, ENTIDAD, guardada.getIdCategoriaEtiqueta(),
+            "Reactivó la categoría “" + guardada.getNombre() + "”", antes, guardada, CAMPOS);
+        return CategoriaEtiquetaDTO.desdeCategoria(guardada);
     }
 
     private CategoriaEtiqueta obtener(Long id) {

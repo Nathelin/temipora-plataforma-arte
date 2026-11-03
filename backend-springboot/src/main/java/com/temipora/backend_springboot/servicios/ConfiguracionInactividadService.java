@@ -14,14 +14,28 @@ import com.temipora.backend_springboot.repositorios.ConfiguracionInactividadRepo
 @Service
 public class ConfiguracionInactividadService {
 
+    private static final String ENTIDAD = "ConfiguracionInactividad";
+    private static final java.util.List<CampoAuditado> CAMPOS = java.util.List.of(
+        CampoAuditado.de("diasSinCompra", "Días sin compra"),
+        CampoAuditado.de("diasSinConexion", "Días sin conexión"),
+        CampoAuditado.de("diasCooldown", "Días de cooldown"),
+        CampoAuditado.de("diasMinimosCuenta", "Días mínimos de cuenta"),
+        CampoAuditado.de("porcentajeDescuento", "Descuento"),
+        CampoAuditado.de("vigenciaHoras", "Vigencia de la oferta"),
+        CampoAuditado.de("maxOfertasPorUsuario", "Servicios por usuario"),
+        CampoAuditado.de("maxUsuariosPorCorrida", "Usuarios por ejecución"));
+
     private final ConfiguracionInactividadRepository repository;
     private final ComisionService comisionService;
+    private final AuditoriaService auditoria;
 
     public ConfiguracionInactividadService(
             ConfiguracionInactividadRepository repository,
-            ComisionService comisionService) {
+            ComisionService comisionService,
+            AuditoriaService auditoria) {
         this.repository = repository;
         this.comisionService = comisionService;
+        this.auditoria = auditoria;
     }
 
     @Transactional
@@ -65,6 +79,7 @@ public class ConfiguracionInactividadService {
         }
 
         ConfiguracionInactividad config = obtener();
+        Snapshot antes = Snapshot.de(config, CAMPOS);
         config.setDiasSinCompra(Math.max(0, cambios.getDiasSinCompra()));
         config.setDiasSinConexion(Math.max(0, cambios.getDiasSinConexion()));
         config.setDiasCooldown(Math.max(0, cambios.getDiasCooldown()));
@@ -75,7 +90,10 @@ public class ConfiguracionInactividadService {
         config.setMaxUsuariosPorCorrida(
             Math.max(1, cambios.getMaxUsuariosPorCorrida()));
         config.setFechaActualizacion(LocalDateTime.now());
-        return ConfiguracionInactividadDTO.desdeEntidad(
-            repository.save(config));
+        ConfiguracionInactividad guardada = repository.save(config);
+        auditoria.registrar(
+            AccionesAdmin.INACTIVIDAD_CONFIG_ACTUALIZAR, ENTIDAD, guardada.getIdConfiguracion(),
+            "Actualizó la configuración de promociones por inactividad", antes, guardada, CAMPOS);
+        return ConfiguracionInactividadDTO.desdeEntidad(guardada);
     }
 }

@@ -25,6 +25,9 @@ class ConfiguracionPresupuestoServiceTest {
     @Mock
     private ConfiguracionPresupuestoRepository configuracionRepository;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private ConfiguracionPresupuestoService configuracionPresupuestoService;
 

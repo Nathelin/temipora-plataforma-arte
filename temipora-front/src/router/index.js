@@ -18,6 +18,7 @@ import ConfiguracionMensajeriaAdmin from '../components/ConfiguracionMensajeriaA
 import TerminosPlataformaAdmin from '../components/TerminosPlataformaAdmin.vue'
 import CriteriosReseniaAdmin from '../components/CriteriosReseniaAdmin.vue'
 import ConfiguracionReseniaAdmin from '../components/ConfiguracionReseniaAdmin.vue'
+import AuditoriaAdmin from '../components/AuditoriaAdmin.vue'
 import ReseniasReportadasAdmin from '../components/ReseniasReportadasAdmin.vue'
 import HistorialReportesAdmin from '../components/HistorialReportesAdmin.vue'
 import Registro from '../components/Registro.vue'
@@ -408,6 +409,12 @@ const routes = [
         name: 'terminos-plataforma-admin',
         component: TerminosPlataformaAdmin,
         meta: { title: 'Términos de la plataforma' },
+      },
+      {
+        path: 'auditoria',
+        name: 'admin-auditoria',
+        component: AuditoriaAdmin,
+        meta: { title: 'Auditoría' },
       },
       {
         path: 'notificaciones',

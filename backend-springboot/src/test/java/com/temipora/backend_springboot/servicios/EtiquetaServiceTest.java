@@ -47,6 +47,9 @@ class EtiquetaServiceTest {
     @Mock
     private ImagenEtiquetaRepository imagenEtiquetaRepository;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private EtiquetaService etiquetaService;
 

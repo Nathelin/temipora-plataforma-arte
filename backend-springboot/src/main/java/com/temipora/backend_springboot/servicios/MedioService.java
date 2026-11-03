@@ -16,10 +16,19 @@ import com.temipora.backend_springboot.repositorios.MedioRepository;
 @Validated
 public class MedioService {
 
-    private final MedioRepository medioRepository;
+    private static final String ENTIDAD = "Medio";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("nombre", "Nombre"),
+        CampoAuditado.de("descripcion", "Descripción"),
+        CampoAuditado.de("observaciones", "Observaciones"),
+        CampoAuditado.de("activo", "Activo"));
 
-    public MedioService(MedioRepository medioRepository) {
+    private final MedioRepository medioRepository;
+    private final AuditoriaService auditoria;
+
+    public MedioService(MedioRepository medioRepository, AuditoriaService auditoria) {
         this.medioRepository = medioRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional(readOnly = true)
@@ -47,33 +56,52 @@ public class MedioService {
             .activo(true)
             .build();
 
-        return MedioDTO.desdeMedio(medioRepository.save(medio));
+        Medio guardado = medioRepository.save(medio);
+        auditoria.registrar(
+            AccionesAdmin.MEDIO_CREAR, ENTIDAD, guardado.getIdMedio(),
+            "Creó el medio “" + guardado.getNombre() + "”", null, guardado, CAMPOS);
+        return MedioDTO.desdeMedio(guardado);
     }
 
     @Transactional
     public MedioDTO modificar(Long id, MedioRequest request) {
         Medio medio = obtener(id);
+        Snapshot antes = Snapshot.de(medio, CAMPOS);
         validarNombreUnico(request.getNombre(), id);
 
         medio.setNombre(request.getNombre().trim());
         medio.setDescripcion(request.getDescripcion() != null ? request.getDescripcion().trim() : null);
         medio.setObservaciones(request.getObservaciones() != null ? request.getObservaciones().trim() : null);
 
-        return MedioDTO.desdeMedio(medioRepository.save(medio));
+        Medio guardado = medioRepository.save(medio);
+        auditoria.registrar(
+            AccionesAdmin.MEDIO_MODIFICAR, ENTIDAD, guardado.getIdMedio(),
+            "Modificó el medio “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return MedioDTO.desdeMedio(guardado);
     }
 
     @Transactional
     public MedioDTO darDeBaja(Long id) {
         Medio medio = obtener(id);
+        Snapshot antes = Snapshot.de(medio, CAMPOS);
         medio.setActivo(false);
-        return MedioDTO.desdeMedio(medioRepository.save(medio));
+        Medio guardado = medioRepository.save(medio);
+        auditoria.registrar(
+            AccionesAdmin.MEDIO_BAJA, ENTIDAD, guardado.getIdMedio(),
+            "Dio de baja el medio “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return MedioDTO.desdeMedio(guardado);
     }
 
     @Transactional
     public MedioDTO darDeAlta(Long id) {
         Medio medio = obtener(id);
+        Snapshot antes = Snapshot.de(medio, CAMPOS);
         medio.setActivo(true);
-        return MedioDTO.desdeMedio(medioRepository.save(medio));
+        Medio guardado = medioRepository.save(medio);
+        auditoria.registrar(
+            AccionesAdmin.MEDIO_REACTIVAR, ENTIDAD, guardado.getIdMedio(),
+            "Reactivó el medio “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return MedioDTO.desdeMedio(guardado);
     }
 
     private Medio obtener(Long id) {

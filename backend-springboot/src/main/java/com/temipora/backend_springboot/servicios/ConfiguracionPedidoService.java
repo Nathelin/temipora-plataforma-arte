@@ -15,11 +15,22 @@ import com.temipora.backend_springboot.repositorios.ConfiguracionPedidoRepositor
 @Service
 public class ConfiguracionPedidoService {
 
+    private static final String ENTIDAD = "ConfiguracionPedido";
+    private static final java.util.List<CampoAuditado> CAMPOS = java.util.List.of(
+        CampoAuditado.de("diasAprobacionAutomatica", "Días de aprobación automática"),
+        CampoAuditado.de("diasPagoCuota", "Días para pagar una cuota"),
+        CampoAuditado.de("maxHitos", "Máximo de hitos"),
+        CampoAuditado.de("porcentajeMaxPrimerHito", "Porcentaje máximo de la primera cuota"),
+        CampoAuditado.de("montoMinimoCuota", "Monto mínimo por cuota"));
+
     private final ConfiguracionPedidoRepository configuracionRepository;
+    private final AuditoriaService auditoria;
 
     public ConfiguracionPedidoService(
-            ConfiguracionPedidoRepository configuracionRepository) {
+            ConfiguracionPedidoRepository configuracionRepository,
+            AuditoriaService auditoria) {
         this.configuracionRepository = configuracionRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional
@@ -74,6 +85,7 @@ public class ConfiguracionPedidoService {
         }
 
         ConfiguracionPedido config = obtener();
+        Snapshot antes = Snapshot.de(config, CAMPOS);
         config.setDiasAprobacionAutomatica(request.getDiasAprobacionAutomatica());
         config.setDiasPagoCuota(request.getDiasPagoCuota());
         config.setMaxHitos(request.getMaxHitos());
@@ -81,7 +93,11 @@ public class ConfiguracionPedidoService {
             porcentajeMaximo.setScale(2, RoundingMode.HALF_UP));
         config.setMontoMinimoCuota(montoMinimo.setScale(2, RoundingMode.HALF_UP));
         config.setFechaActualizacion(LocalDateTime.now());
-        return PedidoConfigDTO.desdeConfiguracion(configuracionRepository.save(config));
+        ConfiguracionPedido guardada = configuracionRepository.save(config);
+        auditoria.registrar(
+            AccionesAdmin.PEDIDO_CONFIG_ACTUALIZAR, ENTIDAD, guardada.getIdConfiguracion(),
+            "Actualizó las reglas de pedidos e hitos", antes, guardada, CAMPOS);
+        return PedidoConfigDTO.desdeConfiguracion(guardada);
     }
 
     private void validarRango(Integer valor, int minimo, int maximo, String mensaje) {

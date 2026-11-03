@@ -18,12 +18,25 @@ import com.temipora.backend_springboot.repositorios.TipoArteRepository;
 @Validated
 public class TipoArteService {
 
+    private static final String ENTIDAD = "TipoArte";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("nombre", "Nombre"),
+        CampoAuditado.de("descripcion", "Descripción"),
+        CampoAuditado.de("observaciones", "Observaciones"),
+        CampoAuditado.de("medio", "Medio"),
+        CampoAuditado.de("activo", "Activo"));
+
     private final TipoArteRepository tipoArteRepository;
     private final MedioRepository medioRepository;
+    private final AuditoriaService auditoria;
 
-    public TipoArteService(TipoArteRepository tipoArteRepository, MedioRepository medioRepository) {
+    public TipoArteService(
+            TipoArteRepository tipoArteRepository,
+            MedioRepository medioRepository,
+            AuditoriaService auditoria) {
         this.tipoArteRepository = tipoArteRepository;
         this.medioRepository = medioRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional(readOnly = true)
@@ -53,12 +66,17 @@ public class TipoArteService {
             .activo(true)
             .build();
 
-        return TipoArteDTO.desdeTipoArte(tipoArteRepository.save(tipoArte));
+        TipoArte guardado = tipoArteRepository.save(tipoArte);
+        auditoria.registrar(
+            AccionesAdmin.TIPO_ARTE_CREAR, ENTIDAD, guardado.getIdTipoArte(),
+            "Creó el tipo de arte “" + guardado.getNombre() + "”", null, guardado, CAMPOS);
+        return TipoArteDTO.desdeTipoArte(guardado);
     }
 
     @Transactional
     public TipoArteDTO modificar(Long id, TipoArteRequest request) {
         TipoArte tipoArte = obtener(id);
+        Snapshot antes = Snapshot.de(tipoArte, CAMPOS);
         validarNombreUnico(request.getNombre(), id);
 
         Medio medio = cargarMedio(request.getIdMedio());
@@ -74,21 +92,35 @@ public class TipoArteService {
         tipoArte.setMedio(medio);
         tipoArte.setObservaciones(request.getObservaciones() != null ? request.getObservaciones().trim() : null);
 
-        return TipoArteDTO.desdeTipoArte(tipoArteRepository.save(tipoArte));
+        TipoArte guardado = tipoArteRepository.save(tipoArte);
+        auditoria.registrar(
+            AccionesAdmin.TIPO_ARTE_MODIFICAR, ENTIDAD, guardado.getIdTipoArte(),
+            "Modificó el tipo de arte “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return TipoArteDTO.desdeTipoArte(guardado);
     }
 
     @Transactional
     public TipoArteDTO darDeBaja(Long id) {
         TipoArte tipoArte = obtener(id);
+        Snapshot antes = Snapshot.de(tipoArte, CAMPOS);
         tipoArte.setActivo(false);
-        return TipoArteDTO.desdeTipoArte(tipoArteRepository.save(tipoArte));
+        TipoArte guardado = tipoArteRepository.save(tipoArte);
+        auditoria.registrar(
+            AccionesAdmin.TIPO_ARTE_BAJA, ENTIDAD, guardado.getIdTipoArte(),
+            "Dio de baja el tipo de arte “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return TipoArteDTO.desdeTipoArte(guardado);
     }
 
     @Transactional
     public TipoArteDTO darDeAlta(Long id) {
         TipoArte tipoArte = obtener(id);
+        Snapshot antes = Snapshot.de(tipoArte, CAMPOS);
         tipoArte.setActivo(true);
-        return TipoArteDTO.desdeTipoArte(tipoArteRepository.save(tipoArte));
+        TipoArte guardado = tipoArteRepository.save(tipoArte);
+        auditoria.registrar(
+            AccionesAdmin.TIPO_ARTE_REACTIVAR, ENTIDAD, guardado.getIdTipoArte(),
+            "Reactivó el tipo de arte “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return TipoArteDTO.desdeTipoArte(guardado);
     }
 
     private TipoArte obtener(Long id) {

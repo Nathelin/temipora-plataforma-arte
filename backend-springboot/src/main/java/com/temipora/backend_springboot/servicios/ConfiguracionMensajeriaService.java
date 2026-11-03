@@ -13,11 +13,24 @@ import com.temipora.backend_springboot.repositorios.ConfiguracionMensajeriaRepos
 @Service
 public class ConfiguracionMensajeriaService {
 
+    private static final String ENTIDAD = "ConfiguracionMensajeria";
+    private static final java.util.List<CampoAuditado> CAMPOS = java.util.List.of(
+        CampoAuditado.de("longitudMaximaMensaje", "Caracteres por mensaje"),
+        CampoAuditado.de("longitudMaximaMotivo", "Caracteres del motivo"),
+        CampoAuditado.de("horasEsperaReenvio", "Horas para reenviar"),
+        CampoAuditado.de("maxSolicitudesPendientes", "Solicitudes pendientes"),
+        CampoAuditado.de("maxSolicitudesPorDia", "Solicitudes por día"),
+        CampoAuditado.de("maxMensajesPorDia", "Mensajes por día"),
+        CampoAuditado.de("diasVencimientoSolicitud", "Días para vencer una solicitud"));
+
     private final ConfiguracionMensajeriaRepository configuracionRepository;
+    private final AuditoriaService auditoria;
 
     public ConfiguracionMensajeriaService(
-            ConfiguracionMensajeriaRepository configuracionRepository) {
+            ConfiguracionMensajeriaRepository configuracionRepository,
+            AuditoriaService auditoria) {
         this.configuracionRepository = configuracionRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional
@@ -57,6 +70,7 @@ public class ConfiguracionMensajeriaService {
                 "La configuración de mensajería es obligatoria.");
         }
         ConfiguracionMensajeria config = obtener();
+        Snapshot antes = Snapshot.de(config, CAMPOS);
         config.setLongitudMaximaMensaje(request.getLongitudMaximaMensaje());
         config.setLongitudMaximaMotivo(request.getLongitudMaximaMotivo());
         config.setHorasEsperaReenvio(request.getHorasEsperaReenvio());
@@ -65,7 +79,10 @@ public class ConfiguracionMensajeriaService {
         config.setMaxMensajesPorDia(request.getMaxMensajesPorDia());
         config.setDiasVencimientoSolicitud(request.getDiasVencimientoSolicitud());
         config.setFechaActualizacion(LocalDateTime.now());
-        return ConfiguracionMensajeriaDTO.desdeConfiguracion(
-            configuracionRepository.save(config));
+        ConfiguracionMensajeria guardada = configuracionRepository.save(config);
+        auditoria.registrar(
+            AccionesAdmin.MENSAJERIA_CONFIG_ACTUALIZAR, ENTIDAD, guardada.getIdConfiguracion(),
+            "Actualizó la configuración de mensajería", antes, guardada, CAMPOS);
+        return ConfiguracionMensajeriaDTO.desdeConfiguracion(guardada);
     }
 }

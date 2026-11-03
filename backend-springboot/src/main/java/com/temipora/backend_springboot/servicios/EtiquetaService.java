@@ -29,18 +29,28 @@ import com.temipora.backend_springboot.repositorios.ImagenEtiquetaRepository;
 public class EtiquetaService {
 
     private static final int TAMANIO_MAXIMO = 100;
+    private static final String ENTIDAD = "Etiqueta";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("nombre", "Nombre"),
+        CampoAuditado.de("descripcion", "Descripción"),
+        CampoAuditado.de("observaciones", "Observaciones"),
+        CampoAuditado.de("categoria", "Categoría"),
+        CampoAuditado.de("estado", "Estado"));
 
     private final EtiquetaRepository etiquetaRepository;
     private final CategoriaEtiquetaRepository categoriaEtiquetaRepository;
     private final ImagenEtiquetaRepository imagenEtiquetaRepository;
+    private final AuditoriaService auditoria;
 
     public EtiquetaService(
             EtiquetaRepository etiquetaRepository,
             CategoriaEtiquetaRepository categoriaEtiquetaRepository,
-            ImagenEtiquetaRepository imagenEtiquetaRepository) {
+            ImagenEtiquetaRepository imagenEtiquetaRepository,
+            AuditoriaService auditoria) {
         this.etiquetaRepository = etiquetaRepository;
         this.categoriaEtiquetaRepository = categoriaEtiquetaRepository;
         this.imagenEtiquetaRepository = imagenEtiquetaRepository;
+        this.auditoria = auditoria;
     }
 
     // ---------------------------------------------------------------
@@ -95,12 +105,17 @@ public class EtiquetaService {
             .fechaCreacion(LocalDateTime.now())
             .build();
 
-        return EtiquetaDTO.desdeEtiqueta(etiquetaRepository.save(etiqueta));
+        Etiqueta guardada = etiquetaRepository.save(etiqueta);
+        auditoria.registrar(
+            AccionesAdmin.ETIQUETA_CREAR, ENTIDAD, guardada.getIdEtiqueta(),
+            "Creó la etiqueta “" + guardada.getNombre() + "”", null, guardada, CAMPOS);
+        return EtiquetaDTO.desdeEtiqueta(guardada);
     }
 
     @Transactional
     public EtiquetaDTO modificar(Long id, EtiquetaRequest request) {
         Etiqueta etiqueta = obtener(id);
+        Snapshot antes = Snapshot.de(etiqueta, CAMPOS);
         String nombre = request.getNombre().trim();
         validarNombreDisponible(nombre, id);
 
@@ -119,7 +134,11 @@ public class EtiquetaService {
         etiqueta.setObservaciones(request.getObservaciones() != null ? request.getObservaciones().trim() : null);
         etiqueta.setCategoria(categoria);
 
-        return EtiquetaDTO.desdeEtiqueta(etiquetaRepository.save(etiqueta));
+        Etiqueta guardada = etiquetaRepository.save(etiqueta);
+        auditoria.registrar(
+            AccionesAdmin.ETIQUETA_MODIFICAR, ENTIDAD, guardada.getIdEtiqueta(),
+            "Modificó la etiqueta “" + guardada.getNombre() + "”", antes, guardada, CAMPOS);
+        return EtiquetaDTO.desdeEtiqueta(guardada);
     }
 
     @Transactional
@@ -136,11 +155,16 @@ public class EtiquetaService {
             throw new IllegalArgumentException("Ya existe una etiqueta válida con ese nombre; modifícala o eliminala primero.");
         }
 
+        Snapshot antes = Snapshot.de(etiqueta, CAMPOS);
         etiqueta.setEstado(EtiquetaEstado.VALIDA);
         etiqueta.setEvaluadoPor(admin);
         etiqueta.setFechaEvaluacion(LocalDateTime.now());
 
-        return EtiquetaDTO.desdeEtiqueta(etiquetaRepository.save(etiqueta));
+        Etiqueta guardada = etiquetaRepository.save(etiqueta);
+        auditoria.registrar(
+            AccionesAdmin.ETIQUETA_APROBAR, ENTIDAD, guardada.getIdEtiqueta(),
+            "Aprobó la etiqueta “" + guardada.getNombre() + "”", antes, guardada, CAMPOS);
+        return EtiquetaDTO.desdeEtiqueta(guardada);
     }
 
     @Transactional
@@ -151,6 +175,7 @@ public class EtiquetaService {
             throw new IllegalArgumentException("Solo se pueden rechazar etiquetas pendientes de evaluación.");
         }
 
+        Snapshot antes = Snapshot.de(etiqueta, CAMPOS);
         etiqueta.setEstado(EtiquetaEstado.RECHAZADA);
         etiqueta.setEvaluadoPor(admin);
         etiqueta.setFechaEvaluacion(LocalDateTime.now());
@@ -159,6 +184,9 @@ public class EtiquetaService {
         // UC-57: se quita de las imágenes a las que se asignó mientras estaba PENDIENTE
         imagenEtiquetaRepository.deleteByEtiquetaIdEtiqueta(id);
 
+        auditoria.registrar(
+            AccionesAdmin.ETIQUETA_RECHAZAR, ENTIDAD, guardada.getIdEtiqueta(),
+            "Rechazó la etiqueta “" + guardada.getNombre() + "”", antes, guardada, CAMPOS);
         return EtiquetaDTO.desdeEtiqueta(guardada);
     }
 
@@ -170,8 +198,13 @@ public class EtiquetaService {
             throw new IllegalArgumentException("Solo puede darse de baja una etiqueta en estado VALIDA.");
         }
 
+        Snapshot antes = Snapshot.de(etiqueta, CAMPOS);
         etiqueta.setEstado(EtiquetaEstado.INACTIVA);
-        return EtiquetaDTO.desdeEtiqueta(etiquetaRepository.save(etiqueta));
+        Etiqueta guardada = etiquetaRepository.save(etiqueta);
+        auditoria.registrar(
+            AccionesAdmin.ETIQUETA_BAJA, ENTIDAD, guardada.getIdEtiqueta(),
+            "Dio de baja la etiqueta “" + guardada.getNombre() + "”", antes, guardada, CAMPOS);
+        return EtiquetaDTO.desdeEtiqueta(guardada);
     }
 
     @Transactional
@@ -183,11 +216,16 @@ public class EtiquetaService {
         }
         validarNombreDisponible(etiqueta.getNombre(), id);
 
+        Snapshot antes = Snapshot.de(etiqueta, CAMPOS);
         etiqueta.setEstado(EtiquetaEstado.VALIDA);
         etiqueta.setEvaluadoPor(admin);
         etiqueta.setFechaEvaluacion(LocalDateTime.now());
 
-        return EtiquetaDTO.desdeEtiqueta(etiquetaRepository.save(etiqueta));
+        Etiqueta guardada = etiquetaRepository.save(etiqueta);
+        auditoria.registrar(
+            AccionesAdmin.ETIQUETA_REACTIVAR, ENTIDAD, guardada.getIdEtiqueta(),
+            "Reactivó la etiqueta “" + guardada.getNombre() + "”", antes, guardada, CAMPOS);
+        return EtiquetaDTO.desdeEtiqueta(guardada);
     }
 
     // ---------------------------------------------------------------

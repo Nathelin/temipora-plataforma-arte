@@ -3,6 +3,7 @@ package com.temipora.backend_springboot.servicios;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,10 +19,19 @@ public class ComisionService {
     public static final BigDecimal PORCENTAJE_MAXIMO = new BigDecimal("50.00");
     private static final BigDecimal CIEN = new BigDecimal("100");
 
-    private final ConfiguracionComisionRepository configuracionRepository;
+    private static final String ENTIDAD = "ConfiguracionComision";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("porcentajeServicio", "Comisión de servicios"),
+        CampoAuditado.de("porcentajeProducto", "Comisión de productos"));
 
-    public ComisionService(ConfiguracionComisionRepository configuracionRepository) {
+    private final ConfiguracionComisionRepository configuracionRepository;
+    private final AuditoriaService auditoria;
+
+    public ComisionService(
+            ConfiguracionComisionRepository configuracionRepository,
+            AuditoriaService auditoria) {
         this.configuracionRepository = configuracionRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional
@@ -52,10 +62,15 @@ public class ComisionService {
         BigDecimal producto = normalizar(request.getPorcentajeProducto(), "productos");
 
         ConfiguracionComision config = obtener();
+        Snapshot antes = Snapshot.de(config, CAMPOS);
         config.setPorcentajeServicio(servicio);
         config.setPorcentajeProducto(producto);
         config.setFechaActualizacion(LocalDateTime.now());
-        return ComisionConfigDTO.desdeConfiguracion(configuracionRepository.save(config));
+        ConfiguracionComision guardada = configuracionRepository.save(config);
+        auditoria.registrar(
+            AccionesAdmin.COMISION_ACTUALIZAR, ENTIDAD, guardada.getIdConfiguracion(),
+            "Actualizó la comisión de la plataforma", antes, guardada, CAMPOS);
+        return ComisionConfigDTO.desdeConfiguracion(guardada);
     }
 
     public BigDecimal calcularComision(BigDecimal monto, BigDecimal porcentaje) {

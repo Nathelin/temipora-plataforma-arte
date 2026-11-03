@@ -113,7 +113,7 @@ const grupos = [
 ]
 
 const utilidades = [
-  { nombre: 'Auditoría', icono: Clock, disponible: false },
+  { nombre: 'Auditoría', to: '/admin/auditoria', icono: Clock },
 ]
 
 const resumen = { nombre: 'Resumen', to: '/admin', icono: LayoutDashboard }
@@ -492,18 +492,32 @@ function cerrarSesion() {
         </nav>
 
         <div v-if="!filtrando" class="shrink-0 border-t border-blanco/10 px-2 py-3">
-          <div
+          <router-link
             v-for="item in utilidades"
             :key="item.nombre"
-            class="flex h-11 items-center gap-3 px-3 py-1 text-sm text-inverso-contraste/35 cursor-not-allowed select-none"
-            :class="colapsada ? 'md:justify-center md:px-0' : ''"
-            aria-disabled="true"
+            :to="item.to"
+            class="relative flex h-11 items-center gap-3 px-3 py-1 text-sm transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60"
+            :class="[
+              esActiva(item.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste',
+              colapsada ? 'md:justify-center md:px-0' : '',
+            ]"
+            :aria-current="esActiva(item.to) ? 'page' : null"
+            :aria-label="item.nombre"
             :title="colapsada ? item.nombre : null"
           >
-            <component :is="item.icono" class="h-5 w-5 shrink-0" :stroke-width="1.75" aria-hidden="true" />
-            <span class="min-w-0 flex-1 line-clamp-2 whitespace-normal break-words leading-tight" :class="colapsada ? 'md:hidden' : ''">{{ item.nombre }}</span>
-            <span class="text-[10px] uppercase tracking-wide text-inverso-contraste/30" :class="colapsada ? 'md:hidden' : ''">Próximamente</span>
-          </div>
+            <span
+              v-if="esActiva(item.to)"
+              class="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-coral-vivo"
+              aria-hidden="true"
+            ></span>
+            <component
+              :is="item.icono"
+              class="h-5 w-5 shrink-0"
+              :stroke-width="esActiva(item.to) ? 2.2 : 1.75"
+              aria-hidden="true"
+            />
+            <span class="min-w-0 line-clamp-2 whitespace-normal break-words leading-tight" :class="colapsada ? 'md:hidden' : ''">{{ item.nombre }}</span>
+          </router-link>
         </div>
       </aside>
 

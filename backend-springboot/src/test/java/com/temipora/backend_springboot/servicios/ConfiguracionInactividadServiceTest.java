@@ -34,6 +34,9 @@ class ConfiguracionInactividadServiceTest {
     @Mock
     private ComisionService comisionService;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private ConfiguracionInactividadService service;
 

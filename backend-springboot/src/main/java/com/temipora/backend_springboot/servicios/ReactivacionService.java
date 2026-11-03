@@ -22,16 +22,19 @@ public class ReactivacionService {
     private final ReactivacionRepository reactivacionRepository;
     private final ServicioService servicioService;
     private final ReactivacionProcesador procesador;
+    private final AuditoriaService auditoria;
 
     public ReactivacionService(
             ConfiguracionInactividadService configuracionService,
             ReactivacionRepository reactivacionRepository,
             ServicioService servicioService,
-            ReactivacionProcesador procesador) {
+            ReactivacionProcesador procesador,
+            AuditoriaService auditoria) {
         this.configuracionService = configuracionService;
         this.reactivacionRepository = reactivacionRepository;
         this.servicioService = servicioService;
         this.procesador = procesador;
+        this.auditoria = auditoria;
     }
 
     public int ejecutar() {
@@ -67,7 +70,20 @@ public class ReactivacionService {
         }
         log.info("Reactivación: {} campaña(s) generadas sobre {} candidato(s).",
             campanas, candidatosIds.size());
+        registrarAuditoria(config, campanas);
         return campanas;
+    }
+
+    private void registrarAuditoria(ConfiguracionInactividad config, int campanas) {
+        try {
+            auditoria.registrarSistema(
+                AccionesAdmin.REACTIVACION_EJECUTAR,
+                "ConfiguracionInactividad",
+                config.getIdConfiguracion(),
+                "Ejecutó promociones por inactividad: " + campanas + " campaña(s).");
+        } catch (RuntimeException e) {
+            log.warn("No se pudo registrar la auditoría de la reactivación: {}", e.getMessage());
+        }
     }
 
     @Scheduled(cron = "${temipora.reactivacion.cron:0 0 9 * * *}")

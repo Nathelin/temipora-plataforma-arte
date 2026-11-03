@@ -16,10 +16,19 @@ import com.temipora.backend_springboot.repositorios.PaisRepository;
 @Validated
 public class PaisService {
 
-    private final PaisRepository paisRepository;
+    private static final String ENTIDAD = "Pais";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("nombre", "Nombre"),
+        CampoAuditado.de("codigoIso", "Código ISO"),
+        CampoAuditado.de("prefijoTelefonico", "Prefijo telefónico"),
+        CampoAuditado.de("estado", "Activo"));
 
-    public PaisService(PaisRepository paisRepository) {
+    private final PaisRepository paisRepository;
+    private final AuditoriaService auditoria;
+
+    public PaisService(PaisRepository paisRepository, AuditoriaService auditoria) {
         this.paisRepository = paisRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional(readOnly = true)
@@ -51,12 +60,17 @@ public class PaisService {
             .estado(true)
             .build();
 
-        return PaisDTO.desdePais(paisRepository.save(pais));
+        Pais guardado = paisRepository.save(pais);
+        auditoria.registrar(
+            AccionesAdmin.PAIS_CREAR, ENTIDAD, guardado.getIdPais(),
+            "Creó el país “" + guardado.getNombre() + "”", null, guardado, CAMPOS);
+        return PaisDTO.desdePais(guardado);
     }
 
     @Transactional
     public PaisDTO modificar(Long id, PaisRequest request) {
         Pais pais = obtener(id);
+        Snapshot antes = Snapshot.de(pais, CAMPOS);
         String nombre = request.getNombre().trim();
         String codigoIso = request.getCodigoIso().trim().toUpperCase();
 
@@ -67,21 +81,35 @@ public class PaisService {
         pais.setCodigoIso(codigoIso);
         pais.setPrefijoTelefonico(request.getPrefijoTelefonico().trim());
 
-        return PaisDTO.desdePais(paisRepository.save(pais));
+        Pais guardado = paisRepository.save(pais);
+        auditoria.registrar(
+            AccionesAdmin.PAIS_MODIFICAR, ENTIDAD, guardado.getIdPais(),
+            "Modificó el país “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return PaisDTO.desdePais(guardado);
     }
 
     @Transactional
     public PaisDTO darDeBaja(Long id) {
         Pais pais = obtener(id);
+        Snapshot antes = Snapshot.de(pais, CAMPOS);
         pais.setEstado(false);
-        return PaisDTO.desdePais(paisRepository.save(pais));
+        Pais guardado = paisRepository.save(pais);
+        auditoria.registrar(
+            AccionesAdmin.PAIS_BAJA, ENTIDAD, guardado.getIdPais(),
+            "Dio de baja el país “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return PaisDTO.desdePais(guardado);
     }
 
     @Transactional
     public PaisDTO darDeAlta(Long id) {
         Pais pais = obtener(id);
+        Snapshot antes = Snapshot.de(pais, CAMPOS);
         pais.setEstado(true);
-        return PaisDTO.desdePais(paisRepository.save(pais));
+        Pais guardado = paisRepository.save(pais);
+        auditoria.registrar(
+            AccionesAdmin.PAIS_REACTIVAR, ENTIDAD, guardado.getIdPais(),
+            "Reactivó el país “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        return PaisDTO.desdePais(guardado);
     }
 
     private Pais obtener(Long id) {

@@ -45,6 +45,9 @@ class TerminosPlataformaServiceTest {
     @Mock
     private ComisionService comisionService;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private TerminosPlataformaService service;
 

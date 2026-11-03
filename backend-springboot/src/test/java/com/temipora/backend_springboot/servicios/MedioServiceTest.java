@@ -29,6 +29,9 @@ class MedioServiceTest {
     @Mock
     private MedioRepository medioRepository;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private MedioService medioService;
 

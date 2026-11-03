@@ -15,11 +15,22 @@ import com.temipora.backend_springboot.repositorios.ConfiguracionReseniaReposito
 @Service
 public class ConfiguracionReseniaService {
 
+    private static final String ENTIDAD = "ConfiguracionResenia";
+    private static final java.util.List<CampoAuditado> CAMPOS = java.util.List.of(
+        CampoAuditado.de("diasVentanaCreacion", "Días para dejar una reseña"),
+        CampoAuditado.de("diasEdicion", "Días para editar una reseña"),
+        CampoAuditado.de("minimoReseniasEtiqueta", "Mínimo de reseñas para la etiqueta"),
+        CampoAuditado.de("umbralExcelente", "Umbral Excelente"),
+        CampoAuditado.de("umbralBuena", "Umbral Buena"));
+
     private final ConfiguracionReseniaRepository configuracionRepository;
+    private final AuditoriaService auditoria;
 
     public ConfiguracionReseniaService(
-            ConfiguracionReseniaRepository configuracionRepository) {
+            ConfiguracionReseniaRepository configuracionRepository,
+            AuditoriaService auditoria) {
         this.configuracionRepository = configuracionRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional
@@ -73,6 +84,7 @@ public class ConfiguracionReseniaService {
         }
 
         ConfiguracionResenia config = obtener();
+        Snapshot antes = Snapshot.de(config, CAMPOS);
         config.setDiasVentanaCreacion(request.getDiasVentanaCreacion());
         config.setDiasEdicion(request.getDiasEdicion());
         config.setMinimoReseniasEtiqueta(request.getMinimoReseniasEtiqueta());
@@ -80,8 +92,11 @@ public class ConfiguracionReseniaService {
         config.setUmbralBuena(buena.setScale(2, RoundingMode.HALF_UP));
         config.setFechaActualizacion(LocalDateTime.now());
 
-        return ConfiguracionReseniaDTO.desdeConfiguracion(
-            configuracionRepository.save(config));
+        ConfiguracionResenia guardada = configuracionRepository.save(config);
+        auditoria.registrar(
+            AccionesAdmin.RESENIA_CONFIG_ACTUALIZAR, ENTIDAD, guardada.getIdConfiguracion(),
+            "Actualizó la configuración de reseñas", antes, guardada, CAMPOS);
+        return ConfiguracionReseniaDTO.desdeConfiguracion(guardada);
     }
 
     private void validarRango(

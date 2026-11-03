@@ -13,11 +13,18 @@ import com.temipora.backend_springboot.repositorios.ConfiguracionPresupuestoRepo
 @Service
 public class ConfiguracionPresupuestoService {
 
+    private static final String ENTIDAD = "ConfiguracionPresupuesto";
+    private static final java.util.List<CampoAuditado> CAMPOS = java.util.List.of(
+        CampoAuditado.de("vigenciaHoras", "Vigencia en horas"));
+
     private final ConfiguracionPresupuestoRepository configuracionRepository;
+    private final AuditoriaService auditoria;
 
     public ConfiguracionPresupuestoService(
-            ConfiguracionPresupuestoRepository configuracionRepository) {
+            ConfiguracionPresupuestoRepository configuracionRepository,
+            AuditoriaService auditoria) {
         this.configuracionRepository = configuracionRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional
@@ -47,9 +54,13 @@ public class ConfiguracionPresupuestoService {
                 "La vigencia debe estar entre 1 y 8760 horas.");
         }
         ConfiguracionPresupuesto config = obtener();
+        Snapshot antes = Snapshot.de(config, CAMPOS);
         config.setVigenciaHoras(horas);
         config.setFechaActualizacion(LocalDateTime.now());
-        return PresupuestoConfigDTO.desdeConfiguracion(
-            configuracionRepository.save(config));
+        ConfiguracionPresupuesto guardada = configuracionRepository.save(config);
+        auditoria.registrar(
+            AccionesAdmin.PRESUPUESTO_CONFIG_ACTUALIZAR, ENTIDAD, guardada.getIdConfiguracion(),
+            "Actualizó la vigencia de los presupuestos", antes, guardada, CAMPOS);
+        return PresupuestoConfigDTO.desdeConfiguracion(guardada);
     }
 }

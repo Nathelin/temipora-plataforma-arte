@@ -25,6 +25,9 @@ class ComisionServiceTest {
     @Mock
     private ConfiguracionComisionRepository configuracionRepository;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private ComisionService comisionService;
 

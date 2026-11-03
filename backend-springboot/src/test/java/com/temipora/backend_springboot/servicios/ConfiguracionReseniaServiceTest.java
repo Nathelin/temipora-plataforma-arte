@@ -25,6 +25,9 @@ class ConfiguracionReseniaServiceTest {
     @Mock
     private ConfiguracionReseniaRepository configuracionRepository;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private ConfiguracionReseniaService configuracionReseniaService;
 

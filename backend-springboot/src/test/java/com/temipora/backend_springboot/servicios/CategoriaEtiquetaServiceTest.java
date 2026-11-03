@@ -34,6 +34,9 @@ class CategoriaEtiquetaServiceTest {
     @Mock
     private EtiquetaRepository etiquetaRepository;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private CategoriaEtiquetaService categoriaEtiquetaService;
 

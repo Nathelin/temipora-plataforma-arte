@@ -54,6 +54,10 @@ public class ReseniaModeracionService {
     private static final String NOTIFICACION_RESTAURADA = "RESENIA_RESTAURADA";
     private static final String REFERENCIA_PEDIDO = "PEDIDO";
     private static final String REFERENCIA_RESENIA = "RESENIA";
+    private static final String ENTIDAD = "Resenia";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("estado", "Estado"),
+        CampoAuditado.de("motivoModeracion", "Motivo de moderación"));
 
     private final ReseniaRepository reseniaRepository;
     private final ReporteReseniaRepository reporteRepository;
@@ -62,6 +66,7 @@ public class ReseniaModeracionService {
     private final ReseniaValorRepository valorRepository;
     private final ReseniaOpcionRepository opcionRepository;
     private final NotificacionService notificacionService;
+    private final AuditoriaService auditoria;
 
     public ReseniaModeracionService(
             ReseniaRepository reseniaRepository,
@@ -70,7 +75,8 @@ public class ReseniaModeracionService {
             ReseniaVersionRepository versionRepository,
             ReseniaValorRepository valorRepository,
             ReseniaOpcionRepository opcionRepository,
-            NotificacionService notificacionService) {
+            NotificacionService notificacionService,
+            AuditoriaService auditoria) {
         this.reseniaRepository = reseniaRepository;
         this.reporteRepository = reporteRepository;
         this.usuarioRepository = usuarioRepository;
@@ -78,6 +84,7 @@ public class ReseniaModeracionService {
         this.valorRepository = valorRepository;
         this.opcionRepository = opcionRepository;
         this.notificacionService = notificacionService;
+        this.auditoria = auditoria;
     }
 
     // -----------------------------------------------------------------
@@ -218,6 +225,7 @@ public class ReseniaModeracionService {
 
         Usuario admin = obtenerAdmin(idAdmin);
         boolean yaEstabaOculta = resenia.getEstado() == EstadoResenia.OCULTA;
+        Snapshot antes = Snapshot.de(resenia, CAMPOS);
         LocalDateTime ahora = LocalDateTime.now();
 
         resenia.setEstado(EstadoResenia.OCULTA);
@@ -237,6 +245,9 @@ public class ReseniaModeracionService {
                     + resenia.getMotivoModeracion() + ".");
         }
 
+        auditoria.registrar(
+            AccionesAdmin.RESENIA_OCULTAR, ENTIDAD, resenia.getIdResenia(),
+            "Ocultó una reseña de " + nombreServicio(resenia), antes, resenia, CAMPOS);
         return aDTOs(List.of(resenia)).get(0);
     }
 
@@ -265,6 +276,11 @@ public class ReseniaModeracionService {
         }
         reporteRepository.saveAll(pendientes);
 
+        auditoria.registrar(
+            AccionesAdmin.RESENIA_DESCARTAR_REPORTES, ENTIDAD, resenia.getIdResenia(),
+            "Descartó " + pendientes.size() + " reporte(s) de una reseña de "
+                + nombreServicio(resenia),
+            "Descartado por moderación");
         return aDTOs(List.of(resenia)).get(0);
     }
 
@@ -278,6 +294,7 @@ public class ReseniaModeracionService {
         }
 
         obtenerAdmin(idAdmin);
+        Snapshot antes = Snapshot.de(resenia, CAMPOS);
         resenia.setEstado(EstadoResenia.PUBLICADA);
         resenia.setModeradaEn(null);
         resenia.setMotivoModeracion(null);
@@ -288,6 +305,9 @@ public class ReseniaModeracionService {
             "Tu reseña de " + nombreServicio(resenia)
                 + " volvió a publicarse.");
 
+        auditoria.registrar(
+            AccionesAdmin.RESENIA_RESTAURAR, ENTIDAD, resenia.getIdResenia(),
+            "Restauró una reseña de " + nombreServicio(resenia), antes, resenia, CAMPOS);
         return aDTOs(List.of(resenia)).get(0);
     }
 
