@@ -112,6 +112,8 @@ onMounted(cargar)
       descripcion="Límites del plan de hitos, aprobación automática y plazos de pago."
     />
 
+    <AdminTabs />
+
     <p v-if="cargando" class="py-10 text-center text-cafe/60">Cargando...</p>
     <p v-else-if="error" class="py-10 text-center text-rojizo">{{ error }}</p>
 

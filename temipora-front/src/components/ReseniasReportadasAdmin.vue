@@ -174,16 +174,9 @@ function claseOpcion(opcion) {
       eyebrow="Comunidad"
       titulo="Moderación de reseñas"
       descripcion="Revisá los reportes de la comunidad y decidí si ocultás la reseña o descartás el reporte. Al ocultarla deja de aparecer en el servicio, el perfil y los promedios."
-    >
-      <template #acciones>
-        <router-link
-          :to="{ name: 'admin-resenias-historial' }"
-          class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
-        >
-          Ver historial de reportes →
-        </router-link>
-      </template>
-    </AdminPageHeader>
+    />
+
+    <AdminTabs />
 
     <div class="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Estado de las reseñas">
       <button

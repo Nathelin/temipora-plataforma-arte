@@ -71,6 +71,8 @@ onMounted(cargar)
       descripcion="Cuánto tiempo tiene un cliente para aceptar un presupuesto."
     />
 
+    <AdminTabs />
+
     <p v-if="cargando" class="py-10 text-center text-cafe/60">Cargando...</p>
     <p v-else-if="error" class="py-10 text-center text-rojizo">{{ error }}</p>
 

@@ -6,6 +6,7 @@ import ThemeToggle from '../components/ThemeToggle.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 import api from '../servicios/api'
 import {
+  Archive,
   Ban,
   Clock,
   Coins,
@@ -36,8 +37,6 @@ const menuAbierto = ref(false)
 const menuAdminAbierto = ref(false)
 const contenedorMenu = ref(null)
 
-const ABIERTOS_KEY = 'adminMenuAbiertos'
-
 const grupos = [
   {
     id: 'comunidad',
@@ -46,20 +45,16 @@ const grupos = [
       { nombre: 'Usuarios', to: '/admin/usuarios', icono: Users },
       {
         nombre: 'Reseñas',
+        to: '/admin/resenas/criterios',
+        rutas: ['/admin/resenas/criterios', '/admin/resenas/configuracion'],
         icono: Star,
-        items: [
-          { nombre: 'Criterios de evaluación', to: '/admin/resenas/criterios' },
-          { nombre: 'Configuración de reseñas', to: '/admin/resenas/configuracion' },
-        ],
       },
       {
         nombre: 'Moderación',
+        to: '/admin/resenas/reportadas',
+        rutas: ['/admin/resenas/reportadas', '/admin/resenas/historial'],
         icono: ShieldAlert,
         badge: 'reportes',
-        items: [
-          { nombre: 'Reseñas reportadas', to: '/admin/resenas/reportadas' },
-          { nombre: 'Historial de reportes', to: '/admin/resenas/historial' },
-        ],
       },
       { nombre: 'Sanciones', icono: Ban, disponible: false },
     ],
@@ -69,31 +64,20 @@ const grupos = [
     nombre: 'Catálogo',
     items: [
       { nombre: 'Tipos de producto', to: '/admin/tipos/producto', icono: Package },
-      {
-        nombre: 'Servicios',
-        icono: Wrench,
-        items: [
-          { nombre: 'Tipos', to: '/admin/tipos/servicio' },
-          { nombre: 'Archivados', to: '/admin/servicios/archivados' },
-        ],
-      },
+      { nombre: 'Tipos de servicio', to: '/admin/tipos/servicio', icono: Wrench },
+      { nombre: 'Servicios archivados', to: '/admin/servicios/archivados', icono: Archive },
       {
         nombre: 'Arte',
+        to: '/admin/arte/medios',
+        rutas: ['/admin/arte/medios', '/admin/arte/tipos', '/admin/arte/materiales'],
         icono: Palette,
-        items: [
-          { nombre: 'Medios', to: '/admin/arte/medios' },
-          { nombre: 'Tipos de arte', to: '/admin/arte/tipos' },
-          { nombre: 'Materiales', to: '/admin/arte/materiales' },
-        ],
       },
       {
         nombre: 'Etiquetas y categorías',
+        to: '/admin/etiquetas',
+        rutas: ['/admin/etiquetas', '/admin/etiquetas/categorias'],
         icono: Tags,
         badge: 'etiquetas',
-        items: [
-          { nombre: 'Etiquetas', to: '/admin/etiquetas' },
-          { nombre: 'Categorías', to: '/admin/etiquetas/categorias' },
-        ],
       },
     ],
   },
@@ -102,22 +86,18 @@ const grupos = [
     nombre: 'Comercio',
     items: [
       {
-        nombre: 'Presupuestos e hitos',
+        nombre: 'Presupuestos y hitos',
+        to: '/admin/ajustes/presupuestos',
+        rutas: ['/admin/ajustes/presupuestos', '/admin/ajustes/pedidos'],
         icono: Receipt,
-        items: [
-          { nombre: 'Vigencia de presupuestos', to: '/admin/ajustes/presupuestos' },
-          { nombre: 'Reglas de pedidos e hitos', to: '/admin/ajustes/pedidos' },
-        ],
       },
       { nombre: 'Promociones y reactivación', to: '/admin/campanas/promociones', icono: Megaphone },
       { nombre: 'Comisiones', to: '/admin/ajustes/comisiones', icono: Percent },
       {
         nombre: 'Monedas y cotización',
+        to: '/admin/ajustes/monedas',
+        rutas: ['/admin/ajustes/monedas', '/admin/ajustes/cotizacion'],
         icono: Coins,
-        items: [
-          { nombre: 'Monedas', to: '/admin/ajustes/monedas' },
-          { nombre: 'Cotización', to: '/admin/ajustes/cotizacion' },
-        ],
       },
     ],
   },
@@ -139,66 +119,17 @@ const utilidades = [
 const resumen = { nombre: 'Resumen', to: '/admin', icono: LayoutDashboard }
 
 const esActiva = (to) => Boolean(to) && route.path === to
-const grupoActivo = (item) => Boolean(item.items?.some((sub) => esActiva(sub.to)))
-
-function leerAbiertos() {
-  const guardado = leerJson(ABIERTOS_KEY)
-  return Object.fromEntries(
-    grupos.flatMap((grupo) =>
-      grupo.items
-        .filter((item) => item.items)
-        .map((item) => [item.nombre, Boolean(guardado[item.nombre])]),
-    ),
-  )
+const estaActivo = (item) => (item.rutas ? item.rutas.includes(route.path) : esActiva(item.to))
+const ariaActual = (item) => {
+  if (!estaActivo(item)) return null
+  return route.path === item.to ? 'page' : 'true'
 }
-
-function leerJson(clave) {
-  try {
-    return JSON.parse(localStorage.getItem(clave) || '{}') || {}
-  } catch {
-    return {}
-  }
-}
-
-const abiertos = ref(leerAbiertos())
 
 const COLAPSADA_KEY = 'adminMenuColapsada'
 const colapsada = ref(localStorage.getItem(COLAPSADA_KEY) === '1')
 
 function alternarColapsada() {
   colapsada.value = !colapsada.value
-  try {
-    localStorage.setItem(COLAPSADA_KEY, colapsada.value ? '1' : '0')
-  } catch {
-    /* sin persistencia disponible */
-  }
-}
-
-function esEscritorio() {
-  return window.matchMedia('(min-width: 768px)').matches
-}
-
-function alternar(nombre) {
-  if (colapsada.value && esEscritorio()) {
-    colapsada.value = false
-    guardarColapsada()
-    abiertos.value[nombre] = true
-    guardarAbiertos()
-    return
-  }
-  abiertos.value[nombre] = !abiertos.value[nombre]
-  guardarAbiertos()
-}
-
-function guardarAbiertos() {
-  try {
-    localStorage.setItem(ABIERTOS_KEY, JSON.stringify(abiertos.value))
-  } catch {
-    /* sin persistencia disponible */
-  }
-}
-
-function guardarColapsada() {
   try {
     localStorage.setItem(COLAPSADA_KEY, colapsada.value ? '1' : '0')
   } catch {
@@ -239,33 +170,17 @@ const gruposVisibles = computed(() => {
   if (!filtrando.value) return grupos
 
   return grupos
-    .map((grupo) => {
-      const items = grupo.items
-        .map((item) => {
-          if (!item.items) {
-            return coincide(item.nombre) ? item : null
-          }
-          if (coincide(item.nombre)) return item
-          const hijos = item.items.filter((sub) => coincide(sub.nombre))
-          return hijos.length ? { ...item, items: hijos } : null
-        })
-        .filter(Boolean)
-      return { ...grupo, items }
-    })
+    .map((grupo) => ({
+      ...grupo,
+      items: grupo.items.filter((item) => coincide(item.nombre)),
+    }))
     .filter((grupo) => grupo.items.length)
 })
 
 watch(
   () => route.path,
-  (ruta) => {
+  () => {
     menuAdminAbierto.value = false
-    for (const grupo of grupos) {
-      for (const item of grupo.items) {
-        if (item.items?.some((sub) => sub.to === ruta)) {
-          abiertos.value[item.nombre] = true
-        }
-      }
-    }
     cargarConteos()
   },
   { immediate: true },
@@ -519,100 +434,27 @@ function cerrarSesion() {
 
             <div class="space-y-0.5">
               <template v-for="item in grupo.items" :key="item.nombre">
-                <template v-if="item.items">
-                  <button
-                    type="button"
-                    class="relative flex h-11 w-full items-center gap-3 px-5 py-1 text-sm transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60"
-                    :class="[
-                      grupoActivo(item) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste',
-                      colapsada ? 'md:justify-center md:px-0' : '',
-                    ]"
-                    :aria-expanded="filtrando || !!abiertos[item.nombre]"
-                    :aria-label="item.nombre"
-                    :title="colapsada ? item.nombre : null"
-                    @click="alternar(item.nombre)"
-                  >
-                    <span
-                      v-if="grupoActivo(item)"
-                      class="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-coral-vivo"
-                      aria-hidden="true"
-                    ></span>
-                    <component
-                      :is="item.icono"
-                      class="h-5 w-5 shrink-0"
-                      :stroke-width="grupoActivo(item) ? 2.2 : 1.75"
-                      aria-hidden="true"
-                    />
-                    <span
-                      class="min-w-0 line-clamp-2 whitespace-normal break-words text-left leading-tight"
-                      :class="colapsada ? 'md:hidden' : ''"
-                    >{{ item.nombre }}</span>
-                    <span
-                      v-if="badgeDe(item)"
-                      class="inline-flex min-w-5 items-center justify-center rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white tabular-nums"
-                      :class="colapsada ? 'md:hidden' : ''"
-                      :aria-label="`${badgeDe(item)} pendientes`"
-                    >
-                      {{ badgeDe(item) }}
-                    </span>
-                    <svg
-                      class="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none"
-                      :class="[(filtrando || abiertos[item.nombre]) ? 'rotate-90' : '', colapsada ? 'md:hidden' : '']"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        fill-rule="evenodd"
-                        d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-                        clip-rule="evenodd"
-                      />
-                    </svg>
-                  </button>
-                  <div
-                    v-if="filtrando || abiertos[item.nombre]"
-                    class="space-y-0.5 pb-1"
-                    :class="colapsada ? 'md:hidden' : ''"
-                  >
-                    <router-link
-                      v-for="sub in item.items"
-                      :key="sub.to"
-                      :to="sub.to"
-                      class="relative flex min-h-9 items-center py-1 pl-[3.25rem] pr-5 text-[13px] transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60"
-                      :class="esActiva(sub.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/60 hover:bg-white/10 hover:text-inverso-contraste'"
-                      :aria-current="esActiva(sub.to) ? 'page' : null"
-                    >
-                      <span
-                        v-if="esActiva(sub.to)"
-                        class="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-coral-vivo"
-                        aria-hidden="true"
-                      ></span>
-                      <span class="min-w-0 line-clamp-2 whitespace-normal break-words leading-tight">{{ sub.nombre }}</span>
-                    </router-link>
-                  </div>
-                </template>
-
                 <router-link
-                  v-else-if="item.disponible !== false"
+                  v-if="item.disponible !== false"
                   :to="item.to"
                   class="relative flex h-11 items-center gap-3 px-5 py-1 text-sm transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60"
                   :class="[
-                    esActiva(item.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste',
+                    estaActivo(item) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste',
                     colapsada ? 'md:justify-center md:px-0' : '',
                   ]"
-                  :aria-current="esActiva(item.to) ? 'page' : null"
+                  :aria-current="ariaActual(item)"
                   :aria-label="item.nombre"
                   :title="colapsada ? item.nombre : null"
                 >
                   <span
-                    v-if="esActiva(item.to)"
+                    v-if="estaActivo(item)"
                     class="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-coral-vivo"
                     aria-hidden="true"
                   ></span>
                   <component
                     :is="item.icono"
                     class="h-5 w-5 shrink-0"
-                    :stroke-width="esActiva(item.to) ? 2.2 : 1.75"
+                    :stroke-width="estaActivo(item) ? 2.2 : 1.75"
                     aria-hidden="true"
                   />
                   <span

@@ -312,6 +312,8 @@ function claseAmbito(valor) {
       </template>
     </AdminPageHeader>
 
+    <AdminTabs />
+
     <div class="mb-4 flex flex-wrap gap-3">
       <select v-model="filtroAmbito" class="rounded-md border border-rosa bg-blanco px-3 py-2 text-sm text-cafe" aria-label="Filtrar por ámbito">
         <option value="">Todos los ámbitos</option>

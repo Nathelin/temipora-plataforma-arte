@@ -147,6 +147,8 @@ cargar()
       </template>
     </AdminPageHeader>
 
+    <AdminTabs />
+
     <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
 

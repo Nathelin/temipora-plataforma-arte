@@ -90,16 +90,9 @@ function claseAccion(accion) {
       eyebrow="Comunidad"
       titulo="Historial de reportes"
       descripcion="Los reportes descartados o resueltos no se borran: quedan registrados con quién los reportó, qué administrador los resolvió y cuándo."
-    >
-      <template #acciones>
-        <router-link
-          :to="{ name: 'admin-resenias-reportadas' }"
-          class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
-        >
-          Volver a reportes pendientes
-        </router-link>
-      </template>
-    </AdminPageHeader>
+    />
+
+    <AdminTabs />
 
     <div class="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Filtrar historial por estado">
       <button
