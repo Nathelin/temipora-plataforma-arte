@@ -109,7 +109,12 @@ onMounted(cargar)
 
 <template>
   <div class="flex-1 w-full mx-auto px-4 sm:px-8 py-8">
-    <h1 class="text-xl font-normal text-granate mb-6">Cotización de monedas</h1>
+    <AdminPageHeader
+      class="mb-6"
+      eyebrow="Comercio"
+      titulo="Cotización"
+      descripcion="Par de monedas y factor de conversión vigente."
+    />
 
     <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
@@ -177,14 +182,14 @@ onMounted(cargar)
         <div class="flex flex-wrap items-center gap-3 pt-2">
           <button
             :disabled="guardando"
-            class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rojizo disabled:opacity-50 motion-reduce:transition-none"
             @click="guardar"
           >
             {{ guardando ? 'Guardando...' : 'Guardar cambios' }}
           </button>
           <button
             :disabled="refrescando || !form.apiHabilitada"
-            class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 disabled:opacity-50 transition"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
             :title="!form.apiHabilitada ? 'Habilitá la API para actualizar' : ''"
             @click="refrescar"
           >

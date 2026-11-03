@@ -169,21 +169,21 @@ function claseOpcion(opcion) {
 
 <template>
   <div class="mx-auto w-full flex-1 px-4 py-8 sm:px-8">
-    <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h1 class="text-xl font-normal text-granate">Moderación de reseñas</h1>
-        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-cafe/60">
-          Revisá los reportes de la comunidad y decidí si ocultás la reseña o descartás el reporte.
-          Al ocultarla deja de aparecer en el servicio, el perfil y los promedios.
-        </p>
-      </div>
-      <router-link
-        :to="{ name: 'admin-resenias-historial' }"
-        class="rounded-md border border-rosa px-4 py-2 text-sm text-cafe transition hover:bg-rosa/20"
-      >
-        Ver historial de reportes →
-      </router-link>
-    </div>
+    <AdminPageHeader
+      class="mb-6"
+      eyebrow="Comunidad"
+      titulo="Moderación de reseñas"
+      descripcion="Revisá los reportes de la comunidad y decidí si ocultás la reseña o descartás el reporte. Al ocultarla deja de aparecer en el servicio, el perfil y los promedios."
+    >
+      <template #acciones>
+        <router-link
+          :to="{ name: 'admin-resenias-historial' }"
+          class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
+        >
+          Ver historial de reportes →
+        </router-link>
+      </template>
+    </AdminPageHeader>
 
     <div class="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Estado de las reseñas">
       <button
@@ -368,14 +368,14 @@ function claseOpcion(opcion) {
           <template v-if="esPendientes">
             <button
               type="button"
-              class="rounded-md bg-rojizo px-4 py-2 text-sm text-white shadow-sm transition hover:bg-granate"
+              class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-rojizo px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-granate disabled:opacity-50 motion-reduce:transition-none"
               @click="abrirAccion('ocultar', resenia)"
             >
               Ocultar reseña
             </button>
             <button
               type="button"
-              class="rounded-md border border-rosa px-4 py-2 text-sm text-cafe transition hover:bg-rosa/20"
+              class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
               @click="abrirAccion('descartar', resenia)"
             >
               Descartar reportes
@@ -384,7 +384,7 @@ function claseOpcion(opcion) {
           <button
             v-else
             type="button"
-            class="rounded-md border border-rosa px-4 py-2 text-sm text-cafe transition hover:bg-rosa/20"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
             @click="abrirAccion('restaurar', resenia)"
           >
             Restaurar reseña
@@ -403,7 +403,7 @@ function claseOpcion(opcion) {
       <div class="flex gap-2">
         <button
           type="button"
-          class="rounded-md border border-rosa px-3 py-2 text-sm text-cafe transition hover:bg-rosa/20 disabled:opacity-40"
+          class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-[13px] font-semibold text-cafe transition-colors hover:bg-rosa/20 disabled:opacity-40 motion-reduce:transition-none"
           :disabled="pagina <= 0"
           @click="cargar(pagina - 1)"
         >
@@ -411,7 +411,7 @@ function claseOpcion(opcion) {
         </button>
         <button
           type="button"
-          class="rounded-md border border-rosa px-3 py-2 text-sm text-cafe transition hover:bg-rosa/20 disabled:opacity-40"
+          class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-[13px] font-semibold text-cafe transition-colors hover:bg-rosa/20 disabled:opacity-40 motion-reduce:transition-none"
           :disabled="!hayMas"
           @click="cargar(pagina + 1)"
         >

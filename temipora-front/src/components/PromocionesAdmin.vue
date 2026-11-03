@@ -167,19 +167,12 @@ onMounted(cargar)
 
 <template>
   <div class="mx-auto w-full flex-1 px-4 py-8 sm:px-8">
-    <div class="mb-6">
-      <p class="text-xs font-semibold uppercase tracking-[0.16em] text-cafe/45">
-        Campañas
-      </p>
-      <h1 class="mt-1 text-xl font-normal text-granate">
-        Promociones por inactividad
-      </h1>
-      <p class="mt-2 max-w-2xl text-sm leading-relaxed text-cafe/60">
-        El proceso detecta clientes que no compraron en la ventana configurada
-        <strong>o</strong> que no se loguearon en la otra ventana, les arma una
-        campaña con servicios recomendados y les envía una oferta.
-      </p>
-    </div>
+    <AdminPageHeader
+      class="mb-6"
+      eyebrow="Comercio"
+      titulo="Promociones por inactividad"
+      descripcion="El proceso detecta clientes que no compraron en la ventana configurada o que no se loguearon en la otra, les arma una campaña con servicios recomendados y les envía una oferta."
+    />
 
     <p v-if="cargando" class="py-10 text-center text-cafe/60">Cargando...</p>
     <p v-else-if="error" class="py-10 text-center text-rojizo">{{ error }}</p>
@@ -360,14 +353,14 @@ onMounted(cargar)
         <div class="flex flex-wrap items-center gap-3 border-t border-rosa/40 pt-6">
           <button
             :disabled="guardando"
-            class="rounded-md bg-coral px-4 py-2 text-sm text-white shadow-sm transition hover:bg-rojizo disabled:opacity-50"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rojizo disabled:opacity-50 motion-reduce:transition-none"
             @click="guardar"
           >
             {{ guardando ? 'Guardando...' : 'Guardar cambios' }}
           </button>
           <button
             type="button"
-            class="rounded-md border border-rosa px-4 py-2 text-sm text-cafe transition hover:bg-rosa/20 disabled:opacity-50"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
             :disabled="ejecutando"
             @click="abrirEjecucion"
           >

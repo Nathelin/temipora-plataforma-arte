@@ -234,15 +234,22 @@ cargar(0)
 
 <template>
   <div class="flex-1 w-full mx-auto px-4 sm:px-8 py-8">
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-normal text-granate">Etiquetas</h1>
-      <button
-        class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
-        @click="abrirAltaEtiqueta"
-      >
-        Dar de alta
-      </button>
-    </div>
+    <AdminPageHeader
+      class="mb-6"
+      eyebrow="Catálogo"
+      titulo="Etiquetas"
+      descripcion="Revisá las etiquetas propuestas por artistas y administrá el catálogo."
+    >
+      <template #acciones>
+        <button
+          type="button"
+          class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rojizo disabled:opacity-50 motion-reduce:transition-none"
+          @click="abrirAltaEtiqueta"
+        >
+          Dar de alta
+        </button>
+      </template>
+    </AdminPageHeader>
 
     <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
@@ -359,7 +366,7 @@ cargar(0)
           <div class="flex gap-2">
             <button
               type="button"
-              class="rounded-md border border-rosa px-3 py-2 text-sm text-cafe transition hover:bg-rosa/20 disabled:opacity-40"
+              class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-[13px] font-semibold text-cafe transition-colors hover:bg-rosa/20 disabled:opacity-40 motion-reduce:transition-none"
               :disabled="pagina <= 0"
               @click="cargar(pagina - 1)"
             >
@@ -367,7 +374,7 @@ cargar(0)
             </button>
             <button
               type="button"
-              class="rounded-md border border-rosa px-3 py-2 text-sm text-cafe transition hover:bg-rosa/20 disabled:opacity-40"
+              class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-[13px] font-semibold text-cafe transition-colors hover:bg-rosa/20 disabled:opacity-40 motion-reduce:transition-none"
               :disabled="!hayMas"
               @click="cargar(pagina + 1)"
             >
@@ -442,14 +449,14 @@ cargar(0)
 
         <div class="flex items-center justify-end gap-3 mt-6">
           <button
-            class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 transition"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
             @click="cerrarModal"
           >
             Cancelar
           </button>
           <button
             :disabled="guardando"
-            class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rojizo disabled:opacity-50 motion-reduce:transition-none"
             @click="guardarEtiqueta"
           >
             {{ guardando ? 'Guardando...' : 'Guardar' }}
@@ -476,7 +483,7 @@ cargar(0)
           <button
             type="button"
             :disabled="modalConfirmacion.confirmando"
-            class="px-4 py-2 rounded-md text-sm text-cafe border border-rosa hover:bg-rosa/20 disabled:opacity-50 transition"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
             @click="cerrarConfirmacion"
           >
             Cancelar
@@ -484,7 +491,7 @@ cargar(0)
           <button
             type="button"
             :disabled="modalConfirmacion.confirmando"
-            class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo disabled:opacity-50 transition shadow-sm"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rojizo disabled:opacity-50 motion-reduce:transition-none"
             @click="confirmarAccion"
           >
             {{ modalConfirmacion.confirmando ? 'Procesando...' : modalConfirmacion.boton }}

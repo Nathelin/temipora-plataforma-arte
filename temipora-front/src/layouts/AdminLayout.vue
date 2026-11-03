@@ -6,7 +6,6 @@ import ThemeToggle from '../components/ThemeToggle.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 import api from '../servicios/api'
 import {
-  Archive,
   Ban,
   Clock,
   Coins,
@@ -17,6 +16,8 @@ import {
   MessageSquare,
   Package,
   Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
   Percent,
   Receipt,
   ShieldAlert,
@@ -68,8 +69,14 @@ const grupos = [
     nombre: 'Catálogo',
     items: [
       { nombre: 'Tipos de producto', to: '/admin/tipos/producto', icono: Package },
-      { nombre: 'Tipos de servicio', to: '/admin/tipos/servicio', icono: Wrench },
-      { nombre: 'Servicios archivados', to: '/admin/servicios/archivados', icono: Archive },
+      {
+        nombre: 'Servicios',
+        icono: Wrench,
+        items: [
+          { nombre: 'Tipos', to: '/admin/tipos/servicio' },
+          { nombre: 'Archivados', to: '/admin/servicios/archivados' },
+        ],
+      },
       {
         nombre: 'Arte',
         icono: Palette,
@@ -155,10 +162,45 @@ function leerJson(clave) {
 
 const abiertos = ref(leerAbiertos())
 
+const COLAPSADA_KEY = 'adminMenuColapsada'
+const colapsada = ref(localStorage.getItem(COLAPSADA_KEY) === '1')
+
+function alternarColapsada() {
+  colapsada.value = !colapsada.value
+  try {
+    localStorage.setItem(COLAPSADA_KEY, colapsada.value ? '1' : '0')
+  } catch {
+    /* sin persistencia disponible */
+  }
+}
+
+function esEscritorio() {
+  return window.matchMedia('(min-width: 768px)').matches
+}
+
 function alternar(nombre) {
+  if (colapsada.value && esEscritorio()) {
+    colapsada.value = false
+    guardarColapsada()
+    abiertos.value[nombre] = true
+    guardarAbiertos()
+    return
+  }
   abiertos.value[nombre] = !abiertos.value[nombre]
+  guardarAbiertos()
+}
+
+function guardarAbiertos() {
   try {
     localStorage.setItem(ABIERTOS_KEY, JSON.stringify(abiertos.value))
+  } catch {
+    /* sin persistencia disponible */
+  }
+}
+
+function guardarColapsada() {
+  try {
+    localStorage.setItem(COLAPSADA_KEY, colapsada.value ? '1' : '0')
   } catch {
     /* sin persistencia disponible */
   }
@@ -384,14 +426,36 @@ function cerrarSesion() {
       <!-- Sidebar -->
       <aside
         id="menu-admin"
-        class="fixed bottom-0 left-0 top-14 z-40 flex w-72 max-w-[85vw] shrink-0 flex-col overflow-y-auto bg-granate text-inverso-contraste transition-transform duration-300 sm:top-16 md:sticky md:bottom-auto md:top-16 md:z-auto md:h-[calc(100vh-4rem)] md:min-h-[calc(100vh-4rem)] md:w-60 md:max-w-none md:translate-x-0"
-        :class="menuAdminAbierto ? 'translate-x-0' : '-translate-x-full'"
+        class="fixed bottom-0 left-0 top-14 z-40 flex w-72 max-w-[85vw] shrink-0 flex-col overflow-hidden bg-granate text-inverso-contraste transition-transform duration-300 motion-reduce:transition-none sm:top-16 md:sticky md:bottom-auto md:top-16 md:z-auto md:h-[calc(100vh-4rem)] md:min-h-[calc(100vh-4rem)] md:max-w-none md:translate-x-0"
+        :class="[
+          menuAdminAbierto ? 'translate-x-0' : '-translate-x-full',
+          colapsada ? 'md:w-[4.5rem]' : 'md:w-[16.25rem]',
+        ]"
       >
-        <div class="border-b border-blanco/10 px-5 py-3">
-          <p class="text-xs uppercase tracking-wider text-inverso-contraste/50">Panel de administración</p>
+        <div
+          class="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-blanco/10 pl-5 pr-2"
+          :class="colapsada ? 'md:justify-center md:pl-2' : ''"
+        >
+          <p
+            class="text-xs uppercase tracking-wider text-inverso-contraste/50"
+            :class="colapsada ? 'md:sr-only' : ''"
+          >
+            Panel de administración
+          </p>
+          <button
+            type="button"
+            class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-inverso-contraste/60 transition-colors hover:bg-white/10 hover:text-inverso-contraste focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 motion-reduce:transition-none md:inline-flex"
+            :aria-expanded="!colapsada"
+            :aria-label="colapsada ? 'Expandir menú de administración' : 'Colapsar menú de administración'"
+            :title="colapsada ? 'Expandir menú' : 'Colapsar menú'"
+            @click="alternarColapsada"
+          >
+            <PanelLeftOpen v-if="colapsada" class="h-4 w-4" aria-hidden="true" />
+            <PanelLeftClose v-else class="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
 
-        <div class="px-4 pt-3 md:hidden">
+        <div class="shrink-0 px-4 pt-3 md:hidden">
           <label for="buscar-secciones" class="sr-only">Buscar sección</label>
           <input
             id="buscar-secciones"
@@ -408,9 +472,14 @@ function cerrarSesion() {
         >
           <router-link
             :to="resumen.to"
-            class="relative flex min-h-10 items-center gap-3 px-5 py-2 text-sm transition-colors motion-reduce:transition-none"
-            :class="esActiva(resumen.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
+            class="relative flex h-11 items-center gap-3 px-5 py-1 text-sm transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60"
+            :class="[
+              esActiva(resumen.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste',
+              colapsada ? 'md:justify-center md:px-0' : '',
+            ]"
             :aria-current="esActiva(resumen.to) ? 'page' : null"
+            :aria-label="resumen.nombre"
+            :title="colapsada ? resumen.nombre : null"
           >
             <span
               v-if="esActiva(resumen.to)"
@@ -423,7 +492,7 @@ function cerrarSesion() {
               :stroke-width="esActiva(resumen.to) ? 2.2 : 1.75"
               aria-hidden="true"
             />
-            <span>{{ resumen.nombre }}</span>
+            <span :class="colapsada ? 'md:hidden' : ''">{{ resumen.nombre }}</span>
           </router-link>
 
           <div
@@ -433,21 +502,34 @@ function cerrarSesion() {
             :aria-labelledby="`grupo-${grupo.id}`"
             class="mt-4"
           >
-            <p
-              :id="`grupo-${grupo.id}`"
-              class="px-5 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-inverso-contraste/40"
-            >
-              {{ grupo.nombre }}
-            </p>
+            <div class="flex h-7 items-center px-5">
+              <p
+                :id="`grupo-${grupo.id}`"
+                class="text-[11px] font-semibold uppercase tracking-[0.14em] text-inverso-contraste/40"
+                :class="colapsada ? 'md:sr-only' : ''"
+              >
+                {{ grupo.nombre }}
+              </p>
+              <div
+                v-if="colapsada"
+                class="hidden h-px flex-1 bg-blanco/10 md:block"
+                aria-hidden="true"
+              ></div>
+            </div>
 
             <div class="space-y-0.5">
               <template v-for="item in grupo.items" :key="item.nombre">
                 <template v-if="item.items">
                   <button
                     type="button"
-                    class="relative flex min-h-10 w-full items-center justify-between gap-2 px-5 py-2 text-sm transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60"
-                    :class="grupoActivo(item) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
+                    class="relative flex h-11 w-full items-center gap-3 px-5 py-1 text-sm transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60"
+                    :class="[
+                      grupoActivo(item) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste',
+                      colapsada ? 'md:justify-center md:px-0' : '',
+                    ]"
                     :aria-expanded="filtrando || !!abiertos[item.nombre]"
+                    :aria-label="item.nombre"
+                    :title="colapsada ? item.nombre : null"
                     @click="alternar(item.nombre)"
                   >
                     <span
@@ -455,25 +537,27 @@ function cerrarSesion() {
                       class="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-coral-vivo"
                       aria-hidden="true"
                     ></span>
-                    <span class="flex min-w-0 items-center gap-3">
-                      <component
-                        :is="item.icono"
-                        class="h-5 w-5 shrink-0"
-                        :stroke-width="grupoActivo(item) ? 2.2 : 1.75"
-                        aria-hidden="true"
-                      />
-                      <span class="truncate">{{ item.nombre }}</span>
-                      <span
-                        v-if="badgeDe(item)"
-                        class="inline-flex min-w-5 items-center justify-center rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white tabular-nums"
-                        :aria-label="`${badgeDe(item)} pendientes`"
-                      >
-                        {{ badgeDe(item) }}
-                      </span>
+                    <component
+                      :is="item.icono"
+                      class="h-5 w-5 shrink-0"
+                      :stroke-width="grupoActivo(item) ? 2.2 : 1.75"
+                      aria-hidden="true"
+                    />
+                    <span
+                      class="min-w-0 line-clamp-2 whitespace-normal break-words text-left leading-tight"
+                      :class="colapsada ? 'md:hidden' : ''"
+                    >{{ item.nombre }}</span>
+                    <span
+                      v-if="badgeDe(item)"
+                      class="inline-flex min-w-5 items-center justify-center rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white tabular-nums"
+                      :class="colapsada ? 'md:hidden' : ''"
+                      :aria-label="`${badgeDe(item)} pendientes`"
+                    >
+                      {{ badgeDe(item) }}
                     </span>
                     <svg
-                      class="h-4 w-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none"
-                      :class="(filtrando || abiertos[item.nombre]) ? 'rotate-90' : ''"
+                      class="ml-auto h-4 w-4 shrink-0 transition-transform duration-200 motion-reduce:transition-none"
+                      :class="[(filtrando || abiertos[item.nombre]) ? 'rotate-90' : '', colapsada ? 'md:hidden' : '']"
                       viewBox="0 0 20 20"
                       fill="currentColor"
                       aria-hidden="true"
@@ -485,12 +569,16 @@ function cerrarSesion() {
                       />
                     </svg>
                   </button>
-                  <div v-if="filtrando || abiertos[item.nombre]" class="space-y-0.5 pb-1">
+                  <div
+                    v-if="filtrando || abiertos[item.nombre]"
+                    class="space-y-0.5 pb-1"
+                    :class="colapsada ? 'md:hidden' : ''"
+                  >
                     <router-link
                       v-for="sub in item.items"
                       :key="sub.to"
                       :to="sub.to"
-                      class="relative flex min-h-9 items-center py-2 pl-[3.25rem] pr-5 text-[13px] transition-colors motion-reduce:transition-none"
+                      class="relative flex min-h-9 items-center py-1 pl-[3.25rem] pr-5 text-[13px] transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60"
                       :class="esActiva(sub.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/60 hover:bg-white/10 hover:text-inverso-contraste'"
                       :aria-current="esActiva(sub.to) ? 'page' : null"
                     >
@@ -499,7 +587,7 @@ function cerrarSesion() {
                         class="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-coral-vivo"
                         aria-hidden="true"
                       ></span>
-                      <span class="truncate">{{ sub.nombre }}</span>
+                      <span class="min-w-0 line-clamp-2 whitespace-normal break-words leading-tight">{{ sub.nombre }}</span>
                     </router-link>
                   </div>
                 </template>
@@ -507,9 +595,14 @@ function cerrarSesion() {
                 <router-link
                   v-else-if="item.disponible !== false"
                   :to="item.to"
-                  class="relative flex min-h-10 items-center gap-3 px-5 py-2 text-sm transition-colors motion-reduce:transition-none"
-                  :class="esActiva(item.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
+                  class="relative flex h-11 items-center gap-3 px-5 py-1 text-sm transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60"
+                  :class="[
+                    esActiva(item.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste',
+                    colapsada ? 'md:justify-center md:px-0' : '',
+                  ]"
                   :aria-current="esActiva(item.to) ? 'page' : null"
+                  :aria-label="item.nombre"
+                  :title="colapsada ? item.nombre : null"
                 >
                   <span
                     v-if="esActiva(item.to)"
@@ -522,26 +615,30 @@ function cerrarSesion() {
                     :stroke-width="esActiva(item.to) ? 2.2 : 1.75"
                     aria-hidden="true"
                   />
-                  <span class="flex min-w-0 items-center gap-2">
-                    <span class="truncate">{{ item.nombre }}</span>
-                    <span
-                      v-if="badgeDe(item)"
-                      class="inline-flex min-w-5 items-center justify-center rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white tabular-nums"
-                      :aria-label="`${badgeDe(item)} pendientes`"
-                    >
-                      {{ badgeDe(item) }}
-                    </span>
+                  <span
+                    class="min-w-0 line-clamp-2 whitespace-normal break-words leading-tight"
+                    :class="colapsada ? 'md:hidden' : ''"
+                  >{{ item.nombre }}</span>
+                  <span
+                    v-if="badgeDe(item)"
+                    class="inline-flex min-w-5 items-center justify-center rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white tabular-nums"
+                    :class="colapsada ? 'md:hidden' : ''"
+                    :aria-label="`${badgeDe(item)} pendientes`"
+                  >
+                    {{ badgeDe(item) }}
                   </span>
                 </router-link>
 
                 <div
                   v-else
-                  class="flex min-h-10 items-center gap-3 px-5 py-2 text-sm text-inverso-contraste/35 cursor-not-allowed select-none"
+                  class="flex h-11 items-center gap-3 px-5 py-1 text-sm text-inverso-contraste/35 cursor-not-allowed select-none"
+                  :class="colapsada ? 'md:justify-center md:px-0' : ''"
                   aria-disabled="true"
+                  :title="colapsada ? item.nombre : null"
                 >
                   <component :is="item.icono" class="h-5 w-5 shrink-0" :stroke-width="1.75" aria-hidden="true" />
-                  <span class="min-w-0 flex-1 truncate">{{ item.nombre }}</span>
-                  <span class="text-[10px] uppercase tracking-wide text-inverso-contraste/30">Próximamente</span>
+                  <span class="min-w-0 flex-1 line-clamp-2 whitespace-normal break-words leading-tight" :class="colapsada ? 'md:hidden' : ''">{{ item.nombre }}</span>
+                  <span class="text-[10px] uppercase tracking-wide text-inverso-contraste/30" :class="colapsada ? 'md:hidden' : ''">Próximamente</span>
                 </div>
               </template>
             </div>
@@ -552,16 +649,18 @@ function cerrarSesion() {
           </p>
         </nav>
 
-        <div v-if="!filtrando" class="border-t border-blanco/10 px-2 py-3">
+        <div v-if="!filtrando" class="shrink-0 border-t border-blanco/10 px-2 py-3">
           <div
             v-for="item in utilidades"
             :key="item.nombre"
-            class="flex min-h-10 items-center gap-3 px-3 py-2 text-sm text-inverso-contraste/35 cursor-not-allowed select-none"
+            class="flex h-11 items-center gap-3 px-3 py-1 text-sm text-inverso-contraste/35 cursor-not-allowed select-none"
+            :class="colapsada ? 'md:justify-center md:px-0' : ''"
             aria-disabled="true"
+            :title="colapsada ? item.nombre : null"
           >
             <component :is="item.icono" class="h-5 w-5 shrink-0" :stroke-width="1.75" aria-hidden="true" />
-            <span class="min-w-0 flex-1 truncate">{{ item.nombre }}</span>
-            <span class="text-[10px] uppercase tracking-wide text-inverso-contraste/30">Próximamente</span>
+            <span class="min-w-0 flex-1 line-clamp-2 whitespace-normal break-words leading-tight" :class="colapsada ? 'md:hidden' : ''">{{ item.nombre }}</span>
+            <span class="text-[10px] uppercase tracking-wide text-inverso-contraste/30" :class="colapsada ? 'md:hidden' : ''">Próximamente</span>
           </div>
         </div>
       </aside>

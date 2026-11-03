@@ -121,7 +121,12 @@ onMounted(cargar)
 
 <template>
   <div class="mx-auto w-full flex-1 px-4 py-8 sm:px-8">
-    <h1 class="mb-6 text-xl font-normal text-granate">Reseñas</h1>
+    <AdminPageHeader
+      class="mb-6"
+      eyebrow="Comunidad"
+      titulo="Configuración de reseñas"
+      descripcion="Plazos para reseñar y editar, y reglas de reputación del cliente."
+    />
 
     <p v-if="cargando" class="py-10 text-center text-cafe/60">Cargando...</p>
     <p v-else-if="error" class="py-10 text-center text-rojizo">{{ error }}</p>
@@ -232,7 +237,7 @@ onMounted(cargar)
           <button
             type="button"
             :disabled="guardando"
-            class="rounded-md bg-coral px-4 py-2 text-sm text-white shadow-sm transition hover:bg-rojizo disabled:opacity-50"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-rojizo disabled:opacity-50 motion-reduce:transition-none"
             @click="guardar"
           >
             {{ guardando ? 'Guardando...' : 'Guardar cambios' }}

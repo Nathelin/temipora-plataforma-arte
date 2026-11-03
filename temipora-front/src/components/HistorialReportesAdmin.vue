@@ -85,21 +85,21 @@ function claseAccion(accion) {
 
 <template>
   <div class="mx-auto w-full flex-1 px-4 py-8 sm:px-8">
-    <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h1 class="text-xl font-normal text-granate">Historial de reportes</h1>
-        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-cafe/60">
-          Los reportes descartados o resueltos no se borran: quedan registrados con quién los
-          reportó, qué administrador los resolvió y cuándo.
-        </p>
-      </div>
-      <router-link
-        :to="{ name: 'admin-resenias-reportadas' }"
-        class="rounded-md border border-rosa px-4 py-2 text-sm text-cafe transition hover:bg-rosa/20"
-      >
-        Volver a reportes pendientes
-      </router-link>
-    </div>
+    <AdminPageHeader
+      class="mb-6"
+      eyebrow="Comunidad"
+      titulo="Historial de reportes"
+      descripcion="Los reportes descartados o resueltos no se borran: quedan registrados con quién los reportó, qué administrador los resolvió y cuándo."
+    >
+      <template #acciones>
+        <router-link
+          :to="{ name: 'admin-resenias-reportadas' }"
+          class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
+        >
+          Volver a reportes pendientes
+        </router-link>
+      </template>
+    </AdminPageHeader>
 
     <div class="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Filtrar historial por estado">
       <button
@@ -202,7 +202,7 @@ function claseAccion(accion) {
       <div class="flex gap-2">
         <button
           type="button"
-          class="rounded-md border border-rosa px-3 py-2 text-sm text-cafe transition hover:bg-rosa/20 disabled:opacity-40"
+          class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-[13px] font-semibold text-cafe transition-colors hover:bg-rosa/20 disabled:opacity-40 motion-reduce:transition-none"
           :disabled="pagina <= 0"
           @click="cargar(pagina - 1)"
         >
@@ -210,7 +210,7 @@ function claseAccion(accion) {
         </button>
         <button
           type="button"
-          class="rounded-md border border-rosa px-3 py-2 text-sm text-cafe transition hover:bg-rosa/20 disabled:opacity-40"
+          class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-[13px] font-semibold text-cafe transition-colors hover:bg-rosa/20 disabled:opacity-40 motion-reduce:transition-none"
           :disabled="!hayMas"
           @click="cargar(pagina + 1)"
         >
