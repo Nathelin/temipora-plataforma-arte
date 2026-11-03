@@ -1,6 +1,6 @@
 package com.temipora.backend_springboot.controladores;
 
-import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.springframework.http.HttpStatus;
@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.temipora.backend_springboot.modelo.EtiquetaDTO;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 import com.temipora.backend_springboot.modelo.EtiquetaRequest;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 import com.temipora.backend_springboot.servicios.EtiquetaService;
@@ -39,10 +40,17 @@ public class EtiquetaAdminController {
     }
 
     @GetMapping
-    public List<EtiquetaDTO> listar(
+    public PaginaDTO<EtiquetaDTO> listar(
             @RequestParam(required = false) EtiquetaEstado estado,
-            @RequestParam(required = false) Long idCategoria) {
-        return etiquetaService.listarAdmin(estado, idCategoria);
+            @RequestParam(required = false) Long idCategoria,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "10") int tamanio) {
+        return etiquetaService.listarAdmin(estado, idCategoria, pagina, tamanio);
+    }
+
+    @GetMapping("/conteo-pendientes")
+    public Map<String, Long> conteoPendientes() {
+        return Map.of("pendientes", etiquetaService.contarPendientes());
     }
 
     @PostMapping

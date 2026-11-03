@@ -1,14 +1,15 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import api from '../servicios/api'
+
+const route = useRoute()
 
 const etiquetas = ref([])
 const categorias = ref([])
 const cargando = ref(true)
 const error = ref('')
 const errorAccion = ref('')
-const filtroEstado = ref('')
-const filtroCategoria = ref('')
 
 const ESTADOS = [
   { valor: '', etiqueta: 'Todos los estados' },
@@ -17,6 +18,15 @@ const ESTADOS = [
   { valor: 'RECHAZADA', etiqueta: 'Rechazadas' },
   { valor: 'INACTIVA', etiqueta: 'Dadas de baja' },
 ]
+
+const estadoInicial = String(route.query.estado || '')
+const filtroEstado = ref(
+  ESTADOS.some((op) => op.valor === estadoInicial) ? estadoInicial : '',
+)
+const filtroCategoria = ref('')
+const pagina = ref(0)
+const totalPaginas = ref(0)
+const hayMas = ref(false)
 
 const modalEtiquetaAbierto = ref(false)
 const editandoEtiqueta = ref(false)
@@ -28,7 +38,7 @@ const descripcion = ref('')
 const observaciones = ref('')
 const idCategoria = ref('')
 
-async function cargar() {
+async function cargar(nuevaPagina = 0) {
   cargando.value = true
   error.value = ''
   try {
@@ -37,12 +47,22 @@ async function cargar() {
         params: {
           estado: filtroEstado.value || undefined,
           idCategoria: filtroCategoria.value || undefined,
+          pagina: nuevaPagina,
+          tamanio: 10,
         },
       }),
       api.get('/admin/categorias-etiqueta'),
     ])
-    etiquetas.value = resEtiquetas.data
+    const data = resEtiquetas.data ?? {}
+    etiquetas.value = data.contenido ?? []
+    pagina.value = data.pagina ?? 0
+    totalPaginas.value = data.totalPaginas ?? 0
+    hayMas.value = Boolean(data.hayMas)
     categorias.value = resCategorias.data
+
+    if (!etiquetas.value.length && pagina.value > 0) {
+      await cargar(pagina.value - 1)
+    }
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudieron cargar los datos.'
   } finally {
@@ -52,8 +72,17 @@ async function cargar() {
 
 watch([filtroEstado, filtroCategoria], () => {
   errorAccion.value = ''
-  cargar()
+  cargar(0)
 })
+
+watch(
+  () => route.query.estado,
+  (valor) => {
+    const estado = String(valor || '')
+    const valido = ESTADOS.some((op) => op.valor === estado) ? estado : ''
+    if (valido !== filtroEstado.value) filtroEstado.value = valido
+  },
+)
 
 // ---------------------------------------------------------------
 // etiquetas
@@ -105,7 +134,7 @@ async function guardarEtiqueta() {
       await api.post('/admin/etiquetas', payload)
     }
     modalEtiquetaAbierto.value = false
-    await cargar()
+    await cargar(pagina.value)
   } catch (e) {
     errorEtiqueta.value = e.response?.data?.message || 'No se pudo guardar la etiqueta.'
   } finally {
@@ -133,7 +162,7 @@ async function confirmarAccion() {
   try {
     await c.ejecutar()
     modalConfirmacion.value = null
-    await cargar()
+    await cargar(pagina.value)
   } catch (err) {
     c.error = err.response?.data?.message || 'No se pudo completar la acción.'
     c.confirmando = false
@@ -172,7 +201,7 @@ async function reactivarEtiqueta(e) {
   errorAccion.value = ''
   try {
     await api.post(`/admin/etiquetas/${e.idEtiqueta}/reactivar`)
-    await cargar()
+    await cargar(pagina.value)
   } catch (err) {
     errorAccion.value = err.response?.data?.message || 'No se pudo reactivar la etiqueta.'
   }
@@ -200,7 +229,7 @@ function cerrarModal() {
   modalEtiquetaAbierto.value = false
 }
 
-cargar()
+cargar(0)
 </script>
 
 <template>
@@ -318,6 +347,33 @@ cargar()
           <p v-if="!etiquetas.length" class="p-8 text-cafe/50 text-center">
             No hay etiquetas con los filtros seleccionados.
           </p>
+        </div>
+
+        <div
+          v-if="totalPaginas > 1"
+          class="mt-5 flex items-center justify-between gap-3"
+        >
+          <p class="text-xs text-cafe/50">
+            Página {{ pagina + 1 }} de {{ totalPaginas }}
+          </p>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              class="rounded-md border border-rosa px-3 py-2 text-sm text-cafe transition hover:bg-rosa/20 disabled:opacity-40"
+              :disabled="pagina <= 0"
+              @click="cargar(pagina - 1)"
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              class="rounded-md border border-rosa px-3 py-2 text-sm text-cafe transition hover:bg-rosa/20 disabled:opacity-40"
+              :disabled="!hayMas"
+              @click="cargar(pagina + 1)"
+            >
+              Siguiente
+            </button>
+          </div>
         </div>
     </template>
 

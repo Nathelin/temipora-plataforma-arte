@@ -1,9 +1,10 @@
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BrandLogo from '../components/BrandLogo.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
+import api from '../servicios/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,97 +15,187 @@ const menuAbierto = ref(false)
 const menuAdminAbierto = ref(false)
 const contenedorMenu = ref(null)
 
-const secciones = [
-  { nombre: 'Usuarios', to: '/admin/usuarios', activa: true },
-  { nombre: 'Productos', to: '/admin/tipos/producto', activa: true },
+const ABIERTOS_KEY = 'adminMenuAbiertos'
+
+const grupos = [
   {
-    nombre: 'Servicios',
-    subsecciones: [
-      { nombre: 'Servicios', to: '/admin/tipos/servicio' },
+    id: 'comunidad',
+    nombre: 'Comunidad',
+    items: [
+      { nombre: 'Usuarios', to: '/admin/usuarios' },
+      {
+        nombre: 'Reseñas',
+        items: [
+          { nombre: 'Criterios de evaluación', to: '/admin/resenas/criterios' },
+          { nombre: 'Configuración de reseñas', to: '/admin/resenas/configuracion' },
+        ],
+      },
+      {
+        nombre: 'Moderación',
+        badge: 'reportes',
+        items: [
+          { nombre: 'Reseñas reportadas', to: '/admin/resenas/reportadas' },
+          { nombre: 'Historial de reportes', to: '/admin/resenas/historial' },
+        ],
+      },
+      { nombre: 'Sanciones', disponible: false },
+    ],
+  },
+  {
+    id: 'catalogo',
+    nombre: 'Catálogo',
+    items: [
+      { nombre: 'Tipos de producto', to: '/admin/tipos/producto' },
+      { nombre: 'Tipos de servicio', to: '/admin/tipos/servicio' },
       { nombre: 'Servicios archivados', to: '/admin/servicios/archivados' },
+      {
+        nombre: 'Arte',
+        items: [
+          { nombre: 'Medios', to: '/admin/arte/medios' },
+          { nombre: 'Tipos de arte', to: '/admin/arte/tipos' },
+          { nombre: 'Materiales', to: '/admin/arte/materiales' },
+        ],
+      },
+      {
+        nombre: 'Etiquetas y categorías',
+        badge: 'etiquetas',
+        items: [
+          { nombre: 'Etiquetas', to: '/admin/etiquetas' },
+          { nombre: 'Categorías', to: '/admin/etiquetas/categorias' },
+        ],
+      },
     ],
   },
   {
-    nombre: 'Etiquetas y categorías',
-    base: '/admin/etiquetas',
-    subsecciones: [
-      { nombre: 'Etiquetas', to: '/admin/etiquetas' },
-      { nombre: 'Categorías', to: '/admin/etiquetas/categorias' },
-    ],
-  },
-  {
-    nombre: 'Arte',
-    base: '/admin/arte',
-    subsecciones: [
-      { nombre: 'Medios', to: '/admin/arte/medios' },
-      { nombre: 'Tipos de arte', to: '/admin/arte/tipos' },
-      { nombre: 'Materiales', to: '/admin/arte/materiales' },
-    ],
-  },
-  {
-    nombre: 'Reseñas',
-    base: '/admin/resenas',
-    subsecciones: [
-      { nombre: 'Criterios de evaluación', to: '/admin/resenas/criterios' },
-      { nombre: 'Configuración', to: '/admin/resenas/configuracion' },
-    ],
-  },
-  {
-    nombre: 'Campañas',
-    base: '/admin/campanas',
-    subsecciones: [
-      { nombre: 'Promociones', to: '/admin/campanas/promociones' },
-    ],
-  },
-  {
-    nombre: 'Ajustes generales',
-    base: '/admin/ajustes',
-    subsecciones: [
-      { nombre: 'Países', to: '/admin/ajustes/paises' },
-      { nombre: 'Monedas', to: '/admin/ajustes/monedas' },
-      { nombre: 'Cotización', to: '/admin/ajustes/cotizacion' },
-      { nombre: 'Presupuestos', to: '/admin/ajustes/presupuestos' },
+    id: 'comercio',
+    nombre: 'Comercio',
+    items: [
+      {
+        nombre: 'Presupuestos y hitos',
+        items: [
+          { nombre: 'Vigencia de presupuestos', to: '/admin/ajustes/presupuestos' },
+          { nombre: 'Reglas de pedidos e hitos', to: '/admin/ajustes/pedidos' },
+        ],
+      },
+      { nombre: 'Promociones y reactivación', to: '/admin/campanas/promociones' },
       { nombre: 'Comisiones', to: '/admin/ajustes/comisiones' },
-      { nombre: 'Hitos y pedidos', to: '/admin/ajustes/pedidos' },
+      {
+        nombre: 'Monedas y cotización',
+        items: [
+          { nombre: 'Monedas', to: '/admin/ajustes/monedas' },
+          { nombre: 'Cotización', to: '/admin/ajustes/cotizacion' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'sistema',
+    nombre: 'Sistema',
+    items: [
+      { nombre: 'Países', to: '/admin/ajustes/paises' },
       { nombre: 'Mensajería', to: '/admin/ajustes/mensajeria' },
       { nombre: 'Términos de la plataforma', to: '/admin/ajustes/terminos-plataforma' },
+      { nombre: 'Auditoría', disponible: false },
     ],
   },
-  {
-    nombre: 'Moderación',
-    base: '/admin/resenas',
-    subsecciones: [
-      { nombre: 'Reseñas reportadas', to: '/admin/resenas/reportadas' },
-      { nombre: 'Historial de reportes', to: '/admin/resenas/historial' },
-    ],
-  },
-  { nombre: 'Sanciones', to: null, activa: false },
-  { nombre: 'Notificaciones', to: '/admin/notificaciones', activa: true },
-  { nombre: 'Auditoría', to: null, activa: false },
 ]
 
-const esActiva = (to) => to && route.path === to
+const esActiva = (to) => Boolean(to) && route.path === to
+const grupoActivo = (item) => Boolean(item.items?.some((sub) => esActiva(sub.to)))
 
-const submenusAbiertos = ref(
-  Object.fromEntries(
-    secciones
-      .filter((s) => s.subsecciones)
-      .map((s) => [s.nombre, s.subsecciones.some((sub) => route.path === sub.to)]),
-  ),
-)
+function leerAbiertos() {
+  const guardado = leerJson(ABIERTOS_KEY)
+  return Object.fromEntries(
+    grupos.flatMap((grupo) =>
+      grupo.items
+        .filter((item) => item.items)
+        .map((item) => [item.nombre, Boolean(guardado[item.nombre])]),
+    ),
+  )
+}
 
-const grupoActivo = (s) => s.subsecciones?.some((sub) => route.path === sub.to)
+function leerJson(clave) {
+  try {
+    return JSON.parse(localStorage.getItem(clave) || '{}') || {}
+  } catch {
+    return {}
+  }
+}
+
+const abiertos = ref(leerAbiertos())
+
+function alternar(nombre) {
+  abiertos.value[nombre] = !abiertos.value[nombre]
+  try {
+    localStorage.setItem(ABIERTOS_KEY, JSON.stringify(abiertos.value))
+  } catch {
+    /* sin persistencia disponible */
+  }
+}
+
+const conteos = ref({ reportes: 0, etiquetas: 0 })
+
+async function cargarConteos() {
+  const [reportes, etiquetas] = await Promise.allSettled([
+    api.get('/admin/resenias/reportadas', { params: { pagina: 0, tamanio: 1 } }),
+    api.get('/admin/etiquetas/conteo-pendientes'),
+  ])
+  if (reportes.status === 'fulfilled') {
+    conteos.value.reportes = Number(reportes.value.data?.totalElementos ?? 0)
+  }
+  if (etiquetas.status === 'fulfilled') {
+    conteos.value.etiquetas = Number(etiquetas.value.data?.pendientes ?? 0)
+  }
+}
+
+function badgeDe(item) {
+  const valor = item.badge ? Number(conteos.value[item.badge] ?? 0) : 0
+  if (!valor) return null
+  return valor > 99 ? '99+' : String(valor)
+}
+
+const filtro = ref('')
+const termino = computed(() => filtro.value.trim().toLowerCase())
+const filtrando = computed(() => termino.value.length > 0)
+
+function coincide(texto) {
+  return texto.toLowerCase().includes(termino.value)
+}
+
+const gruposVisibles = computed(() => {
+  if (!filtrando.value) return grupos
+
+  return grupos
+    .map((grupo) => {
+      const items = grupo.items
+        .map((item) => {
+          if (!item.items) {
+            return coincide(item.nombre) ? item : null
+          }
+          if (coincide(item.nombre)) return item
+          const hijos = item.items.filter((sub) => coincide(sub.nombre))
+          return hijos.length ? { ...item, items: hijos } : null
+        })
+        .filter(Boolean)
+      return { ...grupo, items }
+    })
+    .filter((grupo) => grupo.items.length)
+})
 
 watch(
   () => route.path,
   (ruta) => {
     menuAdminAbierto.value = false
-    for (const s of secciones) {
-      if (s.subsecciones && s.subsecciones.some((sub) => ruta === sub.to)) {
-        submenusAbiertos.value[s.nombre] = true
+    for (const grupo of grupos) {
+      for (const item of grupo.items) {
+        if (item.items?.some((sub) => sub.to === ruta)) {
+          abiertos.value[item.nombre] = true
+        }
       }
     }
+    cargarConteos()
   },
+  { immediate: true },
 )
 
 function actualizarFotoPerfil(event) {
@@ -269,60 +360,123 @@ function cerrarSesion() {
           <p class="text-xs uppercase tracking-wider text-inverso-contraste/50">Panel de administración</p>
         </div>
 
-        <nav class="flex-1 py-3">
-          <div class="space-y-1">
-            <template v-for="s in secciones" :key="s.nombre">
-              <template v-if="s.subsecciones">
-                <button
-                  class="w-full flex items-center justify-between px-5 py-2 text-sm transition"
-                  :class="grupoActivo(s) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
-                  :aria-expanded="!!submenusAbiertos[s.nombre]"
-                  @click="submenusAbiertos[s.nombre] = !submenusAbiertos[s.nombre]"
+        <div class="px-4 pt-3 md:hidden">
+          <label for="buscar-secciones" class="sr-only">Buscar sección</label>
+          <input
+            id="buscar-secciones"
+            v-model="filtro"
+            type="search"
+            placeholder="Buscar sección"
+            class="block w-full rounded-lg border-0 bg-blanco/10 px-3 py-2 text-sm text-inverso-contraste placeholder:text-inverso-contraste/40 focus:bg-blanco/15 focus:outline-none focus:ring-2 focus:ring-coral/60"
+          />
+        </div>
+
+        <nav class="flex-1 py-3" aria-label="Secciones de administración">
+          <router-link
+            :to="{ name: 'admin-resumen' }"
+            class="flex items-center gap-3 px-5 py-2 text-sm transition"
+            :class="esActiva('/admin') ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
+            :aria-current="esActiva('/admin') ? 'page' : null"
+          >
+            <span>Resumen</span>
+          </router-link>
+
+          <div
+            v-for="grupo in gruposVisibles"
+            :key="grupo.id"
+            role="group"
+            :aria-labelledby="`grupo-${grupo.id}`"
+            class="mt-3"
+          >
+            <p
+              :id="`grupo-${grupo.id}`"
+              class="px-5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-inverso-contraste/40"
+            >
+              {{ grupo.nombre }}
+            </p>
+
+            <div class="space-y-1">
+              <template v-for="item in grupo.items" :key="item.nombre">
+                <template v-if="item.items">
+                  <button
+                    type="button"
+                    class="w-full flex items-center justify-between gap-2 px-5 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60"
+                    :class="grupoActivo(item) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
+                    :aria-expanded="filtrando || !!abiertos[item.nombre]"
+                    @click="alternar(item.nombre)"
+                  >
+                    <span class="flex items-center gap-2">
+                      <span>{{ item.nombre }}</span>
+                      <span
+                        v-if="badgeDe(item)"
+                        class="inline-flex min-w-5 items-center justify-center rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white"
+                        :aria-label="`${badgeDe(item)} pendientes`"
+                      >
+                        {{ badgeDe(item) }}
+                      </span>
+                    </span>
+                    <svg
+                      class="w-4 h-4 shrink-0 transition-transform"
+                      :class="(filtrando || abiertos[item.nombre]) ? 'rotate-90' : ''"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                  <div v-if="filtrando || abiertos[item.nombre]" class="space-y-1 pb-1">
+                    <router-link
+                      v-for="sub in item.items"
+                      :key="sub.to"
+                      :to="sub.to"
+                      class="flex items-center gap-3 pl-9 pr-5 py-2 text-sm transition"
+                      :class="esActiva(sub.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
+                      :aria-current="esActiva(sub.to) ? 'page' : null"
+                    >
+                      <span>{{ sub.nombre }}</span>
+                    </router-link>
+                  </div>
+                </template>
+
+                <router-link
+                  v-else-if="item.disponible !== false"
+                  :to="item.to"
+                  class="flex items-center gap-3 px-5 py-2 text-sm transition"
+                  :class="esActiva(item.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
+                  :aria-current="esActiva(item.to) ? 'page' : null"
                 >
-                  <span>{{ s.nombre }}</span>
-                  <svg
-                    class="w-4 h-4 transition-transform"
-                    :class="submenusAbiertos[s.nombre] ? 'rotate-90' : ''"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fill-rule="evenodd"
-                      d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-                      clip-rule="evenodd"
-                    />
-                  </svg>
-                </button>
-                <div v-if="submenusAbiertos[s.nombre]" class="space-y-1 pb-1">
-                  <router-link
-                    v-for="sub in s.subsecciones"
-                    :key="sub.to"
-                    :to="sub.to"
-                    class="flex items-center gap-3 pl-9 pr-5 py-2 text-sm transition"
-                    :class="esActiva(sub.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
-                  >
-                    <span>{{ sub.nombre }}</span>
-                  </router-link>
+                  <span class="flex items-center gap-2">
+                    <span>{{ item.nombre }}</span>
+                    <span
+                      v-if="badgeDe(item)"
+                      class="inline-flex min-w-5 items-center justify-center rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white"
+                      :aria-label="`${badgeDe(item)} pendientes`"
+                    >
+                      {{ badgeDe(item) }}
+                    </span>
+                  </span>
+                </router-link>
+
+                <div
+                  v-else
+                  class="flex items-center justify-between gap-2 px-5 py-2 text-sm text-inverso-contraste/30 cursor-not-allowed select-none"
+                  aria-disabled="true"
+                >
+                  <span>{{ item.nombre }}</span>
+                  <span class="text-[10px] uppercase tracking-wide text-inverso-contraste/30">Próximamente</span>
                 </div>
               </template>
-              <router-link
-                v-else-if="s.activa"
-                :to="s.to"
-                class="flex items-center gap-3 px-5 py-2 text-sm transition"
-                :class="esActiva(s.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste'"
-              >
-                <span>{{ s.nombre }}</span>
-              </router-link>
-              <div
-                v-else
-                class="flex items-center gap-3 px-5 py-2 text-sm text-inverso-contraste/30 cursor-not-allowed select-none"
-                :title="'Próximamente'"
-              >
-                <span>{{ s.nombre }}</span>
-              </div>
-            </template>
+            </div>
           </div>
+
+          <p v-if="!gruposVisibles.length" class="px-5 py-6 text-sm text-inverso-contraste/50">
+            No hay secciones que coincidan con “{{ filtro.trim() }}”.
+          </p>
         </nav>
       </aside>
 

@@ -6,6 +6,10 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +19,7 @@ import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaDTO;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 import com.temipora.backend_springboot.modelo.EtiquetaRequest;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.CategoriaEtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
@@ -22,6 +27,8 @@ import com.temipora.backend_springboot.repositorios.ImagenEtiquetaRepository;
 
 @Service
 public class EtiquetaService {
+
+    private static final int TAMANIO_MAXIMO = 100;
 
     private final EtiquetaRepository etiquetaRepository;
     private final CategoriaEtiquetaRepository categoriaEtiquetaRepository;
@@ -41,24 +48,34 @@ public class EtiquetaService {
     // ---------------------------------------------------------------
 
     @Transactional(readOnly = true)
-    public List<EtiquetaDTO> listarAdmin(EtiquetaEstado estado, Long idCategoria) {
-        List<Etiqueta> etiquetas;
+    public PaginaDTO<EtiquetaDTO> listarAdmin(
+            EtiquetaEstado estado, Long idCategoria, int pagina, int tamanio) {
+        Pageable pageable = pagina(pagina, tamanio, ordenDe(estado));
 
+        Page<Etiqueta> page;
         if (estado != null && idCategoria != null) {
-            etiquetas = etiquetaRepository.findByEstadoAndCategoriaIdCategoriaEtiquetaOrderByNombreAsc(estado, idCategoria);
+            page = etiquetaRepository.findByEstadoAndCategoriaIdCategoriaEtiqueta(estado, idCategoria, pageable);
         } else if (estado != null) {
-            etiquetas = switch (estado) {
-                case PENDIENTE -> etiquetaRepository.findByEstadoOrderByFechaCreacionAsc(estado);
-                case RECHAZADA -> etiquetaRepository.findByEstadoOrderByVecesSolicitadaDesc(estado);
-                default -> etiquetaRepository.findByEstadoOrderByNombreAsc(estado);
-            };
+            page = etiquetaRepository.findByEstado(estado, pageable);
         } else if (idCategoria != null) {
-            etiquetas = etiquetaRepository.findByCategoriaIdCategoriaEtiquetaOrderByNombreAsc(idCategoria);
+            page = etiquetaRepository.findByCategoriaIdCategoriaEtiqueta(idCategoria, pageable);
         } else {
-            etiquetas = etiquetaRepository.findAllByOrderByNombreAsc();
+            page = etiquetaRepository.findAll(pageable);
         }
 
-        return etiquetas.stream().map(EtiquetaDTO::desdeEtiqueta).toList();
+        return PaginaDTO.<EtiquetaDTO>builder()
+            .contenido(page.getContent().stream().map(EtiquetaDTO::desdeEtiqueta).toList())
+            .pagina(page.getNumber())
+            .tamanio(page.getSize())
+            .totalElementos(page.getTotalElements())
+            .totalPaginas(page.getTotalPages())
+            .hayMas(page.hasNext())
+            .build();
+    }
+
+    @Transactional(readOnly = true)
+    public long contarPendientes() {
+        return etiquetaRepository.countByEstado(EtiquetaEstado.PENDIENTE);
     }
 
     @Transactional
@@ -275,6 +292,23 @@ public class EtiquetaService {
                     "Otro artista propuso esa etiqueta y está pendiente de evaluación.");
             }
         };
+    }
+
+    private Pageable pagina(int pagina, int tamanio, Sort orden) {
+        return PageRequest.of(
+            Math.max(0, pagina),
+            Math.min(Math.max(1, tamanio), TAMANIO_MAXIMO),
+            orden);
+    }
+
+    private Sort ordenDe(EtiquetaEstado estado) {
+        if (estado == EtiquetaEstado.PENDIENTE) {
+            return Sort.by(Sort.Direction.ASC, "fechaCreacion");
+        }
+        if (estado == EtiquetaEstado.RECHAZADA) {
+            return Sort.by(Sort.Direction.DESC, "vecesSolicitada");
+        }
+        return Sort.by(Sort.Direction.ASC, "nombre");
     }
 
     private Etiqueta obtener(Long id) {

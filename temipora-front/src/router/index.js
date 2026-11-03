@@ -28,6 +28,7 @@ import ConfiguracionLayout from '../layouts/ConfiguracionLayout.vue'
 import ArtistLayout from '../layouts/ArtistLayout.vue'
 import ClientLayout from '../layouts/ClientLayout.vue'
 import Inicio from '../views/Inicio.vue'
+import AdminResumen from '../views/AdminResumen.vue'
 import PanelResumen from '../views/PanelResumen.vue'
 import Perfil from '../views/Perfil.vue'
 import Favoritos from '../views/Favoritos.vue'
@@ -262,6 +263,12 @@ const routes = [
     component: AdminLayout,
     meta: { requiresAdmin: true },
     children: [
+      {
+        path: '',
+        name: 'admin-resumen',
+        component: AdminResumen,
+        meta: { title: 'Resumen de administración' },
+      },
       {
         path: 'usuarios',
         name: 'usuarios',
