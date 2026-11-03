@@ -23,6 +23,7 @@ import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 public class TerminosPlataformaService {
 
     private static final String ENTIDAD = "TerminosPlataforma";
+    private static final String ENTIDAD_USUARIO = "Usuario";
     private static final List<CampoAuditado> CAMPOS = List.of(
         CampoAuditado.de("version", "Versión"),
         CampoAuditado.de("titulo", "Título"),
@@ -111,6 +112,10 @@ public class TerminosPlataformaService {
             aceptacion.setSnapshot(actual.getContenido());
             aceptacion.setFechaAceptacion(LocalDateTime.now());
             aceptacionRepository.save(aceptacion);
+            auditoria.registrar(
+                AccionesAdmin.TERMINOS_ACEPTAR, ENTIDAD_USUARIO, idUsuario,
+                "Aceptó los términos de la plataforma (versión " + version + ")",
+                "Aceptación registrada");
         }
         return obtenerEstadoUsuario(idUsuario);
     }

@@ -72,6 +72,9 @@ class ReseniaServiceTest {
     @Mock
     private NotificacionService notificacionService;
 
+    @Mock
+    private AuditoriaService auditoria;
+
     @InjectMocks
     private ReseniaService reseniaService;
 

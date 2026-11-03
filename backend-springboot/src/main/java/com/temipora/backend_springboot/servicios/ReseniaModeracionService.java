@@ -58,6 +58,11 @@ public class ReseniaModeracionService {
     private static final List<CampoAuditado> CAMPOS = List.of(
         CampoAuditado.de("estado", "Estado"),
         CampoAuditado.de("motivoModeracion", "Motivo de moderación"));
+    private static final String ENTIDAD_REPORTE = "ReporteResenia";
+    private static final List<CampoAuditado> CAMPOS_REPORTE = List.of(
+        CampoAuditado.de("motivo", "Motivo"),
+        CampoAuditado.de("comentario", "Comentario"),
+        CampoAuditado.de("estado", "Estado"));
 
     private final ReseniaRepository reseniaRepository;
     private final ReporteReseniaRepository reporteRepository;
@@ -134,6 +139,12 @@ public class ReseniaModeracionService {
         reporte.setFechaCreacion(LocalDateTime.now());
 
         ReporteResenia guardado = reporteRepository.save(reporte);
+
+        auditoria.registrar(
+            AccionesAdmin.RESENIA_REPORTAR, ENTIDAD_REPORTE,
+            guardado.getIdReporte(),
+            "Reportó la reseña #" + idResenia + " (" + request.getMotivo() + ")",
+            null, guardado, CAMPOS_REPORTE);
 
         if (pendientesPrevios == 0) {
             notificarAdministradores(resenia, request.getMotivo());

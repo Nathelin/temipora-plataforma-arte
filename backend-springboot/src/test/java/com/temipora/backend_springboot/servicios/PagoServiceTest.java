@@ -67,6 +67,8 @@ class PagoServiceTest {
     private PedidoCierreService pedidoCierreService;
     @Mock
     private ProveedorPago proveedorPago;
+    @Mock
+    private AuditoriaService auditoria;
 
     @InjectMocks
     private PagoService pagoService;

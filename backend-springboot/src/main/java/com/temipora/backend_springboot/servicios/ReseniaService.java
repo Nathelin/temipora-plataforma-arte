@@ -48,6 +48,16 @@ public class ReseniaService {
     private static final String NOTIFICACION_RESENIA = "RESENIA_RECIBIDA";
     private static final String TIPO_REFERENCIA_PEDIDO = "PEDIDO";
 
+    private static final String ENTIDAD_RESENIA = "Resenia";
+    private static final List<CampoAuditado> CAMPOS_RESENIA = List.of(
+        CampoAuditado.de("estado", "Estado"),
+        CampoAuditado.de("mostrarNombre", "Mostrar nombre"),
+        CampoAuditado.de("eliminadaEn", "Eliminada en"));
+    private static final List<CampoAuditado> CAMPOS_VERSION = List.of(
+        CampoAuditado.de("numero", "Versión"),
+        CampoAuditado.de("descripcion", "Descripción"),
+        CampoAuditado.de("calificacionGeneral", "Calificación"));
+
     private final ReseniaRepository reseniaRepository;
     private final PedidoRepository pedidoRepository;
     private final UsuarioRepository usuarioRepository;
@@ -56,6 +66,7 @@ public class ReseniaService {
     private final SolicitudRepository solicitudRepository;
     private final ConfiguracionReseniaService configuracionService;
     private final NotificacionService notificacionService;
+    private final AuditoriaService auditoria;
 
     public ReseniaService(
             ReseniaRepository reseniaRepository,
@@ -65,7 +76,8 @@ public class ReseniaService {
             OpcionCriterioRepository opcionRepository,
             SolicitudRepository solicitudRepository,
             ConfiguracionReseniaService configuracionService,
-            NotificacionService notificacionService) {
+            NotificacionService notificacionService,
+            AuditoriaService auditoria) {
         this.reseniaRepository = reseniaRepository;
         this.pedidoRepository = pedidoRepository;
         this.usuarioRepository = usuarioRepository;
@@ -74,6 +86,7 @@ public class ReseniaService {
         this.solicitudRepository = solicitudRepository;
         this.configuracionService = configuracionService;
         this.notificacionService = notificacionService;
+        this.auditoria = auditoria;
     }
 
     @Transactional
@@ -184,6 +197,12 @@ public class ReseniaService {
 
         Resenia guardada = reseniaRepository.save(resenia);
 
+        auditoria.registrar(
+            AccionesAdmin.RESENIA_CREAR, ENTIDAD_RESENIA, guardada.getIdResenia(),
+            "Dejó una reseña del pedido #" + idPedido
+                + " (calificación " + version.getCalificacionGeneral() + "/5)",
+            null, version, CAMPOS_VERSION);
+
         if (direccion == AmbitoResenia.SERVICIO) {
             notificarResenia(pedido, autor);
         }
@@ -223,14 +242,25 @@ public class ReseniaService {
                 "El plazo para editar la reseña venció.");
         }
 
+        ReseniaVersion anterior = resenia.getVersiones().isEmpty()
+            ? null
+            : resenia.getVersiones().get(resenia.getVersiones().size() - 1);
         int siguienteNumero = resenia.getVersiones().size() + 1;
-        resenia.agregarVersion(
-            construirVersion(siguienteNumero, request, direccion));
+        ReseniaVersion nuevaVersion = construirVersion(
+            siguienteNumero, request, direccion);
+        resenia.agregarVersion(nuevaVersion);
         resenia.setMostrarNombre(
             mostrarNombre(pedido, request, resenia.isMostrarNombre()));
         resenia.setFechaActualizacion(LocalDateTime.now());
 
-        return ReseniaDTO.desde(reseniaRepository.save(resenia), true);
+        Resenia guardada = reseniaRepository.save(resenia);
+        auditoria.registrar(
+            AccionesAdmin.RESENIA_EDITAR, ENTIDAD_RESENIA, guardada.getIdResenia(),
+            "Editó su reseña del pedido #" + idPedido
+                + " (versión " + nuevaVersion.getNumero() + ")",
+            anterior != null ? Snapshot.de(anterior, CAMPOS_VERSION) : null,
+            nuevaVersion, CAMPOS_VERSION);
+        return ReseniaDTO.desde(guardada, true);
     }
 
     @Transactional
@@ -248,11 +278,16 @@ public class ReseniaService {
             throw new IllegalArgumentException("La reseña ya fue eliminada.");
         }
 
+        Snapshot antes = Snapshot.de(resenia, CAMPOS_RESENIA);
         LocalDateTime ahora = LocalDateTime.now();
         resenia.setEstado(EstadoResenia.ELIMINADA);
         resenia.setEliminadaEn(ahora);
         resenia.setFechaActualizacion(ahora);
         reseniaRepository.save(resenia);
+        auditoria.registrar(
+            AccionesAdmin.RESENIA_ELIMINAR, ENTIDAD_RESENIA, resenia.getIdResenia(),
+            "Eliminó su reseña del pedido #" + idPedido,
+            antes, resenia, CAMPOS_RESENIA);
     }
 
     @Transactional

@@ -31,6 +31,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.temipora.backend_springboot.modelo.ContadoresPedidosDTO;
 import com.temipora.backend_springboot.modelo.Conversacion;
+import com.temipora.backend_springboot.modelo.EntregaHito;
 import com.temipora.backend_springboot.modelo.EntregaHitoMultipartRequest;
 import com.temipora.backend_springboot.modelo.ETiempoEntregaUnidad;
 import com.temipora.backend_springboot.modelo.EstadoConversacion;
@@ -95,6 +96,8 @@ class PedidoServiceTest {
     private ConversacionRepository conversacionRepository;
     @Mock
     private MensajeRepository mensajeRepository;
+    @Mock
+    private AuditoriaService auditoria;
 
     @InjectMocks
     private PedidoService pedidoService;
@@ -210,6 +213,8 @@ class PedidoServiceTest {
             any(), any())).thenReturn(BigDecimal.ONE);
         lenient().when(entregaService.listarPorPedido(anyLong()))
             .thenReturn(List.of());
+        lenient().when(entregaService.crear(any(), any(), any(), any()))
+            .thenReturn(new EntregaHito());
         lenient().when(pagoRepository
             .findByHitoPedidoIdHitoPedidoOrderByFechaCreacionDesc(anyLong()))
             .thenReturn(List.of());

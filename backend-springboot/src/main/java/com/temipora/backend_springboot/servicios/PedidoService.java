@@ -23,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.temipora.backend_springboot.modelo.ContadoresPedidosDTO;
 import com.temipora.backend_springboot.modelo.Conversacion;
 import com.temipora.backend_springboot.modelo.DibujoResumenDTO;
+import com.temipora.backend_springboot.modelo.EntregaHito;
 import com.temipora.backend_springboot.modelo.EntregaHitoDTO;
 import com.temipora.backend_springboot.modelo.EntregaHitoMultipartRequest;
 import com.temipora.backend_springboot.modelo.EstadoConversacion;
@@ -73,6 +74,35 @@ public class PedidoService {
     private static final String NOTIF_PUBLICACION_RETIRADA =
         "PEDIDO_PUBLICACION_RETIRADA";
 
+    private static final String ENTIDAD_PEDIDO = "Pedido";
+    private static final List<CampoAuditado> CAMPOS_PEDIDO = List.of(
+        CampoAuditado.de("estado", "Estado"),
+        CampoAuditado.de("precioFinal", "Precio final"),
+        CampoAuditado.de("moneda", "Moneda"),
+        CampoAuditado.de("precioFinalCliente", "Total del cliente"),
+        CampoAuditado.de("monedaCobro", "Moneda de cobro"),
+        CampoAuditado.de("comisionPorcentaje", "Comisión (%)"),
+        CampoAuditado.de("descuentoMonto", "Descuento"),
+        CampoAuditado.de("fechaInicio", "Inicio"),
+        CampoAuditado.de("limiteEntrega", "Límite de entrega"),
+        CampoAuditado.de("publicacionAutorizada", "Publicación autorizada"),
+        CampoAuditado.de("publicacionOcultadaCliente", "Oculto en la galería del cliente"));
+
+    private static final String ENTIDAD_HITO = "HitoPedido";
+    private static final List<CampoAuditado> CAMPOS_HITO = List.of(
+        CampoAuditado.de("estadoPago", "Estado del pago"),
+        CampoAuditado.de("estadoEntrega", "Estado de la entrega"),
+        CampoAuditado.de("fechaPago", "Fecha de pago"),
+        CampoAuditado.de("fechaEntrega", "Fecha de entrega"),
+        CampoAuditado.de("fechaAprobacion", "Fecha de aprobación"));
+
+    private static final String ENTIDAD_ENTREGA = "Entrega";
+    private static final List<CampoAuditado> CAMPOS_ENTREGA = List.of(
+        CampoAuditado.de("numero", "Versión"),
+        CampoAuditado.de("descripcion", "Descripción"),
+        CampoAuditado.de("fechaEntrega", "Fecha de entrega"),
+        CampoAuditado.de("vigente", "Vigente"));
+
     private static final List<EstadoPedido> ESTADOS_PANEL_ACTIVOS = List.of(
         EstadoPedido.PENDIENTE_PAGO,
         EstadoPedido.EN_CURSO,
@@ -115,6 +145,7 @@ public class PedidoService {
     private final PedidoCierreService pedidoCierreService;
     private final ConversacionRepository conversacionRepository;
     private final MensajeRepository mensajeRepository;
+    private final AuditoriaService auditoria;
 
     public PedidoService(
             PedidoRepository pedidoRepository,
@@ -129,7 +160,8 @@ public class PedidoService {
             EntregaService entregaService,
             PedidoCierreService pedidoCierreService,
             ConversacionRepository conversacionRepository,
-            MensajeRepository mensajeRepository) {
+            MensajeRepository mensajeRepository,
+            AuditoriaService auditoria) {
         this.pedidoRepository = pedidoRepository;
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.pagoRepository = pagoRepository;
@@ -143,6 +175,7 @@ public class PedidoService {
         this.pedidoCierreService = pedidoCierreService;
         this.conversacionRepository = conversacionRepository;
         this.mensajeRepository = mensajeRepository;
+        this.auditoria = auditoria;
     }
 
     @Transactional
@@ -265,6 +298,10 @@ public class PedidoService {
             pagoService.cancelarPendientes(primero);
             iniciarPedidoSinPago(pedido, ahora);
         }
+        auditoria.registrar(
+            AccionesAdmin.PEDIDO_CREAR, ENTIDAD_PEDIDO, pedido.getIdPedido(),
+            "Aceptó el presupuesto de la solicitud #" + solicitud.getIdSolicitud(),
+            null, pedido, CAMPOS_PEDIDO);
         return construirDTO(pedido, idCliente);
     }
 
@@ -348,7 +385,7 @@ public class PedidoService {
             throw new ConflictoException("La cuota todavía no está paga.");
         }
 
-        entregaService.crear(pedido, hito, request, archivos);
+        EntregaHito entrega = entregaService.crear(pedido, hito, request, archivos);
 
         LocalDateTime ahora = LocalDateTime.now();
         hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
@@ -362,6 +399,11 @@ public class PedidoService {
                 ahora.plusDays(hitoFlujoService.diasAprobacion()));
         }
         hitoPedidoRepository.save(hito);
+        auditoria.registrar(
+            AccionesAdmin.ENTREGA_CREAR, ENTIDAD_ENTREGA, entrega.getIdEntrega(),
+            "Entregó el hito '" + hito.getNombre() + "' del pedido #"
+                + pedido.getIdPedido() + " (" + archivos.size() + " archivo(s))",
+            null, entrega, CAMPOS_ENTREGA);
         notificarEntrega(pedido, hito);
         return construirDTO(pedido, idArtista);
     }
@@ -391,16 +433,26 @@ public class PedidoService {
             throw new ConflictoException("El hito no está entregado.");
         }
 
+        Snapshot antesHito = Snapshot.de(hito, CAMPOS_HITO);
         LocalDateTime ahora = LocalDateTime.now();
         hito.setEstadoEntrega(EstadoEntregaHito.APROBADO);
         hito.setFechaAprobacion(ahora);
         hito.setFechaLimiteAprobacion(null);
         hitoPedidoRepository.save(hito);
+        auditoria.registrar(
+            AccionesAdmin.HITO_APROBAR, ENTIDAD_HITO, hito.getIdHitoPedido(),
+            "Aprobó el hito '" + hito.getNombre() + "' del pedido #"
+                + pedido.getIdPedido(),
+            antesHito, hito, CAMPOS_HITO);
         HitoPedido siguiente = hitoFlujoService.habilitarSiguiente(
             pedido, hito, ahora);
         notificarAprobado(pedido, hito, false);
         if (siguiente == null) {
             pedidoCierreService.finalizar(pedido, ahora);
+            auditoria.registrar(
+                AccionesAdmin.PEDIDO_FINALIZAR, ENTIDAD_PEDIDO, pedido.getIdPedido(),
+                "Finalizó el pedido al aprobarse el último hito",
+                null, pedido, CAMPOS_PEDIDO);
         }
         return construirDTO(pedido, idCliente);
     }
@@ -427,6 +479,7 @@ public class PedidoService {
                 "Solo podés pedir una revisión de un entregable ya subido.");
         }
 
+        Snapshot antesHito = Snapshot.de(hito, CAMPOS_HITO);
         hito.setEstadoEntrega(EstadoEntregaHito.CON_REVISION);
         hito.setFechaLimiteAprobacion(null);
         if (hito.getTipo() == TipoHito.ENTREGA) {
@@ -436,6 +489,13 @@ public class PedidoService {
         String motivo = limpiarTexto(
             request != null ? request.getMotivo() : null, 500);
         entregaService.registrarRevision(hito, pedido.getCliente(), motivo);
+        auditoria.registrar(
+            AccionesAdmin.HITO_REVISION, ENTIDAD_HITO, hito.getIdHitoPedido(),
+            motivo != null
+                ? "Solicitó una revisión del hito '" + hito.getNombre()
+                    + "'. Motivo: " + motivo
+                : "Solicitó una revisión del hito '" + hito.getNombre() + "'",
+            antesHito, hito, CAMPOS_HITO);
         notificarRevision(pedido, hito, motivo);
         return construirDTO(pedido, idCliente);
     }
@@ -453,6 +513,7 @@ public class PedidoService {
             throw new ConflictoException("El pedido ya está cerrado.");
         }
 
+        Snapshot antesPedido = Snapshot.de(pedido, CAMPOS_PEDIDO);
         LocalDateTime ahora = LocalDateTime.now();
         pedido.setEstado(EstadoPedido.CANCELADO);
         for (HitoPedido hito : pedido.getHitos()) {
@@ -468,6 +529,9 @@ public class PedidoService {
         solicitud.setFechaActualizacion(ahora);
         solicitudRepository.save(solicitud);
         notificarCancelacion(pedido);
+        auditoria.registrar(
+            AccionesAdmin.PEDIDO_CANCELAR, ENTIDAD_PEDIDO, pedido.getIdPedido(),
+            "Canceló el pedido", antesPedido, pedido, CAMPOS_PEDIDO);
         return construirDTO(pedido, idCliente);
     }
 
@@ -492,12 +556,22 @@ public class PedidoService {
                 "Todavía no hay una entrega final para autorizar.");
         }
         if (pedido.isPublicacionAutorizada() != autoriza) {
+            Snapshot antesPedido = Snapshot.de(pedido, CAMPOS_PEDIDO);
             pedido.setPublicacionAutorizada(autoriza);
             if (autoriza) {
                 pedido.setPublicacionAutorizadaEn(LocalDateTime.now());
             }
             pedidoRepository.save(pedido);
             notificarPublicacion(pedido, autoriza);
+            auditoria.registrar(
+                autoriza
+                    ? AccionesAdmin.PEDIDO_PUBLICACION_AUTORIZAR
+                    : AccionesAdmin.PEDIDO_PUBLICACION_RETIRAR,
+                ENTIDAD_PEDIDO, pedido.getIdPedido(),
+                autoriza
+                    ? "Autorizó la publicación del pedido en la galería"
+                    : "Retiró la autorización de publicación del pedido",
+                antesPedido, pedido, CAMPOS_PEDIDO);
         }
         return construirDTO(pedido, idArtista);
     }
@@ -521,10 +595,20 @@ public class PedidoService {
                 "El artista todavía no autorizó la publicación.");
         }
         if (pedido.isPublicacionOcultadaCliente() != ocultar) {
+            Snapshot antesPedido = Snapshot.de(pedido, CAMPOS_PEDIDO);
             pedido.setPublicacionOcultadaCliente(ocultar);
             pedido.setPublicacionOcultadaEn(
                 ocultar ? LocalDateTime.now() : null);
             pedidoRepository.save(pedido);
+            auditoria.registrar(
+                ocultar
+                    ? AccionesAdmin.PEDIDO_GALERIA_OCULTAR
+                    : AccionesAdmin.PEDIDO_GALERIA_MOSTRAR,
+                ENTIDAD_PEDIDO, pedido.getIdPedido(),
+                ocultar
+                    ? "Ocultó el pedido de su galería pública"
+                    : "Volvió a mostrar el pedido en su galería pública",
+                antesPedido, pedido, CAMPOS_PEDIDO);
         }
         return construirDTO(pedido, idCliente);
     }
@@ -994,8 +1078,17 @@ public class PedidoService {
             HitoPedido siguiente = hitoFlujoService.habilitarSiguiente(
                 pedido, hito, ahora);
             notificarAprobado(pedido, hito, true);
+            auditoria.registrarSistema(
+                AccionesAdmin.HITO_APROBAR_AUTOMATICO, ENTIDAD_HITO,
+                hito.getIdHitoPedido(),
+                "Aprobó automáticamente el hito '" + hito.getNombre()
+                    + "' del pedido #" + pedido.getIdPedido());
             if (siguiente == null) {
                 pedidoCierreService.finalizar(pedido, ahora);
+                auditoria.registrarSistema(
+                    AccionesAdmin.PEDIDO_FINALIZAR, ENTIDAD_PEDIDO,
+                    pedido.getIdPedido(),
+                    "Finalizó el pedido por aprobación automática de la entrega");
             }
             aprobados++;
         }
@@ -1037,6 +1130,12 @@ public class PedidoService {
             solicitud.setFechaActualizacion(ahora);
             solicitudRepository.save(solicitud);
             notificarImpago(pedido, hito);
+            auditoria.registrarSistema(
+                AccionesAdmin.HITO_VENCER, ENTIDAD_HITO,
+                hito.getIdHitoPedido(),
+                "Venció el pago del hito '" + hito.getNombre()
+                    + "' del pedido #" + pedido.getIdPedido()
+                    + "; el pedido quedó impago");
             expirados++;
         }
         return expirados;

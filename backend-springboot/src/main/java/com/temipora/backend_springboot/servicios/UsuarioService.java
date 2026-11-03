@@ -32,12 +32,18 @@ import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 @Validated
 public class UsuarioService {
 
+    private static final String ENTIDAD_USUARIO = "Usuario";
+    private static final List<CampoAuditado> CAMPOS_USUARIO = List.of(
+        CampoAuditado.de("correo", "Correo electrónico"),
+        CampoAuditado.de("telefono", "Teléfono"));
+
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
     private final RolRepository rolRepository;
     private final PaisRepository paisRepository;
     private final TelefonoService telefonoService;
     private final MonedaService monedaService;
+    private final AuditoriaService auditoria;
 
     public UsuarioService(
             UsuarioRepository usuarioRepository,
@@ -45,7 +51,8 @@ public class UsuarioService {
             RolRepository rolRepository,
             PaisRepository paisRepository,
             TelefonoService telefonoService,
-            MonedaService monedaService) {
+            MonedaService monedaService,
+            AuditoriaService auditoria) {
 
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
@@ -53,6 +60,7 @@ public class UsuarioService {
         this.paisRepository = paisRepository;
         this.telefonoService = telefonoService;
         this.monedaService = monedaService;
+        this.auditoria = auditoria;
     }
 
     public Usuario registrarUsuario(RegistroUsuarioDTO dto) {
@@ -194,8 +202,13 @@ public class UsuarioService {
                     throw new IllegalArgumentException("Ya existe una cuenta con ese correo.");
                 });
 
+        Snapshot antes = Snapshot.de(usuario, CAMPOS_USUARIO);
         usuario.setCorreo(nuevoCorreo);
-        return UsuarioDTO.desdeUsuario(usuarioRepository.save(usuario));
+        Usuario guardado = usuarioRepository.save(usuario);
+        auditoria.registrar(
+            AccionesAdmin.USUARIO_CAMBIAR_CORREO, ENTIDAD_USUARIO, idUsuario,
+            "Cambió su correo electrónico", antes, guardado, CAMPOS_USUARIO);
+        return UsuarioDTO.desdeUsuario(guardado);
     }
 
     @Transactional
@@ -215,6 +228,10 @@ public class UsuarioService {
 
         usuario.setContrasenia(passwordEncoder.encode(dto.getContraseniaNueva()));
         usuarioRepository.save(usuario);
+        auditoria.registrar(
+            AccionesAdmin.USUARIO_CAMBIAR_CONTRASENIA, ENTIDAD_USUARIO, idUsuario,
+            "Cambió su contraseña",
+            "La contraseña se actualizó; el valor no se registra.");
     }
 
     @Transactional
@@ -251,8 +268,13 @@ public class UsuarioService {
                     throw new IllegalArgumentException("Ya existe una cuenta con ese teléfono.");
                 });
 
+        Snapshot antes = Snapshot.de(usuario, CAMPOS_USUARIO);
         usuario.setTelefono(telefonoNuevo);
-        return UsuarioDTO.desdeUsuario(usuarioRepository.save(usuario));
+        Usuario guardado = usuarioRepository.save(usuario);
+        auditoria.registrar(
+            AccionesAdmin.USUARIO_CAMBIAR_TELEFONO, ENTIDAD_USUARIO, idUsuario,
+            "Cambió su teléfono", antes, guardado, CAMPOS_USUARIO);
+        return UsuarioDTO.desdeUsuario(guardado);
     }
 
     @Transactional
@@ -264,8 +286,13 @@ public class UsuarioService {
             throw new IllegalArgumentException("La contraseña actual no es correcta.");
         }
 
+        Snapshot antes = Snapshot.de(usuario, CAMPOS_USUARIO);
         usuario.setTelefono(null);
-        return UsuarioDTO.desdeUsuario(usuarioRepository.save(usuario));
+        Usuario guardado = usuarioRepository.save(usuario);
+        auditoria.registrar(
+            AccionesAdmin.USUARIO_QUITAR_TELEFONO, ENTIDAD_USUARIO, idUsuario,
+            "Quitó su teléfono", antes, guardado, CAMPOS_USUARIO);
+        return UsuarioDTO.desdeUsuario(guardado);
     }
 
     private String normalizarTelefonoActual(String telefono, String codigoIso) {

@@ -64,6 +64,9 @@ class UsuarioServiceTest {
     @Mock
     private MonedaService monedaService;
 
+    @Mock
+    private AuditoriaService auditoria;
+
     @InjectMocks
     private UsuarioService usuarioService;
 
