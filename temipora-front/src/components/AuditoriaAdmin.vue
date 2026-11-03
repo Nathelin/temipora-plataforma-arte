@@ -55,6 +55,11 @@ const ETIQUETAS_ACCION = {
   RESENIA_RESTAURAR: 'Restauró una reseña',
   RESENIA_DESCARTAR_REPORTES: 'Descartó reportes de reseña',
   TERMINOS_PUBLICAR: 'Publicó una versión de los términos',
+  SERVICIO_CREAR: 'Creó un servicio',
+  SERVICIO_MODIFICAR: 'Modificó un servicio',
+  SERVICIO_PAUSAR: 'Pausó un servicio',
+  SERVICIO_REACTIVAR: 'Reactivó un servicio',
+  SERVICIO_ARCHIVAR: 'Dio de baja definitiva un servicio',
   SERVICIO_RESTAURAR: 'Restauró un servicio archivado',
   PEDIDO_PROCESAR: 'Procesó hitos de pedidos',
   CRITERIO_CREAR: 'Creó un criterio de evaluación',
@@ -386,10 +391,6 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
             <div v-if="evento.requestId">
               <dt class="font-semibold text-cafe/60">Identificador de la acción</dt>
               <dd class="break-all">{{ evento.requestId }}</dd>
-            </div>
-            <div v-if="evento.userAgent">
-              <dt class="font-semibold text-cafe/60">Navegador</dt>
-              <dd class="break-all">{{ evento.userAgent }}</dd>
             </div>
           </dl>
         </div>

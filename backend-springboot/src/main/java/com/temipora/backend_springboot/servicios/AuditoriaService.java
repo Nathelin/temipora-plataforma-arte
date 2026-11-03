@@ -180,14 +180,15 @@ public class AuditoriaService {
             evento.setOrigen("SISTEMA");
             return;
         }
-        evento.setOrigen("ADMIN");
         evento.setActorNombre(recortar(auth.getName(), 60));
-        evento.setActorRol(auth.getAuthorities().stream()
+        String rol = auth.getAuthorities().stream()
             .map(a -> a.getAuthority())
             .filter(a -> a.startsWith("ROLE_"))
             .map(a -> a.substring("ROLE_".length()))
             .findFirst()
-            .orElse(null));
+            .orElse(null);
+        evento.setActorRol(rol);
+        evento.setOrigen(rol != null ? rol : "USUARIO");
         usuarioRepository.findByNombreUsuarioIgnoreCase(auth.getName())
             .ifPresent(usuario -> evento.setActorId(usuario.getIdUsuario()));
     }
@@ -200,7 +201,6 @@ public class AuditoriaService {
         Object requestId = request.getAttribute(AuditoriaRequestFilter.REQUEST_ID_ATTR);
         evento.setRequestId(requestId != null ? String.valueOf(requestId) : null);
         evento.setIp(recortar(ipDe(request), 45));
-        evento.setUserAgent(recortar(request.getHeader("User-Agent"), 300));
     }
 
     private String ipDe(HttpServletRequest request) {
@@ -225,7 +225,6 @@ public class AuditoriaService {
             deserializar(evento.getCambios()),
             evento.getMotivo(),
             evento.getIp(),
-            evento.getUserAgent(),
             evento.getRequestId(),
             evento.getOrigen(),
             evento.getResultado());

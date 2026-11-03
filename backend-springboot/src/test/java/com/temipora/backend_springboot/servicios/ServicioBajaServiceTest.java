@@ -52,6 +52,9 @@ class ServicioBajaServiceTest {
     @Mock
     private SolicitudServicioService solicitudServicioService;
 
+    @Mock
+    private AuditoriaService auditoriaService;
+
     @InjectMocks
     private ServicioBajaService servicioBajaService;
 

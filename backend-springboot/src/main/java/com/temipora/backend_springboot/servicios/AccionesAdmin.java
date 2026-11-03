@@ -63,6 +63,11 @@ public final class AccionesAdmin {
     public static final String RESENIA_RESTAURAR = "RESENIA_RESTAURAR";
     public static final String RESENIA_DESCARTAR_REPORTES = "RESENIA_DESCARTAR_REPORTES";
     public static final String TERMINOS_PUBLICAR = "TERMINOS_PUBLICAR";
+    public static final String SERVICIO_CREAR = "SERVICIO_CREAR";
+    public static final String SERVICIO_MODIFICAR = "SERVICIO_MODIFICAR";
+    public static final String SERVICIO_PAUSAR = "SERVICIO_PAUSAR";
+    public static final String SERVICIO_REACTIVAR = "SERVICIO_REACTIVAR";
+    public static final String SERVICIO_ARCHIVAR = "SERVICIO_ARCHIVAR";
     public static final String SERVICIO_RESTAURAR = "SERVICIO_RESTAURAR";
     public static final String PEDIDO_PROCESAR = "PEDIDO_PROCESAR";
 

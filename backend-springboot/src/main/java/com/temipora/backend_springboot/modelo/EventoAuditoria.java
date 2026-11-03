@@ -57,9 +57,6 @@ public class EventoAuditoria {
     @Column(name = "ip", length = 45)
     private String ip;
 
-    @Column(name = "user_agent", length = 300)
-    private String userAgent;
-
     @Column(name = "request_id", length = 36)
     private String requestId;
 

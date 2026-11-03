@@ -16,7 +16,6 @@ public record EventoAuditoriaDTO(
         List<CambioAuditoriaDTO> cambios,
         String motivo,
         String ip,
-        String userAgent,
         String requestId,
         String origen,
         String resultado) {

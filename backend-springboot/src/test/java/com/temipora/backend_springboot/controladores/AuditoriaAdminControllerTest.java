@@ -152,7 +152,6 @@ class AuditoriaAdminControllerTest {
             List.of(new CambioAuditoriaDTO("estado", "Estado", "PENDIENTE", "VALIDA")),
             null,
             "127.0.0.1",
-            "test",
             "req-1",
             "ADMIN",
             "OK");
