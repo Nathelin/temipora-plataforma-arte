@@ -200,15 +200,6 @@ public class AuditoriaService {
         HttpServletRequest request = atributos.getRequest();
         Object requestId = request.getAttribute(AuditoriaRequestFilter.REQUEST_ID_ATTR);
         evento.setRequestId(requestId != null ? String.valueOf(requestId) : null);
-        evento.setIp(recortar(ipDe(request), 45));
-    }
-
-    private String ipDe(HttpServletRequest request) {
-        String reenviada = request.getHeader("X-Forwarded-For");
-        if (reenviada != null && !reenviada.isBlank()) {
-            return reenviada.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 
     private EventoAuditoriaDTO aDto(EventoAuditoria evento) {
@@ -224,7 +215,6 @@ public class AuditoriaService {
             evento.getResumen(),
             deserializar(evento.getCambios()),
             evento.getMotivo(),
-            evento.getIp(),
             evento.getRequestId(),
             evento.getOrigen(),
             evento.getResultado());

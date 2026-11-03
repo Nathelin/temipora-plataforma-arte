@@ -151,7 +151,6 @@ class AuditoriaAdminControllerTest {
             "Aprobó la etiqueta",
             List.of(new CambioAuditoriaDTO("estado", "Estado", "PENDIENTE", "VALIDA")),
             null,
-            "127.0.0.1",
             "req-1",
             "ADMIN",
             "OK");

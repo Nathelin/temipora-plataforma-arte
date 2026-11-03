@@ -69,6 +69,7 @@ public final class AccionesAdmin {
     public static final String SERVICIO_REACTIVAR = "SERVICIO_REACTIVAR";
     public static final String SERVICIO_ARCHIVAR = "SERVICIO_ARCHIVAR";
     public static final String SERVICIO_RESTAURAR = "SERVICIO_RESTAURAR";
+    public static final String PRESUPUESTO_CREAR = "PRESUPUESTO_CREAR";
     public static final String PEDIDO_PROCESAR = "PEDIDO_PROCESAR";
 
     public static final String CRITERIO_CREAR = "CRITERIO_CREAR";

@@ -64,6 +64,25 @@ public class PresupuestoService {
     private final ConfiguracionPedidoService configuracionPedidoService;
     private final MonedaVistaService monedaVistaService;
     private final OfertaReactivacionService ofertaReactivacionService;
+    private final AuditoriaService auditoria;
+
+    private static final String ENTIDAD = "Presupuesto";
+    private static final List<CampoAuditado> CAMPOS = List.of(
+        CampoAuditado.de("precioBaseTotal", "Precio base total"),
+        CampoAuditado.de("precioFinal", "Precio final"),
+        CampoAuditado.de("moneda", "Moneda"),
+        CampoAuditado.de("monedaCobro", "Moneda de cobro"),
+        CampoAuditado.de("cotizacionCobro", "Cotización de cobro"),
+        CampoAuditado.de("comisionPorcentaje", "Comisión (%)"),
+        CampoAuditado.de("comisionMonto", "Comisión"),
+        CampoAuditado.de("montoNetoArtista", "Neto del artista"),
+        CampoAuditado.de("descuentoPorcentaje", "Descuento (%)"),
+        CampoAuditado.de("descuentoMonto", "Descuento"),
+        CampoAuditado.de("precioFinalCliente", "Total del cliente"),
+        CampoAuditado.de("tiempoEntregaValor", "Tiempo de entrega"),
+        CampoAuditado.de("tiempoEntregaUnidad", "Unidad de entrega"),
+        CampoAuditado.de("fechaInicioEstimada", "Inicio estimado"),
+        CampoAuditado.de("fechaVencimiento", "Vencimiento"));
 
     public PresupuestoService(
             SolicitudRepository solicitudRepository,
@@ -76,7 +95,8 @@ public class PresupuestoService {
             ComisionService comisionService,
             ConfiguracionPedidoService configuracionPedidoService,
             MonedaVistaService monedaVistaService,
-            OfertaReactivacionService ofertaReactivacionService) {
+            OfertaReactivacionService ofertaReactivacionService,
+            AuditoriaService auditoria) {
         this.solicitudRepository = solicitudRepository;
         this.servicioRepository = servicioRepository;
         this.presupuestoRepository = presupuestoRepository;
@@ -88,6 +108,7 @@ public class PresupuestoService {
         this.configuracionPedidoService = configuracionPedidoService;
         this.monedaVistaService = monedaVistaService;
         this.ofertaReactivacionService = ofertaReactivacionService;
+        this.auditoria = auditoria;
     }
 
     @Transactional
@@ -363,7 +384,11 @@ public class PresupuestoService {
                 .setScale(2, RoundingMode.HALF_UP));
 
         solicitud.setPresupuesto(presupuesto);
-        presupuestoRepository.save(presupuesto);
+        Presupuesto guardado = presupuestoRepository.save(presupuesto);
+        auditoria.registrar(
+            AccionesAdmin.PRESUPUESTO_CREAR, ENTIDAD, guardado.getIdPresupuesto(),
+            "Envió un presupuesto para la solicitud #" + solicitud.getIdSolicitud(),
+            null, guardado, CAMPOS);
 
         if (oferta != null) {
             ofertaReactivacionService.marcarUtilizada(oferta);

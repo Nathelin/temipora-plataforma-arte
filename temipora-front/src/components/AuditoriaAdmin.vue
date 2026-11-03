@@ -61,6 +61,7 @@ const ETIQUETAS_ACCION = {
   SERVICIO_REACTIVAR: 'Reactivó un servicio',
   SERVICIO_ARCHIVAR: 'Dio de baja definitiva un servicio',
   SERVICIO_RESTAURAR: 'Restauró un servicio archivado',
+  PRESUPUESTO_CREAR: 'Envió un presupuesto',
   PEDIDO_PROCESAR: 'Procesó hitos de pedidos',
   CRITERIO_CREAR: 'Creó un criterio de evaluación',
   CRITERIO_MODIFICAR: 'Modificó un criterio de evaluación',
@@ -94,6 +95,7 @@ const ETIQUETAS_ENTIDAD = {
   CriterioResenia: 'Criterio de evaluación',
   ConfiguracionCotizacion: 'Cotización',
   Pedido: 'Pedido',
+  Presupuesto: 'Presupuesto',
 }
 
 const eventos = ref([])
@@ -383,10 +385,6 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
             <div v-if="evento.motivo">
               <dt class="font-semibold text-cafe/60">Motivo</dt>
               <dd>{{ evento.motivo }}</dd>
-            </div>
-            <div v-if="evento.ip">
-              <dt class="font-semibold text-cafe/60">IP</dt>
-              <dd>{{ evento.ip }}</dd>
             </div>
             <div v-if="evento.requestId">
               <dt class="font-semibold text-cafe/60">Identificador de la acción</dt>

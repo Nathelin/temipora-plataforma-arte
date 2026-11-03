@@ -54,9 +54,6 @@ public class EventoAuditoria {
     @Column(name = "motivo", length = 500)
     private String motivo;
 
-    @Column(name = "ip", length = 45)
-    private String ip;
-
     @Column(name = "request_id", length = 36)
     private String requestId;
 
