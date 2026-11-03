@@ -79,7 +79,9 @@ onMounted(() => {
   window.addEventListener('perfil-foto-actualizada', actualizarFotoPerfil)
   document.addEventListener('click', manejarClickExterior)
   document.addEventListener('keydown', manejarTecla)
-  iniciarPollingMensajes()
+  if (!esAdmin.value) {
+    iniciarPollingMensajes()
+  }
 
   if (estaLogueado.value && !esAdmin.value) {
     conectarSocket()

@@ -1,5 +1,7 @@
 package com.temipora.backend_springboot.repositorios;
 
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,4 +18,13 @@ public interface EventoAuditoriaRepository
 
     @Query("SELECT DISTINCT e.accion FROM EventoAuditoria e ORDER BY e.accion")
     List<String> accionesRegistradas();
+
+    long countByOcurridoEnBetween(
+        LocalDateTime desde, LocalDateTime hasta);
+
+    long countByAccionInAndOcurridoEnBetween(
+        Collection<String> acciones, LocalDateTime desde, LocalDateTime hasta);
+
+    long countByAccionAndOcurridoEnBetween(
+        String accion, LocalDateTime desde, LocalDateTime hasta);
 }

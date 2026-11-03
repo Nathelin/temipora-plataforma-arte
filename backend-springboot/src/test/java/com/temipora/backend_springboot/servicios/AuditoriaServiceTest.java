@@ -25,6 +25,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.temipora.backend_springboot.modelo.EventoAuditoria;
 import com.temipora.backend_springboot.modelo.EventoAuditoriaDTO;
+import com.temipora.backend_springboot.modelo.FiltroAuditoria;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
@@ -138,10 +139,15 @@ class AuditoriaServiceTest {
             .thenReturn(new PageImpl<>(List.of(evento)));
 
         PaginaDTO<EventoAuditoriaDTO> pagina = auditoriaService.listar(
-            "admin", "Etiqueta", "ETIQUETA_APROBAR", null, null, 0, 20);
+            new FiltroAuditoria(
+                "admin", null, "Etiqueta", null, "ETIQUETA_APROBAR",
+                null, null, null, null, null, null),
+            0, 20);
 
         assertThat(pagina.getContenido()).hasSize(1);
         EventoAuditoriaDTO dto = pagina.getContenido().get(0);
+        assertThat(dto.categoria()).isEqualTo("CATALOGO");
+        assertThat(dto.critica()).isFalse();
         assertThat(dto.cambios()).hasSize(1);
         assertThat(dto.cambios().get(0).etiqueta()).isEqualTo("Estado");
         assertThat(dto.cambios().get(0).anterior()).isEqualTo("PENDIENTE");
@@ -158,7 +164,10 @@ class AuditoriaServiceTest {
                 any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(evento)));
 
-        PaginaDTO<EventoAuditoriaDTO> pagina = auditoriaService.listar(null, null, null, null, null, 0, 20);
+        PaginaDTO<EventoAuditoriaDTO> pagina = auditoriaService.listar(
+            new FiltroAuditoria(
+                null, null, null, null, null, null, null, null, null, null, null),
+            0, 20);
 
         assertThat(pagina.getContenido().get(0).cambios()).isEmpty();
     }
@@ -172,6 +181,46 @@ class AuditoriaServiceTest {
 
         assertThat(opciones.entidades()).containsExactly("Etiqueta");
         assertThat(opciones.acciones()).containsExactly("ETIQUETA_APROBAR");
+        assertThat(opciones.categorias())
+            .anySatisfy(categoria -> {
+                assertThat(categoria.codigo()).isEqualTo("COMERCIO");
+                assertThat(categoria.etiqueta()).isEqualTo("Comercio");
+            });
+    }
+
+    @Test
+    void obtener_devuelveElEventoPorId() {
+        EventoAuditoria evento = new EventoAuditoria();
+        evento.setIdEventoAuditoria(9L);
+        evento.setAccion("PAGO_CONFIRMAR");
+        evento.setOrigen("CLIENTE");
+        evento.setResultado("OK");
+        evento.setCambios("[]");
+        when(eventoRepository.findById(9L)).thenReturn(Optional.of(evento));
+
+        EventoAuditoriaDTO dto = auditoriaService.obtener(9L);
+
+        assertThat(dto.idEventoAuditoria()).isEqualTo(9L);
+        assertThat(dto.categoria()).isEqualTo("COMERCIO");
+        assertThat(dto.critica()).isTrue();
+    }
+
+    @Test
+    void resumen_devuelveLosConteosDelRango() {
+        LocalDateTime desde = LocalDateTime.now().minusHours(24);
+        LocalDateTime hasta = LocalDateTime.now();
+        when(eventoRepository.countByOcurridoEnBetween(desde, hasta))
+            .thenReturn(10L);
+        when(eventoRepository.countByAccionInAndOcurridoEnBetween(
+            any(), eq(desde), eq(hasta))).thenReturn(4L);
+        when(eventoRepository.countByAccionAndOcurridoEnBetween(
+            AccionesAdmin.LOGIN_FALLIDO, desde, hasta)).thenReturn(2L);
+
+        var resumen = auditoriaService.resumen(desde, hasta);
+
+        assertThat(resumen.total()).isEqualTo(10);
+        assertThat(resumen.criticas()).isEqualTo(4);
+        assertThat(resumen.loginFallido()).isEqualTo(2);
     }
 
     private EventoAuditoria capturarGuardado() {

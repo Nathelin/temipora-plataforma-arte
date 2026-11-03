@@ -1,7 +1,9 @@
 package com.temipora.backend_springboot.controladores;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -25,10 +28,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.temipora.backend_springboot.config.JwtUtils;
 import com.temipora.backend_springboot.config.SecurityConfig;
 import com.temipora.backend_springboot.modelo.CambioAuditoriaDTO;
+import com.temipora.backend_springboot.modelo.CategoriaAuditoriaDTO;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EventoAuditoriaDTO;
+import com.temipora.backend_springboot.modelo.FiltroAuditoria;
 import com.temipora.backend_springboot.modelo.OpcionesAuditoriaDTO;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
+import com.temipora.backend_springboot.modelo.ResumenAuditoriaDTO;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 import com.temipora.backend_springboot.servicios.AuditoriaService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
@@ -66,7 +72,7 @@ class AuditoriaAdminControllerTest {
     void listar_sinToken_devuelve401() throws Exception {
         mockMvc.perform(get(BASE)).andExpect(status().isUnauthorized());
 
-        verify(auditoriaService, never()).listar(any(), any(), any(), any(), any(), anyInt(), anyInt());
+        verify(auditoriaService, never()).listar(any(FiltroAuditoria.class), anyInt(), anyInt());
     }
 
     @Test
@@ -81,7 +87,7 @@ class AuditoriaAdminControllerTest {
     @Test
     void listar_tokenDeAdmin_devuelveEventos() throws Exception {
         stubUsuarioConRol("admin", ERol.ADMIN);
-        when(auditoriaService.listar(null, null, null, null, null, 0, 20))
+        when(auditoriaService.listar(any(FiltroAuditoria.class), eq(0), eq(20)))
                 .thenReturn(pagina());
 
         mockMvc.perform(get(BASE)
@@ -97,13 +103,20 @@ class AuditoriaAdminControllerTest {
         stubUsuarioConRol("admin", ERol.ADMIN);
         LocalDateTime desde = LocalDateTime.of(2026, 1, 1, 0, 0);
         LocalDateTime hasta = LocalDateTime.of(2026, 1, 31, 23, 59, 59);
-        when(auditoriaService.listar("admin", "Etiqueta", "ETIQUETA_APROBAR", desde, hasta, 2, 50))
+        when(auditoriaService.listar(
+                any(FiltroAuditoria.class), eq(2), eq(50)))
                 .thenReturn(pagina());
 
         mockMvc.perform(get(BASE)
                 .param("actor", "admin")
+                .param("origen", "ADMIN")
                 .param("entidad", "Etiqueta")
+                .param("entidadId", "3")
                 .param("accion", "ETIQUETA_APROBAR")
+                .param("requestId", "req-1")
+                .param("texto", "etiqueta")
+                .param("categoria", "CATALOGO")
+                .param("critica", "true")
                 .param("desde", "2026-01-01")
                 .param("hasta", "2026-01-31")
                 .param("pagina", "2")
@@ -111,14 +124,53 @@ class AuditoriaAdminControllerTest {
                 .header("Authorization", "Bearer " + token("admin", ERol.ADMIN)))
                 .andExpect(status().isOk());
 
-        verify(auditoriaService).listar("admin", "Etiqueta", "ETIQUETA_APROBAR", desde, hasta, 2, 50);
+        ArgumentCaptor<FiltroAuditoria> captor =
+            ArgumentCaptor.forClass(FiltroAuditoria.class);
+        verify(auditoriaService).listar(captor.capture(), eq(2), eq(50));
+        FiltroAuditoria filtro = captor.getValue();
+        assertThat(filtro.actor()).isEqualTo("admin");
+        assertThat(filtro.origen()).isEqualTo("ADMIN");
+        assertThat(filtro.entidad()).isEqualTo("Etiqueta");
+        assertThat(filtro.entidadId()).isEqualTo("3");
+        assertThat(filtro.accion()).isEqualTo("ETIQUETA_APROBAR");
+        assertThat(filtro.requestId()).isEqualTo("req-1");
+        assertThat(filtro.texto()).isEqualTo("etiqueta");
+        assertThat(filtro.categoria()).isEqualTo("CATALOGO");
+        assertThat(filtro.critica()).isTrue();
+        assertThat(filtro.desde()).isEqualTo(desde);
+        assertThat(filtro.hasta()).isEqualTo(hasta);
+    }
+
+    @Test
+    void listar_conFechaHoraConservaLaPrecision() throws Exception {
+        stubUsuarioConRol("admin", ERol.ADMIN);
+        when(auditoriaService.listar(
+                any(FiltroAuditoria.class), eq(0), eq(20)))
+                .thenReturn(pagina());
+
+        mockMvc.perform(get(BASE)
+                .param("desde", "2026-01-01T10:30:00")
+                .param("hasta", "2026-01-01T11:45:00")
+                .header("Authorization", "Bearer " + token("admin", ERol.ADMIN)))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<FiltroAuditoria> captor =
+            ArgumentCaptor.forClass(FiltroAuditoria.class);
+        verify(auditoriaService).listar(captor.capture(), eq(0), eq(20));
+        assertThat(captor.getValue().desde())
+            .isEqualTo(LocalDateTime.of(2026, 1, 1, 10, 30));
+        assertThat(captor.getValue().hasta())
+            .isEqualTo(LocalDateTime.of(2026, 1, 1, 11, 45));
     }
 
     @Test
     void opciones_tokenDeAdmin_devuelveListas() throws Exception {
         stubUsuarioConRol("admin", ERol.ADMIN);
         when(auditoriaService.opciones())
-                .thenReturn(new OpcionesAuditoriaDTO(List.of("Etiqueta"), List.of("ETIQUETA_APROBAR")));
+                .thenReturn(new OpcionesAuditoriaDTO(
+                    List.of("Etiqueta"),
+                    List.of("ETIQUETA_APROBAR"),
+                    List.of(new CategoriaAuditoriaDTO("CATALOGO", "Catálogo"))));
 
         mockMvc.perform(get(BASE + "/opciones")
                 .header("Authorization", "Bearer " + token("admin", ERol.ADMIN)))
@@ -139,7 +191,18 @@ class AuditoriaAdminControllerTest {
     }
 
     private PaginaDTO<EventoAuditoriaDTO> pagina() {
-        EventoAuditoriaDTO evento = new EventoAuditoriaDTO(
+        return PaginaDTO.<EventoAuditoriaDTO>builder()
+            .contenido(List.of(evento()))
+            .pagina(0)
+            .tamanio(20)
+            .totalElementos(1)
+            .totalPaginas(1)
+            .hayMas(false)
+            .build();
+    }
+
+    private EventoAuditoriaDTO evento() {
+        return new EventoAuditoriaDTO(
             1L,
             LocalDateTime.now(),
             1L,
@@ -153,15 +216,36 @@ class AuditoriaAdminControllerTest {
             null,
             "req-1",
             "ADMIN",
-            "OK");
-        return PaginaDTO.<EventoAuditoriaDTO>builder()
-            .contenido(List.of(evento))
-            .pagina(0)
-            .tamanio(20)
-            .totalElementos(1)
-            .totalPaginas(1)
-            .hayMas(false)
-            .build();
+            "OK",
+            "CATALOGO",
+            false);
+    }
+
+    @Test
+    void resumen_tokenDeAdmin_devuelveConteos() throws Exception {
+        stubUsuarioConRol("admin", ERol.ADMIN);
+        when(auditoriaService.resumen(any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(new ResumenAuditoriaDTO(10, 4, 2));
+
+        mockMvc.perform(get(BASE + "/resumen")
+                .header("Authorization", "Bearer " + token("admin", ERol.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(10))
+                .andExpect(jsonPath("$.criticas").value(4))
+                .andExpect(jsonPath("$.loginFallido").value(2));
+    }
+
+    @Test
+    void obtener_tokenDeAdmin_devuelveElEvento() throws Exception {
+        stubUsuarioConRol("admin", ERol.ADMIN);
+        when(auditoriaService.obtener(1L)).thenReturn(evento());
+
+        mockMvc.perform(get(BASE + "/1")
+                .header("Authorization", "Bearer " + token("admin", ERol.ADMIN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resumen").value("Aprobó la etiqueta"))
+                .andExpect(jsonPath("$.categoria").value("CATALOGO"))
+                .andExpect(jsonPath("$.critica").value(false));
     }
 
     private void stubUsuarioConRol(String nombreUsuario, ERol rol) {

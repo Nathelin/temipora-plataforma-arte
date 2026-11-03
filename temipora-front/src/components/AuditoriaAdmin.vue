@@ -1,168 +1,136 @@
 <script setup>
-import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  Activity,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Info,
+  LogIn,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  X,
+} from '@lucide/vue'
 import api from '../servicios/api'
+import AuditoriaDetalle from './admin/AuditoriaDetalle.vue'
+import {
+  actorVisible,
+  formatearFecha,
+  formatearFechaRelativa,
+  nombreAccion,
+  nombreCategoria,
+  nombreEntidad,
+  nombreOrigen,
+  resumenCambios,
+} from '../servicios/auditoriaCatalogo'
 
-const ETIQUETAS_ACCION = {
-  ETIQUETA_CREAR: 'Creó una etiqueta',
-  ETIQUETA_MODIFICAR: 'Modificó una etiqueta',
-  ETIQUETA_APROBAR: 'Aprobó una etiqueta',
-  ETIQUETA_RECHAZAR: 'Rechazó una etiqueta',
-  ETIQUETA_BAJA: 'Dio de baja una etiqueta',
-  ETIQUETA_REACTIVAR: 'Reactivó una etiqueta',
-  CATEGORIA_CREAR: 'Creó una categoría',
-  CATEGORIA_MODIFICAR: 'Modificó una categoría',
-  CATEGORIA_BAJA: 'Dio de baja una categoría',
-  CATEGORIA_REACTIVAR: 'Reactivó una categoría',
-  MEDIO_CREAR: 'Creó un medio',
-  MEDIO_MODIFICAR: 'Modificó un medio',
-  MEDIO_BAJA: 'Dio de baja un medio',
-  MEDIO_REACTIVAR: 'Reactivó un medio',
-  MATERIAL_CREAR: 'Creó un material',
-  MATERIAL_MODIFICAR: 'Modificó un material',
-  MATERIAL_BAJA: 'Dio de baja un material',
-  MATERIAL_REACTIVAR: 'Reactivó un material',
-  TIPO_ARTE_CREAR: 'Creó un tipo de arte',
-  TIPO_ARTE_MODIFICAR: 'Modificó un tipo de arte',
-  TIPO_ARTE_BAJA: 'Dio de baja un tipo de arte',
-  TIPO_ARTE_REACTIVAR: 'Reactivó un tipo de arte',
-  TIPO_PRODUCTO_CREAR: 'Creó un tipo de producto',
-  TIPO_PRODUCTO_MODIFICAR: 'Modificó un tipo de producto',
-  TIPO_PRODUCTO_BAJA: 'Dio de baja un tipo de producto',
-  TIPO_PRODUCTO_REACTIVAR: 'Reactivó un tipo de producto',
-  TIPO_SERVICIO_CREAR: 'Creó un tipo de servicio',
-  TIPO_SERVICIO_MODIFICAR: 'Modificó un tipo de servicio',
-  TIPO_SERVICIO_BAJA: 'Dio de baja un tipo de servicio',
-  TIPO_SERVICIO_REACTIVAR: 'Reactivó un tipo de servicio',
-  PAIS_CREAR: 'Creó un país',
-  PAIS_MODIFICAR: 'Modificó un país',
-  PAIS_BAJA: 'Dio de baja un país',
-  PAIS_REACTIVAR: 'Reactivó un país',
-  MONEDA_CREAR: 'Creó una moneda',
-  MONEDA_MODIFICAR: 'Modificó una moneda',
-  MONEDA_BAJA: 'Dio de baja una moneda',
-  MONEDA_REACTIVAR: 'Reactivó una moneda',
-  MONEDA_PREDETERMINADA: 'Marcó la moneda predeterminada',
-  COMISION_ACTUALIZAR: 'Actualizó las comisiones',
-  PRESUPUESTO_CONFIG_ACTUALIZAR: 'Actualizó la vigencia de presupuestos',
-  PEDIDO_CONFIG_ACTUALIZAR: 'Actualizó las reglas de pedidos e hitos',
-  MENSAJERIA_CONFIG_ACTUALIZAR: 'Actualizó la configuración de mensajería',
-  RESENIA_CONFIG_ACTUALIZAR: 'Actualizó la configuración de reseñas',
-  INACTIVIDAD_CONFIG_ACTUALIZAR: 'Actualizó las promociones por inactividad',
-  REACTIVACION_EJECUTAR: 'Ejecutó las promociones por inactividad',
-  COTIZACION_ACTUALIZAR: 'Actualizó la cotización',
-  COTIZACION_REFRESCAR: 'Actualizó la cotización desde la API',
-  RESENIA_CREAR: 'Dejó una reseña',
-  RESENIA_EDITAR: 'Editó una reseña',
-  RESENIA_ELIMINAR: 'Eliminó una reseña',
-  RESENIA_REPORTAR: 'Reportó una reseña',
-  RESENIA_OCULTAR: 'Ocultó una reseña',
-  RESENIA_RESTAURAR: 'Restauró una reseña',
-  RESENIA_DESCARTAR_REPORTES: 'Descartó reportes de reseña',
-  TERMINOS_PUBLICAR: 'Publicó una versión de los términos',
-  TERMINOS_ACEPTAR: 'Aceptó los términos de la plataforma',
-  USUARIO_CAMBIAR_CORREO: 'Cambió su correo electrónico',
-  USUARIO_CAMBIAR_CONTRASENIA: 'Cambió su contraseña',
-  USUARIO_CAMBIAR_TELEFONO: 'Cambió su teléfono',
-  USUARIO_QUITAR_TELEFONO: 'Quitó su teléfono',
-  LOGIN_FALLIDO: 'Intento de inicio de sesión fallido',
-  SERVICIO_CREAR: 'Creó un servicio',
-  SERVICIO_MODIFICAR: 'Modificó un servicio',
-  SERVICIO_PAUSAR: 'Pausó un servicio',
-  SERVICIO_REACTIVAR: 'Reactivó un servicio',
-  SERVICIO_ARCHIVAR: 'Dio de baja definitiva un servicio',
-  SERVICIO_RESTAURAR: 'Restauró un servicio archivado',
-  PRESUPUESTO_CREAR: 'Envió un presupuesto',
-  PEDIDO_CREAR: 'Aceptó un presupuesto y creó un pedido',
-  PEDIDO_CANCELAR: 'Canceló un pedido',
-  PEDIDO_FINALIZAR: 'Finalizó un pedido',
-  PEDIDO_PUBLICACION_AUTORIZAR: 'Autorizó la publicación de un pedido',
-  PEDIDO_PUBLICACION_RETIRAR: 'Retiró la publicación de un pedido',
-  PEDIDO_GALERIA_OCULTAR: 'Ocultó un pedido de su galería',
-  PEDIDO_GALERIA_MOSTRAR: 'Mostró un pedido en su galería',
-  PEDIDO_PROCESAR: 'Procesó hitos de pedidos',
-  HITO_APROBAR: 'Aprobó un hito',
-  HITO_REVISION: 'Solicitó una revisión de un hito',
-  HITO_APROBAR_AUTOMATICO: 'Aprobó automáticamente un hito',
-  HITO_VENCER: 'Venció el pago de un hito',
-  ENTREGA_CREAR: 'Subió una entrega',
-  PAGO_INICIAR: 'Inició un pago',
-  PAGO_CONFIRMAR: 'Confirmó un pago',
-  PAGO_ESTADO_ACTUALIZAR: 'Actualizó el estado de un pago',
-  PAGO_RECHAZAR: 'Rechazó un pago',
-  SOLICITUD_CREAR: 'Envió una solicitud de servicio',
-  SOLICITUD_RECHAZAR: 'Rechazó una solicitud de servicio',
-  SOLICITUD_CANCELAR: 'Canceló una solicitud de servicio',
-  SOLICITUD_RETIRAR_PRESUPUESTO: 'Retiró un presupuesto',
-  CRITERIO_CREAR: 'Creó un criterio de evaluación',
-  CRITERIO_MODIFICAR: 'Modificó un criterio de evaluación',
-  CRITERIO_BAJA: 'Dio de baja un criterio de evaluación',
-  CRITERIO_REACTIVAR: 'Reactivó un criterio de evaluación',
-  CRITERIO_OPCION_CREAR: 'Agregó una opción a un criterio',
-  CRITERIO_OPCION_MODIFICAR: 'Modificó una opción de un criterio',
-  CRITERIO_OPCION_BAJA: 'Dio de baja una opción de un criterio',
-  CRITERIO_OPCION_REACTIVAR: 'Reactivó una opción de un criterio',
-}
+const route = useRoute()
+const router = useRouter()
 
-const ETIQUETAS_ENTIDAD = {
-  Etiqueta: 'Etiqueta',
-  CategoriaEtiqueta: 'Categoría de etiqueta',
-  Medio: 'Medio',
-  Material: 'Material',
-  TipoArte: 'Tipo de arte',
-  TipoProducto: 'Tipo de producto',
-  TipoServicio: 'Tipo de servicio',
-  Pais: 'País',
-  Moneda: 'Moneda',
-  ConfiguracionComision: 'Comisión',
-  ConfiguracionPresupuesto: 'Reglas de presupuestos',
-  ConfiguracionPedido: 'Reglas de pedidos',
-  ConfiguracionMensajeria: 'Mensajería',
-  ConfiguracionResenia: 'Configuración de reseñas',
-  ConfiguracionInactividad: 'Promociones',
-  Resenia: 'Reseña',
-  TerminosPlataforma: 'Términos de la plataforma',
-  Servicio: 'Servicio',
-  CriterioResenia: 'Criterio de evaluación',
-  ConfiguracionCotizacion: 'Cotización',
-  Pedido: 'Pedido',
-  Presupuesto: 'Presupuesto',
-  Solicitud: 'Solicitud de servicio',
-  Pago: 'Pago',
-  Entrega: 'Entrega',
-  HitoPedido: 'Hito del pedido',
-  ReporteResenia: 'Reporte de reseña',
-  Usuario: 'Usuario',
-}
+const RANGOS = [
+  { id: '1h', etiqueta: '1 h' },
+  { id: 'hoy', etiqueta: 'Hoy' },
+  { id: '7d', etiqueta: '7 días' },
+  { id: '30d', etiqueta: '30 días' },
+  { id: 'custom', etiqueta: 'Personalizado' },
+  { id: 'todo', etiqueta: 'Todo' },
+]
+
+const ORIGENES = [
+  { codigo: 'ADMIN', etiqueta: 'Administración' },
+  { codigo: 'ARTISTA', etiqueta: 'Artistas' },
+  { codigo: 'CLIENTE', etiqueta: 'Clientes' },
+  { codigo: 'SISTEMA', etiqueta: 'Sistema' },
+]
+
+const claseCampo =
+  'block w-full rounded-lg border-0 bg-blanco px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral'
+const claseEtiqueta =
+  'mb-1 block text-[11px] font-semibold uppercase tracking-wide text-cafe/55'
+const claseBotonRango =
+  'inline-flex min-h-9 items-center justify-center rounded-full px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 motion-reduce:transition-none'
 
 const eventos = ref([])
-const opciones = ref({ entidades: [], acciones: [] })
+const opciones = ref({ entidades: [], acciones: [], categorias: [] })
+const resumen = ref({ total: 0, criticas: 0, loginFallido: 0 })
 const cargando = ref(true)
+const cargandoResumen = ref(true)
 const error = ref('')
 const pagina = ref(0)
 const totalPaginas = ref(0)
 const totalElementos = ref(0)
 const hayMas = ref(false)
-const abiertos = ref(new Set())
+const seleccionado = ref(null)
 
 const filtroActor = ref('')
+const filtroOrigen = ref('')
 const filtroEntidad = ref('')
+const filtroEntidadId = ref('')
 const filtroAccion = ref('')
-const filtroDesde = ref('')
-const filtroHasta = ref('')
+const filtroTexto = ref('')
+const filtroCategoria = ref('')
+const filtroCritica = ref(false)
+const filtroRequestId = ref('')
+const rango = ref('7d')
+const desde = ref('')
+const hasta = ref('')
+const desdeCustom = ref('')
+const hastaCustom = ref('')
 
 let debounceTimer
+let cargaProgramada
+
+function isoLocal(fecha) {
+  const dos = (valor) => String(valor).padStart(2, '0')
+  return `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())}`
+    + `T${dos(fecha.getHours())}:${dos(fecha.getMinutes())}:${dos(fecha.getSeconds())}`
+}
+
+function aplicarRango() {
+  if (rango.value === 'todo') {
+    desde.value = ''
+    hasta.value = ''
+    return
+  }
+  if (rango.value === 'custom') {
+    desde.value = desdeCustom.value ? `${desdeCustom.value}:00` : ''
+    hasta.value = hastaCustom.value ? `${hastaCustom.value}:59` : ''
+    return
+  }
+  const ahora = new Date()
+  let inicio
+  if (rango.value === '1h') {
+    inicio = new Date(ahora.getTime() - 60 * 60 * 1000)
+  } else if (rango.value === 'hoy') {
+    inicio = new Date(ahora)
+    inicio.setHours(0, 0, 0, 0)
+  } else if (rango.value === '7d') {
+    inicio = new Date(ahora.getTime() - 7 * 24 * 60 * 60 * 1000)
+  } else {
+    inicio = new Date(ahora.getTime() - 30 * 24 * 60 * 60 * 1000)
+  }
+  desde.value = isoLocal(inicio)
+  hasta.value = isoLocal(ahora)
+}
 
 function params(nuevaPagina = 0) {
-  const valores = {
+  return {
     actor: filtroActor.value.trim() || undefined,
+    origen: filtroOrigen.value || undefined,
     entidad: filtroEntidad.value || undefined,
+    entidadId: filtroEntidadId.value.trim() || undefined,
     accion: filtroAccion.value || undefined,
-    desde: filtroDesde.value || undefined,
-    hasta: filtroHasta.value || undefined,
+    requestId: filtroRequestId.value || undefined,
+    texto: filtroTexto.value.trim() || undefined,
+    categoria: filtroCategoria.value || undefined,
+    critica: filtroCritica.value ? true : undefined,
+    desde: desde.value || undefined,
+    hasta: hasta.value || undefined,
     pagina: nuevaPagina,
-    tamanio: 20,
+    tamanio: 25,
   }
-  return valores
 }
 
 async function cargar(nuevaPagina = 0) {
@@ -183,82 +151,255 @@ async function cargar(nuevaPagina = 0) {
   }
 }
 
+async function cargarResumen() {
+  cargandoResumen.value = true
+  try {
+    const fin = new Date()
+    const inicio = new Date(fin.getTime() - 24 * 60 * 60 * 1000)
+    const res = await api.get('/admin/auditoria/resumen', {
+      params: { desde: isoLocal(inicio), hasta: isoLocal(fin) },
+    })
+    resumen.value = {
+      total: res.data?.total ?? 0,
+      criticas: res.data?.criticas ?? 0,
+      loginFallido: res.data?.loginFallido ?? 0,
+    }
+  } catch {
+    resumen.value = { total: 0, criticas: 0, loginFallido: 0 }
+  } finally {
+    cargandoResumen.value = false
+  }
+}
+
 async function cargarOpciones() {
   try {
     const res = await api.get('/admin/auditoria/opciones')
     opciones.value = {
       entidades: res.data?.entidades ?? [],
       acciones: res.data?.acciones ?? [],
+      categorias: res.data?.categorias ?? [],
     }
   } catch {
-    opciones.value = { entidades: [], acciones: [] }
+    opciones.value = { entidades: [], acciones: [], categorias: [] }
   }
 }
 
-watch([filtroEntidad, filtroAccion, filtroDesde, filtroHasta], () => cargar(0))
-watch(filtroActor, () => {
+function programarCarga() {
+  if (cargaProgramada) return
+  cargaProgramada = setTimeout(() => {
+    cargaProgramada = null
+    cargar(0)
+  }, 0)
+}
+
+function programarCargaConDebounce() {
   clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => cargar(0), 300)
+  debounceTimer = setTimeout(() => {
+    cargar(0)
+  }, 300)
+}
+
+watch(rango, () => {
+  aplicarRango()
+  programarCarga()
 })
+
+watch([desdeCustom, hastaCustom], () => {
+  if (rango.value === 'custom') {
+    aplicarRango()
+    programarCarga()
+  }
+})
+
+watch(
+  [
+    filtroOrigen,
+    filtroEntidad,
+    filtroAccion,
+    filtroCategoria,
+    filtroCritica,
+    filtroRequestId,
+  ],
+  () => programarCarga(),
+)
+
+watch([filtroActor, filtroEntidadId, filtroTexto], () => {
+  programarCargaConDebounce()
+})
+
+function esSeleccionado(evento) {
+  return seleccionado.value?.idEventoAuditoria === evento.idEventoAuditoria
+}
+
+function seleccionar(evento) {
+  seleccionado.value = evento
+  router.replace({
+    query: { ...route.query, evento: String(evento.idEventoAuditoria) },
+  })
+}
+
+function cerrarDetalle() {
+  seleccionado.value = null
+  const query = { ...route.query }
+  delete query.evento
+  router.replace({ query })
+}
+
+async function abrirPorId(id) {
+  const enLista = eventos.value.find(
+    (evento) => String(evento.idEventoAuditoria) === String(id),
+  )
+  if (enLista) {
+    seleccionado.value = enLista
+    return
+  }
+  try {
+    const res = await api.get(`/admin/auditoria/${id}`)
+    seleccionado.value = res.data
+  } catch {
+    seleccionado.value = null
+  }
+}
+
+function moverSeleccion(indice) {
+  if (indice < 0 || indice >= eventos.value.length) return
+  const evento = eventos.value[indice]
+  seleccionar(evento)
+  const fila = document.getElementById(
+    `fila-auditoria-${evento.idEventoAuditoria}`,
+  )
+  fila?.focus()
+}
+
+const etiquetaRango = computed(
+  () => RANGOS.find((item) => item.id === rango.value)?.etiqueta ?? 'Todo',
+)
+
+const chips = computed(() => {
+  const activos = []
+  if (rango.value !== 'todo') {
+    activos.push({ clave: 'rango', etiqueta: etiquetaRango.value })
+  }
+  if (filtroActor.value) {
+    activos.push({ clave: 'actor', etiqueta: `Actor: ${filtroActor.value}` })
+  }
+  if (filtroOrigen.value) {
+    activos.push({
+      clave: 'origen',
+      etiqueta: `Origen: ${nombreOrigen(filtroOrigen.value)}`,
+    })
+  }
+  if (filtroEntidad.value) {
+    activos.push({
+      clave: 'entidad',
+      etiqueta: `Entidad: ${nombreEntidad(filtroEntidad.value)}`,
+    })
+  }
+  if (filtroEntidadId.value) {
+    activos.push({
+      clave: 'entidadId',
+      etiqueta: `ID de entidad: ${filtroEntidadId.value}`,
+    })
+  }
+  if (filtroAccion.value) {
+    activos.push({
+      clave: 'accion',
+      etiqueta: `Acción: ${nombreAccion(filtroAccion.value)}`,
+    })
+  }
+  if (filtroCategoria.value) {
+    activos.push({
+      clave: 'categoria',
+      etiqueta: `Categoría: ${nombreCategoria(filtroCategoria.value)}`,
+    })
+  }
+  if (filtroCritica.value) {
+    activos.push({ clave: 'critica', etiqueta: 'Solo críticas' })
+  }
+  if (filtroRequestId.value) {
+    activos.push({ clave: 'requestId', etiqueta: 'Operación relacionada' })
+  }
+  if (filtroTexto.value) {
+    activos.push({ clave: 'texto', etiqueta: `Buscar: ${filtroTexto.value}` })
+  }
+  return activos
+})
+
+function quitarChip(clave) {
+  if (clave === 'rango') rango.value = 'todo'
+  if (clave === 'actor') filtroActor.value = ''
+  if (clave === 'origen') filtroOrigen.value = ''
+  if (clave === 'entidad') filtroEntidad.value = ''
+  if (clave === 'entidadId') filtroEntidadId.value = ''
+  if (clave === 'accion') filtroAccion.value = ''
+  if (clave === 'categoria') filtroCategoria.value = ''
+  if (clave === 'critica') filtroCritica.value = false
+  if (clave === 'requestId') filtroRequestId.value = ''
+  if (clave === 'texto') filtroTexto.value = ''
+}
 
 function limpiar() {
   filtroActor.value = ''
+  filtroOrigen.value = ''
   filtroEntidad.value = ''
+  filtroEntidadId.value = ''
   filtroAccion.value = ''
-  filtroDesde.value = ''
-  filtroHasta.value = ''
-  abiertos.value = new Set()
+  filtroTexto.value = ''
+  filtroCategoria.value = ''
+  filtroCritica.value = false
+  filtroRequestId.value = ''
+  rango.value = '7d'
+  desdeCustom.value = ''
+  hastaCustom.value = ''
+  aplicarRango()
+  cerrarDetalle()
+  programarCarga()
 }
 
-function alternar(id) {
-  const copia = new Set(abiertos.value)
-  if (copia.has(id)) copia.delete(id)
-  else copia.add(id)
-  abiertos.value = copia
-}
-
-const estaAbierto = (id) => abiertos.value.has(id)
-
-function formatearFecha(valor) {
-  if (!valor) return '—'
-  const fecha = new Date(valor)
-  if (Number.isNaN(fecha.getTime())) return '—'
-  return new Intl.DateTimeFormat('es', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(fecha)
-}
-
-function nombreAccion(codigo) {
-  return ETIQUETAS_ACCION[codigo] || codigo
-}
-
-function nombreEntidad(codigo) {
-  if (!codigo) return '—'
-  return ETIQUETAS_ENTIDAD[codigo] || codigo
-}
-
-function resumenCambios(evento) {
-  const cambios = evento.cambios || []
-  if (!cambios.length) return 'Sin cambios de campos'
-  if (cambios.length === 1) {
-    const [c] = cambios
-    return `${c.etiqueta}: ${c.anterior ?? '—'} → ${c.nuevo ?? '—'}`
+function aplicarFiltro(payload) {
+  if (payload.tipo === 'actor') {
+    filtroActor.value = payload.valor || ''
+  } else if (payload.tipo === 'entidad') {
+    filtroEntidad.value = payload.entidad || ''
+    filtroEntidadId.value = payload.entidadId || ''
+  } else if (payload.tipo === 'requestId') {
+    filtroRequestId.value = payload.valor || ''
   }
-  return `${cambios.length} campos modificados`
+  rango.value = 'todo'
+  aplicarRango()
 }
 
-function actorVisible(evento) {
-  if (!evento.actorNombre) return evento.origen === 'SISTEMA' ? 'Sistema' : 'Sin actor'
-  return `@${evento.actorNombre}`
+function recargar() {
+  cargar(pagina.value)
+  cargarResumen()
 }
 
-onMounted(() => {
-  cargar(0)
-  cargarOpciones()
+watch(
+  () => route.query.evento,
+  (valor) => {
+    if (!valor) {
+      seleccionado.value = null
+      return
+    }
+    if (String(seleccionado.value?.idEventoAuditoria) === String(valor)) {
+      return
+    }
+    abrirPorId(valor)
+  },
+)
+
+onMounted(async () => {
+  aplicarRango()
+  await Promise.all([cargar(0), cargarOpciones(), cargarResumen()])
+  if (route.query.evento) {
+    abrirPorId(route.query.evento)
+  }
 })
 
-onBeforeUnmount(() => clearTimeout(debounceTimer))
+onBeforeUnmount(() => {
+  clearTimeout(debounceTimer)
+  clearTimeout(cargaProgramada)
+})
 </script>
 
 <template>
@@ -268,193 +409,356 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
       eyebrow="Sistema"
       titulo="Auditoría"
       descripcion="Quién hizo qué, sobre qué registro y con qué valores anteriores y nuevos."
-    />
-
-    <div class="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      <div>
-        <label class="mb-1 block text-xs text-cafe/60">Actor</label>
-        <input
-          v-model="filtroActor"
-          type="search"
-          placeholder="Usuario"
-          class="block w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-        />
-      </div>
-      <div>
-        <label class="mb-1 block text-xs text-cafe/60">Entidad</label>
-        <select
-          v-model="filtroEntidad"
-          class="block w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-        >
-          <option value="">Todas</option>
-          <option v-for="entidad in opciones.entidades" :key="entidad" :value="entidad">
-            {{ nombreEntidad(entidad) }}
-          </option>
-        </select>
-      </div>
-      <div>
-        <label class="mb-1 block text-xs text-cafe/60">Acción</label>
-        <select
-          v-model="filtroAccion"
-          class="block w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-        >
-          <option value="">Todas</option>
-          <option v-for="accion in opciones.acciones" :key="accion" :value="accion">
-            {{ nombreAccion(accion) }}
-          </option>
-        </select>
-      </div>
-      <div>
-        <label class="mb-1 block text-xs text-cafe/60">Desde</label>
-        <input
-          v-model="filtroDesde"
-          type="date"
-          class="block w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-        />
-      </div>
-      <div class="flex items-end gap-2">
-        <div class="min-w-0 flex-1">
-          <label class="mb-1 block text-xs text-cafe/60">Hasta</label>
-          <input
-            v-model="filtroHasta"
-            type="date"
-            class="block w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-          />
-        </div>
+    >
+      <template #acciones>
         <button
           type="button"
-          class="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 motion-reduce:transition-none"
-          @click="limpiar"
+          class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
+          :disabled="cargando"
+          @click="recargar"
         >
-          Limpiar
+          <RefreshCw class="h-4 w-4" :class="cargando ? 'animate-spin' : ''" aria-hidden="true" />
+          Actualizar
         </button>
+      </template>
+    </AdminPageHeader>
+
+    <div class="mb-5 grid gap-3 sm:grid-cols-3">
+      <div class="rounded-2xl border border-rosa/50 bg-blanco px-4 py-3">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[11px] font-semibold uppercase tracking-wide text-cafe/55">Eventos (24 h)</span>
+          <Activity class="h-4 w-4 text-cafe/30" aria-hidden="true" />
+        </div>
+        <p class="mt-1 font-display text-2xl font-extrabold tabular-nums text-granate">
+          {{ cargandoResumen ? '—' : resumen.total }}
+        </p>
+      </div>
+      <div class="rounded-2xl border border-rosa/50 bg-blanco px-4 py-3">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[11px] font-semibold uppercase tracking-wide text-cafe/55">Acciones críticas (24 h)</span>
+          <ShieldAlert class="h-4 w-4 text-coral/60" aria-hidden="true" />
+        </div>
+        <p class="mt-1 font-display text-2xl font-extrabold tabular-nums text-coral">
+          {{ cargandoResumen ? '—' : resumen.criticas }}
+        </p>
+      </div>
+      <div class="rounded-2xl border border-rosa/50 bg-blanco px-4 py-3">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[11px] font-semibold uppercase tracking-wide text-cafe/55">Logins fallidos (24 h)</span>
+          <LogIn class="h-4 w-4 text-cafe/30" aria-hidden="true" />
+        </div>
+        <p class="mt-1 font-display text-2xl font-extrabold tabular-nums text-cafe">
+          {{ cargandoResumen ? '—' : resumen.loginFallido }}
+        </p>
       </div>
     </div>
+
+    <section class="rounded-2xl border border-rosa/50 bg-blanco p-4">
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="w-full">
+          <span :class="claseEtiqueta">Rango</span>
+          <div class="flex flex-wrap gap-1.5" role="group" aria-label="Rango de tiempo">
+            <button
+              v-for="item in RANGOS"
+              :key="item.id"
+              type="button"
+              :class="[
+                claseBotonRango,
+                rango === item.id
+                  ? 'bg-granate text-blanco'
+                  : 'border border-rosa bg-blanco text-cafe hover:bg-rosa/20',
+              ]"
+              :aria-pressed="rango === item.id"
+              @click="rango = item.id"
+            >
+              {{ item.etiqueta }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="rango === 'custom'" class="grid w-full gap-3 sm:grid-cols-2">
+          <label class="block">
+            <span :class="claseEtiqueta">Desde</span>
+            <input v-model="desdeCustom" type="datetime-local" :class="claseCampo" />
+          </label>
+          <label class="block">
+            <span :class="claseEtiqueta">Hasta</span>
+            <input v-model="hastaCustom" type="datetime-local" :class="claseCampo" />
+          </label>
+        </div>
+      </div>
+
+      <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <label class="block">
+          <span :class="claseEtiqueta">Actor</span>
+          <input v-model="filtroActor" type="search" placeholder="Usuario" :class="claseCampo" />
+        </label>
+        <label class="block">
+          <span :class="claseEtiqueta">Origen</span>
+          <select v-model="filtroOrigen" :class="claseCampo">
+            <option value="">Todos</option>
+            <option v-for="origen in ORIGENES" :key="origen.codigo" :value="origen.codigo">
+              {{ origen.etiqueta }}
+            </option>
+          </select>
+        </label>
+        <label class="block">
+          <span :class="claseEtiqueta">Entidad</span>
+          <select v-model="filtroEntidad" :class="claseCampo">
+            <option value="">Todas</option>
+            <option v-for="entidad in opciones.entidades" :key="entidad" :value="entidad">
+              {{ nombreEntidad(entidad) }}
+            </option>
+          </select>
+        </label>
+        <label class="block">
+          <span :class="claseEtiqueta">ID de entidad</span>
+          <input v-model="filtroEntidadId" type="search" placeholder="Ej. 318" :class="claseCampo" />
+        </label>
+        <label class="block">
+          <span :class="claseEtiqueta">Acción</span>
+          <select v-model="filtroAccion" :class="claseCampo">
+            <option value="">Todas</option>
+            <option v-for="accion in opciones.acciones" :key="accion" :value="accion">
+              {{ nombreAccion(accion) }}
+            </option>
+          </select>
+        </label>
+        <label class="block">
+          <span :class="claseEtiqueta">Categoría</span>
+          <select v-model="filtroCategoria" :class="claseCampo">
+            <option value="">Todas</option>
+            <option v-for="categoria in opciones.categorias" :key="categoria.codigo" :value="categoria.codigo">
+              {{ categoria.etiqueta }}
+            </option>
+          </select>
+        </label>
+        <label class="block">
+          <span :class="claseEtiqueta">Buscar</span>
+          <span class="relative block">
+            <Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cafe/35" aria-hidden="true" />
+            <input v-model="filtroTexto" type="search" placeholder="Resumen, actor o ID" :class="[claseCampo, 'pl-9']" />
+          </span>
+        </label>
+        <div class="flex items-end gap-2">
+          <button
+            type="button"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 motion-reduce:transition-none"
+            :class="filtroCritica ? 'bg-granate text-blanco' : 'border border-rosa bg-blanco text-cafe hover:bg-rosa/20'"
+            :aria-pressed="filtroCritica"
+            @click="filtroCritica = !filtroCritica"
+          >
+            <ShieldAlert class="h-4 w-4" aria-hidden="true" />
+            Solo críticas
+          </button>
+          <span class="group relative inline-flex">
+            <button
+              type="button"
+              class="inline-flex h-9 w-9 items-center justify-center rounded-full text-cafe/45 transition-colors hover:bg-rosa/20 hover:text-granate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 motion-reduce:transition-none"
+              aria-label="Qué se considera un evento crítico"
+              aria-describedby="ayuda-critica"
+            >
+              <Info class="h-4 w-4" aria-hidden="true" />
+            </button>
+            <span
+              id="ayuda-critica"
+              role="tooltip"
+              class="pointer-events-none absolute bottom-full right-0 z-20 mb-2 hidden w-72 rounded-lg bg-cafe px-3 py-2 text-xs leading-relaxed text-blanco shadow-lg group-hover:block group-focus-within:block"
+            >
+              Se consideran críticas las acciones sobre pagos, pedidos, presupuestos, entregas, términos y cambios de seguridad de la cuenta.
+            </span>
+          </span>
+        </div>
+      </div>
+
+      <div v-if="chips.length" class="mt-3 flex flex-wrap items-center gap-2">
+        <span
+          v-for="chip in chips"
+          :key="chip.clave"
+          class="inline-flex max-w-full items-center gap-1 rounded-full bg-rosa/20 py-1 pl-2.5 pr-1 text-xs font-medium text-granate"
+        >
+          <span class="truncate">{{ chip.etiqueta }}</span>
+          <button
+            type="button"
+            class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-granate/60 transition-colors hover:bg-granate/10 hover:text-granate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 motion-reduce:transition-none"
+            :aria-label="`Quitar filtro ${chip.etiqueta}`"
+            @click="quitarChip(chip.clave)"
+          >
+            <X class="h-3 w-3" aria-hidden="true" />
+          </button>
+        </span>
+        <button
+          type="button"
+          class="ml-1 rounded-full px-2 py-1 text-xs font-semibold text-coral transition-colors hover:text-granate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 motion-reduce:transition-none"
+          @click="limpiar"
+        >
+          Limpiar filtros
+        </button>
+      </div>
+    </section>
 
     <p v-if="cargando" class="py-10 text-center text-sm text-cafe/55">Cargando auditoría...</p>
     <p v-else-if="error" class="py-10 text-center text-sm text-rojizo" role="alert">{{ error }}</p>
     <p
       v-else-if="!eventos.length"
-      class="rounded-2xl border border-dashed border-rosa/60 py-10 text-center text-sm text-cafe/55"
+      class="mt-5 rounded-2xl border border-dashed border-rosa/60 py-10 text-center text-sm text-cafe/55"
     >
       No hay acciones registradas con estos filtros.
     </p>
 
-    <div v-else class="space-y-2">
-      <article
-        v-for="evento in eventos"
-        :key="evento.idEventoAuditoria"
-        class="rounded-2xl border border-rosa/50 bg-blanco"
-      >
-        <button
-          type="button"
-          class="flex w-full items-start gap-3 rounded-2xl px-4 py-3 text-left transition-colors hover:bg-rosa/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60 motion-reduce:transition-none"
-          :aria-expanded="estaAbierto(evento.idEventoAuditoria)"
-          :aria-controls="`evento-${evento.idEventoAuditoria}`"
-          @click="alternar(evento.idEventoAuditoria)"
-        >
-          <svg
-            class="mt-0.5 h-4 w-4 shrink-0 text-cafe/40 transition-transform duration-200 motion-reduce:transition-none"
-            :class="estaAbierto(evento.idEventoAuditoria) ? 'rotate-90' : ''"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-              clip-rule="evenodd"
-            />
-          </svg>
-
-          <span class="min-w-0 flex-1">
-            <span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span class="text-sm font-semibold text-granate">{{ evento.resumen }}</span>
-              <span class="text-xs text-cafe/45">{{ formatearFecha(evento.ocurridoEn) }}</span>
-            </span>
-            <span class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-cafe/60">
-              <span class="font-medium text-cafe/75">{{ actorVisible(evento) }}</span>
-              <span v-if="evento.actorRol" class="rounded-full bg-rosa/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-granate">
-                {{ evento.actorRol }}
-              </span>
-              <span v-if="evento.entidad">· {{ nombreEntidad(evento.entidad) }}<span v-if="evento.entidadId"> #{{ evento.entidadId }}</span></span>
-              <span class="text-cafe/40">·</span>
-              <span class="text-cafe/50">{{ resumenCambios(evento) }}</span>
-            </span>
-          </span>
-        </button>
-
-        <div
-          v-if="estaAbierto(evento.idEventoAuditoria)"
-          :id="`evento-${evento.idEventoAuditoria}`"
-          class="border-t border-rosa/40 px-4 py-4"
-        >
-          <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-cafe/50">
-            {{ nombreAccion(evento.accion) }}
-          </p>
-
-          <div v-if="evento.cambios.length" class="overflow-x-auto">
-            <table class="w-full min-w-96 text-left text-sm">
+    <div v-else class="mt-5 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div class="min-w-0">
+        <div class="hidden overflow-hidden rounded-2xl border border-rosa/50 bg-blanco md:block">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
               <thead>
-                <tr class="border-b border-rosa/40 text-xs uppercase tracking-wide text-cafe/50">
-                  <th class="py-2 pr-4 font-semibold">Campo</th>
-                  <th class="py-2 pr-4 font-semibold">Antes</th>
-                  <th class="py-2 font-semibold">Después</th>
+                <tr class="border-b border-rosa/40 text-[10px] uppercase tracking-wide text-cafe/50">
+                  <th class="px-3 py-2.5 font-semibold">Fecha</th>
+                  <th class="px-3 py-2.5 font-semibold">Actor</th>
+                  <th class="px-3 py-2.5 font-semibold">Acción</th>
+                  <th class="px-3 py-2.5 font-semibold">Entidad</th>
+                  <th class="px-3 py-2.5 font-semibold">Categoría</th>
                 </tr>
               </thead>
               <tbody>
                 <tr
-                  v-for="cambio in evento.cambios"
-                  :key="cambio.campo"
-                  class="border-b border-rosa/25 last:border-0"
+                  v-for="(evento, indice) in eventos"
+                  :id="`fila-auditoria-${evento.idEventoAuditoria}`"
+                  :key="evento.idEventoAuditoria"
+                  tabindex="0"
+                  :aria-current="esSeleccionado(evento) ? 'true' : undefined"
+                  class="cursor-pointer border-b border-rosa/25 transition-colors last:border-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60 motion-reduce:transition-none"
+                  :class="esSeleccionado(evento) ? 'bg-coral/5' : 'hover:bg-rosa/5'"
+                  @click="seleccionar(evento)"
+                  @keydown.enter.prevent="seleccionar(evento)"
+                  @keydown.space.prevent="seleccionar(evento)"
+                  @keydown.down.prevent="moverSeleccion(indice + 1)"
+                  @keydown.up.prevent="moverSeleccion(indice - 1)"
+                  @keydown.esc="cerrarDetalle"
                 >
-                  <td class="py-2 pr-4 text-cafe/70">{{ cambio.etiqueta }}</td>
-                  <td class="py-2 pr-4 text-cafe/50">{{ cambio.anterior ?? '—' }}</td>
-                  <td class="py-2 font-medium text-granate">{{ cambio.nuevo ?? '—' }}</td>
+                  <td class="whitespace-nowrap px-3 py-3 align-top text-xs text-cafe/55">
+                    <span :title="formatearFecha(evento.ocurridoEn)">
+                      {{ formatearFechaRelativa(evento.ocurridoEn) }}
+                    </span>
+                  </td>
+                  <td class="px-3 py-3 align-top">
+                    <p class="text-xs font-medium text-cafe">{{ actorVisible(evento) }}</p>
+                    <span
+                      v-if="evento.actorRol"
+                      class="mt-1 inline-flex rounded-full bg-rosa/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-granate"
+                    >
+                      {{ evento.actorRol }}
+                    </span>
+                  </td>
+                  <td class="px-3 py-3 align-top">
+                    <div class="flex items-start gap-1.5">
+                      <AlertTriangle
+                        v-if="evento.critica"
+                        class="mt-0.5 h-3.5 w-3.5 shrink-0 text-coral"
+                        aria-hidden="true"
+                      />
+                      <span class="text-xs font-semibold text-granate">{{ nombreAccion(evento.accion) }}</span>
+                    </div>
+                    <p class="mt-0.5 text-[11px] text-cafe/50">{{ resumenCambios(evento) }}</p>
+                  </td>
+                  <td class="px-3 py-3 align-top text-xs text-cafe/70">
+                    {{ nombreEntidad(evento.entidad) }}
+                    <span v-if="evento.entidadId" class="text-cafe/45">#{{ evento.entidadId }}</span>
+                  </td>
+                  <td class="px-3 py-3 align-top">
+                    <span class="inline-flex rounded-full bg-rosa/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cafe/70">
+                      {{ nombreCategoria(evento.categoria) }}
+                    </span>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <p v-else class="text-sm text-cafe/55">Esta acción no modificó campos: solo registró el evento.</p>
-
-          <dl class="mt-4 grid gap-2 text-xs text-cafe/50 sm:grid-cols-2">
-            <div v-if="evento.motivo">
-              <dt class="font-semibold text-cafe/60">Motivo</dt>
-              <dd>{{ evento.motivo }}</dd>
-            </div>
-            <div v-if="evento.requestId">
-              <dt class="font-semibold text-cafe/60">Identificador de la acción</dt>
-              <dd class="break-all">{{ evento.requestId }}</dd>
-            </div>
-          </dl>
         </div>
-      </article>
+
+        <div class="space-y-2 md:hidden">
+          <button
+            v-for="evento in eventos"
+            :key="evento.idEventoAuditoria"
+            type="button"
+            class="w-full rounded-2xl border border-rosa/50 bg-blanco p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 motion-reduce:transition-none"
+            :class="esSeleccionado(evento) ? 'bg-coral/5' : 'hover:bg-rosa/5'"
+            :aria-current="esSeleccionado(evento) ? 'true' : undefined"
+            @click="seleccionar(evento)"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs text-cafe/50">{{ formatearFechaRelativa(evento.ocurridoEn) }}</span>
+              <span class="rounded-full bg-rosa/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cafe/70">
+                {{ nombreCategoria(evento.categoria) }}
+              </span>
+            </div>
+            <p class="mt-1 flex items-start gap-1.5 text-sm font-semibold text-granate">
+              <AlertTriangle v-if="evento.critica" class="mt-0.5 h-3.5 w-3.5 shrink-0 text-coral" aria-hidden="true" />
+              {{ nombreAccion(evento.accion) }}
+            </p>
+            <p class="mt-1 text-xs text-cafe/60">{{ evento.resumen }}</p>
+            <p class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-cafe/55">
+              <span class="font-medium text-cafe/75">{{ actorVisible(evento) }}</span>
+              <span v-if="evento.entidad">· {{ nombreEntidad(evento.entidad) }}<span v-if="evento.entidadId"> #{{ evento.entidadId }}</span></span>
+            </p>
+          </button>
+        </div>
+
+        <div
+          v-if="totalPaginas > 1"
+          class="mt-4 flex items-center justify-between gap-3 border-t border-rosa/40 pt-4"
+        >
+          <p class="text-xs text-cafe/50 tabular-nums">
+            Página {{ pagina + 1 }} de {{ totalPaginas }} · {{ totalElementos }} eventos
+          </p>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              class="inline-flex min-h-9 items-center justify-center gap-1 rounded-full border border-rosa bg-blanco px-4 text-[13px] font-semibold text-cafe transition-colors hover:bg-rosa/20 disabled:opacity-40 motion-reduce:transition-none"
+              :disabled="pagina <= 0"
+              @click="cargar(pagina - 1)"
+            >
+              <ChevronLeft class="h-4 w-4" aria-hidden="true" />
+              Anterior
+            </button>
+            <button
+              type="button"
+              class="inline-flex min-h-9 items-center justify-center gap-1 rounded-full border border-rosa bg-blanco px-4 text-[13px] font-semibold text-cafe transition-colors hover:bg-rosa/20 disabled:opacity-40 motion-reduce:transition-none"
+              :disabled="!hayMas"
+              @click="cargar(pagina + 1)"
+            >
+              Siguiente
+              <ChevronRight class="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="hidden xl:block">
+        <div class="sticky top-24 rounded-2xl border border-rosa/50 bg-blanco p-4">
+          <AuditoriaDetalle
+            :evento="seleccionado"
+            @cerrar="cerrarDetalle"
+            @filtrar="aplicarFiltro"
+          />
+        </div>
+      </aside>
     </div>
 
     <div
-      v-if="!cargando && !error && totalPaginas > 1"
-      class="mt-6 flex items-center justify-between gap-3 border-t border-rosa/40 pt-4"
+      v-if="seleccionado"
+      class="fixed inset-0 z-40 xl:hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Detalle del evento"
     >
-      <p class="text-xs text-cafe/50 tabular-nums">
-        Página {{ pagina + 1 }} de {{ totalPaginas }} · {{ totalElementos }} eventos
-      </p>
-      <div class="flex gap-2">
-        <button
-          type="button"
-          class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-[13px] font-semibold text-cafe transition-colors hover:bg-rosa/20 disabled:opacity-40 motion-reduce:transition-none"
-          :disabled="pagina <= 0"
-          @click="cargar(pagina - 1)"
-        >
-          Anterior
-        </button>
-        <button
-          type="button"
-          class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-[13px] font-semibold text-cafe transition-colors hover:bg-rosa/20 disabled:opacity-40 motion-reduce:transition-none"
-          :disabled="!hayMas"
-          @click="cargar(pagina + 1)"
-        >
-          Siguiente
-        </button>
+      <div class="absolute inset-0 bg-cafe/30" @click="cerrarDetalle" />
+      <div class="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-blanco p-4 shadow-xl">
+        <AuditoriaDetalle
+          :evento="seleccionado"
+          @cerrar="cerrarDetalle"
+          @filtrar="aplicarFiltro"
+        />
       </div>
     </div>
   </div>

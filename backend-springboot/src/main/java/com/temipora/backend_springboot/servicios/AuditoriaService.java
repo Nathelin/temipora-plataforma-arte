@@ -3,6 +3,7 @@ package com.temipora.backend_springboot.servicios;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 
 import org.slf4j.Logger;
@@ -22,10 +23,13 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import com.temipora.backend_springboot.config.AuditoriaRequestFilter;
 import com.temipora.backend_springboot.modelo.CambioAuditoriaDTO;
+import com.temipora.backend_springboot.modelo.CategoriaAuditoriaDTO;
 import com.temipora.backend_springboot.modelo.EventoAuditoria;
 import com.temipora.backend_springboot.modelo.EventoAuditoriaDTO;
+import com.temipora.backend_springboot.modelo.FiltroAuditoria;
 import com.temipora.backend_springboot.modelo.OpcionesAuditoriaDTO;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
+import com.temipora.backend_springboot.modelo.ResumenAuditoriaDTO;
 import com.temipora.backend_springboot.repositorios.EventoAuditoriaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -102,11 +106,7 @@ public class AuditoriaService {
 
     @Transactional(readOnly = true)
     public PaginaDTO<EventoAuditoriaDTO> listar(
-            String actor,
-            String entidad,
-            String accion,
-            LocalDateTime desde,
-            LocalDateTime hasta,
+            FiltroAuditoria filtro,
             int pagina,
             int tamanio) {
         Pageable pageable = PageRequest.of(
@@ -114,28 +114,58 @@ public class AuditoriaService {
             Math.min(Math.max(1, tamanio), TAMANIO_MAXIMO),
             Sort.by(Sort.Direction.DESC, "ocurridoEn").and(Sort.by(Sort.Direction.DESC, "idEventoAuditoria")));
 
-        Specification<EventoAuditoria> filtro = (root, query, cb) -> {
+        Specification<EventoAuditoria> especificacion = (root, query, cb) -> {
             List<Predicate> predicados = new ArrayList<>();
-            if (actor != null && !actor.isBlank()) {
+            if (texto(filtro.actor())) {
                 predicados.add(cb.like(cb.lower(root.<String>get("actorNombre")),
-                    "%" + actor.trim().toLowerCase() + "%"));
+                    "%" + filtro.actor().trim().toLowerCase() + "%"));
             }
-            if (entidad != null && !entidad.isBlank()) {
-                predicados.add(cb.equal(root.get("entidad"), entidad.trim()));
+            if (texto(filtro.origen())) {
+                predicados.add(cb.equal(root.get("origen"),
+                    filtro.origen().trim().toUpperCase()));
             }
-            if (accion != null && !accion.isBlank()) {
-                predicados.add(cb.equal(root.get("accion"), accion.trim()));
+            if (texto(filtro.entidad())) {
+                predicados.add(cb.equal(root.get("entidad"), filtro.entidad().trim()));
             }
-            if (desde != null) {
-                predicados.add(cb.greaterThanOrEqualTo(root.<LocalDateTime>get("ocurridoEn"), desde));
+            if (texto(filtro.entidadId())) {
+                predicados.add(cb.like(cb.lower(root.<String>get("entidadId")),
+                    "%" + filtro.entidadId().trim().toLowerCase() + "%"));
             }
-            if (hasta != null) {
-                predicados.add(cb.lessThanOrEqualTo(root.<LocalDateTime>get("ocurridoEn"), hasta));
+            if (texto(filtro.accion())) {
+                predicados.add(cb.equal(root.get("accion"), filtro.accion().trim()));
+            }
+            if (texto(filtro.requestId())) {
+                predicados.add(cb.equal(root.get("requestId"), filtro.requestId().trim()));
+            }
+            if (texto(filtro.texto())) {
+                String patron = "%" + filtro.texto().trim().toLowerCase() + "%";
+                predicados.add(cb.or(
+                    cb.like(cb.lower(root.<String>get("actorNombre")), patron),
+                    cb.like(cb.lower(root.<String>get("resumen")), patron),
+                    cb.like(cb.lower(root.<String>get("entidadId")), patron)));
+            }
+            if (texto(filtro.categoria())) {
+                var acciones = CatalogoAuditoria.accionesDe(filtro.categoria());
+                predicados.add(acciones.isEmpty()
+                    ? cb.disjunction()
+                    : root.get("accion").in(acciones));
+            }
+            if (Boolean.TRUE.equals(filtro.critica())) {
+                predicados.add(root.get("accion")
+                    .in(CatalogoAuditoria.accionesCriticas()));
+            }
+            if (filtro.desde() != null) {
+                predicados.add(cb.greaterThanOrEqualTo(
+                    root.<LocalDateTime>get("ocurridoEn"), filtro.desde()));
+            }
+            if (filtro.hasta() != null) {
+                predicados.add(cb.lessThanOrEqualTo(
+                    root.<LocalDateTime>get("ocurridoEn"), filtro.hasta()));
             }
             return cb.and(predicados.toArray(Predicate[]::new));
         };
 
-        Page<EventoAuditoria> page = eventoRepository.findAll(filtro, pageable);
+        Page<EventoAuditoria> page = eventoRepository.findAll(especificacion, pageable);
         return PaginaDTO.<EventoAuditoriaDTO>builder()
             .contenido(page.getContent().stream().map(this::aDto).toList())
             .pagina(page.getNumber())
@@ -147,10 +177,37 @@ public class AuditoriaService {
     }
 
     @Transactional(readOnly = true)
+    public EventoAuditoriaDTO obtener(Long idEvento) {
+        return eventoRepository.findById(idEvento)
+            .map(this::aDto)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Evento de auditoría no encontrado: " + idEvento));
+    }
+
+    @Transactional(readOnly = true)
     public OpcionesAuditoriaDTO opciones() {
         return new OpcionesAuditoriaDTO(
             eventoRepository.entidadesRegistradas(),
-            eventoRepository.accionesRegistradas());
+            eventoRepository.accionesRegistradas(),
+            CatalogoAuditoria.categorias().stream()
+                .map(categoria -> new CategoriaAuditoriaDTO(
+                    categoria.name(), categoria.getEtiqueta()))
+                .toList());
+    }
+
+    @Transactional(readOnly = true)
+    public ResumenAuditoriaDTO resumen(
+            LocalDateTime desde, LocalDateTime hasta) {
+        return new ResumenAuditoriaDTO(
+            eventoRepository.countByOcurridoEnBetween(desde, hasta),
+            eventoRepository.countByAccionInAndOcurridoEnBetween(
+                CatalogoAuditoria.accionesCriticas(), desde, hasta),
+            eventoRepository.countByAccionAndOcurridoEnBetween(
+                AccionesAdmin.LOGIN_FALLIDO, desde, hasta));
+    }
+
+    private boolean texto(String valor) {
+        return valor != null && !valor.isBlank();
     }
 
     private void guardar(
@@ -217,7 +274,9 @@ public class AuditoriaService {
             evento.getMotivo(),
             evento.getRequestId(),
             evento.getOrigen(),
-            evento.getResultado());
+            evento.getResultado(),
+            CatalogoAuditoria.categoriaDe(evento.getAccion()).name(),
+            CatalogoAuditoria.esCritica(evento.getAccion()));
     }
 
     private String serializar(List<CambioAuditoriaDTO> cambios) {

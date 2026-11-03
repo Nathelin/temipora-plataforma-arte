@@ -4,5 +4,6 @@ import java.util.List;
 
 public record OpcionesAuditoriaDTO(
         List<String> entidades,
-        List<String> acciones) {
+        List<String> acciones,
+        List<CategoriaAuditoriaDTO> categorias) {
 }
