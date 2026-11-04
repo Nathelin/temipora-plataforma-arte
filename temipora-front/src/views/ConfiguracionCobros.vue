@@ -67,14 +67,6 @@ async function desconectar() {
   }
 }
 
-function formatearFecha(fecha) {
-  if (!fecha) return null
-  return new Date(fecha).toLocaleString('es-AR', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
-}
-
 onMounted(() => {
   if (!esArtista) {
     cargando.value = false
@@ -116,11 +108,8 @@ onMounted(() => {
           <p class="text-sm font-semibold text-green-700">
             Cuenta conectada
           </p>
-          <p v-if="cuenta.idCuentaExterna" class="mt-1 text-sm text-cafe/70">
-            Cuenta de MercadoPago: {{ cuenta.idCuentaExterna }}
-          </p>
-          <p v-if="cuenta.expiraEn" class="mt-1 text-xs text-cafe/50">
-            Autorización válida hasta {{ formatearFecha(cuenta.expiraEn) }}.
+          <p class="mt-1 text-sm text-cafe/70">
+            Vas a recibir los pagos de tus pedidos en esta cuenta.
           </p>
           <div class="mt-4 flex flex-wrap gap-3">
             <button
@@ -139,6 +128,12 @@ onMounted(() => {
             >
               {{ desconectando ? 'Desconectando...' : 'Desconectar' }}
             </button>
+            <router-link
+              to="/panel/ventas"
+              class="inline-flex min-h-10 items-center justify-center rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+            >
+              Ver mis ventas
+            </router-link>
           </div>
         </div>
 

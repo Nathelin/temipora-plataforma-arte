@@ -31,6 +31,7 @@ import ClientLayout from '../layouts/ClientLayout.vue'
 import Inicio from '../views/Inicio.vue'
 import AdminResumen from '../views/AdminResumen.vue'
 import PanelResumen from '../views/PanelResumen.vue'
+import Ventas from '../views/Ventas.vue'
 import Perfil from '../views/Perfil.vue'
 import Favoritos from '../views/Favoritos.vue'
 import FavoritosArtistas from '../views/FavoritosArtistas.vue'
@@ -221,6 +222,7 @@ const routes = [
           { path: 'solicitudes/:idSolicitud/presupuesto', name: 'presupuesto-crear', component: PresupuestoForm, meta: { title: 'Enviar presupuesto' } },
           { path: 'pedidos', name: 'panel-pedidos', component: Pedidos, meta: { title: 'Pedidos' } },
           { path: 'pedidos/:idPedido', name: 'panel-pedido-detalle', component: PedidoDetalle, meta: { title: 'Pedido' } },
+          { path: 'ventas', name: 'panel-ventas', component: Ventas, meta: { title: 'Ventas' } },
           { path: 'mensajes', name: 'panel-mensajes', component: Mensajes, meta: { title: 'Mensajes' } },
           { path: 'mensajes/:idConversacion', name: 'panel-conversacion', component: Conversacion, meta: { title: 'Conversación' } },
           { path: 'formulario-pedidos', name: 'panel-formulario-pedidos', component: ConfiguracionFormularioPedidos, meta: { title: 'Formulario de pedidos' } },
@@ -252,7 +254,7 @@ const routes = [
           { path: 'apariencia', name: 'configuracion-apariencia', component: ConfiguracionApariencia, meta: { title: 'Configuración - Apariencia' } },
           { path: 'privacidad', name: 'configuracion-privacidad', component: ConfiguracionPrivacidad, meta: { title: 'Configuración - Privacidad' } },
           { path: 'cuenta', name: 'configuracion-cuenta', component: ConfiguracionCuenta, meta: { title: 'Configuración - Cuenta' } },
-          { path: 'cobros', name: 'configuracion-cobros', component: ConfiguracionCobros, meta: { title: 'Configuración - Cobros', requiresArtist: true } },
+          { path: 'cobros', name: 'configuracion-cobros', component: ConfiguracionCobros, meta: { title: 'Configuración - Formas de cobro', requiresArtist: true } },
         ],
       },
       { path: 'about', redirect: '/' },

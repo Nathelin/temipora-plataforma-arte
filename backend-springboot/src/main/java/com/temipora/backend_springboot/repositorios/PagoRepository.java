@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,7 +16,8 @@ import com.temipora.backend_springboot.modelo.Pago;
 
 import jakarta.persistence.LockModeType;
 
-public interface PagoRepository extends JpaRepository<Pago, Long> {
+public interface PagoRepository
+        extends JpaRepository<Pago, Long>, JpaSpecificationExecutor<Pago> {
 
     Optional<Pago> findFirstByHitoPedidoIdHitoPedidoAndEstado(
         Long idHitoPedido, EstadoPago estado);
@@ -70,4 +72,13 @@ public interface PagoRepository extends JpaRepository<Pago, Long> {
         @Param("estado") EstadoPago estado,
         @Param("desde") LocalDateTime desde,
         @Param("hasta") LocalDateTime hasta);
+
+    @Query("""
+        select coalesce(sum(p.montoNetoCobro), 0) from Pago p
+        where p.hitoPedido.pedido.artista.idUsuario = :idArtista
+          and p.estado = :estado
+        """)
+    BigDecimal sumarNetoDeArtista(
+        @Param("idArtista") Long idArtista,
+        @Param("estado") EstadoPago estado);
 }

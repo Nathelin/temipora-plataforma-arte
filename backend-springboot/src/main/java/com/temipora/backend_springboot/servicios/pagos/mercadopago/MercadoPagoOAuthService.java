@@ -45,7 +45,7 @@ public class MercadoPagoOAuthService {
             UsuarioRepository usuarios,
             CifradorTokens cifrador,
             @Value("${pagos.mercadopago.client-id:}") String clientId,
-            @Value("${pagos.mercadopago.oauth-url:https://auth.mercadopago.com/authorization}") String oauthUrl,
+            @Value("${pagos.mercadopago.oauth-url:https://auth.mercadopago.com.ar/authorization}") String oauthUrl,
             @Value("${app.frontend.url:http://localhost:5173}") String frontendUrl,
             @Value("${pagos.mercadopago.oauth-test-token:${pagos.mercadopago.sandbox:false}}") boolean oauthTestToken) {
         this.cliente = cliente;
@@ -121,10 +121,8 @@ public class MercadoPagoOAuthService {
             .findByUsuarioIdUsuarioAndProveedor(idUsuario, PROVEEDOR)
             .map(cuenta -> new CuentaCobroDTO(
                 cuenta.getEstado() == EstadoCuentaPago.ACTIVA,
-                cuenta.getEstado() != null ? cuenta.getEstado().name() : null,
-                cuenta.getIdCuentaExterna(),
-                cuenta.getTokenExpiraEn()))
-            .orElse(new CuentaCobroDTO(false, null, null, null));
+                cuenta.getEstado() != null ? cuenta.getEstado().name() : null))
+            .orElse(new CuentaCobroDTO(false, null));
     }
 
     @Transactional

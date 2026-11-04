@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.servicios;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.Comparator;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.ContadorMensajesDTO;
 import com.temipora.backend_springboot.modelo.DineroPanelDTO;
+import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.HitoPedido;
@@ -19,6 +21,7 @@ import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.PanelArtistaResumenDTO;
 import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
 import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
+import com.temipora.backend_springboot.repositorios.PagoRepository;
 import com.temipora.backend_springboot.servicios.pagos.mercadopago.MercadoPagoOAuthService;
 
 @Service
@@ -35,6 +38,7 @@ public class PanelArtistaService {
     private final SolicitudServicioService solicitudServicioService;
     private final PedidoService pedidoService;
     private final HitoPedidoRepository hitoPedidoRepository;
+    private final PagoRepository pagoRepository;
     private final ConversacionService conversacionService;
     private final MercadoPagoOAuthService mercadoPagoOAuthService;
     private final MonedaVistaService monedaVistaService;
@@ -43,12 +47,14 @@ public class PanelArtistaService {
             SolicitudServicioService solicitudServicioService,
             PedidoService pedidoService,
             HitoPedidoRepository hitoPedidoRepository,
+            PagoRepository pagoRepository,
             ConversacionService conversacionService,
             MercadoPagoOAuthService mercadoPagoOAuthService,
             MonedaVistaService monedaVistaService) {
         this.solicitudServicioService = solicitudServicioService;
         this.pedidoService = pedidoService;
         this.hitoPedidoRepository = hitoPedidoRepository;
+        this.pagoRepository = pagoRepository;
         this.conversacionService = conversacionService;
         this.mercadoPagoOAuthService = mercadoPagoOAuthService;
         this.monedaVistaService = monedaVistaService;
@@ -156,7 +162,24 @@ public class PanelArtistaService {
             .porCobrar(actividad.porCobrar())
             .cobradoMes(delMes)
             .cobradoTotal(total)
+            .pendienteAcreditar(pendienteAcreditar(idArtista, mostrada, ahora))
             .monedaMostrada(mostrada != null ? mostrada.getCodigo() : null)
             .build();
+    }
+
+    private BigDecimal pendienteAcreditar(
+            Long idArtista, Moneda mostrada, LocalDateTime ahora) {
+        BigDecimal pendiente = pagoRepository.sumarNetoDeArtista(
+            idArtista, EstadoPago.PENDIENTE);
+        if (pendiente == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal factor = mostrada != null
+            ? monedaVistaService.factorCobroAMostrada(mostrada, ahora)
+            : null;
+        if (factor == null) {
+            return pendiente;
+        }
+        return pendiente.multiply(factor).setScale(2, RoundingMode.HALF_UP);
     }
 }

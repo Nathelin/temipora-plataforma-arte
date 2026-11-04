@@ -18,5 +18,6 @@ public class DineroPanelDTO {
     private BigDecimal porCobrar;
     private BigDecimal cobradoMes;
     private BigDecimal cobradoTotal;
+    private BigDecimal pendienteAcreditar;
     private String monedaMostrada;
 }

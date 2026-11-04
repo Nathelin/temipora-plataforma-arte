@@ -17,12 +17,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.ContadorMensajesDTO;
 import com.temipora.backend_springboot.modelo.CuentaCobroDTO;
+import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.PanelArtistaResumenDTO;
 import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
 import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
+import com.temipora.backend_springboot.repositorios.PagoRepository;
 import com.temipora.backend_springboot.servicios.pagos.mercadopago.MercadoPagoOAuthService;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +38,8 @@ class PanelArtistaServiceTest {
     private PedidoService pedidoService;
     @Mock
     private HitoPedidoRepository hitoPedidoRepository;
+    @Mock
+    private PagoRepository pagoRepository;
     @Mock
     private ConversacionService conversacionService;
     @Mock
@@ -156,10 +160,13 @@ class PanelArtistaServiceTest {
             .thenReturn(new BigDecimal("300.00"));
         when(pedidoService.netoMostradoDe(eq(anterior), any(), any()))
             .thenReturn(new BigDecimal("100.00"));
+        when(pagoRepository.sumarNetoDeArtista(
+            ARTISTA, EstadoPago.PENDIENTE))
+            .thenReturn(new BigDecimal("50.00"));
         when(conversacionService.contador(ARTISTA))
             .thenReturn(new ContadorMensajesDTO(0, 0));
         when(mercadoPagoOAuthService.estado(ARTISTA))
-            .thenReturn(new CuentaCobroDTO(true, null, null, null));
+            .thenReturn(new CuentaCobroDTO(true, null));
 
         PanelArtistaResumenDTO resumen = panelArtistaService.resumen(ARTISTA);
 
@@ -169,6 +176,8 @@ class PanelArtistaServiceTest {
             .isEqualByComparingTo("300.00");
         assertThat(resumen.getDinero().getPorCobrar())
             .isEqualByComparingTo("250.00");
+        assertThat(resumen.getDinero().getPendienteAcreditar())
+            .isEqualByComparingTo("50.00");
         assertThat(resumen.isCuentaCobrosConectada()).isTrue();
     }
 
@@ -188,10 +197,13 @@ class PanelArtistaServiceTest {
         when(hitoPedidoRepository.findPagadosDeArtista(
             ARTISTA, EstadoPagoHito.PAGADO))
             .thenReturn(List.of());
+        when(pagoRepository.sumarNetoDeArtista(
+            ARTISTA, EstadoPago.PENDIENTE))
+            .thenReturn(BigDecimal.ZERO);
         when(conversacionService.contador(ARTISTA))
             .thenReturn(new ContadorMensajesDTO(0, 0));
         when(mercadoPagoOAuthService.estado(ARTISTA))
-            .thenReturn(new CuentaCobroDTO(false, null, null, null));
+            .thenReturn(new CuentaCobroDTO(false, null));
     }
 
     private SolicitudResumenDTO solicitud(

@@ -77,7 +77,9 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
             "title", "Pedido " + pedido.getIdPedido() + " - " + hito.getNombre(),
             "description", "Hito " + hito.getOrden() + " de " + nombreServicio,
             "quantity", 1,
-            "currency_id", "ARS",
+            "currency_id", pago.getMonedaCobro() != null
+                ? pago.getMonedaCobro().getCodigo()
+                : "ARS",
             "unit_price", pago.getMontoCobro())));
         cuerpo.put("external_reference", String.valueOf(pago.getIdPago()));
         cuerpo.put("notification_url", notificationUrl);
