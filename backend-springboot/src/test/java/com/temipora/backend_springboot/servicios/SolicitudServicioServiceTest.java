@@ -30,6 +30,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.AccionSolicitud;
+import com.temipora.backend_springboot.modelo.ArancelEstimadoDTO;
 import com.temipora.backend_springboot.modelo.Conversacion;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.DisponibilidadServicioDTO;
@@ -65,6 +66,7 @@ import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
 import com.temipora.backend_springboot.repositorios.TerminosRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
+import com.temipora.backend_springboot.servicios.pagos.ArancelEstimadoService;
 
 @ExtendWith(MockitoExtension.class)
 class SolicitudServicioServiceTest {
@@ -126,6 +128,9 @@ class SolicitudServicioServiceTest {
 
     @Mock
     private AuditoriaService auditoria;
+
+    @Mock
+    private ArancelEstimadoService arancelEstimadoService;
 
     @InjectMocks
     private SolicitudServicioService solicitudServicioService;
@@ -199,6 +204,11 @@ class SolicitudServicioServiceTest {
         lenient().when(colaSolicitudesService.evaluar(any(Solicitud.class)))
             .thenReturn(new ColaSolicitudesService.EvaluacionPresupuesto(
                 false, null, null));
+        lenient().when(arancelEstimadoService.estimar())
+            .thenReturn(new ArancelEstimadoDTO(
+                new BigDecimal("3.49"),
+                new BigDecimal("21"),
+                new BigDecimal("4.2229")));
     }
 
     @Test

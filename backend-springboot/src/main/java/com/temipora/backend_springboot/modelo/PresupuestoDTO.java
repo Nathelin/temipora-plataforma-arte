@@ -64,6 +64,22 @@ public class PresupuestoDTO {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal montoNetoArtistaMostrado;
 
+    // Arancel estimado de MercadoPago, informado solo al artista/admin.
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal arancelMpPorcentaje;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal arancelMpEstimado;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal arancelMpEstimadoCobro;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal arancelMpEstimadoMostrado;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal montoNetoArtistaConArancel;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal montoNetoArtistaConArancelCobro;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal montoNetoArtistaConArancelMostrado;
+
     private Integer tiempoEntregaValor;
     private String tiempoEntregaUnidad;
     private Integer tiempoEntregaDias;
@@ -232,6 +248,56 @@ public class PresupuestoDTO {
                     incluirComision))
                 .toList())
             .build();
+    }
+
+    public void aplicarArancelMp(BigDecimal porcentajeTotal) {
+        if (porcentajeTotal == null || porcentajeTotal.signum() < 0) {
+            return;
+        }
+
+        BigDecimal base = precioFinalCliente != null
+            ? precioFinalCliente
+            : precioFinal;
+        BigDecimal baseCobro = precioFinalClienteCobro != null
+            ? precioFinalClienteCobro
+            : precioFinalCobro;
+        BigDecimal baseMostrado = precioFinalClienteMostrado != null
+            ? precioFinalClienteMostrado
+            : precioFinalMostrado;
+
+        this.arancelMpPorcentaje = porcentajeTotal.setScale(4, RoundingMode.HALF_UP);
+        this.arancelMpEstimado = parte(base, porcentajeTotal);
+        this.arancelMpEstimadoCobro = parte(baseCobro, porcentajeTotal);
+        this.arancelMpEstimadoMostrado = parte(baseMostrado, porcentajeTotal);
+        this.montoNetoArtistaConArancel = restar(
+            montoNetoArtista, arancelMpEstimado);
+        this.montoNetoArtistaConArancelCobro = restar(
+            montoNetoArtistaCobro, arancelMpEstimadoCobro);
+        this.montoNetoArtistaConArancelMostrado = restar(
+            montoNetoArtistaMostrado, arancelMpEstimadoMostrado);
+
+        if (hitos != null) {
+            for (HitoPresupuestoDTO hito : hitos) {
+                hito.aplicarArancelMp(porcentajeTotal);
+            }
+        }
+    }
+
+    static BigDecimal parte(BigDecimal base, BigDecimal porcentaje) {
+        if (base == null) {
+            return null;
+        }
+        return base.multiply(porcentaje)
+            .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+    }
+
+    static BigDecimal restar(BigDecimal total, BigDecimal parte) {
+        if (total == null || parte == null) {
+            return total;
+        }
+        return total.subtract(parte)
+            .max(BigDecimal.ZERO)
+            .setScale(2, RoundingMode.HALF_UP);
     }
 
     public static BigDecimal totalMostrado(

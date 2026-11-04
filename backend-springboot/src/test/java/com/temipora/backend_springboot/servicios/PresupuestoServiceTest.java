@@ -26,6 +26,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 
+import com.temipora.backend_springboot.modelo.ArancelEstimadoDTO;
 import com.temipora.backend_springboot.modelo.ConfiguracionComision;
 import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.ConfiguracionPresupuesto;
@@ -52,6 +53,7 @@ import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.PresupuestoRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
+import com.temipora.backend_springboot.servicios.pagos.ArancelEstimadoService;
 
 @ExtendWith(MockitoExtension.class)
 class PresupuestoServiceTest {
@@ -95,6 +97,9 @@ class PresupuestoServiceTest {
 
     @Mock
     private AuditoriaService auditoriaService;
+
+    @Mock
+    private ArancelEstimadoService arancelEstimadoService;
 
     @InjectMocks
     private PresupuestoService presupuestoService;
@@ -163,6 +168,27 @@ class PresupuestoServiceTest {
             contains("200.00 ARS"),
             eq(SOLICITUD),
             eq("SOLICITUD"));
+    }
+
+    @Test
+    void crear_informaArancelMpEstimadoAlArtista() {
+        prepararCreacion();
+
+        SolicitudDTO resultado = presupuestoService.crear(
+            SOLICITUD, ARTISTA, request());
+
+        PresupuestoDTO presupuesto = resultado.getPresupuesto();
+        assertThat(presupuesto.getArancelMpPorcentaje())
+            .isEqualByComparingTo("4.2229");
+        assertThat(presupuesto.getArancelMpEstimado())
+            .isEqualByComparingTo("8.45");
+        assertThat(presupuesto.getMontoNetoArtistaConArancel())
+            .isEqualByComparingTo("171.55");
+        assertThat(presupuesto.getHitos()).hasSize(1);
+        assertThat(presupuesto.getHitos().get(0).getArancelMpEstimado())
+            .isEqualByComparingTo("8.45");
+        assertThat(presupuesto.getHitos().get(0).getMontoNetoConArancel())
+            .isEqualByComparingTo("171.55");
     }
 
     @Test
@@ -721,6 +747,11 @@ class PresupuestoServiceTest {
                 return monto.multiply(porcentaje)
                     .divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP);
             });
+        lenient().when(arancelEstimadoService.estimar())
+            .thenReturn(new ArancelEstimadoDTO(
+                new BigDecimal("3.49"),
+                new BigDecimal("21"),
+                new BigDecimal("4.2229")));
         ConfiguracionPedido configuracionPedido = new ConfiguracionPedido();
         configuracionPedido.setMaxHitos(4);
         configuracionPedido.setPorcentajeMaxPrimerHito(new BigDecimal("50.00"));

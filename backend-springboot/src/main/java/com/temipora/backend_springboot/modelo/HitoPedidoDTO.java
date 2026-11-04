@@ -42,6 +42,18 @@ public class HitoPedidoDTO {
     private BigDecimal montoNetoCobro;
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal montoNetoMostrado;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal arancelMpEstimado;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal arancelMpEstimadoCobro;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal arancelMpEstimadoMostrado;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal montoNetoConArancel;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal montoNetoConArancelCobro;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal montoNetoConArancelMostrado;
     private String estadoPago;
     private String estadoEntrega;
     private LocalDateTime fechaLimitePago;
@@ -139,5 +151,22 @@ public class HitoPedidoDTO {
             .puedeSolicitarRevision(puedeSolicitarRevision)
             .pagos(pagos)
             .build();
+    }
+
+    public void aplicarArancelMp(BigDecimal porcentajeTotal) {
+        if (porcentajeTotal == null || porcentajeTotal.signum() < 0) {
+            return;
+        }
+        this.arancelMpEstimado = PresupuestoDTO.parte(monto, porcentajeTotal);
+        this.arancelMpEstimadoCobro = PresupuestoDTO.parte(
+            montoCobro, porcentajeTotal);
+        this.arancelMpEstimadoMostrado = PresupuestoDTO.parte(
+            montoMostrado != null ? montoMostrado : monto, porcentajeTotal);
+        this.montoNetoConArancel = PresupuestoDTO.restar(
+            montoNeto, arancelMpEstimado);
+        this.montoNetoConArancelCobro = PresupuestoDTO.restar(
+            montoNetoCobro, arancelMpEstimadoCobro);
+        this.montoNetoConArancelMostrado = PresupuestoDTO.restar(
+            montoNetoMostrado, arancelMpEstimadoMostrado);
     }
 }

@@ -57,6 +57,7 @@ import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
 import com.temipora.backend_springboot.repositorios.TerminosRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
+import com.temipora.backend_springboot.servicios.pagos.ArancelEstimadoService;
 
 @Service
 public class SolicitudServicioService {
@@ -123,6 +124,7 @@ public class SolicitudServicioService {
     private final ConversacionRepository conversacionRepository;
     private final OfertaReactivacionService ofertaReactivacionService;
     private final AuditoriaService auditoria;
+    private final ArancelEstimadoService arancelEstimadoService;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -142,7 +144,8 @@ public class SolicitudServicioService {
             ConversacionService conversacionService,
             ConversacionRepository conversacionRepository,
             OfertaReactivacionService ofertaReactivacionService,
-            AuditoriaService auditoria) {
+            AuditoriaService auditoria,
+            ArancelEstimadoService arancelEstimadoService) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -161,6 +164,7 @@ public class SolicitudServicioService {
         this.conversacionRepository = conversacionRepository;
         this.ofertaReactivacionService = ofertaReactivacionService;
         this.auditoria = auditoria;
+        this.arancelEstimadoService = arancelEstimadoService;
     }
 
     @Transactional(readOnly = true)
@@ -737,6 +741,10 @@ public class SolicitudServicioService {
             && idVista.equals(solicitud.getArtista().getIdUsuario());
         SolicitudDTO dto = SolicitudDTO.desdeSolicitud(
             solicitud, mostrada, factorOrigen, factorCobro, incluirComision);
+        if (incluirComision && dto.getPresupuesto() != null) {
+            dto.getPresupuesto().aplicarArancelMp(
+                arancelEstimadoService.estimar().porcentajeTotal());
+        }
         if (incluirComision && solicitud.getCliente() != null) {
             dto.setReputacionCliente(reputacionDe(
                 solicitud.getCliente().getIdUsuario()));

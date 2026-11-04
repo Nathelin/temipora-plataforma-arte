@@ -110,6 +110,23 @@ const netoMostrado = computed(
 const muestraComision = computed(
   () => comisionPorcentaje.value != null && comisionMostrada.value != null,
 )
+const arancelMpPorcentaje = computed(() => {
+  const valor = Number(props.presupuesto?.arancelMpPorcentaje)
+  return Number.isFinite(valor) ? valor : null
+})
+const arancelMpEstimado = computed(
+  () => props.presupuesto?.arancelMpEstimadoMostrado
+    ?? props.presupuesto?.arancelMpEstimado
+    ?? null,
+)
+const netoConArancel = computed(
+  () => props.presupuesto?.montoNetoArtistaConArancelMostrado
+    ?? props.presupuesto?.montoNetoArtistaConArancel
+    ?? netoMostrado.value,
+)
+const muestraArancelMp = computed(
+  () => arancelMpPorcentaje.value != null && arancelMpEstimado.value != null,
+)
 
 function formatearMoneda(valor) {
   return formatearPrecio(valor, monedaMostrada.value)
@@ -197,18 +214,28 @@ function formatearRecargo(recargo) {
           </dt>
           <dd class="text-cafe">− {{ formatearMoneda(comisionMostrada) }}</dd>
         </div>
+        <div v-if="muestraArancelMp" class="flex items-center justify-between gap-3">
+          <dt class="text-cafe/60">
+            Arancel MercadoPago estimado ({{ formatearMonto(arancelMpPorcentaje) }}%)
+          </dt>
+          <dd class="text-cafe">− {{ formatearMoneda(arancelMpEstimado) }}</dd>
+        </div>
         <div
           v-if="esArtista"
           class="flex items-center justify-between gap-3 border-t border-cafe/10 pt-1.5"
         >
           <dt class="font-semibold text-granate">Recibís</dt>
-          <dd class="text-base font-bold text-granate">{{ formatearMoneda(netoMostrado) }}</dd>
+          <dd class="text-base font-bold text-granate">{{ formatearMoneda(netoConArancel) }}</dd>
         </div>
       </dl>
       <p class="mt-2 text-xs leading-relaxed text-cafe/50">
         {{ Number(descuentoMostrado) > 0
           ? 'El descuento de reactivación lo absorbe la plataforma: tu neto no cambia.'
           : 'La comisión se descuenta de tu precio. El cliente paga el total sin cambios.' }}
+        <span v-if="muestraArancelMp">
+          El arancel de MercadoPago es una estimación y puede variar según el medio de pago
+          y las cuotas.
+        </span>
       </p>
     </div>
 
@@ -238,8 +265,18 @@ function formatearRecargo(recargo) {
             <p class="text-sm font-semibold text-granate">
               {{ formatearMoneda(hito.montoMostrado ?? hito.monto) }}
             </p>
+            <p
+              v-if="esArtista && hito.arancelMpEstimadoMostrado != null"
+              class="text-xs text-cafe/45"
+            >
+              Arancel MP est. − {{ formatearMoneda(hito.arancelMpEstimadoMostrado) }}
+            </p>
             <p v-if="esArtista" class="text-xs text-cafe/50">
-              Recibís {{ formatearMoneda(hito.montoNetoMostrado ?? hito.montoNeto) }}
+              Recibís {{ formatearMoneda(
+                hito.montoNetoConArancelMostrado
+                  ?? hito.montoNetoMostrado
+                  ?? hito.montoNeto,
+              ) }}
             </p>
           </div>
         </li>

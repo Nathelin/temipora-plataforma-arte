@@ -38,6 +38,7 @@ import com.temipora.backend_springboot.modelo.TipoRecargo;
 import com.temipora.backend_springboot.repositorios.PresupuestoRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
+import com.temipora.backend_springboot.servicios.pagos.ArancelEstimadoService;
 
 @Service
 public class PresupuestoService {
@@ -67,6 +68,7 @@ public class PresupuestoService {
     private final MonedaVistaService monedaVistaService;
     private final OfertaReactivacionService ofertaReactivacionService;
     private final AuditoriaService auditoria;
+    private final ArancelEstimadoService arancelEstimadoService;
 
     private static final String ENTIDAD = "Presupuesto";
     private static final List<CampoAuditado> CAMPOS = List.of(
@@ -98,7 +100,8 @@ public class PresupuestoService {
             ConfiguracionPedidoService configuracionPedidoService,
             MonedaVistaService monedaVistaService,
             OfertaReactivacionService ofertaReactivacionService,
-            AuditoriaService auditoria) {
+            AuditoriaService auditoria,
+            ArancelEstimadoService arancelEstimadoService) {
         this.solicitudRepository = solicitudRepository;
         this.servicioRepository = servicioRepository;
         this.presupuestoRepository = presupuestoRepository;
@@ -111,6 +114,7 @@ public class PresupuestoService {
         this.monedaVistaService = monedaVistaService;
         this.ofertaReactivacionService = ofertaReactivacionService;
         this.auditoria = auditoria;
+        this.arancelEstimadoService = arancelEstimadoService;
     }
 
     @Transactional
@@ -421,6 +425,10 @@ public class PresupuestoService {
             : null;
         SolicitudDTO dto = SolicitudDTO.desdeSolicitud(
             solicitud, monedaMostrada, factorOrigen, factorCobro, true);
+        if (dto.getPresupuesto() != null) {
+            dto.getPresupuesto().aplicarArancelMp(
+                arancelEstimadoService.estimar().porcentajeTotal());
+        }
         dto.setPuedePresupuestar(false);
         dto.setMotivoNoPresupuestable(null);
         dto.setPosicionCola(null);

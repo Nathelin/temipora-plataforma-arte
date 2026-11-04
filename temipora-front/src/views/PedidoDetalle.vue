@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
-import { formatearPrecio } from '../servicios/moneda'
+import { formatearMonto, formatearPrecio } from '../servicios/moneda'
 import { descripcionMedioPago } from '../servicios/ventas'
 import EntregasHito from '../components/EntregasHito.vue'
 import HiloConversacion from '../components/HiloConversacion.vue'
@@ -161,7 +161,7 @@ function netoHito(hito) {
     return formatearPrecio(pago.netoRecibidoMp, monedaCobro.value)
   }
   return formatearPrecio(
-    hito.montoNetoMostrado ?? hito.montoNeto,
+    hito.montoNetoConArancelMostrado ?? hito.montoNetoMostrado ?? hito.montoNeto,
     moneda.value,
   )
 }
@@ -966,13 +966,36 @@ onMounted(async () => {
                 − {{ formatearPrecio(pedido.comisionMontoMostrado ?? pedido.comisionMonto, moneda) }}
               </dd>
             </div>
+            <div
+              v-if="pedido.arancelMpEstimadoMostrado != null"
+              class="flex items-center justify-between gap-3"
+            >
+              <dt class="text-cafe/60">
+                Arancel MercadoPago estimado ({{ formatearMonto(pedido.arancelMpPorcentaje) }}%)
+              </dt>
+              <dd class="text-cafe">
+                − {{ formatearPrecio(pedido.arancelMpEstimadoMostrado, moneda) }}
+              </dd>
+            </div>
             <div class="flex items-center justify-between gap-3 border-t border-cafe/10 pt-1.5">
               <dt class="font-semibold text-granate">Recibís</dt>
               <dd class="text-base font-bold text-granate">
-                {{ formatearPrecio(pedido.montoNetoArtistaMostrado ?? pedido.montoNetoArtista, moneda) }}
+                {{ formatearPrecio(
+                  pedido.montoNetoArtistaConArancelMostrado
+                    ?? pedido.montoNetoArtistaMostrado
+                    ?? pedido.montoNetoArtista,
+                  moneda,
+                ) }}
               </dd>
             </div>
           </dl>
+          <p
+            v-if="pedido.arancelMpEstimadoMostrado != null"
+            class="mt-2 text-xs leading-relaxed text-cafe/50"
+          >
+            El arancel de MercadoPago es una estimación y puede variar según el medio de pago
+            y las cuotas.
+          </p>
         </div>
           </section>
 
@@ -1403,6 +1426,13 @@ onMounted(async () => {
               </span>
               <span v-if="tieneDatosMp(hito)">
                 Arancel MercadoPago: − {{ arancelMpHito(hito) }}
+              </span>
+              <span
+                v-else-if="hito.arancelMpEstimadoMostrado != null"
+                class="text-cafe/50"
+              >
+                Arancel MercadoPago est.: −
+                {{ formatearPrecio(hito.arancelMpEstimadoMostrado, moneda) }}
               </span>
               <span class="font-semibold text-granate">
                 Recibís{{ tieneDatosMp(hito) ? '' : ' (estimado)' }}: {{ netoHito(hito) }}
