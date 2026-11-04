@@ -36,6 +36,14 @@ public interface HitoPedidoRepository extends JpaRepository<HitoPedido, Long> {
         EstadoPagoHito estado, LocalDateTime limite);
 
     @Query("""
+        select count(h) from HitoPedido h
+        where h.estadoEntrega = :estado
+          and h.fechaLimiteAprobacion is not null
+        """)
+    long contarAprobacionesPendientes(
+        @Param("estado") EstadoEntregaHito estado);
+
+    @Query("""
         select h from HitoPedido h
         join fetch h.pedido p
         where p.artista.idUsuario = :idArtista and h.estadoPago = :pagado

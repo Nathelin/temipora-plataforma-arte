@@ -14,6 +14,7 @@ import {
   X,
 } from '@lucide/vue'
 import api from '../servicios/api'
+import { useAdminMenu } from '../composables/useAdminMenu'
 import AuditoriaDetalle from './admin/AuditoriaDetalle.vue'
 import {
   actorVisible,
@@ -28,6 +29,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const { colapsada: menuColapsada } = useAdminMenu()
 
 const RANGOS = [
   { id: '1h', etiqueta: '1 h' },
@@ -81,6 +83,7 @@ const hastaCustom = ref('')
 
 let debounceTimer
 let cargaProgramada
+let inicializado = false
 
 function isoLocal(fecha) {
   const dos = (valor) => String(valor).padStart(2, '0')
@@ -200,11 +203,13 @@ function programarCargaConDebounce() {
 }
 
 watch(rango, () => {
+  if (!inicializado) return
   aplicarRango()
   programarCarga()
 })
 
 watch([desdeCustom, hastaCustom], () => {
+  if (!inicializado) return
   if (rango.value === 'custom') {
     aplicarRango()
     programarCarga()
@@ -220,11 +225,13 @@ watch(
     filtroCritica,
     filtroRequestId,
   ],
-  () => programarCarga(),
+  () => {
+    if (inicializado) programarCarga()
+  },
 )
 
 watch([filtroActor, filtroEntidadId, filtroTexto], () => {
-  programarCargaConDebounce()
+  if (inicializado) programarCargaConDebounce()
 })
 
 function esSeleccionado(evento) {
@@ -273,6 +280,12 @@ function moverSeleccion(indice) {
 
 const etiquetaRango = computed(
   () => RANGOS.find((item) => item.id === rango.value)?.etiqueta ?? 'Todo',
+)
+
+const grillaContenido = computed(() =>
+  menuColapsada.value
+    ? 'xl:grid-cols-[minmax(0,1fr)_460px] 2xl:grid-cols-[minmax(0,1fr)_540px]'
+    : 'xl:grid-cols-[minmax(0,1fr)_400px] 2xl:grid-cols-[minmax(0,1fr)_460px]',
 )
 
 const chips = computed(() => {
@@ -388,12 +401,38 @@ watch(
   },
 )
 
-onMounted(async () => {
+function aInputFechaHora(valor) {
+  return valor ? String(valor).slice(0, 16) : ''
+}
+
+function inicializarDesdeUrl() {
+  const q = route.query
+  if (q.actor) filtroActor.value = String(q.actor)
+  if (q.origen) filtroOrigen.value = String(q.origen)
+  if (q.entidad) filtroEntidad.value = String(q.entidad)
+  if (q.entidadId) filtroEntidadId.value = String(q.entidadId)
+  if (q.accion) filtroAccion.value = String(q.accion)
+  if (q.requestId) filtroRequestId.value = String(q.requestId)
+  if (q.texto) filtroTexto.value = String(q.texto)
+  if (q.categoria) filtroCategoria.value = String(q.categoria)
+  if (String(q.critica) === 'true') filtroCritica.value = true
+  if (q.desde || q.hasta) {
+    rango.value = 'custom'
+    desdeCustom.value = aInputFechaHora(q.desde)
+    hastaCustom.value = aInputFechaHora(q.hasta)
+  } else if (q.rango) {
+    rango.value = String(q.rango)
+  }
   aplicarRango()
+}
+
+onMounted(async () => {
+  inicializarDesdeUrl()
   await Promise.all([cargar(0), cargarOpciones(), cargarResumen()])
   if (route.query.evento) {
     abrirPorId(route.query.evento)
   }
+  inicializado = true
 })
 
 onBeforeUnmount(() => {
@@ -606,7 +645,7 @@ onBeforeUnmount(() => {
       No hay acciones registradas con estos filtros.
     </p>
 
-    <div v-else class="mt-5 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div v-else class="mt-5 grid items-start gap-4" :class="grillaContenido">
       <div class="min-w-0">
         <div class="hidden overflow-hidden rounded-2xl border border-rosa/50 bg-blanco md:block">
           <div class="overflow-x-auto">

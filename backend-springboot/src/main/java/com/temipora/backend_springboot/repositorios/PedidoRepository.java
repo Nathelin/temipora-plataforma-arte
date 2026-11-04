@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.repositorios;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -43,6 +44,16 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
 
     long countByClienteIdUsuarioAndEstadoIn(
         Long idCliente, Collection<EstadoPedido> estados);
+
+    @Query("""
+        select count(p) from Pedido p
+        where p.estado = :estado
+          and p.limiteEntrega is not null
+          and p.limiteEntrega < :hoy
+        """)
+    long contarEntregasAtrasadas(
+        @Param("estado") EstadoPedido estado,
+        @Param("hoy") LocalDate hoy);
 
     @Query("""
         select p from Pedido p

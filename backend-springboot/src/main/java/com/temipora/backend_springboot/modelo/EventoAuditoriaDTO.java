@@ -19,5 +19,6 @@ public record EventoAuditoriaDTO(
         String origen,
         String resultado,
         String categoria,
-        boolean critica) {
+        boolean critica,
+        long eventosOperacion) {
 }

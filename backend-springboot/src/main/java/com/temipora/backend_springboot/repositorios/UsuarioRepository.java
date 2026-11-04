@@ -9,10 +9,15 @@ import org.springframework.data.repository.query.Param;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.Usuario;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
+    long countByRolNombre(ERol nombre);
+
+    long countByFechaCreacionAfter(LocalDateTime desde);
+
     Optional<Usuario> findByIdUsuario(Long idUsuario);
     Optional<Usuario> findByNombreUsuario(String nombreUsuario);
     Optional<Usuario> findByNombreUsuarioIgnoreCase(String nombreUsuario);

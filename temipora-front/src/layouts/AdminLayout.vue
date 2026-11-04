@@ -2,6 +2,7 @@
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BrandLogo from '../components/BrandLogo.vue'
+import { useAdminMenu } from '../composables/useAdminMenu'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 import api from '../servicios/api'
@@ -125,16 +126,10 @@ const ariaActual = (item) => {
   return route.path === item.to ? 'page' : 'true'
 }
 
-const COLAPSADA_KEY = 'adminMenuColapsada'
-const colapsada = ref(localStorage.getItem(COLAPSADA_KEY) === '1')
+const { colapsada } = useAdminMenu()
 
 function alternarColapsada() {
   colapsada.value = !colapsada.value
-  try {
-    localStorage.setItem(COLAPSADA_KEY, colapsada.value ? '1' : '0')
-  } catch {
-    /* sin persistencia disponible */
-  }
 }
 
 const conteos = ref({ reportes: 0, etiquetas: 0 })
