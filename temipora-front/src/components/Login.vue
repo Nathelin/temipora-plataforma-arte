@@ -31,7 +31,7 @@ async function iniciarSesion() {
     if (redirect) {
       router.push(String(redirect))
     } else if (rol === 'ADMIN') {
-      router.push({ name: 'usuarios' })
+      router.push({ name: 'admin-resumen' })
     } else {
       router.push({ name: 'servicios' })
     }

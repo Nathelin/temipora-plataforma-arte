@@ -236,7 +236,7 @@ public class ReactivacionProcesador {
             "REACTIVACION",
             campana.getIdCampana(),
             "CAMPANA_REACTIVACION",
-            "Ofertas para retomar tus compras en Temipora",
+            EmailPlantillaService.ASUNTO_REACTIVACION,
             html,
             "reactivacion:" + campana.getToken());
     }
