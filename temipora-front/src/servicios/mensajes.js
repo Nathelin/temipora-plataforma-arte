@@ -124,6 +124,35 @@ export function formatearFechaMensaje(valor) {
   }).format(fecha)
 }
 
+export function formatearHoraMensaje(valor) {
+  if (!valor) return ''
+  const fecha = new Date(valor)
+  if (Number.isNaN(fecha.getTime())) return ''
+  return new Intl.DateTimeFormat('es', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(fecha)
+}
+
+export function formatearDiaConversacion(valor) {
+  if (!valor) return ''
+  const fecha = new Date(valor)
+  if (Number.isNaN(fecha.getTime())) return ''
+  const hoy = new Date()
+  const ayer = new Date(hoy)
+  ayer.setDate(hoy.getDate() - 1)
+  if (fecha.toDateString() === hoy.toDateString()) return 'Hoy'
+  if (fecha.toDateString() === ayer.toDateString()) return 'Ayer'
+  const mismoAnio = fecha.getFullYear() === hoy.getFullYear()
+  const texto = new Intl.DateTimeFormat('es', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    ...(mismoAnio ? {} : { year: 'numeric' }),
+  }).format(fecha)
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
+}
+
 export function formatearFechaHora(valor) {
   if (!valor) return ''
   const fecha = new Date(valor)
