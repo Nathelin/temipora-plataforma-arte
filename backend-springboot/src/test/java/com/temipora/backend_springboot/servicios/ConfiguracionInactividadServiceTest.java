@@ -8,6 +8,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -85,6 +87,44 @@ class ConfiguracionInactividadServiceTest {
         verify(repository, never()).save(any(ConfiguracionInactividad.class));
     }
 
+    @Test
+    void actualizar_guardaLaHoraDeEnvio() {
+        when(repository.findById(ConfiguracionInactividad.ID_UNICO))
+            .thenReturn(Optional.of(new ConfiguracionInactividad()));
+
+        ConfiguracionInactividadDTO resultado = service.actualizar(dto("10.00"));
+
+        assertThat(resultado.getHoraEjecucion())
+            .isEqualTo(LocalTime.of(9, 30));
+    }
+
+    @Test
+    void actualizar_rechazaHoraNula() {
+        when(repository.findById(ConfiguracionInactividad.ID_UNICO))
+            .thenReturn(Optional.of(new ConfiguracionInactividad()));
+        ConfiguracionInactividadDTO cambios = dto("10.00");
+        cambios.setHoraEjecucion(null);
+
+        assertThatThrownBy(() -> service.actualizar(cambios))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("hora de envío");
+
+        verify(repository, never()).save(any(ConfiguracionInactividad.class));
+    }
+
+    @Test
+    void marcarCorridaProgramada_guardaElMomento() {
+        ConfiguracionInactividad config = new ConfiguracionInactividad();
+        when(repository.findById(ConfiguracionInactividad.ID_UNICO))
+            .thenReturn(Optional.of(config));
+        LocalDateTime momento = LocalDateTime.of(2026, 11, 4, 9, 30);
+
+        service.marcarCorridaProgramada(momento);
+
+        assertThat(config.getUltimaCorridaProgramada()).isEqualTo(momento);
+        verify(repository).save(config);
+    }
+
     private ConfiguracionInactividadDTO dto(String porcentaje) {
         return ConfiguracionInactividadDTO.builder()
             .diasSinCompra(60)
@@ -95,6 +135,7 @@ class ConfiguracionInactividadServiceTest {
             .vigenciaHoras(72)
             .maxOfertasPorUsuario(3)
             .maxUsuariosPorCorrida(50)
+            .horaEjecucion(LocalTime.of(9, 30))
             .build();
     }
 }

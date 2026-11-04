@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +24,9 @@ public class ReactivacionService {
     private final ServicioService servicioService;
     private final ReactivacionProcesador procesador;
     private final AuditoriaService auditoria;
+
+    @Value("${temipora.reactivacion.programada:true}")
+    private boolean programadaHabilitada;
 
     public ReactivacionService(
             ConfiguracionInactividadService configuracionService,
@@ -86,12 +90,37 @@ public class ReactivacionService {
         }
     }
 
-    @Scheduled(cron = "${temipora.reactivacion.cron:0 0 9 * * *}")
-    public void ejecutarProgramado() {
+    // Tick liviano: cada minuto decide si ya es la hora configurada y si aún no corrió hoy.
+    @Scheduled(cron = "0 * * * * *")
+    public void evaluarEjecucionProgramada() {
+        if (!programadaHabilitada) {
+            return;
+        }
+        ConfiguracionInactividad config = configuracionService.obtener();
+        LocalDateTime ahora = LocalDateTime.now();
+        if (!correspondeEjecutar(config, ahora)) {
+            return;
+        }
+        configuracionService.marcarCorridaProgramada(ahora);
         try {
             ejecutar();
         } catch (RuntimeException e) {
             log.error("Falló la corrida programada de reactivación.", e);
         }
+    }
+
+    boolean correspondeEjecutar(
+            ConfiguracionInactividad config,
+            LocalDateTime ahora) {
+        if (config == null || config.getHoraEjecucion() == null) {
+            return false;
+        }
+        if (ahora.toLocalTime().isBefore(config.getHoraEjecucion())) {
+            return false;
+        }
+        LocalDateTime horarioDeHoy = LocalDateTime.of(
+            ahora.toLocalDate(), config.getHoraEjecucion());
+        return config.getUltimaCorridaProgramada() == null
+            || config.getUltimaCorridaProgramada().isBefore(horarioDeHoy);
     }
 }

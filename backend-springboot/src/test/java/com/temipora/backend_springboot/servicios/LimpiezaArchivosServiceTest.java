@@ -20,6 +20,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.repositorios.ImagenRepository;
 import com.temipora.backend_springboot.repositorios.RespuestaRepository;
+import com.temipora.backend_springboot.repositorios.ServicioImagenRepository;
+import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +38,12 @@ class LimpiezaArchivosServiceTest {
 
     @Mock
     private RespuestaRepository respuestaRepository;
+
+    @Mock
+    private ServicioRepository servicioRepository;
+
+    @Mock
+    private ServicioImagenRepository servicioImagenRepository;
 
     @InjectMocks
     private LimpiezaArchivosService limpieza;
@@ -56,6 +64,30 @@ class LimpiezaArchivosServiceTest {
         when(usuarioRepository.existeUrlEnPerfil("/uploads/b.webp")).thenReturn(true);
 
         int borrados = limpieza.eliminar(List.of("/uploads/b.webp"));
+
+        assertThat(borrados).isZero();
+        verify(storageService, never()).eliminar(any());
+    }
+
+    @Test
+    void eliminar_archivoReferenciadoComoImagenDeServicio_noLoBorra() {
+        when(imagenRepository.existsByUrl("/uploads/servicio.webp")).thenReturn(false);
+        when(usuarioRepository.existeUrlEnPerfil("/uploads/servicio.webp")).thenReturn(false);
+        when(servicioRepository.existsByImagenPortada("/uploads/servicio.webp")).thenReturn(true);
+
+        int borrados = limpieza.eliminar(List.of("/uploads/servicio.webp"));
+
+        assertThat(borrados).isZero();
+        verify(storageService, never()).eliminar(any());
+    }
+
+    @Test
+    void eliminar_archivoReferenciadoEnGaleriaDeServicio_noLoBorra() {
+        when(imagenRepository.existsByUrl("/uploads/galeria.webp")).thenReturn(false);
+        when(usuarioRepository.existeUrlEnPerfil("/uploads/galeria.webp")).thenReturn(false);
+        when(servicioImagenRepository.existsByUrl("/uploads/galeria.webp")).thenReturn(true);
+
+        int borrados = limpieza.eliminar(List.of("/uploads/galeria.webp"));
 
         assertThat(borrados).isZero();
         verify(storageService, never()).eliminar(any());
@@ -86,10 +118,14 @@ class LimpiezaArchivosServiceTest {
         when(usuarioRepository.findUrlsFotoPerfil()).thenReturn(List.of("/uploads/avatar.webp"));
         when(usuarioRepository.findUrlsFotoPerfilMiniatura()).thenReturn(Collections.emptyList());
         when(usuarioRepository.findUrlsBanner()).thenReturn(Collections.emptyList());
+        when(servicioRepository.findImagenesPortada()).thenReturn(List.of("/uploads/servicio.webp"));
+        when(servicioImagenRepository.findUrls()).thenReturn(List.of("/uploads/galeria.webp"));
         when(storageService.eliminarHuerfanos(any(), any())).thenAnswer(invocacion -> {
             Predicate<String> enUso = invocacion.getArgument(0);
             assertThat(enUso.test("/uploads/viva.webp")).isTrue();
             assertThat(enUso.test("/uploads/avatar.webp")).isTrue();
+            assertThat(enUso.test("/uploads/servicio.webp")).isTrue();
+            assertThat(enUso.test("/uploads/galeria.webp")).isTrue();
             assertThat(enUso.test("/uploads/huerfana.webp")).isFalse();
             Duration antiguedad = invocacion.getArgument(1);
             assertThat(antiguedad).isEqualTo(LimpiezaArchivosService.ANTIGUEDAD_HUERFANOS);

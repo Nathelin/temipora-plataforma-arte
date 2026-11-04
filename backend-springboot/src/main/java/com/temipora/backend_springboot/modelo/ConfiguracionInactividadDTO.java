@@ -2,6 +2,9 @@ package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -46,6 +49,10 @@ public class ConfiguracionInactividadDTO {
     @Min(1)
     private int maxUsuariosPorCorrida;
 
+    @NotNull
+    @JsonFormat(pattern = "HH:mm")
+    private LocalTime horaEjecucion;
+
     private LocalDateTime fechaActualizacion;
 
     public static ConfiguracionInactividadDTO desdeEntidad(
@@ -59,6 +66,7 @@ public class ConfiguracionInactividadDTO {
             .vigenciaHoras(config.getVigenciaHoras())
             .maxOfertasPorUsuario(config.getMaxOfertasPorUsuario())
             .maxUsuariosPorCorrida(config.getMaxUsuariosPorCorrida())
+            .horaEjecucion(config.getHoraEjecucion())
             .fechaActualizacion(config.getFechaActualizacion())
             .build();
     }

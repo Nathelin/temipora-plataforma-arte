@@ -2,6 +2,7 @@ package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -47,6 +48,12 @@ public class ConfiguracionInactividad {
 
     @Column(name = "max_usuarios_por_corrida", nullable = false)
     private int maxUsuariosPorCorrida = 50;
+
+    @Column(name = "hora_ejecucion", nullable = false)
+    private LocalTime horaEjecucion = LocalTime.of(9, 0);
+
+    @Column(name = "ultima_corrida_programada")
+    private LocalDateTime ultimaCorridaProgramada;
 
     @Column(name = "fecha_actualizacion")
     private LocalDateTime fechaActualizacion;

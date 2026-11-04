@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 
 import com.temipora.backend_springboot.repositorios.ImagenRepository;
 import com.temipora.backend_springboot.repositorios.RespuestaRepository;
+import com.temipora.backend_springboot.repositorios.ServicioImagenRepository;
+import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 @Service
@@ -21,15 +23,21 @@ public class LimpiezaArchivosService {
     private final ImagenRepository imagenRepository;
     private final UsuarioRepository usuarioRepository;
     private final RespuestaRepository respuestaRepository;
+    private final ServicioRepository servicioRepository;
+    private final ServicioImagenRepository servicioImagenRepository;
 
     public LimpiezaArchivosService(StorageService storageService,
             ImagenRepository imagenRepository,
             UsuarioRepository usuarioRepository,
-            RespuestaRepository respuestaRepository) {
+            RespuestaRepository respuestaRepository,
+            ServicioRepository servicioRepository,
+            ServicioImagenRepository servicioImagenRepository) {
         this.storageService = storageService;
         this.imagenRepository = imagenRepository;
         this.usuarioRepository = usuarioRepository;
         this.respuestaRepository = respuestaRepository;
+        this.servicioRepository = servicioRepository;
+        this.servicioImagenRepository = servicioImagenRepository;
     }
 
     /**
@@ -69,12 +77,16 @@ public class LimpiezaArchivosService {
         respuestaRepository.findRespuestasByTipoCampoCodigo(TIPO_CAMPO_IMAGEN).stream()
             .filter(url -> url != null && !url.isBlank())
             .forEach(referenciadas::add);
+        servicioRepository.findImagenesPortada().forEach(referenciadas::add);
+        servicioImagenRepository.findUrls().forEach(referenciadas::add);
         return storageService.eliminarHuerfanos(referenciadas::contains, ANTIGUEDAD_HUERFANOS);
     }
 
     public boolean enUso(String url) {
         return imagenRepository.existsByUrl(url)
             || usuarioRepository.existeUrlEnPerfil(url)
-            || respuestaRepository.existsByRespuestaAndTipoCampoCodigo(url, TIPO_CAMPO_IMAGEN);
+            || respuestaRepository.existsByRespuestaAndTipoCampoCodigo(url, TIPO_CAMPO_IMAGEN)
+            || servicioRepository.existsByImagenPortada(url)
+            || servicioImagenRepository.existsByUrl(url);
     }
 }
