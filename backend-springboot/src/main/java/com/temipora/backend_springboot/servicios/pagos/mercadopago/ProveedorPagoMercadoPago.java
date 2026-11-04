@@ -151,7 +151,8 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
             MercadoPagoEstados.mapear(pagoMp.status()),
             pagoMp.id() != null ? String.valueOf(pagoMp.id()) : null,
             pagoMp.status(),
-            pagoMp.statusDetail()));
+            pagoMp.statusDetail(),
+            MercadoPagoEstados.datos(pagoMp)));
     }
 
     private String tokenVendedor(Pago pago) {

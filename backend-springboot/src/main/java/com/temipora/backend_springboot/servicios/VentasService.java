@@ -8,6 +8,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.NoSuchElementException;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -34,12 +35,15 @@ public class VentasService {
     private static final int TAMANIO_MAXIMO = 50;
 
     private final PagoRepository pagoRepository;
+    private final PagoService pagoService;
     private final MonedaVistaService monedaVistaService;
 
     public VentasService(
             PagoRepository pagoRepository,
+            PagoService pagoService,
             MonedaVistaService monedaVistaService) {
         this.pagoRepository = pagoRepository;
+        this.pagoService = pagoService;
         this.monedaVistaService = monedaVistaService;
     }
 
@@ -68,6 +72,24 @@ public class VentasService {
             .totalPaginas(page.getTotalPages())
             .hayMas(page.hasNext())
             .build();
+    }
+
+    @Transactional
+    public VentaDTO sincronizar(Long idArtista, Long idPago) {
+        Pago pago = pagoRepository.findByIdPagoConPedido(idPago)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Pago no encontrado: " + idPago));
+        Pedido pedido = pago.getHitoPedido().getPedido();
+        if (pedido.getArtista() == null
+                || !idArtista.equals(pedido.getArtista().getIdUsuario())) {
+            throw new AccesoDenegadoException(
+                "No podés sincronizar esta venta.");
+        }
+        pagoService.sincronizar(idPago);
+        Pago actualizado = pagoRepository.findByIdPagoConPedido(idPago)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Pago no encontrado: " + idPago));
+        return dto(actualizado, monedaVistaService.preferidaDe(idArtista));
     }
 
     private Specification<Pago> filtro(
@@ -133,6 +155,15 @@ public class VentasService {
             .montoNetoCobro(pago.getMontoNetoCobro())
             .netoMostrado(netoMostrado)
             .monedaMostrada(mostrada != null ? mostrada.getCodigo() : null)
+            .arancelMp(pago.getArancelMp())
+            .netoRecibidoMp(pago.getNetoRecibidoMp())
+            .fechaAprobacion(pago.getFechaAprobacion())
+            .fechaLiberacion(pago.getFechaLiberacion())
+            .medioPago(pago.getMedioPago())
+            .tipoMedioPago(pago.getTipoMedioPago())
+            .cuotas(pago.getCuotas())
+            .ultimosCuatro(pago.getUltimosCuatro())
+            .puedeSincronizar(pago.getIdPagoExterno() != null)
             .proveedor(pago.getProveedor())
             .build();
     }

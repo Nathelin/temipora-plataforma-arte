@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +43,8 @@ class VentasServiceTest {
     @Mock
     private PagoRepository pagoRepository;
     @Mock
+    private PagoService pagoService;
+    @Mock
     private MonedaVistaService monedaVistaService;
 
     @InjectMocks
@@ -69,6 +73,15 @@ class VentasServiceTest {
         assertThat(venta.getEstado()).isEqualTo(EstadoPago.APROBADO.name());
         assertThat(venta.getNetoMostrado())
             .isEqualByComparingTo("100.00");
+        assertThat(venta.getArancelMp())
+            .isEqualByComparingTo("4.50");
+        assertThat(venta.getNetoRecibidoMp())
+            .isEqualByComparingTo("45.50");
+        assertThat(venta.getMedioPago()).isEqualTo("visa");
+        assertThat(venta.getTipoMedioPago()).isEqualTo("credit_card");
+        assertThat(venta.getCuotas()).isEqualTo(3);
+        assertThat(venta.getUltimosCuatro()).isEqualTo("1234");
+        assertThat(venta.isPuedeSincronizar()).isTrue();
     }
 
     @Test
@@ -119,6 +132,30 @@ class VentasServiceTest {
             .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void sincronizar_validaElArtistaYDelega() {
+        Pago pago = pago(30L, "cliente1", "Ilustración");
+        pago.getHitoPedido().getPedido().setArtista(artista(ARTISTA));
+        when(pagoRepository.findByIdPagoConPedido(30L))
+            .thenReturn(Optional.of(pago));
+
+        VentaDTO venta = ventasService.sincronizar(ARTISTA, 30L);
+
+        assertThat(venta.getIdPago()).isEqualTo(30L);
+        verify(pagoService).sincronizar(30L);
+    }
+
+    @Test
+    void sincronizar_deOtroArtistaFalla() {
+        Pago pago = pago(30L, "cliente1", "Ilustración");
+        pago.getHitoPedido().getPedido().setArtista(artista(99L));
+        when(pagoRepository.findByIdPagoConPedido(30L))
+            .thenReturn(Optional.of(pago));
+
+        assertThatThrownBy(() -> ventasService.sincronizar(ARTISTA, 30L))
+            .isInstanceOf(AccesoDenegadoException.class);
+    }
+
     private Pago pago(Long id, String usuarioCliente, String servicio) {
         Servicio entidadServicio = new Servicio();
         entidadServicio.setNombre(servicio);
@@ -148,8 +185,23 @@ class VentasServiceTest {
         pago.setMontoNetoCobro(new BigDecimal("100.00"));
         pago.setEstado(EstadoPago.APROBADO);
         pago.setProveedor("MERCADOPAGO");
+        pago.setIdPagoExterno("mp-30");
         pago.setFechaCreacion(LocalDateTime.of(2026, 11, 2, 10, 0));
+        pago.setFechaAprobacion(LocalDateTime.of(2026, 11, 2, 10, 5));
+        pago.setFechaLiberacion(LocalDateTime.of(2026, 11, 5, 10, 0));
+        pago.setArancelMp(new BigDecimal("4.50"));
+        pago.setNetoRecibidoMp(new BigDecimal("45.50"));
+        pago.setMedioPago("visa");
+        pago.setTipoMedioPago("credit_card");
+        pago.setCuotas(3);
+        pago.setUltimosCuatro("1234");
         return pago;
+    }
+
+    private Usuario artista(Long id) {
+        Usuario artista = new Usuario();
+        artista.setIdUsuario(id);
+        return artista;
     }
 
     private Moneda moneda(String codigo) {

@@ -3,6 +3,8 @@ package com.temipora.backend_springboot.controladores;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -48,6 +50,15 @@ public class PanelArtistaController {
             @RequestParam(defaultValue = "10") int tamanio) {
         return ventasService.listar(
             idArtista(authentication), estado, mes, idServicio, pagina, tamanio);
+    }
+
+    @PostMapping("/ventas/{idPago}/sincronizar")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public VentaDTO sincronizar(
+            Authentication authentication,
+            @PathVariable Long idPago) {
+        return ventasService.sincronizar(
+            idArtista(authentication), idPago);
     }
 
     private Long idArtista(Authentication authentication) {

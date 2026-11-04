@@ -34,5 +34,14 @@ public class VentaDTO {
     private BigDecimal montoNetoCobro;
     private BigDecimal netoMostrado;
     private String monedaMostrada;
+    private BigDecimal arancelMp;
+    private BigDecimal netoRecibidoMp;
+    private LocalDateTime fechaAprobacion;
+    private LocalDateTime fechaLiberacion;
+    private String medioPago;
+    private String tipoMedioPago;
+    private Integer cuotas;
+    private String ultimosCuatro;
+    private boolean puedeSincronizar;
     private String proveedor;
 }

@@ -36,3 +36,51 @@ export function estadoVentaDe(estado) {
     clase: 'border-rosa bg-blanco text-cafe/60',
   }
 }
+
+const TIPOS_MEDIO_PAGO = {
+  credit_card: 'Tarjeta de crédito',
+  debit_card: 'Tarjeta de débito',
+  account_money: 'Dinero en cuenta',
+  bank_transfer: 'Transferencia',
+  ticket: 'Efectivo',
+  atm: 'Cajero automático',
+}
+
+const MARCAS = {
+  visa: 'Visa',
+  master: 'Mastercard',
+  amex: 'American Express',
+  debvisa: 'Visa débito',
+  debmaster: 'Mastercard débito',
+  maestro: 'Maestro',
+  cabal: 'Cabal',
+  naranja: 'Naranja X',
+}
+
+function capitalizar(texto) {
+  if (!texto) return ''
+  return texto.charAt(0).toUpperCase() + texto.slice(1)
+}
+
+export function descripcionMedioPago(venta) {
+  if (!venta) return '—'
+  const tipo = TIPOS_MEDIO_PAGO[venta.tipoMedioPago] || null
+  const marca = MARCAS[venta.medioPago]
+    || (venta.medioPago ? capitalizar(venta.medioPago) : null)
+
+  if (venta.tipoMedioPago === 'credit_card'
+    || venta.tipoMedioPago === 'debit_card') {
+    const partes = [marca]
+    if (venta.ultimosCuatro) partes.push(`•••• ${venta.ultimosCuatro}`)
+    if (Number(venta.cuotas) > 1) partes.push(`${venta.cuotas} cuotas`)
+    return partes.filter(Boolean).join(' · ') || tipo || '—'
+  }
+
+  return tipo || marca || '—'
+}
+
+export function necesitaSincronizar(venta) {
+  return Boolean(venta?.puedeSincronizar)
+    && venta.estado === 'APROBADO'
+    && !venta.fechaAprobacion
+}

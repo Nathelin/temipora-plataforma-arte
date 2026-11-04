@@ -93,4 +93,27 @@ public class Pago {
 
     @Column(name = "fecha_acreditacion")
     private LocalDateTime fechaAcreditacion;
+
+    @Column(name = "arancel_mp", precision = 12, scale = 2)
+    private BigDecimal arancelMp;
+
+    @Column(name = "neto_recibido_mp", precision = 12, scale = 2)
+    private BigDecimal netoRecibidoMp;
+
+    @Column(name = "fecha_aprobacion")
+    private LocalDateTime fechaAprobacion;
+
+    @Column(name = "fecha_liberacion")
+    private LocalDateTime fechaLiberacion;
+
+    @Column(name = "medio_pago", length = 40)
+    private String medioPago;
+
+    @Column(name = "tipo_medio_pago", length = 30)
+    private String tipoMedioPago;
+
+    private Integer cuotas;
+
+    @Column(name = "ultimos_cuatro", length = 4)
+    private String ultimosCuatro;
 }

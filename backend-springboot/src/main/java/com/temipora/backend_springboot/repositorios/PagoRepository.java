@@ -72,13 +72,4 @@ public interface PagoRepository
         @Param("estado") EstadoPago estado,
         @Param("desde") LocalDateTime desde,
         @Param("hasta") LocalDateTime hasta);
-
-    @Query("""
-        select coalesce(sum(p.montoNetoCobro), 0) from Pago p
-        where p.hitoPedido.pedido.artista.idUsuario = :idArtista
-          and p.estado = :estado
-        """)
-    BigDecimal sumarNetoDeArtista(
-        @Param("idArtista") Long idArtista,
-        @Param("estado") EstadoPago estado);
 }

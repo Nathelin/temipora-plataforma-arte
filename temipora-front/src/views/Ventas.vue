@@ -4,7 +4,12 @@ import { useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
 import { formatearFecha } from '../servicios/pedidos'
-import { FILTROS_ESTADO_VENTA, estadoVentaDe } from '../servicios/ventas'
+import {
+  FILTROS_ESTADO_VENTA,
+  descripcionMedioPago,
+  estadoVentaDe,
+  necesitaSincronizar,
+} from '../servicios/ventas'
 import { usePanelArtista } from '../composables/usePanelArtista'
 
 const router = useRouter()
@@ -23,6 +28,8 @@ const totalPaginas = ref(0)
 const hayMas = ref(false)
 const cargando = ref(true)
 const error = ref('')
+const errorAccion = ref('')
+const sincronizando = ref([])
 const servicios = ref([])
 
 const tarjetas = computed(() => [
@@ -41,11 +48,6 @@ const tarjetas = computed(() => [
     valor: formatearPrecio(dinero.value.porCobrar, dinero.value.monedaMostrada),
     detalle: 'Cuotas pendientes de pago en pedidos activos.',
   },
-  {
-    etiqueta: 'Pendiente de acreditar',
-    valor: formatearPrecio(dinero.value.pendienteAcreditar, dinero.value.monedaMostrada),
-    detalle: 'Pagos iniciados que todavía no se acreditaron.',
-  },
 ])
 
 const hayFiltros = computed(
@@ -55,12 +57,48 @@ const paginaMostrada = computed(() => (totalPaginas.value ? pagina.value + 1 : 0
 const puedeAnterior = computed(() => pagina.value > 0)
 const puedeSiguiente = computed(() => hayMas.value)
 
-function monedaDe(venta) {
+function monedaNetoDe(venta) {
+  if (venta.netoRecibidoMp != null) return venta.monedaCobro
   return venta.monedaMostrada || venta.monedaCobro
 }
 
 function netoDe(venta) {
-  return venta.netoMostrado ?? venta.montoNetoCobro
+  return venta.netoRecibidoMp ?? venta.netoMostrado ?? venta.montoNetoCobro
+}
+
+function liberacionDe(venta) {
+  return venta.fechaLiberacion || venta.fechaAcreditacion
+}
+
+function estaSincronizando(idPago) {
+  return sincronizando.value.includes(idPago)
+}
+
+async function sincronizarVenta(venta) {
+  if (!venta?.puedeSincronizar || estaSincronizando(venta.idPago)) return
+  sincronizando.value = [...sincronizando.value, venta.idPago]
+  errorAccion.value = ''
+  try {
+    const res = await api.post(
+      `/panel-artista/ventas/${venta.idPago}/sincronizar`,
+    )
+    const actualizado = res.data
+    if (actualizado) {
+      const indice = ventas.value.findIndex(
+        (item) => item.idPago === venta.idPago,
+      )
+      if (indice >= 0) {
+        ventas.value[indice] = actualizado
+      }
+    }
+  } catch (e) {
+    errorAccion.value = e.response?.data?.message
+      || 'No se pudieron actualizar los datos de MercadoPago.'
+  } finally {
+    sincronizando.value = sincronizando.value.filter(
+      (id) => id !== venta.idPago,
+    )
+  }
 }
 
 async function cargar() {
@@ -148,7 +186,7 @@ onMounted(() => {
       </span>
     </header>
 
-    <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <div
         v-for="tarjeta in tarjetas"
         :key="tarjeta.etiqueta"
@@ -216,6 +254,14 @@ onMounted(() => {
       </button>
     </div>
 
+    <p
+      v-if="errorAccion"
+      class="mt-4 rounded-xl border border-rojizo/25 bg-rojizo/5 px-4 py-3 text-sm text-rojizo"
+      role="alert"
+    >
+      {{ errorAccion }}
+    </p>
+
     <div v-if="cargando" class="mt-6 space-y-3" role="status" aria-live="polite">
       <span class="sr-only">Cargando ventas...</span>
       <div
@@ -262,7 +308,7 @@ onMounted(() => {
     </div>
 
     <div v-else class="mt-6">
-      <div class="hidden overflow-hidden rounded-2xl border border-rosa/60 bg-blanco md:block">
+      <div class="hidden overflow-x-auto rounded-2xl border border-rosa/60 bg-blanco md:block">
         <table class="min-w-full text-sm">
           <thead class="bg-rosa/20 text-left text-xs uppercase tracking-wide text-cafe/60">
             <tr>
@@ -271,9 +317,11 @@ onMounted(() => {
               <th class="px-4 py-3 font-semibold">Servicio / hito</th>
               <th class="px-4 py-3 text-right font-semibold">Cobrado</th>
               <th class="px-4 py-3 text-right font-semibold">Comisión</th>
-              <th class="px-4 py-3 text-right font-semibold">Neto</th>
+              <th class="px-4 py-3 text-right font-semibold">Arancel MP</th>
+              <th class="px-4 py-3 text-right font-semibold">Recibís</th>
+              <th class="px-4 py-3 font-semibold">Medio de pago</th>
               <th class="px-4 py-3 font-semibold">Estado</th>
-              <th class="px-4 py-3 font-semibold">Acreditado</th>
+              <th class="px-4 py-3 font-semibold">Liberación</th>
             </tr>
           </thead>
           <tbody>
@@ -303,8 +351,25 @@ onMounted(() => {
               <td class="px-4 py-3 text-right whitespace-nowrap text-cafe/60">
                 {{ formatearPrecio(venta.comisionMontoCobro, venta.monedaCobro) }}
               </td>
+              <td class="px-4 py-3 text-right whitespace-nowrap">
+                <span class="block text-cafe/70">
+                  {{ formatearPrecio(venta.arancelMp, venta.monedaCobro) }}
+                </span>
+                <button
+                  v-if="necesitaSincronizar(venta)"
+                  type="button"
+                  :disabled="estaSincronizando(venta.idPago)"
+                  class="mt-0.5 text-[11px] font-semibold text-coral underline-offset-2 transition hover:text-rojizo hover:underline disabled:opacity-50"
+                  @click="sincronizarVenta(venta)"
+                >
+                  {{ estaSincronizando(venta.idPago) ? 'Actualizando...' : 'Actualizar' }}
+                </button>
+              </td>
               <td class="px-4 py-3 text-right whitespace-nowrap font-semibold text-granate">
-                {{ formatearPrecio(netoDe(venta), monedaDe(venta)) }}
+                {{ formatearPrecio(netoDe(venta), monedaNetoDe(venta)) }}
+              </td>
+              <td class="px-4 py-3 whitespace-nowrap text-cafe/70">
+                {{ descripcionMedioPago(venta) }}
               </td>
               <td class="px-4 py-3">
                 <span
@@ -315,7 +380,7 @@ onMounted(() => {
                 </span>
               </td>
               <td class="px-4 py-3 whitespace-nowrap text-cafe/60">
-                {{ formatearFecha(venta.fechaAcreditacion) }}
+                {{ formatearFecha(liberacionDe(venta)) }}
               </td>
             </tr>
           </tbody>
@@ -351,9 +416,9 @@ onMounted(() => {
               <dd class="text-cafe/75">@{{ venta.nombreUsuarioCliente || 'usuario' }}</dd>
             </div>
             <div class="text-right">
-              <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Neto</dt>
+              <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Recibís</dt>
               <dd class="font-semibold text-granate">
-                {{ formatearPrecio(netoDe(venta), monedaDe(venta)) }}
+                {{ formatearPrecio(netoDe(venta), monedaNetoDe(venta)) }}
               </dd>
             </div>
             <div>
@@ -368,14 +433,41 @@ onMounted(() => {
                 {{ formatearPrecio(venta.comisionMontoCobro, venta.monedaCobro) }}
               </dd>
             </div>
+            <div>
+              <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Arancel MP</dt>
+              <dd class="text-cafe/60">
+                {{ formatearPrecio(venta.arancelMp, venta.monedaCobro) }}
+              </dd>
+            </div>
+            <div class="text-right">
+              <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Liberación</dt>
+              <dd class="text-cafe/60">
+                {{ formatearFecha(liberacionDe(venta)) }}
+              </dd>
+            </div>
           </dl>
 
-          <router-link
-            :to="{ name: 'panel-pedido-detalle', params: { idPedido: venta.idPedido } }"
-            class="mt-3 inline-flex text-sm font-semibold text-coral transition hover:text-rojizo"
-          >
-            Ver pedido
-          </router-link>
+          <p class="mt-2 text-xs text-cafe/55">
+            Medio de pago: {{ descripcionMedioPago(venta) }}
+          </p>
+
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <router-link
+              :to="{ name: 'panel-pedido-detalle', params: { idPedido: venta.idPedido } }"
+              class="inline-flex text-sm font-semibold text-coral transition hover:text-rojizo"
+            >
+              Ver pedido
+            </router-link>
+            <button
+              v-if="necesitaSincronizar(venta)"
+              type="button"
+              :disabled="estaSincronizando(venta.idPago)"
+              class="text-sm font-semibold text-cafe/60 underline-offset-2 transition hover:text-granate hover:underline disabled:opacity-50"
+              @click="sincronizarVenta(venta)"
+            >
+              {{ estaSincronizando(venta.idPago) ? 'Actualizando...' : 'Actualizar datos de MP' }}
+            </button>
+          </div>
         </li>
       </ul>
 

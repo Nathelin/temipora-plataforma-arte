@@ -6,5 +6,6 @@ public record EstadoCobroProveedor(
         EstadoPago estado,
         String idPagoExterno,
         String estadoExterno,
-        String detalle) {
+        String detalle,
+        DatosPagoProveedor datos) {
 }

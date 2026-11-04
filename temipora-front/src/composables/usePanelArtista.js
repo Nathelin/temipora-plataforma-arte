@@ -19,7 +19,6 @@ const DINERO_VACIO = {
   porCobrar: 0,
   cobradoMes: 0,
   cobradoTotal: 0,
-  pendienteAcreditar: 0,
   monedaMostrada: null,
 }
 

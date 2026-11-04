@@ -25,6 +25,7 @@ import com.temipora.backend_springboot.modelo.Pago;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.servicios.pagos.DatosPagoProveedor;
 import com.temipora.backend_springboot.servicios.pagos.EstadoCobroProveedor;
 import com.temipora.backend_springboot.servicios.pagos.ResultadoCobro;
 
@@ -158,7 +159,17 @@ class ProveedorPagoMercadoPagoTest {
             new MercadoPagoPago(
                 123L, "approved", "accredited",
                 new BigDecimal("50.00"), "ARS", "30", "visa",
-                "credit_card", null)));
+                "credit_card", "2026-11-02T10:00:00.000-03:00",
+                "2026-11-05T10:00:00.000-03:00", "released",
+                new MercadoPagoPago.TransactionDetails(
+                    new BigDecimal("45.50"), new BigDecimal("50.00")),
+                List.of(
+                    new MercadoPagoPago.FeeDetail(
+                        "mercadopago_fee", new BigDecimal("4.50"),
+                        "collector"),
+                    new MercadoPagoPago.FeeDetail(
+                        "financing_fee", new BigDecimal("1.00"), "payer")),
+                3, new MercadoPagoPago.Card("1234"))));
 
         Optional<EstadoCobroProveedor> estado =
             proveedor.consultarEstado(nuevoPago());
@@ -166,6 +177,17 @@ class ProveedorPagoMercadoPagoTest {
         assertThat(estado).isPresent();
         assertThat(estado.get().estado()).isEqualTo(EstadoPago.APROBADO);
         assertThat(estado.get().idPagoExterno()).isEqualTo("123");
+
+        DatosPagoProveedor datos = estado.get().datos();
+        assertThat(datos).isNotNull();
+        assertThat(datos.arancel()).isEqualByComparingTo("4.50");
+        assertThat(datos.netoRecibido()).isEqualByComparingTo("45.50");
+        assertThat(datos.fechaAprobacion()).isNotNull();
+        assertThat(datos.fechaLiberacion()).isNotNull();
+        assertThat(datos.medioPago()).isEqualTo("visa");
+        assertThat(datos.tipoMedioPago()).isEqualTo("credit_card");
+        assertThat(datos.cuotas()).isEqualTo(3);
+        assertThat(datos.ultimosCuatro()).isEqualTo("1234");
     }
 
     @Test
