@@ -59,6 +59,7 @@ public class ServicioDTO {
     private Long cantidadResenias;
     private Long idOferta;
     private BigDecimal descuentoOfertaPorcentaje;
+    private BigDecimal precioConDescuentoEstimado;
     private LocalDateTime pausadoEn;
     private LocalDateTime archivadoEn;
 

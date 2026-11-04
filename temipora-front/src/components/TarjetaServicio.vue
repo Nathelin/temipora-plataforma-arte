@@ -42,6 +42,12 @@ const descuentoOferta = computed(() => {
   const valor = Number(props.servicio.descuentoOfertaPorcentaje)
   return Number.isFinite(valor) && valor > 0 ? valor : 0
 })
+const precioConDescuentoMostrado = computed(() =>
+  formatearPrecio(
+    props.servicio.precioConDescuentoEstimado,
+    props.servicio.monedaMostrada ?? props.servicio.moneda,
+  ),
+)
 
 const destino = computed(() => ({
   name: 'servicio-detalle',
@@ -152,7 +158,16 @@ function textoEntrega(s) {
       <div class="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-t border-borde/40 pt-3">
         <p class="font-display text-lg font-extrabold leading-none text-coral">
           <span class="mr-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-cafe/45">Desde</span>
-          {{ precioMostrado }}
+          <span :title="descuentoOferta ? 'Precio estimado con tu descuento sobre el presupuesto final' : undefined">
+            {{ descuentoOferta ? precioConDescuentoMostrado : precioMostrado }}
+          </span>
+          <span
+            v-if="descuentoOferta"
+            class="ml-1 text-[10px] font-semibold text-cafe/60 line-through"
+            :title="`Precio base: ${precioMostrado}`"
+          >
+            {{ precioMostrado }}
+          </span>
           <span v-if="precioConvertido" class="text-xs text-cafe/40" :title="`Precio original: ${formatearPrecio(servicio.precioBase, servicio.moneda)}`">≈</span>
         </p>
 
