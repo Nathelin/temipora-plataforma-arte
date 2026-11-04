@@ -173,6 +173,45 @@ class AuditoriaServiceTest {
     }
 
     @Test
+    void registrarIntentoFallido_guardaElUsuarioIntentado() {
+        auditoriaService.registrarIntentoFallido("  artista777  ");
+
+        EventoAuditoria evento = capturarGuardado();
+        assertThat(evento.getAccion()).isEqualTo(AccionesAdmin.LOGIN_FALLIDO);
+        assertThat(evento.getActorNombre()).isEqualTo("artista777");
+        assertThat(evento.getOrigen()).isEqualTo("SISTEMA");
+        assertThat(evento.getResumen()).contains("artista777");
+    }
+
+    @Test
+    void listar_cuentaLosEventosDeLaMismaOperacion() {
+        EventoAuditoria uno = new EventoAuditoria();
+        uno.setIdEventoAuditoria(1L);
+        uno.setRequestId("req-1");
+        uno.setAccion("PEDIDO_CREAR");
+        uno.setCambios("[]");
+        EventoAuditoria dos = new EventoAuditoria();
+        dos.setIdEventoAuditoria(2L);
+        dos.setRequestId("req-1");
+        dos.setAccion("PAGO_INICIAR");
+        dos.setCambios("[]");
+        when(eventoRepository.findAll(
+                org.mockito.ArgumentMatchers.<Specification<EventoAuditoria>>any(),
+                any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(uno, dos)));
+        when(eventoRepository.contarPorRequestIds(any()))
+            .thenReturn(List.<Object[]>of(new Object[] { "req-1", 2L }));
+
+        var pagina = auditoriaService.listar(
+            new FiltroAuditoria(
+                null, null, null, null, null, null, null, null, null, null, null),
+            0, 20);
+
+        assertThat(pagina.getContenido())
+            .allSatisfy(dto -> assertThat(dto.eventosOperacion()).isEqualTo(2));
+    }
+
+    @Test
     void opciones_devuelveLosValoresDelRepositorio() {
         when(eventoRepository.entidadesRegistradas()).thenReturn(List.of("Etiqueta"));
         when(eventoRepository.accionesRegistradas()).thenReturn(List.of("ETIQUETA_APROBAR"));

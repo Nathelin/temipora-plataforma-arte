@@ -218,7 +218,8 @@ class AuditoriaAdminControllerTest {
             "ADMIN",
             "OK",
             "CATALOGO",
-            false);
+            false,
+            1L);
     }
 
     @Test

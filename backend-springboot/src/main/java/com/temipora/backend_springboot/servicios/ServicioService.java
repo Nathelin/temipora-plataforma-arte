@@ -491,6 +491,17 @@ public class ServicioService {
             if (oferta != null) {
                 dto.setIdOferta(oferta.idOferta());
                 dto.setDescuentoOfertaPorcentaje(oferta.porcentajeDescuento());
+                BigDecimal base = dto.getPrecioBaseMostrado() != null
+                    ? dto.getPrecioBaseMostrado()
+                    : dto.getPrecioBase();
+                if (base != null) {
+                    BigDecimal descuento = base
+                        .multiply(oferta.porcentajeDescuento())
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                    dto.setPrecioConDescuentoEstimado(
+                        base.subtract(descuento).max(BigDecimal.ZERO)
+                            .setScale(2, RoundingMode.HALF_UP));
+                }
             }
         }
     }

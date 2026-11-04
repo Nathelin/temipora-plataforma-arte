@@ -166,12 +166,12 @@ async function copiarRequestId() {
         Ver historial de esta entidad
       </button>
       <button
-        v-if="evento.requestId"
+        v-if="evento.requestId && evento.eventosOperacion > 1"
         type="button"
         class="rounded-md py-1 text-left text-xs font-semibold text-coral transition-colors hover:text-granate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 motion-reduce:transition-none"
         @click="emit('filtrar', { tipo: 'requestId', valor: evento.requestId })"
       >
-        Ver toda la operación
+        Ver toda la operación ({{ evento.eventosOperacion }} eventos)
       </button>
     </section>
   </div>

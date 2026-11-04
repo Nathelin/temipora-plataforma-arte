@@ -145,6 +145,17 @@ const precioConvertido = computed(
     !!servicio.value?.monedaMostrada &&
     servicio.value.monedaMostrada !== servicio.value.moneda,
 )
+const descuentoPorcentaje = computed(() => {
+  const valor = Number(servicio.value?.descuentoOfertaPorcentaje)
+  return Number.isFinite(valor) && valor > 0 ? valor : 0
+})
+const precioConDescuentoMostrado = computed(() =>
+  formatearPrecio(
+    servicio.value?.precioConDescuentoEstimado,
+    servicio.value?.monedaMostrada ?? servicio.value?.moneda,
+  ),
+)
+const notaDescuento = 'El descuento se aplica sobre el presupuesto final que envíe el artista. Si agrega recargos, también se calculan sobre el total. El precio mostrado es un estimado sobre el precio base.'
 
 const cuposDisponibles = computed(() => {
   if (disponibilidad.value?.cuposDisponibles != null) {
@@ -684,8 +695,42 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
 
           <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div class="rounded-[22px] bg-mantequilla/70 px-4 py-4">
-              <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/90">Precio base</p>
-              <p class="mt-1 font-display text-3xl font-extrabold text-granate">{{ precioMostrado }}</p>
+              <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/90">
+                {{ descuentoPorcentaje ? 'Precio con tu descuento' : 'Precio base' }}
+              </p>
+              <div class="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <p class="font-display text-3xl font-extrabold text-granate">
+                  {{ descuentoPorcentaje ? precioConDescuentoMostrado : precioMostrado }}
+                </p>
+                <p
+                  v-if="descuentoPorcentaje"
+                  class="text-lg font-semibold text-cafe/70 line-through decoration-cafe/50"
+                  :title="`Precio base: ${precioMostrado}`"
+                >
+                  {{ precioMostrado }}
+                </p>
+              </div>
+              <div v-if="descuentoPorcentaje" class="mt-1 flex items-center gap-1.5">
+                <p class="text-xs font-bold text-coral">
+                  {{ descuentoPorcentaje }}% de descuento
+                </p>
+                <span class="group relative inline-flex">
+                  <button
+                    type="button"
+                    class="flex h-5 w-5 items-center justify-center rounded-full text-cafe/70 transition hover:bg-white/80 hover:text-granate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+                    :aria-label="notaDescuento"
+                    :title="notaDescuento"
+                  >
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" />
+                      <path stroke-linecap="round" d="M12 11v5m0-8h.01" />
+                    </svg>
+                  </button>
+                  <span class="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 w-64 -translate-x-1/2 rounded-xl bg-tinta px-3 py-2 text-xs font-normal leading-snug text-white opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-within:opacity-100">
+                    {{ notaDescuento }}
+                  </span>
+                </span>
+              </div>
               <p v-if="precioConvertido" class="mt-1 text-xs leading-snug text-cafe/85">
                 El artista lo cargó como {{ formatearPrecio(servicio.precioBase, servicio.moneda) }}
               </p>

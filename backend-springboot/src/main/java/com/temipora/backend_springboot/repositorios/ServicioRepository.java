@@ -61,6 +61,11 @@ public interface ServicioRepository extends JpaRepository<Servicio, Long>, JpaSp
 
     List<Servicio> findByEstadoOrderByArchivadoEnDesc(EstadoServicio estado);
 
+    @Query("SELECT s.imagenPortada FROM Servicio s WHERE s.imagenPortada IS NOT NULL")
+    List<String> findImagenesPortada();
+
+    boolean existsByImagenPortada(String imagenPortada);
+
     boolean existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndEstadoNot(
             Long idUsuario, Long idTipoServicio, String nombre, EstadoServicio estado);
 

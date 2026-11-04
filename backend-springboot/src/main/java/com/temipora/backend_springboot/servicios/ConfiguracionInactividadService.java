@@ -23,7 +23,8 @@ public class ConfiguracionInactividadService {
         CampoAuditado.de("porcentajeDescuento", "Descuento"),
         CampoAuditado.de("vigenciaHoras", "Vigencia de la oferta"),
         CampoAuditado.de("maxOfertasPorUsuario", "Servicios por usuario"),
-        CampoAuditado.de("maxUsuariosPorCorrida", "Usuarios por ejecución"));
+        CampoAuditado.de("maxUsuariosPorCorrida", "Usuarios por ejecución"),
+        CampoAuditado.de("horaEjecucion", "Hora de envío"));
 
     private final ConfiguracionInactividadRepository repository;
     private final ComisionService comisionService;
@@ -60,6 +61,10 @@ public class ConfiguracionInactividadService {
             throw new IllegalArgumentException(
                 "El porcentaje de descuento es obligatorio.");
         }
+        if (cambios.getHoraEjecucion() == null) {
+            throw new IllegalArgumentException(
+                "La hora de envío es obligatoria.");
+        }
         BigDecimal porcentaje = cambios.getPorcentajeDescuento()
             .setScale(2, RoundingMode.HALF_UP);
         if (porcentaje.signum() < 0
@@ -89,11 +94,19 @@ public class ConfiguracionInactividadService {
         config.setMaxOfertasPorUsuario(Math.max(1, cambios.getMaxOfertasPorUsuario()));
         config.setMaxUsuariosPorCorrida(
             Math.max(1, cambios.getMaxUsuariosPorCorrida()));
+        config.setHoraEjecucion(cambios.getHoraEjecucion());
         config.setFechaActualizacion(LocalDateTime.now());
         ConfiguracionInactividad guardada = repository.save(config);
         auditoria.registrar(
             AccionesAdmin.INACTIVIDAD_CONFIG_ACTUALIZAR, ENTIDAD, guardada.getIdConfiguracion(),
             "Actualizó la configuración de promociones por inactividad", antes, guardada, CAMPOS);
         return ConfiguracionInactividadDTO.desdeEntidad(guardada);
+    }
+
+    @Transactional
+    public void marcarCorridaProgramada(LocalDateTime momento) {
+        ConfiguracionInactividad config = obtener();
+        config.setUltimaCorridaProgramada(momento);
+        repository.save(config);
     }
 }

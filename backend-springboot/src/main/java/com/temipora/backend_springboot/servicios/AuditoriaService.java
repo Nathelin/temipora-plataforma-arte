@@ -3,8 +3,11 @@ package com.temipora.backend_springboot.servicios;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,6 +107,39 @@ public class AuditoriaService {
         }
     }
 
+    /**
+     * Login fallido: no hay sesión, pero guardamos el usuario intentado en
+     * actorNombre para poder agrupar intentos por cuenta.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void registrarIntentoFallido(String usuario) {
+        try {
+            String intento = usuario != null && !usuario.isBlank()
+                ? usuario.trim()
+                : null;
+
+            LocalDateTime ocurridoEn = LocalDateTime.now();
+            EventoAuditoria evento = new EventoAuditoria();
+            evento.setOcurridoEn(ocurridoEn);
+            evento.setAccion(AccionesAdmin.LOGIN_FALLIDO);
+            evento.setEntidad("Usuario");
+            evento.setResumen(recortar(intento == null
+                ? "Intento de inicio de sesión fallido (sin usuario)"
+                : "Intento de inicio de sesión fallido para '" + intento + "'",
+                RESUMEN_MAXIMO));
+            evento.setCambios(serializar(List.of()));
+            evento.setResultado("OK");
+            evento.setOrigen("SISTEMA");
+            evento.setActorNombre(intento != null
+                ? recortar(intento, 60)
+                : null);
+            completarRequest(evento);
+            eventoRepository.save(evento);
+        } catch (RuntimeException e) {
+            log.warn("No se pudo registrar el login fallido: {}", e.getMessage());
+        }
+    }
+
     @Transactional(readOnly = true)
     public PaginaDTO<EventoAuditoriaDTO> listar(
             FiltroAuditoria filtro,
@@ -166,8 +202,11 @@ public class AuditoriaService {
         };
 
         Page<EventoAuditoria> page = eventoRepository.findAll(especificacion, pageable);
+        Map<String, Long> operaciones = contarOperaciones(page.getContent());
         return PaginaDTO.<EventoAuditoriaDTO>builder()
-            .contenido(page.getContent().stream().map(this::aDto).toList())
+            .contenido(page.getContent().stream()
+                .map(evento -> aDto(evento, operacionDe(evento, operaciones)))
+                .toList())
             .pagina(page.getNumber())
             .tamanio(page.getSize())
             .totalElementos(page.getTotalElements())
@@ -178,10 +217,34 @@ public class AuditoriaService {
 
     @Transactional(readOnly = true)
     public EventoAuditoriaDTO obtener(Long idEvento) {
-        return eventoRepository.findById(idEvento)
-            .map(this::aDto)
+        EventoAuditoria evento = eventoRepository.findById(idEvento)
             .orElseThrow(() -> new NoSuchElementException(
                 "Evento de auditoría no encontrado: " + idEvento));
+        long operacion = evento.getRequestId() != null
+            ? eventoRepository.countByRequestId(evento.getRequestId())
+            : 1L;
+        return aDto(evento, operacion);
+    }
+
+    private Map<String, Long> contarOperaciones(List<EventoAuditoria> eventos) {
+        Set<String> requestIds = eventos.stream()
+            .map(EventoAuditoria::getRequestId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        if (requestIds.isEmpty()) {
+            return Map.of();
+        }
+        return eventoRepository.contarPorRequestIds(requestIds).stream()
+            .collect(Collectors.toMap(
+                fila -> (String) fila[0],
+                fila -> ((Number) fila[1]).longValue()));
+    }
+
+    private long operacionDe(
+            EventoAuditoria evento, Map<String, Long> operaciones) {
+        return evento.getRequestId() != null
+            ? operaciones.getOrDefault(evento.getRequestId(), 1L)
+            : 1L;
     }
 
     @Transactional(readOnly = true)
@@ -259,7 +322,8 @@ public class AuditoriaService {
         evento.setRequestId(requestId != null ? String.valueOf(requestId) : null);
     }
 
-    private EventoAuditoriaDTO aDto(EventoAuditoria evento) {
+    private EventoAuditoriaDTO aDto(
+            EventoAuditoria evento, long eventosOperacion) {
         return new EventoAuditoriaDTO(
             evento.getIdEventoAuditoria(),
             evento.getOcurridoEn(),
@@ -276,7 +340,8 @@ public class AuditoriaService {
             evento.getOrigen(),
             evento.getResultado(),
             CatalogoAuditoria.categoriaDe(evento.getAccion()).name(),
-            CatalogoAuditoria.esCritica(evento.getAccion()));
+            CatalogoAuditoria.esCritica(evento.getAccion()),
+            eventosOperacion);
     }
 
     private String serializar(List<CambioAuditoriaDTO> cambios) {

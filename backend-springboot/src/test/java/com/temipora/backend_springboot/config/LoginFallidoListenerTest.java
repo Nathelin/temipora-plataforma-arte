@@ -11,7 +11,6 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.event.AuthenticationFailureBadCredentialsEvent;
 
-import com.temipora.backend_springboot.servicios.AccionesAdmin;
 import com.temipora.backend_springboot.servicios.AuditoriaService;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,9 +31,7 @@ class LoginFallidoListenerTest {
             new AuthenticationFailureBadCredentialsEvent(
                 auth, new BadCredentialsException("credenciales")));
 
-        verify(auditoria).registrarSistema(
-            AccionesAdmin.LOGIN_FALLIDO, "Usuario", null,
-            "Intento de inicio de sesión fallido para 'artista777'");
+        verify(auditoria).registrarIntentoFallido("artista777");
     }
 
     @Test
@@ -46,8 +43,6 @@ class LoginFallidoListenerTest {
             new AuthenticationFailureBadCredentialsEvent(
                 auth, new BadCredentialsException("credenciales")));
 
-        verify(auditoria).registrarSistema(
-            AccionesAdmin.LOGIN_FALLIDO, "Usuario", null,
-            "Intento de inicio de sesión fallido (sin usuario)");
+        verify(auditoria).registrarIntentoFallido("");
     }
 }

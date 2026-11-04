@@ -23,6 +23,7 @@ const form = ref({
   vigenciaHoras: 72,
   maxOfertasPorUsuario: 3,
   maxUsuariosPorCorrida: 50,
+  horaEjecucion: '09:00',
 })
 
 const comisionTexto = computed(() => `${formatearNumero(comisionServicio.value)}%`)
@@ -49,6 +50,11 @@ function formatearFecha(valor) {
   }
 }
 
+function normalizarHora(valor) {
+  if (!valor) return '09:00'
+  return String(valor).slice(0, 5)
+}
+
 async function cargar() {
   cargando.value = true
   error.value = ''
@@ -69,6 +75,7 @@ async function cargar() {
       vigenciaHoras: Number(d.vigenciaHoras ?? 72),
       maxOfertasPorUsuario: Number(d.maxOfertasPorUsuario ?? 3),
       maxUsuariosPorCorrida: Number(d.maxUsuariosPorCorrida ?? 50),
+      horaEjecucion: normalizarHora(d.horaEjecucion),
     }
   } catch (e) {
     error.value = e.response?.data?.message
@@ -83,6 +90,9 @@ function validar() {
   if (f.diasSinCompra < 0 || f.diasSinConexion < 0
     || f.diasCooldown < 0 || f.diasMinimosCuenta < 0) {
     return 'Los días no pueden ser negativos.'
+  }
+  if (!/^\d{2}:\d{2}$/.test(f.horaEjecucion)) {
+    return 'Ingresá una hora de envío válida.'
   }
   if (f.vigenciaHoras < 1) {
     return 'La vigencia de la oferta debe ser de al menos 1 hora.'
@@ -112,6 +122,7 @@ function payload() {
     vigenciaHoras: Number(form.value.vigenciaHoras),
     maxOfertasPorUsuario: Number(form.value.maxOfertasPorUsuario),
     maxUsuariosPorCorrida: Number(form.value.maxUsuariosPorCorrida),
+    horaEjecucion: form.value.horaEjecucion,
   }
 }
 
@@ -252,6 +263,31 @@ onMounted(cargar)
         </section>
 
         <section class="border-t border-rosa/40 pt-6">
+          <h2 class="text-base text-granate">Programación</h2>
+          <p class="mt-1 text-xs leading-relaxed text-cafe/50">
+            El proceso corre todos los días a la hora indicada, en la zona horaria del servidor.
+          </p>
+
+          <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label for="hora-ejecucion" class="mb-1.5 block text-sm text-cafe">
+                Hora de envío
+              </label>
+              <input
+                id="hora-ejecucion"
+                v-model="form.horaEjecucion"
+                type="time"
+                required
+                class="block w-40 rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-1.5 text-xs text-cafe/50">
+                Si el servidor estuvo caído a esa hora, la ejecución se recupera al volver durante el mismo día.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="border-t border-rosa/40 pt-6">
           <h2 class="text-base text-granate">Oferta</h2>
 
           <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -333,16 +369,14 @@ onMounted(cargar)
               El descuento supera la comisión vigente ({{ comisionTexto }}).
             </p>
             <p v-else class="font-semibold text-granate">
-              El descuento lo absorbe la plataforma hasta la comisión.
+              El descuento lo absorbe la plataforma.
             </p>
             <p class="mt-1">
               El artista siempre cobra su neto completo. Si querés descontar más
               que {{ comisionTexto }}, primero tenés que subir la comisión en
               <router-link to="/admin/ajustes/comisiones" class="font-semibold underline decoration-coral/40 underline-offset-4">
                 Comisiones
-              </router-link>;
-              eso reduce el neto del artista. Cubrir el excedente con fondos de la
-              plataforma queda para una próxima versión.
+              </router-link>.
             </p>
           </div>
         </section>
@@ -397,7 +431,7 @@ onMounted(cargar)
         <div class="border-t border-rosa/40 pt-4">
           <h3 class="text-sm font-semibold text-granate">Ejecución</h3>
           <p class="mt-2 text-xs leading-relaxed text-cafe/50">
-            El proceso también corre automáticamente todos los días a las 9:00.
+            El proceso también corre automáticamente todos los días a las {{ form.horaEjecucion }}.
             “Ejecutar ahora” no espera a esa hora.
           </p>
           <p v-if="resultadoEjecucion != null" class="mt-3 text-xs font-semibold text-cafe">

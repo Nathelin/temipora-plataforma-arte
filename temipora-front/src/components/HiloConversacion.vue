@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
-import { formatearFechaMensaje } from '../servicios/mensajes'
+import { formatearDiaConversacion, formatearFechaMensaje, formatearHoraMensaje } from '../servicios/mensajes'
 
 const props = defineProps({
   mensajes: { type: Array, default: () => [] },
@@ -54,6 +54,20 @@ function mostrarHora(indice) {
   if (siguiente.esPropio !== actual.esPropio) return true
   return formatearFechaMensaje(actual.fechaEnvio)
     !== formatearFechaMensaje(siguiente.fechaEnvio)
+}
+
+function claveDia(valor) {
+  const fecha = new Date(valor)
+  if (Number.isNaN(fecha.getTime())) return ''
+  return `${fecha.getFullYear()}-${fecha.getMonth()}-${fecha.getDate()}`
+}
+
+function esNuevoDia(indice) {
+  const actual = props.mensajes[indice]
+  if (!actual) return false
+  if (indice === 0) return true
+  const anterior = props.mensajes[indice - 1]
+  return claveDia(actual.fechaEnvio) !== claveDia(anterior?.fechaEnvio)
 }
 
 function esUltimoPropio(mensaje) {
@@ -142,36 +156,44 @@ defineExpose({ enfocar })
       Todavía no hay mensajes. Escribí el primero.
     </p>
 
-    <div
-      v-for="(mensaje, indice) in mensajes"
-      :key="mensaje.idMensaje"
-      class="flex"
-      :class="mensaje.esPropio ? 'justify-end' : 'justify-start'"
-    >
-      <div class="max-w-[85%] sm:max-w-[75%]">
-        <div
-          class="whitespace-pre-line rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm"
-          :class="mensaje.esPropio
-            ? 'rounded-br-md bg-coral text-white'
-            : 'rounded-bl-md border border-rosa/50 bg-blanco text-cafe'"
-        >
-          {{ mensaje.contenido }}
-        </div>
-        <p
-          v-if="mostrarHora(indice)"
-          class="mt-1 text-[10px] text-cafe/45"
-          :class="mensaje.esPropio ? 'text-right' : 'text-left'"
-        >
-          {{ formatearFechaMensaje(mensaje.fechaEnvio) }}
-          <span
-            v-if="esUltimoPropio(mensaje) && mensaje.leido"
-            class="font-semibold text-coral"
-          >
-            · Leído
-          </span>
-        </p>
+    <template v-for="(mensaje, indice) in mensajes" :key="mensaje.idMensaje">
+      <div v-if="esNuevoDia(indice)" class="flex items-center gap-3 py-1">
+        <span class="h-px flex-1 bg-borde/60"></span>
+        <span class="rounded-full bg-crema px-3 py-1 text-[11px] font-semibold text-cafe/65">
+          {{ formatearDiaConversacion(mensaje.fechaEnvio) }}
+        </span>
+        <span class="h-px flex-1 bg-borde/60"></span>
       </div>
-    </div>
+
+      <div
+        class="flex"
+        :class="mensaje.esPropio ? 'justify-end' : 'justify-start'"
+      >
+        <div class="max-w-[85%] sm:max-w-[75%]">
+          <div
+            class="whitespace-pre-line rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm"
+            :class="mensaje.esPropio
+              ? 'rounded-br-md bg-coral text-white'
+              : 'rounded-bl-md border border-rosa/50 bg-blanco text-cafe'"
+          >
+            {{ mensaje.contenido }}
+          </div>
+          <p
+            v-if="mostrarHora(indice)"
+            class="mt-1 text-[10px] text-cafe/45"
+            :class="mensaje.esPropio ? 'text-right' : 'text-left'"
+          >
+            {{ formatearHoraMensaje(mensaje.fechaEnvio) }}
+            <span
+              v-if="esUltimoPropio(mensaje) && mensaje.leido"
+              class="font-semibold text-coral"
+            >
+              · Leído
+            </span>
+          </p>
+        </div>
+      </div>
+    </template>
   </div>
 
   <div class="mt-3 min-h-5 px-1 text-xs text-cafe/55" role="status" aria-live="polite">

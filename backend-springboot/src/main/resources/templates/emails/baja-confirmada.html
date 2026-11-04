@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light only">
+  <title>Temipora</title>
+</head>
+<body style="margin:0;padding:0;background:#f6ece6;font-family:Arial,Helvetica,sans-serif;color:#4a1d2e;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f6ece6;">
+    <tr>
+      <td align="center" style="padding:32px 12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#ffffff;border:1px solid #f3d3cd;border-radius:24px;">
+          <tr>
+            <td style="padding:32px;">
+              <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#c2185b;">Listo</div>
+              <h1 style="margin:10px 0 12px;font-size:26px;line-height:1.2;color:#4a1d2e;">Damos de baja las promociones</h1>
+              <p style="margin:0;font-size:15px;line-height:1.65;color:#6e3b4d;">
+                Hola, <span th:text="${nombre}">Ana</span>. No vas a recibir más correos promocionales de Temipora.
+                Vas a seguir recibiendo los avisos importantes de tus pedidos.
+                Podés volver a activarlos desde Configuración → Privacidad y contenido.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

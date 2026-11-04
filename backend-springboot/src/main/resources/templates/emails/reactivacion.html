@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
+  <title>Temipora</title>
+  <style>
+    @media only screen and (max-width: 600px) {
+      .contenedor { padding: 12px 8px !important; }
+      .contenido { padding: 24px 20px !important; }
+      .header-tag { display: block !important; padding-top: 10px !important; text-align: left !important; }
+      .oferta-img, .oferta-info { display: block !important; width: 100% !important; }
+      .oferta-img { padding: 14px 14px 0 14px !important; }
+      .oferta-img img, .oferta-img .inicial {
+        width: 100% !important;
+        height: 190px !important;
+      }
+      .oferta-img .inicial { line-height: 190px !important; }
+      .oferta-info { padding: 12px 14px 16px 14px !important; }
+      .pie { padding: 18px 20px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background:#f6ece6;font-family:Arial,Helvetica,sans-serif;color:#4a1d2e;">
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f6ece6;" th:text="${preheader}">Tenés ofertas con descuento esperándote en Temipora.</div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f6ece6;">
+    <tr>
+      <td class="contenedor" align="center" style="padding:28px 12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:620px;background:#ffffff;border:1px solid #f3d3cd;border-radius:24px;overflow:hidden;">
+          <tr>
+            <td style="background:#4a1d2e;padding:26px 32px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td valign="middle" style="font-size:24px;font-weight:800;letter-spacing:-0.02em;color:#fff6f1;">Temipora</td>
+                  <td class="header-tag" align="right" valign="middle">
+                    <span style="display:inline-block;background:#c2185b;color:#ffffff;border-radius:999px;padding:6px 14px;font-size:12px;font-weight:700;letter-spacing:0.02em;">Ofertas para vos</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="contenido" style="padding:32px 32px 16px 32px;">
+              <h1 style="margin:0 0 12px;font-size:27px;line-height:1.2;color:#4a1d2e;">
+                Hola, <span th:text="${nombre}">Ana</span>
+              </h1>
+              <p style="margin:0 0 10px;font-size:15px;line-height:1.65;color:#6e3b4d;">
+                Hace un tiempo no te vemos por Temipora. Elegimos algunas propuestas de artistas
+                que pueden interesarte y les aplicamos un descuento especial.
+              </p>
+              <p style="margin:0 0 4px;font-size:13px;line-height:1.65;color:#8a5a6a;">
+                El descuento lo financia Temipora y se aplica sobre el presupuesto final del servicio.
+              </p>
+
+              <table th:each="oferta : ${ofertas}" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="oferta"
+                     style="margin:16px 0;border:1px solid #f3d3cd;border-radius:18px;border-collapse:separate;">
+                <tr>
+                  <td class="oferta-img" width="132" valign="top" style="padding:14px;">
+                    <img th:if="${oferta.imagenUrl != null}"
+                         th:src="${oferta.imagenUrl}"
+                         th:alt="${oferta.nombreServicio}"
+                         width="120" height="120"
+                         style="display:block;width:120px;height:120px;object-fit:cover;border-radius:14px;border:0;">
+                    <div th:unless="${oferta.imagenUrl != null}"
+                         class="inicial"
+                         th:text="${oferta.inicial}"
+                         style="width:120px;height:120px;line-height:120px;border-radius:14px;background:#ffe1e8;color:#4a1d2e;font-size:34px;font-weight:800;text-align:center;">A</div>
+                  </td>
+                  <td class="oferta-info" valign="top" style="padding:14px 16px 14px 0;">
+                    <div style="font-size:17px;font-weight:800;line-height:1.3;color:#4a1d2e;" th:text="${oferta.nombreServicio}">Retrato en acuarela</div>
+                    <div style="margin-top:2px;font-size:13px;color:#8a5a6a;" th:text="|@${oferta.nombreArtista}|">@artista</div>
+
+                    <div style="margin-top:9px;">
+                      <span style="display:inline-block;background:#ffe8a3;color:#4a1d2e;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700;"
+                            th:text="|${oferta.porcentaje}% de descuento|">10% de descuento</span>
+                    </div>
+
+                    <div style="margin-top:9px;font-size:13px;color:#6e3b4d;" th:text="|Desde ${oferta.precioDesde} ${oferta.moneda}|">Desde 1200 ARS</div>
+                    <div th:if="${oferta.motivo != null and oferta.motivo != ''}"
+                         style="margin-top:4px;font-size:12px;line-height:1.5;color:#8a5a6a;"
+                         th:text="${oferta.motivo}">Coincide con tu estilo</div>
+
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;">
+                      <tr>
+                        <td bgcolor="#c2185b" style="border-radius:999px;">
+                          <a th:href="${oferta.url}" target="_blank"
+                             style="display:inline-block;padding:10px 20px;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:999px;">
+                            Ver y solicitar
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:18px 0 0;font-size:12px;line-height:1.6;color:#8a5a6a;">
+                Las ofertas tienen vencimiento. Si ya no te interesan, podés ignorar este correo.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="pie" style="padding:18px 32px;background:#fff0e9;font-size:12px;line-height:1.6;color:#6e3b4d;">
+              Recibís este correo porque tenés una cuenta en Temipora.
+              <a th:href="${urlBaja}" style="color:#c2185b;font-weight:700;text-decoration:underline;">Darme de baja de las promociones</a>.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

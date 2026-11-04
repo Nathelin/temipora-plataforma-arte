@@ -300,7 +300,7 @@ function irAPerfil() {
                   v-if="esAdmin"
                   class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
                   role="menuitem"
-                  @click="menuAbierto = false; router.push({ name: 'usuarios' })"
+                  @click="menuAbierto = false; router.push({ name: 'admin-resumen' })"
                 >
                   Panel de administración
                 </button>
@@ -397,7 +397,7 @@ function irAPerfil() {
               </router-link>
               <router-link
                 v-if="estaLogueado && esAdmin"
-                :to="{ name: 'usuarios' }"
+                :to="{ name: 'admin-resumen' }"
                 class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
                 @click="menuMovilAbierto = false"
               >
