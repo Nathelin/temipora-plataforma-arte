@@ -28,6 +28,7 @@ const maxInicio = aFechaISO(sumarPlazo(hoy, 12, 'MESES'))
 
 const solicitud = ref(null)
 const comisionPorcentaje = ref(null)
+const arancelMp = ref(null)
 const configPedido = ref({
   maxHitos: 4,
   porcentajeMaxPrimerHito: 50,
@@ -222,9 +223,17 @@ const comisionMonto = computed(() => {
   if (comisionPorcentaje.value == null) return null
   return Math.round(totalFinal.value * comisionPorcentaje.value) / 100
 })
+const arancelMpEstimado = computed(() => {
+  if (arancelMp.value == null) return null
+  return Math.round(totalFinal.value * arancelMp.value) / 100
+})
 const netoArtista = computed(() => {
   if (comisionMonto.value == null) return null
-  return Math.round((totalFinal.value - comisionMonto.value) * 100) / 100
+  const neto = totalFinal.value - comisionMonto.value
+  if (arancelMpEstimado.value == null) {
+    return Math.round(neto * 100) / 100
+  }
+  return Math.round((neto - arancelMpEstimado.value) * 100) / 100
 })
 const maxHitos = computed(() => Number(configPedido.value?.maxHitos) || 4)
 const porcentajeMaxPrimerHito = computed(
@@ -400,16 +409,27 @@ async function cargar() {
   cargando.value = true
   errorCarga.value = ''
   try {
-    const [res, resComision, resConfig, resConfigPresupuesto] = await Promise.all([
+    const [
+      res,
+      resComision,
+      resConfig,
+      resConfigPresupuesto,
+      resArancel,
+    ] = await Promise.all([
       api.get(`/solicitudes-servicio/${idSolicitud.value}`),
       api.get('/comisiones/vigentes').catch(() => null),
       api.get('/configuracion-pedido').catch(() => null),
       api.get('/presupuestos/configuracion-vencimiento').catch(() => null),
+      api.get('/pagos/arancel-estimado').catch(() => null),
     ])
     solicitud.value = res.data
     const porcentaje = Number(resComision?.data?.porcentajeServicio)
     if (Number.isFinite(porcentaje)) {
       comisionPorcentaje.value = porcentaje
+    }
+    const porcentajeArancel = Number(resArancel?.data?.porcentajeTotal)
+    if (Number.isFinite(porcentajeArancel)) {
+      arancelMp.value = porcentajeArancel
     }
     if (resConfig?.data) {
       configPedido.value = {
@@ -1220,12 +1240,25 @@ onMounted(cargar)
                   </dt>
                   <dd class="text-right font-medium text-cafe">− {{ formatear(comisionMonto) }}</dd>
                 </div>
+                <div
+                  v-if="arancelMpEstimado !== null"
+                  class="flex items-start justify-between gap-4"
+                >
+                  <dt class="text-cafe/55">
+                    Arancel MercadoPago estimado ({{ formatearMonto(arancelMp) }}%)
+                  </dt>
+                  <dd class="text-right font-medium text-cafe">
+                    − {{ formatear(arancelMpEstimado) }}
+                  </dd>
+                </div>
                 <div class="flex items-start justify-between gap-4">
                   <dt class="text-base font-semibold text-granate">Recibís</dt>
                   <dd class="text-right text-xl font-bold text-granate">{{ formatear(netoArtista) }}</dd>
                 </div>
                 <p class="text-xs leading-relaxed text-cafe/50">
                   La comisión se descuenta de tu precio. El cliente paga el total sin cambios.
+                  El arancel de MercadoPago es una estimación y puede variar según el medio de
+                  pago y las cuotas.
                 </p>
               </template>
             </dl>

@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
+import { descripcionMedioPago } from '../servicios/ventas'
 import EntregasHito from '../components/EntregasHito.vue'
 import HiloConversacion from '../components/HiloConversacion.vue'
 import IconoDescarga from '../components/IconoDescarga.vue'
@@ -141,6 +142,40 @@ function formatearMontoHito(hito) {
     hito.montoMostrado ?? hito.monto,
     moneda.value,
   )
+}
+
+function pagoAprobado(hito) {
+  return (hito?.pagos || []).find((pago) => pago.estado === 'APROBADO') || null
+}
+
+function tieneDatosMp(hito) {
+  const pago = pagoAprobado(hito)
+  return Boolean(pago && (pago.arancelMp != null
+    || pago.netoRecibidoMp != null
+    || pago.medioPago))
+}
+
+function netoHito(hito) {
+  const pago = pagoAprobado(hito)
+  if (pago?.netoRecibidoMp != null) {
+    return formatearPrecio(pago.netoRecibidoMp, monedaCobro.value)
+  }
+  return formatearPrecio(
+    hito.montoNetoMostrado ?? hito.montoNeto,
+    moneda.value,
+  )
+}
+
+function arancelMpHito(hito) {
+  return formatearPrecio(
+    pagoAprobado(hito)?.arancelMp,
+    monedaCobro.value,
+  )
+}
+
+function liberacionHito(hito) {
+  const fecha = pagoAprobado(hito)?.fechaLiberacion
+  return fecha ? formatearFecha(fecha) : null
 }
 
 const pestanas = computed(() => {
@@ -1360,12 +1395,25 @@ onMounted(async () => {
 
           <div
             v-if="(esArtista || pedido.rolVista === 'ADMIN') && hito.comisionMonto != null"
-            class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-cafe/5 px-3 py-2 text-xs text-cafe/65"
+            class="mt-3 rounded-lg bg-cafe/5 px-3 py-2 text-xs text-cafe/65"
           >
-            <span>Comisión: − {{ formatearPrecio(hito.comisionMontoMostrado ?? hito.comisionMonto, moneda) }}</span>
-            <span class="font-semibold text-granate">
-              Recibís: {{ formatearPrecio(hito.montoNetoMostrado ?? hito.montoNeto, moneda) }}
-            </span>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span>
+                Comisión Temipora: − {{ formatearPrecio(hito.comisionMontoMostrado ?? hito.comisionMonto, moneda) }}
+              </span>
+              <span v-if="tieneDatosMp(hito)">
+                Arancel MercadoPago: − {{ arancelMpHito(hito) }}
+              </span>
+              <span class="font-semibold text-granate">
+                Recibís{{ tieneDatosMp(hito) ? '' : ' (estimado)' }}: {{ netoHito(hito) }}
+              </span>
+            </div>
+            <p v-if="tieneDatosMp(hito)" class="mt-1 text-[11px] text-cafe/50">
+              {{ descripcionMedioPago(pagoAprobado(hito)) }}
+              <span v-if="liberacionHito(hito)">
+                · Liberación {{ liberacionHito(hito) }}
+              </span>
+            </p>
           </div>
 
           <div
