@@ -79,7 +79,20 @@
                             th:text="|${oferta.porcentaje}% de descuento|">10% de descuento</span>
                     </div>
 
-                    <div style="margin-top:9px;font-size:13px;color:#6e3b4d;" th:text="|Desde ${oferta.precioDesde} ${oferta.moneda}|">Desde 1200 ARS</div>
+                    <div style="margin-top:9px;font-size:13px;color:#6e3b4d;">
+                      <div th:if="${oferta.precioConDescuento != null}">
+                        <span style="font-size:16px;font-weight:800;color:#4a1d2e;"
+                              th:text="|${oferta.precioConDescuento} ${oferta.moneda}|">1.080 ARS</span>
+                        <span style="margin-left:6px;font-size:12px;font-weight:600;color:#8a5a6a;text-decoration:line-through;"
+                              th:text="|${oferta.precioDesde} ${oferta.moneda}|">1.200 ARS</span>
+                      </div>
+                      <div th:if="${oferta.precioConDescuento == null}"
+                           th:text="|Desde ${oferta.precioDesde} ${oferta.moneda}|">Desde 1.200 ARS</div>
+                    </div>
+                    <div th:if="${oferta.precioConDescuento != null}"
+                         style="margin-top:3px;font-size:11px;line-height:1.5;color:#8a5a6a;">
+                      Precio estimado sobre el base. El descuento se aplica al presupuesto final.
+                    </div>
                     <div th:if="${oferta.motivo != null and oferta.motivo != ''}"
                          style="margin-top:4px;font-size:12px;line-height:1.5;color:#8a5a6a;"
                          th:text="${oferta.motivo}">Coincide con tu estilo</div>
