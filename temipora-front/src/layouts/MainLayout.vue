@@ -55,11 +55,18 @@ function alternarMenu() {
   menuAbierto.value = !menuAbierto.value
 }
 
+function clickDentroDe(event, contenedor) {
+  if (!contenedor) {
+    return false
+  }
+  return event.composedPath().includes(contenedor)
+}
+
 function manejarClickExterior(event) {
-  if (contenedorMenu.value && !contenedorMenu.value.contains(event.target)) {
+  if (contenedorMenu.value && !clickDentroDe(event, contenedorMenu.value)) {
     menuAbierto.value = false
   }
-  if (contenedorNav.value && !contenedorNav.value.contains(event.target)) {
+  if (contenedorNav.value && !clickDentroDe(event, contenedorNav.value)) {
     menuMovilAbierto.value = false
   }
 }
@@ -262,54 +269,16 @@ function irAPerfil() {
                 <button
                   class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
                   role="menuitem"
-                  @click="menuAbierto = false; router.push({ name: 'favoritos' })"
-                >
-                  Favoritos
-                </button>
-                <button
-                  v-if="!esAdmin"
-                  class="flex w-full items-center justify-between gap-2 rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                  role="menuitem"
-                  @click="menuAbierto = false; router.push({ name: 'mensajes' })"
-                >
-                  <span>Mensajes</span>
-                  <span
-                    v-if="totalMensajes"
-                    class="rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-bold leading-none text-white"
-                  >
-                    {{ badgeMensajes }}
-                  </span>
-                </button>
-                <button
-                  v-if="puedeVerMisCompras"
-                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                  role="menuitem"
-                  @click="menuAbierto = false; router.push({ name: 'pedidos' })"
-                >
-                  Mis compras
-                </button>
-                <button
-                  v-if="esArtista"
-                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm font-semibold text-coral transition hover:bg-coral/10"
-                  role="menuitem"
-                  @click="menuAbierto = false; router.push({ name: 'panel-resumen' })"
-                >
-                  Panel de artista
-                </button>
-                <button
-                  v-if="esAdmin"
-                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                  role="menuitem"
-                  @click="menuAbierto = false; router.push({ name: 'admin-resumen' })"
-                >
-                  Panel de administración
-                </button>
-                <button
-                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                  role="menuitem"
                   @click="menuAbierto = false; router.push({ name: 'configuracion-perfil' })"
                 >
                   Configuración
+                </button>
+                <button
+                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  role="menuitem"
+                  @click="menuAbierto = false; router.push({ name: 'configuracion-apariencia' })"
+                >
+                  Preferencias
                 </button>
                 <button
                   class="mt-1 w-full rounded-xl border-t border-rosa/30 px-3.5 py-2.5 text-left text-sm text-rojizo transition hover:bg-rosa/20"
@@ -366,14 +335,6 @@ function irAPerfil() {
                 Explorar
               </router-link>
               <router-link
-                v-if="estaLogueado"
-                to="/favoritos"
-                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                @click="menuMovilAbierto = false"
-              >
-                Favoritos
-              </router-link>
-              <router-link
                 v-if="estaLogueado && !esAdmin"
                 to="/mensajes"
                 class="flex w-full items-center justify-between gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
@@ -388,9 +349,19 @@ function irAPerfil() {
                 </span>
               </router-link>
               <router-link
+                v-if="estaLogueado"
+                to="/favoritos"
+                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                @click="menuMovilAbierto = false"
+              >
+                Favoritos
+              </router-link>
+              <router-link
                 v-if="puedeVerMisCompras"
                 to="/mis-compras"
-                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                class="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/25 bg-coral/10 px-4 py-3 text-sm font-semibold text-coral transition hover:bg-coral/15"
+                :class="enMisCompras ? 'ring-2 ring-coral/40' : ''"
+                :aria-current="enMisCompras ? 'page' : undefined"
                 @click="menuMovilAbierto = false"
               >
                 Mis compras
@@ -424,28 +395,7 @@ function irAPerfil() {
               <div v-else class="mt-1 border-t border-rosa/40 pt-1">
                 <button
                   type="button"
-                  class="flex w-full items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                  @click="menuMovilAbierto = false; irAPerfil()"
-                >
-                  Mi perfil
-                </button>
-                <button
-                  type="button"
-                  class="flex w-full items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                  @click="menuMovilAbierto = false; router.push({ name: 'favoritos' })"
-                >
-                  Favoritos
-                </button>
-                <button
-                  type="button"
-                  class="flex w-full items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                  @click="menuMovilAbierto = false; router.push({ name: 'configuracion-perfil' })"
-                >
-                  Configuración
-                </button>
-                <button
-                  type="button"
-                  class="mt-1 flex w-full items-center rounded-2xl border-t border-rosa/30 px-4 py-3 text-left text-sm font-semibold text-rojizo transition hover:bg-rosa/20"
+                  class="flex w-full items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold text-rojizo transition hover:bg-rosa/20"
                   @click="menuMovilAbierto = false; cerrarSesion()"
                 >
                   Cerrar sesión
