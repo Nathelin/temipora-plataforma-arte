@@ -22,6 +22,7 @@ public class ServicioDTO {
     private Long idServicio;
     private Long idArtista;
     private String nombreArtista;
+    private String urlFotoArtista;
     private Long idTipoServicio;
     private String nombreTipoServicio;
     private String descripcionTipoServicio;
@@ -61,6 +62,15 @@ public class ServicioDTO {
     private LocalDateTime pausadoEn;
     private LocalDateTime archivadoEn;
 
+    private static String fotoArtista(Usuario artista) {
+        if (artista == null) {
+            return null;
+        }
+        return artista.getUrlFotoPerfilMiniatura() != null
+            ? artista.getUrlFotoPerfilMiniatura()
+            : artista.getUrlFotoPerfil();
+    }
+
     public static ServicioDTO desdeServicio(Servicio s) {
         return desdeServicio(s, false, null, null);
     }
@@ -89,6 +99,7 @@ public class ServicioDTO {
             .idServicio(s.getIdServicio())
             .idArtista(s.getArtista() != null ? s.getArtista().getIdUsuario() : null)
             .nombreArtista(s.getArtista() != null ? s.getArtista().getNombreUsuario() : null)
+            .urlFotoArtista(fotoArtista(s.getArtista()))
             .idTipoServicio(s.getTipoServicio() != null ? s.getTipoServicio().getIdTipoServicio() : null)
             .nombreTipoServicio(s.getTipoServicio() != null ? s.getTipoServicio().getNombre() : null)
             .descripcionTipoServicio(s.getTipoServicio() != null ? s.getTipoServicio().getDescripcion() : null)
