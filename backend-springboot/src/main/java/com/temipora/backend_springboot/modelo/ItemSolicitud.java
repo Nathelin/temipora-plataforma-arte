@@ -19,6 +19,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import org.hibernate.annotations.BatchSize;
+
 @Entity
 @Table(name = "item_solicitud")
 @Getter
@@ -50,8 +52,18 @@ public class ItemSolicitud {
     @OrderBy("orden ASC, suborden ASC")
     private List<Respuesta> respuestas = new ArrayList<>();
 
+    @BatchSize(size = 25)
+    @OneToMany(mappedBy = "itemSolicitud", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("orden ASC")
+    private List<ItemSolicitudDerecho> derechos = new ArrayList<>();
+
     public void agregarRespuesta(Respuesta respuesta) {
         respuesta.setItem(this);
         this.respuestas.add(respuesta);
+    }
+
+    public void agregarDerecho(ItemSolicitudDerecho derecho) {
+        derecho.setItemSolicitud(this);
+        this.derechos.add(derecho);
     }
 }

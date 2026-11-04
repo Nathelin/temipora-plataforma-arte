@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,7 @@ import com.temipora.backend_springboot.modelo.HitoPresupuesto;
 import com.temipora.backend_springboot.modelo.ItemPresupuesto;
 import com.temipora.backend_springboot.modelo.ItemPresupuestoRequest;
 import com.temipora.backend_springboot.modelo.ItemSolicitud;
+import com.temipora.backend_springboot.modelo.ItemSolicitudDerecho;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.OfertaReactivacion;
 import com.temipora.backend_springboot.modelo.Presupuesto;
@@ -246,7 +248,9 @@ public class PresupuestoService {
         for (ItemSolicitud itemSolicitud : solicitud.getItems()) {
             ItemPresupuestoRequest itemRequest =
                 requestsPorItem.get(itemSolicitud.getIdItemSolicitud());
-            BigDecimal finalDibujo = calcularFinalItem(baseDibujo, itemRequest.getRecargos());
+            List<RecargoItemPresupuesto> recargos = construirRecargos(
+                itemSolicitud, itemRequest);
+            BigDecimal finalDibujo = calcularFinalItem(baseDibujo, recargos);
 
             ItemPresupuesto item = new ItemPresupuesto();
             item.setItemSolicitud(itemSolicitud);
@@ -255,16 +259,7 @@ public class PresupuestoService {
             item.setPrecioFinal(finalDibujo);
             item.setNota(limpiarTexto(itemRequest.getNota(), 250));
 
-            List<RecargoPresupuestoRequest> recargos = itemRequest.getRecargos() != null
-                ? itemRequest.getRecargos()
-                : List.of();
-            int ordenRecargo = 0;
-            for (RecargoPresupuestoRequest recargoRequest : recargos) {
-                RecargoItemPresupuesto recargo = new RecargoItemPresupuesto();
-                recargo.setDescripcion(recargoRequest.getDescripcion().trim());
-                recargo.setTipo(recargoRequest.getTipo());
-                recargo.setValor(recargoRequest.getValor().setScale(2, RoundingMode.HALF_UP));
-                recargo.setOrden(ordenRecargo++);
+            for (RecargoItemPresupuesto recargo : recargos) {
                 item.agregarRecargo(recargo);
             }
 
@@ -495,48 +490,88 @@ public class PresupuestoService {
         return porId;
     }
 
+    private List<RecargoItemPresupuesto> construirRecargos(
+            ItemSolicitud itemSolicitud,
+            ItemPresupuestoRequest itemRequest) {
+        List<RecargoItemPresupuesto> recargos = new ArrayList<>();
+        int orden = 0;
+
+        for (ItemSolicitudDerecho derecho : itemSolicitud.getDerechos()) {
+            BigDecimal porcentaje = derecho.getPorcentajeExtra();
+            if (porcentaje == null || porcentaje.signum() <= 0) {
+                continue;
+            }
+
+            RecargoItemPresupuesto recargo = new RecargoItemPresupuesto();
+            recargo.setDescripcion(derecho.getNombre());
+            recargo.setTipo(TipoRecargo.PORCENTAJE);
+            recargo.setValor(porcentaje.setScale(2, RoundingMode.HALF_UP));
+            recargo.setAutomatico(true);
+            recargo.setDerecho(derecho.getDerecho());
+            recargo.setOrden(orden++);
+            recargos.add(recargo);
+        }
+
+        List<RecargoPresupuestoRequest> manuales = itemRequest.getRecargos() != null
+            ? itemRequest.getRecargos()
+            : List.of();
+        if (manuales.size() > MAX_RECARGOS_POR_ITEM) {
+            throw new IllegalArgumentException(
+                "Un dibujo puede tener como máximo " + MAX_RECARGOS_POR_ITEM
+                    + " recargos.");
+        }
+
+        for (RecargoPresupuestoRequest recargoRequest : manuales) {
+            if (recargoRequest == null) {
+                throw new IllegalArgumentException("El recargo no es válido.");
+            }
+            if (recargoRequest.getDescripcion() == null
+                    || recargoRequest.getDescripcion().isBlank()) {
+                throw new IllegalArgumentException(
+                    "La descripción del recargo es obligatoria.");
+            }
+            if (recargoRequest.getDescripcion().trim().length() > 100) {
+                throw new IllegalArgumentException(
+                    "La descripción del recargo no puede superar los 100 caracteres.");
+            }
+            if (recargoRequest.getTipo() == null || recargoRequest.getValor() == null) {
+                throw new IllegalArgumentException(
+                    "El tipo y el valor del recargo son obligatorios.");
+            }
+            if (recargoRequest.getValor().signum() <= 0) {
+                throw new IllegalArgumentException(
+                    "El valor del recargo debe ser mayor a cero.");
+            }
+            if (recargoRequest.getTipo() == TipoRecargo.PORCENTAJE
+                    && recargoRequest.getValor().compareTo(MAX_PORCENTAJE) > 0) {
+                throw new IllegalArgumentException(
+                    "El porcentaje de recargo no puede superar el 1000%.");
+            }
+
+            RecargoItemPresupuesto recargo = new RecargoItemPresupuesto();
+            recargo.setDescripcion(recargoRequest.getDescripcion().trim());
+            recargo.setTipo(recargoRequest.getTipo());
+            recargo.setValor(
+                recargoRequest.getValor().setScale(2, RoundingMode.HALF_UP));
+            recargo.setAutomatico(false);
+            recargo.setOrden(orden++);
+            recargos.add(recargo);
+        }
+
+        return recargos;
+    }
+
     private BigDecimal calcularFinalItem(
             BigDecimal base,
-            List<RecargoPresupuestoRequest> recargos) {
+            List<RecargoItemPresupuesto> recargos) {
         BigDecimal fijos = BigDecimal.ZERO;
         BigDecimal porcentajes = BigDecimal.ZERO;
 
-        if (recargos != null) {
-            if (recargos.size() > MAX_RECARGOS_POR_ITEM) {
-                throw new IllegalArgumentException(
-                    "Un dibujo puede tener como máximo " + MAX_RECARGOS_POR_ITEM
-                        + " recargos.");
-            }
-            for (RecargoPresupuestoRequest recargo : recargos) {
-                if (recargo == null) {
-                    throw new IllegalArgumentException("El recargo no es válido.");
-                }
-                if (recargo.getDescripcion() == null
-                        || recargo.getDescripcion().isBlank()) {
-                    throw new IllegalArgumentException(
-                        "La descripción del recargo es obligatoria.");
-                }
-                if (recargo.getDescripcion().trim().length() > 100) {
-                    throw new IllegalArgumentException(
-                        "La descripción del recargo no puede superar los 100 caracteres.");
-                }
-                if (recargo.getTipo() == null || recargo.getValor() == null) {
-                    throw new IllegalArgumentException(
-                        "El tipo y el valor del recargo son obligatorios.");
-                }
-                if (recargo.getValor().signum() <= 0) {
-                    throw new IllegalArgumentException(
-                        "El valor del recargo debe ser mayor a cero.");
-                }
-                if (recargo.getTipo() == TipoRecargo.PORCENTAJE) {
-                    if (recargo.getValor().compareTo(MAX_PORCENTAJE) > 0) {
-                        throw new IllegalArgumentException(
-                            "El porcentaje de recargo no puede superar el 1000%.");
-                    }
-                    porcentajes = porcentajes.add(recargo.getValor());
-                } else {
-                    fijos = fijos.add(recargo.getValor());
-                }
+        for (RecargoItemPresupuesto recargo : recargos) {
+            if (recargo.getTipo() == TipoRecargo.PORCENTAJE) {
+                porcentajes = porcentajes.add(recargo.getValor());
+            } else {
+                fijos = fijos.add(recargo.getValor());
             }
         }
 

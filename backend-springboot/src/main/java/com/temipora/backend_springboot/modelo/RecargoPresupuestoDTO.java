@@ -23,6 +23,8 @@ public class RecargoPresupuestoDTO {
     // En los porcentajes se conserva el porcentaje original.
     private BigDecimal valorMostrado;
     private Integer orden;
+    private boolean automatico;
+    private Long idDerechoTermino;
 
     public static RecargoPresupuestoDTO desdeRecargo(RecargoItemPresupuesto recargo) {
         return desdeRecargo(recargo, BigDecimal.ONE);
@@ -42,6 +44,10 @@ public class RecargoPresupuestoDTO {
             .valor(recargo.getValor())
             .valorMostrado(valorMostrado)
             .orden(recargo.getOrden())
+            .automatico(recargo.isAutomatico())
+            .idDerechoTermino(recargo.getDerecho() != null
+                ? recargo.getDerecho().getIdDerechoTermino()
+                : null)
             .build();
     }
 }

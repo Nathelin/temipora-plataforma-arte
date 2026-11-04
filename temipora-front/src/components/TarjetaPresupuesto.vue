@@ -329,7 +329,10 @@ function formatearRecargo(recargo) {
           >
             <dt class="text-cafe/55">
               {{ recargo.descripcion }}
-              <span class="text-cafe/35">
+              <span v-if="recargo.automatico" class="ml-1 rounded-full bg-coral/10 px-2 py-0.5 text-[10px] font-semibold text-coral">
+                Automático
+              </span>
+              <span v-else class="text-cafe/35">
                 ({{ recargo.tipo === 'PORCENTAJE' ? 'porcentaje' : 'fijo' }})
               </span>
             </dt>

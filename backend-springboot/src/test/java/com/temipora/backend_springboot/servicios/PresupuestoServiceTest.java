@@ -29,16 +29,20 @@ import org.springframework.data.domain.Pageable;
 import com.temipora.backend_springboot.modelo.ConfiguracionComision;
 import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.ConfiguracionPresupuesto;
+import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.ETiempoEntregaUnidad;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.HitoPresupuestoRequest;
+import com.temipora.backend_springboot.modelo.ItemPresupuestoDTO;
 import com.temipora.backend_springboot.modelo.ItemPresupuestoRequest;
 import com.temipora.backend_springboot.modelo.ItemSolicitud;
+import com.temipora.backend_springboot.modelo.ItemSolicitudDerecho;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Presupuesto;
 import com.temipora.backend_springboot.modelo.PresupuestoDTO;
 import com.temipora.backend_springboot.modelo.PresupuestoRequest;
+import com.temipora.backend_springboot.modelo.RecargoPresupuestoDTO;
 import com.temipora.backend_springboot.modelo.RecargoPresupuestoRequest;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.Solicitud;
@@ -346,6 +350,48 @@ class PresupuestoServiceTest {
             .isEqualByComparingTo("175.00");
         assertThat(resultado.getPresupuesto().getPrecioFinal())
             .isEqualByComparingTo("275.00");
+    }
+
+    @Test
+    void crear_conDerechos_agregaRecargosAutomaticosYLosSuma() {
+        prepararCreacion();
+        ItemSolicitud item = solicitud.getItems().get(0);
+        agregarDerecho(item, 1L, "CONTENIDO",
+            "Uso comercial en producción de contenido", "30");
+        agregarDerecho(item, 2L, "MERCHANDISING",
+            "Uso comercial como merchandising", "20");
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request());
+
+        ItemPresupuestoDTO itemDto = resultado.getPresupuesto().getItems().get(0);
+        assertThat(itemDto.getPrecioFinal()).isEqualByComparingTo("150.00");
+        assertThat(itemDto.getRecargos()).hasSize(2);
+        assertThat(itemDto.getRecargos())
+            .allMatch(RecargoPresupuestoDTO::isAutomatico);
+        assertThat(itemDto.getRecargos().get(0).getValor())
+            .isEqualByComparingTo("30.00");
+        assertThat(itemDto.getRecargos().get(1).getValor())
+            .isEqualByComparingTo("20.00");
+        assertThat(resultado.getPresupuesto().getPrecioFinal())
+            .isEqualByComparingTo("250.00");
+    }
+
+    @Test
+    void crear_conDerechoYRecargoManual_sumaAmbosSinComponer() {
+        prepararCreacion();
+        agregarDerecho(solicitud.getItems().get(0), 1L, "CONTENIDO",
+            "Uso comercial en producción de contenido", "30");
+        PresupuestoRequest request = request();
+        request.getItems().get(0).getRecargos().add(
+            recargo("Personaje extra", TipoRecargo.PORCENTAJE, "20"));
+
+        SolicitudDTO resultado = presupuestoService.crear(SOLICITUD, ARTISTA, request);
+
+        ItemPresupuestoDTO itemDto = resultado.getPresupuesto().getItems().get(0);
+        assertThat(itemDto.getPrecioFinal()).isEqualByComparingTo("150.00");
+        assertThat(itemDto.getRecargos()).hasSize(2);
+        assertThat(itemDto.getRecargos().get(0).isAutomatico()).isTrue();
+        assertThat(itemDto.getRecargos().get(1).isAutomatico()).isFalse();
     }
 
     @Test
@@ -723,6 +769,26 @@ class PresupuestoServiceTest {
         item.setOrden(orden);
         item.setEstado("PENDIENTE");
         return item;
+    }
+
+    private void agregarDerecho(
+            ItemSolicitud item,
+            Long idDerechoTermino,
+            String codigo,
+            String nombre,
+            String porcentaje) {
+        DerechoTermino derecho = new DerechoTermino();
+        derecho.setIdDerechoTermino(idDerechoTermino);
+        derecho.setCodigo(codigo);
+        derecho.setNombre(nombre);
+
+        ItemSolicitudDerecho itemDerecho = new ItemSolicitudDerecho();
+        itemDerecho.setDerecho(derecho);
+        itemDerecho.setCodigo(codigo);
+        itemDerecho.setNombre(nombre);
+        itemDerecho.setPorcentajeExtra(new BigDecimal(porcentaje));
+        itemDerecho.setOrden(item.getDerechos().size());
+        item.agregarDerecho(itemDerecho);
     }
 
     private PresupuestoRequest request() {

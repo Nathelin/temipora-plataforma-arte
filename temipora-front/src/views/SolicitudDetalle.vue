@@ -166,6 +166,14 @@ const dibujos = computed(() =>
   }),
 )
 
+function derechosTexto(dibujo) {
+  const derechos = dibujo?.derechos || []
+  if (!derechos.length) return 'Uso personal'
+  return derechos
+    .map((d) => `${d.nombre} (+${d.porcentajeExtra ?? 0}%)`)
+    .join(' · ')
+}
+
 function alternarDibujo(idItem) {
   const siguiente = new Set(dibujosAbiertos.value)
   if (siguiente.has(idItem)) {
@@ -673,6 +681,12 @@ onMounted(cargar)
                         >
                           {{ dibujo.resumen }}
                         </span>
+                        <span
+                          v-if="!dibujosAbiertos.has(dibujo.idItemSolicitud) && dibujo.derechos?.length"
+                          class="mt-1 block text-xs font-semibold text-coral"
+                        >
+                          {{ derechosTexto(dibujo) }}
+                        </span>
                       </span>
 
                       <svg
@@ -748,6 +762,25 @@ onMounted(cargar)
                         <p v-if="!dibujo.grupos.length" class="text-sm text-cafe/55">
                           Este dibujo no tiene respuestas registradas.
                         </p>
+
+                        <div class="border-t border-rosa/30 pt-4">
+                          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                            Derechos de uso
+                          </p>
+                          <ul v-if="dibujo.derechos?.length" class="mt-2 flex flex-wrap gap-2">
+                            <li
+                              v-for="derecho in dibujo.derechos"
+                              :key="derecho.idDerechoTermino"
+                              class="rounded-full bg-coral/10 px-3 py-1 text-sm text-cafe"
+                            >
+                              {{ derecho.nombre }}
+                              <span class="font-semibold text-granate">
+                                +{{ derecho.porcentajeExtra ?? 0 }}%
+                              </span>
+                            </li>
+                          </ul>
+                          <p v-else class="mt-1 text-sm text-cafe/55">Uso personal</p>
+                        </div>
                       </div>
                     </div>
                   </div>

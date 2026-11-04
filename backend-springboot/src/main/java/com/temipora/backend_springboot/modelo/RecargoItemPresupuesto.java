@@ -43,5 +43,12 @@ public class RecargoItemPresupuesto {
     private BigDecimal valor;
 
     @Column(nullable = false)
+    private boolean automatico = false;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_derecho_termino")
+    private DerechoTermino derecho;
+
+    @Column(nullable = false)
     private Integer orden = 0;
 }

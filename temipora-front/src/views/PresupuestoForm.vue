@@ -198,10 +198,20 @@ function valorRecargo(recargo) {
   return Number.isFinite(valor) && valor > 0 ? valor : 0
 }
 
+function autoRecargosDe(item) {
+  return (item?.derechos || []).map((d) => ({
+    descripcion: d.nombre,
+    tipo: 'PORCENTAJE',
+    valor: Number(d.porcentajeExtra) || 0,
+    automatico: true,
+  }))
+}
+
 function subtotalItem(item) {
   let fijos = 0
   let porcentajes = 0
-  for (const recargo of item.recargos || []) {
+  const recargos = [...autoRecargosDe(item), ...(item.recargos || [])]
+  for (const recargo of recargos) {
     const valor = valorRecargo(recargo)
     if (recargo.tipo === 'PORCENTAJE') porcentajes += valor
     else fijos += valor
@@ -451,6 +461,7 @@ async function cargar() {
       nombre: item.nombre,
       nota: '',
       recargos: [],
+      derechos: item.derechos || [],
       respuestas: gruposDeRespuestas(item),
     }))
     form.value.hitos = hitosPorDefecto()
@@ -912,6 +923,26 @@ onMounted(cargar)
             <p class="mt-2 text-xs text-cafe/50">
               Base {{ formatear(baseItem()) }}
             </p>
+
+            <div
+              v-if="autoRecargosDe(item).length"
+              class="mt-4 rounded-xl border border-coral/30 bg-coral/5 px-3 py-2.5"
+            >
+              <p class="text-xs font-semibold text-granate">Derechos de uso solicitados</p>
+              <ul class="mt-2 space-y-1">
+                <li
+                  v-for="(recargo, autoIndice) in autoRecargosDe(item)"
+                  :key="`auto-${item.idItemSolicitud}-${autoIndice}`"
+                  class="flex items-center justify-between gap-3 text-xs"
+                >
+                  <span class="min-w-0 text-cafe">{{ recargo.descripcion }}</span>
+                  <span class="shrink-0 font-semibold text-granate">+{{ recargo.valor }}%</span>
+                </li>
+              </ul>
+              <p class="mt-2 text-xs leading-relaxed text-cafe/55">
+                Estos recargos se agregan automáticamente sobre el precio base y no se pueden quitar.
+              </p>
+            </div>
 
             <details
               v-if="item.respuestas.length"

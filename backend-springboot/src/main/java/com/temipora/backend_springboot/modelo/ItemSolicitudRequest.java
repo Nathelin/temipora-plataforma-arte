@@ -19,6 +19,9 @@ public class ItemSolicitudRequest {
 
     private Integer prioridad;
 
+    @Size(max = 10, message = "Un dibujo puede tener como máximo 10 derechos.")
+    private List<Long> derechos;
+
     @NotNull(message = "Las respuestas del formulario son obligatorias.")
     @Valid
     private List<RespuestaSolicitudRequest> respuestas;

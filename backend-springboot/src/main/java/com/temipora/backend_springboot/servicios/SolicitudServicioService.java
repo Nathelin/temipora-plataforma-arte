@@ -18,12 +18,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.AccionSolicitud;
 import com.temipora.backend_springboot.modelo.Conversacion;
+import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.DisponibilidadServicioDTO;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.Formulario;
 import com.temipora.backend_springboot.modelo.FormularioDTO;
 import com.temipora.backend_springboot.modelo.ItemSolicitud;
+import com.temipora.backend_springboot.modelo.ItemSolicitudDerecho;
 import com.temipora.backend_springboot.modelo.ItemSolicitudRequest;
 import com.temipora.backend_springboot.modelo.ListaEspera;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
@@ -41,6 +43,7 @@ import com.temipora.backend_springboot.modelo.SolicitudDTO;
 import com.temipora.backend_springboot.modelo.SolicitudPublicaDTO;
 import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
 import com.temipora.backend_springboot.modelo.SolicitudServicioRequest;
+import com.temipora.backend_springboot.modelo.TerminoDerecho;
 import com.temipora.backend_springboot.modelo.TerminoDerechoDTO;
 import com.temipora.backend_springboot.modelo.Terminos;
 import com.temipora.backend_springboot.modelo.TerminosDTO;
@@ -80,6 +83,7 @@ public class SolicitudServicioService {
     private static final String ORIGEN_ARTISTA = "ARTISTA";
     private static final String ORIGEN_CLIENTE = "CLIENTE";
     private static final String ORIGEN_BAJA_SERVICIO = "BAJA_SERVICIO";
+    private static final String DERECHO_PERSONAL = "PERSONAL";
 
     private static final String NOTIFICACION_SOLICITUD = "SOLICITUD_RECIBIDA";
     private static final String NOTIFICACION_ESPERA = "SOLICITUD_EN_LISTA_ESPERA";
@@ -294,8 +298,16 @@ public class SolicitudServicioService {
             .orElseThrow(() -> new NoSuchElementException(
                 "Formulario no encontrado: " + formularioDTO.getIdFormulario()));
 
+        Map<Long, TerminoDerecho> derechosDisponibles = new LinkedHashMap<>();
+        for (TerminoDerecho terminoDerecho : terminosEntidad.getTerminoDerechos()) {
+            if (terminoDerecho.getDerecho() != null) {
+                derechosDisponibles.put(
+                    terminoDerecho.getDerecho().getIdDerechoTermino(), terminoDerecho);
+            }
+        }
+
         List<ItemPreparado> preparados = validarYPrepararItems(
-            request, formularioDTO, formulario);
+            request, formularioDTO, formulario, derechosDisponibles);
         int totalDibujos = preparados.size();
         int maxDibujos = maxDibujosDe(servicio);
         if (totalDibujos > maxDibujos) {
@@ -793,7 +805,8 @@ public class SolicitudServicioService {
     private List<ItemPreparado> validarYPrepararItems(
             SolicitudServicioRequest request,
             FormularioDTO formularioDTO,
-            Formulario formulario) {
+            Formulario formulario,
+            Map<Long, TerminoDerecho> derechosDisponibles) {
         if (request.getItems().size() > 50) {
             throw new IllegalArgumentException(
                 "Una solicitud puede tener como máximo 50 dibujos.");
@@ -880,10 +893,13 @@ public class SolicitudServicioService {
             }
 
             Integer prioridad = request.isPrioridadDefinida() ? item.getPrioridad() : null;
+            List<ItemSolicitudDerecho> derechos = prepararDerechos(
+                item.getDerechos(), derechosDisponibles);
             preparados.add(new ItemPreparado(
                 item.getNombre().trim(),
                 prioridad,
-                respuestasPreparadas));
+                respuestasPreparadas,
+                derechos));
         }
         return preparados;
     }
@@ -967,6 +983,54 @@ public class SolicitudServicioService {
             .toList();
     }
 
+    private List<ItemSolicitudDerecho> prepararDerechos(
+            List<Long> ids,
+            Map<Long, TerminoDerecho> derechosDisponibles) {
+        List<ItemSolicitudDerecho> derechos = new ArrayList<>();
+        if (ids == null || ids.isEmpty()) {
+            return derechos;
+        }
+
+        Set<Long> vistos = new HashSet<>();
+        for (Long id : ids) {
+            if (id == null || !vistos.add(id)) {
+                continue;
+            }
+            TerminoDerecho terminoDerecho = derechosDisponibles.get(id);
+            if (terminoDerecho == null || !terminoDerecho.isDisponible()) {
+                throw new IllegalArgumentException(
+                    "El derecho de uso seleccionado no está disponible para este servicio.");
+            }
+
+            DerechoTermino derecho = terminoDerecho.getDerecho();
+            if (derecho == null) {
+                throw new IllegalArgumentException(
+                    "El derecho de uso seleccionado no está disponible para este servicio.");
+            }
+            if (DERECHO_PERSONAL.equals(derecho.getCodigo())) {
+                throw new IllegalArgumentException(
+                    "El uso personal ya está incluido y no se elige como derecho extra.");
+            }
+            if (derecho.isRequierePiezaUnica()) {
+                throw new IllegalArgumentException(
+                    "El derecho '" + derecho.getNombre()
+                        + "' no está disponible para comisiones.");
+            }
+
+            ItemSolicitudDerecho itemDerecho = new ItemSolicitudDerecho();
+            itemDerecho.setDerecho(derecho);
+            itemDerecho.setCodigo(derecho.getCodigo());
+            itemDerecho.setNombre(derecho.getNombre());
+            itemDerecho.setPorcentajeExtra(
+                terminoDerecho.getPorcentajeExtra() != null
+                    ? terminoDerecho.getPorcentajeExtra()
+                    : BigDecimal.ZERO);
+            itemDerecho.setOrden(derechos.size());
+            derechos.add(itemDerecho);
+        }
+        return derechos;
+    }
+
     private void validarPrioridades(List<ItemPreparado> items) {
         int total = items.size();
         Set<Integer> usadas = new HashSet<>();
@@ -1037,6 +1101,9 @@ public class SolicitudServicioService {
                 respuesta.setSuborden(respuestaPreparada.suborden());
                 item.agregarRespuesta(respuesta);
             }
+            for (ItemSolicitudDerecho derecho : itemPreparado.derechos()) {
+                item.agregarDerecho(derecho);
+            }
             solicitud.agregarItem(item);
         }
         return solicitud;
@@ -1104,7 +1171,8 @@ public class SolicitudServicioService {
     private record ItemPreparado(
             String nombre,
             Integer prioridad,
-            List<RespuestaPreparada> respuestas) {
+            List<RespuestaPreparada> respuestas,
+            List<ItemSolicitudDerecho> derechos) {
     }
 
     private record RespuestaPreparada(
