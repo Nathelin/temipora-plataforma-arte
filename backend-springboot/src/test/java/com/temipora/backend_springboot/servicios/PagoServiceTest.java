@@ -40,6 +40,7 @@ import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
 import com.temipora.backend_springboot.repositorios.PagoRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
+import com.temipora.backend_springboot.servicios.pagos.DatosPagoProveedor;
 import com.temipora.backend_springboot.servicios.pagos.ProveedorPago;
 
 @ExtendWith(MockitoExtension.class)
@@ -295,5 +296,35 @@ class PagoServiceTest {
         assertThat(pago.getEstado()).isEqualTo(EstadoPago.APROBADO);
         verify(hitoPedidoRepository, org.mockito.Mockito.never())
             .findByIdHitoPedidoForUpdate(any());
+    }
+
+    @Test
+    void aplicarEstadoProveedor_conDatos_guardaElDetalleDeMercadoPago() {
+        when(pagoRepository.findByIdPagoForUpdate(PAGO))
+            .thenReturn(Optional.of(pago));
+        LocalDateTime aprobacion = LocalDateTime.of(2026, 11, 2, 10, 0);
+        LocalDateTime liberacion = LocalDateTime.of(2026, 11, 5, 10, 0);
+
+        pagoService.aplicarEstadoProveedor(
+            PAGO, EstadoPago.CANCELADO, "mp-1", "cancelled", null,
+            new DatosPagoProveedor(
+                new BigDecimal("4.50"),
+                new BigDecimal("45.50"),
+                aprobacion,
+                liberacion,
+                "visa",
+                "credit_card",
+                3,
+                "1234"));
+
+        assertThat(pago.getArancelMp()).isEqualByComparingTo("4.50");
+        assertThat(pago.getNetoRecibidoMp())
+            .isEqualByComparingTo("45.50");
+        assertThat(pago.getFechaAprobacion()).isEqualTo(aprobacion);
+        assertThat(pago.getFechaLiberacion()).isEqualTo(liberacion);
+        assertThat(pago.getMedioPago()).isEqualTo("visa");
+        assertThat(pago.getTipoMedioPago()).isEqualTo("credit_card");
+        assertThat(pago.getCuotas()).isEqualTo(3);
+        assertThat(pago.getUltimosCuatro()).isEqualTo("1234");
     }
 }

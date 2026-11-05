@@ -21,6 +21,7 @@ public class ItemSolicitudDTO {
     private Integer ordenPrioridad;
     private String estado;
     private List<RespuestaDTO> respuestas;
+    private List<ItemSolicitudDerechoDTO> derechos;
 
     public static ItemSolicitudDTO desdeItem(ItemSolicitud item) {
         return ItemSolicitudDTO.builder()
@@ -31,6 +32,9 @@ public class ItemSolicitudDTO {
             .estado(item.getEstado())
             .respuestas(item.getRespuestas().stream()
                 .map(RespuestaDTO::desdeRespuesta)
+                .toList())
+            .derechos(item.getDerechos().stream()
+                .map(ItemSolicitudDerechoDTO::desdeItemSolicitudDerecho)
                 .toList())
             .build();
     }

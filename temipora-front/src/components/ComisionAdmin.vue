@@ -86,8 +86,8 @@ onMounted(cargar)
     <AdminPageHeader
       class="mb-6"
       eyebrow="Comercio"
-      titulo="Comisión de la plataforma"
-      descripcion="Porcentaje que la plataforma descuenta a cada venta."
+      titulo="Comisión Temipora"
+      descripcion="Porcentaje que Temipora descuenta a cada venta."
     />
 
     <p v-if="cargando" class="py-10 text-center text-cafe/60">Cargando...</p>

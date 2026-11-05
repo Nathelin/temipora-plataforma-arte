@@ -531,8 +531,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
           -{{ Number(servicio.descuentoOfertaPorcentaje) }}%
         </span>
         <span>
-          Tenés un descuento para este servicio. Se aplica sobre el presupuesto
-          final que envíe el artista.
+          Tenés un descuento de reactivación para este servicio. Se aplica sobre
+          el presupuesto final que envíe el artista.
         </span>
       </div>
 
@@ -696,7 +696,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
           <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div class="rounded-[22px] bg-mantequilla/70 px-4 py-4">
               <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/90">
-                {{ descuentoPorcentaje ? 'Precio con tu descuento' : 'Precio base' }}
+                {{ descuentoPorcentaje ? 'Precio con descuento' : 'Precio base' }}
               </p>
               <div class="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <p class="font-display text-3xl font-extrabold text-granate">
@@ -712,7 +712,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
               </div>
               <div v-if="descuentoPorcentaje" class="mt-1 flex items-center gap-1.5">
                 <p class="text-xs font-bold text-coral">
-                  {{ descuentoPorcentaje }}% de descuento
+                  Descuento de reactivación del {{ descuentoPorcentaje }}%
                 </p>
                 <span class="group relative inline-flex">
                   <button

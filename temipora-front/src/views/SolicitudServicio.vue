@@ -5,6 +5,7 @@ import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
 import VistaPreviaTerminos from '../components/VistaPreviaTerminos.vue'
 import FormularioSolicitud from '../components/FormularioSolicitud.vue'
+import DerechosUsoSolicitud from '../components/DerechosUsoSolicitud.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -92,6 +93,15 @@ const terminosParaMostrar = computed(() => {
 })
 
 const derechosTerminos = computed(() => terminos.value?.derechos || [])
+const derechosOfertados = computed(() => derechosTerminos.value.filter(
+  (d) => d.disponible && d.codigo !== 'PERSONAL' && !d.requierePiezaUnica,
+))
+const precioBaseParaDerechos = computed(
+  () => Number(servicio.value?.precioBaseMostrado ?? servicio.value?.precioBase ?? 0),
+)
+const monedaParaDerechos = computed(
+  () => servicio.value?.monedaMostrada ?? servicio.value?.moneda ?? 'ARS',
+)
 const precioMostrado = computed(() => {
   if (!servicio.value) return ''
   return formatearPrecio(
@@ -139,7 +149,12 @@ const mensajePlan = computed(() => {
 const solicitudCreada = computed(() => solicitud.value)
 
 function crearItem() {
-  return { nombre: '', respuestas: {} }
+  return { nombre: '', respuestas: {}, derechos: [] }
+}
+
+function derechosElegidos(item) {
+  const ids = Array.isArray(item?.derechos) ? item.derechos : []
+  return derechosOfertados.value.filter((d) => ids.includes(d.idDerechoTermino))
 }
 
 function scrollArriba() {
@@ -357,6 +372,7 @@ async function enviar() {
       items: items.value.map((item, indice) => ({
         nombre: item.nombre.trim(),
         prioridad: definirPrioridad ? indice + 1 : null,
+        derechos: item.derechos || [],
         respuestas: preguntas.value
           .filter((p) => p.codigoTipo !== 'ENCABEZADO')
           .map((p) => ({
@@ -428,9 +444,9 @@ onBeforeUnmount(() => {
             : 'border-rojizo/30 bg-rojizo/5 text-rojizo'"
         >
           <template v-if="ofertaAplicable">
-            <p class="font-bold">Descuento del {{ descuentoOferta }}% aplicado</p>
+            <p class="font-bold">Descuento de reactivación del {{ descuentoOferta }}%</p>
             <p class="mt-1 text-cafe/75">
-              Temipora financia el descuento. Se va a aplicar sobre el presupuesto que envíe el artista.
+              Lo financia Temipora. Se aplica sobre el presupuesto que envíe el artista.
             </p>
           </template>
           <template v-else>
@@ -632,6 +648,15 @@ onBeforeUnmount(() => {
           />
         </div>
 
+        <div class="mt-6">
+          <DerechosUsoSolicitud
+            v-model="items[indiceItem].derechos"
+            :derechos="derechosOfertados"
+            :precio-base="precioBaseParaDerechos"
+            :moneda="monedaParaDerechos"
+          />
+        </div>
+
         <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-rosa/50 pt-5">
           <button type="button" class="text-sm text-cafe/60 hover:text-granate transition" @click="anteriorDibujo">
             ← Anterior
@@ -746,7 +771,16 @@ onBeforeUnmount(() => {
                 :key="i"
                 class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-rosa/40 px-3 py-2 text-sm"
               >
-                <span class="text-cafe">{{ i + 1 }}. {{ item.nombre }}</span>
+                <span class="min-w-0">
+                  <span class="block text-cafe">{{ i + 1 }}. {{ item.nombre }}</span>
+                  <span class="mt-0.5 block text-xs text-cafe/55">
+                    {{ derechosElegidos(item).length
+                      ? derechosElegidos(item)
+                        .map((d) => `${d.nombre} (+${d.porcentajeExtra ?? 0}%)`)
+                        .join(' · ')
+                      : 'Uso personal' }}
+                  </span>
+                </span>
                 <span class="text-xs text-cafe/50">
                   {{ esSoloEspera ? 'Lista de espera' : 'Pendiente' }}
                   <template v-if="prioridadDefinida"> · Prioridad {{ i + 1 }}</template>

@@ -52,7 +52,7 @@ class MercadoPagoOAuthControllerTest {
 
     @Test
     void estado_delegaEnElServicio() {
-        when(oauthService.estado(1L)).thenReturn(new CuentaCobroDTO(true, "ACTIVA", "x", null));
+        when(oauthService.estado(1L)).thenReturn(new CuentaCobroDTO(true, "ACTIVA"));
 
         assertThat(controller.estado(auth()).conectada()).isTrue();
     }

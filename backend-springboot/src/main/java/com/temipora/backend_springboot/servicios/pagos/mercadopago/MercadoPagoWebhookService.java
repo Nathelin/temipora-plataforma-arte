@@ -50,7 +50,8 @@ public class MercadoPagoWebhookService {
             MercadoPagoEstados.mapear(pagoMp.status()),
             pagoMp.id() != null ? String.valueOf(pagoMp.id()) : idPagoExterno,
             pagoMp.status(),
-            pagoMp.statusDetail());
+            pagoMp.statusDetail(),
+            MercadoPagoEstados.datos(pagoMp));
     }
 
     /**

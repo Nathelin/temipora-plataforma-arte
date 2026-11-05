@@ -159,7 +159,7 @@ class PanelArtistaServiceTest {
         when(conversacionService.contador(ARTISTA))
             .thenReturn(new ContadorMensajesDTO(0, 0));
         when(mercadoPagoOAuthService.estado(ARTISTA))
-            .thenReturn(new CuentaCobroDTO(true, null, null, null));
+            .thenReturn(new CuentaCobroDTO(true, null));
 
         PanelArtistaResumenDTO resumen = panelArtistaService.resumen(ARTISTA);
 
@@ -191,7 +191,7 @@ class PanelArtistaServiceTest {
         when(conversacionService.contador(ARTISTA))
             .thenReturn(new ContadorMensajesDTO(0, 0));
         when(mercadoPagoOAuthService.estado(ARTISTA))
-            .thenReturn(new CuentaCobroDTO(false, null, null, null));
+            .thenReturn(new CuentaCobroDTO(false, null));
     }
 
     private SolicitudResumenDTO solicitud(

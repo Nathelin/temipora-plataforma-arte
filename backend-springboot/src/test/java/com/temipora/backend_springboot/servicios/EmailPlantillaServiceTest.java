@@ -49,6 +49,8 @@ class EmailPlantillaServiceTest {
             .contains("Ana &amp; Cía")
             .contains("Retrato &lt;script&gt;")
             .contains("10% de descuento")
+            .contains("1.080 ARS")
+            .contains("1.200 ARS")
             .contains("http://localhost:8080/uploads/portada.png")
             .contains("http://localhost:5173/ofertas/token?oferta=7")
             .contains("http://localhost:8080/api/emails/baja/token-baja")

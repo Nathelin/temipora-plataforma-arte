@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -61,6 +62,31 @@ public class PedidoDTO {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal montoNetoArtistaMostrado;
 
+    // Comisión nominal, antes de financiar el descuento de reactivación.
+    // precioFinal - comisionNominal = montoNetoArtista (el neto no cambia).
+    // comisionNominal - descuentoMonto = comisionMonto (efectiva retenida).
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal comisionNominal;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal comisionNominalCobro;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal comisionNominalMostrado;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal arancelMpPorcentaje;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal arancelMpEstimado;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal arancelMpEstimadoCobro;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal arancelMpEstimadoMostrado;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal montoNetoArtistaConArancel;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal montoNetoArtistaConArancelCobro;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal montoNetoArtistaConArancelMostrado;
+
     private Integer terminosPlataformaVersion;
     private LocalDateTime terminosPlataformaAceptadosEn;
     private List<HitoPedidoDTO> hitos;
@@ -79,4 +105,39 @@ public class PedidoDTO {
     private boolean publicacionVisible;
     private boolean puedeAutorizarPublicacion;
     private boolean puedeOcultarPublicacion;
+
+    public void aplicarArancelMp(BigDecimal porcentajeTotal) {
+        if (porcentajeTotal == null || porcentajeTotal.signum() < 0) {
+            return;
+        }
+
+        BigDecimal base = precioFinalCliente != null
+            ? precioFinalCliente
+            : precioFinal;
+        BigDecimal baseCobro = precioFinalClienteCobro != null
+            ? precioFinalClienteCobro
+            : precioFinalCobro;
+        BigDecimal baseMostrado = precioFinalClienteMostrado != null
+            ? precioFinalClienteMostrado
+            : precioFinalMostrado;
+
+        this.arancelMpPorcentaje = porcentajeTotal.setScale(4, RoundingMode.HALF_UP);
+        this.arancelMpEstimado = PresupuestoDTO.parte(base, porcentajeTotal);
+        this.arancelMpEstimadoCobro = PresupuestoDTO.parte(
+            baseCobro, porcentajeTotal);
+        this.arancelMpEstimadoMostrado = PresupuestoDTO.parte(
+            baseMostrado, porcentajeTotal);
+        this.montoNetoArtistaConArancel = PresupuestoDTO.restar(
+            montoNetoArtista, arancelMpEstimado);
+        this.montoNetoArtistaConArancelCobro = PresupuestoDTO.restar(
+            montoNetoArtistaCobro, arancelMpEstimadoCobro);
+        this.montoNetoArtistaConArancelMostrado = PresupuestoDTO.restar(
+            montoNetoArtistaMostrado, arancelMpEstimadoMostrado);
+
+        if (hitos != null) {
+            for (HitoPedidoDTO hito : hitos) {
+                hito.aplicarArancelMp(porcentajeTotal);
+            }
+        }
+    }
 }

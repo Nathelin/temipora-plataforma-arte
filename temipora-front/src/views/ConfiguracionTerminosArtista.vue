@@ -273,7 +273,7 @@ onBeforeUnmount(() => {
         <!-- Derechos -->
         <div>
           <h3 class="text-base text-granate mb-1">Derechos de uso</h3>
-          <p class="text-sm text-cafe/60 mb-4">Elegí qué permitís y, si cobrás extra, el porcentaje sobre el precio base.</p>
+          <p class="text-sm text-cafe/60 mb-4">Elegí qué permitís y, si cobrás extra, el porcentaje sobre el precio base. El cliente podrá elegir estos derechos al solicitar.</p>
           <div class="space-y-3">
             <div v-for="d in derechosCatalogo" :key="d.idDerechoTermino" class="rounded-lg border border-rosa/50 px-4 py-4">
               <div class="flex flex-wrap items-center justify-between gap-3">

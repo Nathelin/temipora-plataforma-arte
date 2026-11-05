@@ -59,7 +59,18 @@ class MercadoPagoClientTest {
             .andRespond(withSuccess(
                 "{\"id\":123,\"status\":\"approved\","
                     + "\"transaction_amount\":50.00,\"currency_id\":\"ARS\","
-                    + "\"external_reference\":\"7\"}",
+                    + "\"external_reference\":\"7\","
+                    + "\"payment_method_id\":\"visa\","
+                    + "\"payment_type_id\":\"credit_card\","
+                    + "\"installments\":3,"
+                    + "\"date_approved\":\"2026-11-02T10:00:00.000-03:00\","
+                    + "\"money_release_date\":\"2026-11-05T10:00:00.000-03:00\","
+                    + "\"transaction_details\":{"
+                    + "\"net_received_amount\":45.50,"
+                    + "\"total_paid_amount\":50.00},"
+                    + "\"fee_details\":[{\"type\":\"mercadopago_fee\","
+                    + "\"amount\":4.50,\"fee_payer\":\"collector\"}],"
+                    + "\"card\":{\"last_four_digits\":\"1234\"}}",
                 MediaType.APPLICATION_JSON));
 
         MercadoPagoPago pago = cliente.consultarPago("123");
@@ -67,6 +78,16 @@ class MercadoPagoClientTest {
         assertThat(pago.id()).isEqualTo(123L);
         assertThat(pago.status()).isEqualTo("approved");
         assertThat(pago.externalReference()).isEqualTo("7");
+        assertThat(pago.paymentMethodId()).isEqualTo("visa");
+        assertThat(pago.paymentTypeId()).isEqualTo("credit_card");
+        assertThat(pago.installments()).isEqualTo(3);
+        assertThat(pago.dateApproved()).isNotNull();
+        assertThat(pago.moneyReleaseDate()).isNotNull();
+        assertThat(pago.transactionDetails().netReceivedAmount())
+            .isEqualByComparingTo("45.50");
+        assertThat(pago.feeDetails()).hasSize(1);
+        assertThat(pago.feeDetails().get(0).feePayer()).isEqualTo("collector");
+        assertThat(pago.card().lastFourDigits()).isEqualTo("1234");
         server.verify();
     }
 

@@ -26,6 +26,14 @@ public class PagoDTO {
     private String instruccion;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaAcreditacion;
+    private LocalDateTime fechaAprobacion;
+    private LocalDateTime fechaLiberacion;
+    private BigDecimal arancelMp;
+    private BigDecimal netoRecibidoMp;
+    private String medioPago;
+    private String tipoMedioPago;
+    private Integer cuotas;
+    private String ultimosCuatro;
 
     public static PagoDTO desdePago(Pago pago, boolean incluirInstruccion) {
         boolean pendiente = pago.getEstado() == EstadoPago.PENDIENTE;
@@ -42,6 +50,14 @@ public class PagoDTO {
             .instruccion(incluirInstruccion && pendiente ? pago.getPayload() : null)
             .fechaCreacion(pago.getFechaCreacion())
             .fechaAcreditacion(pago.getFechaAcreditacion())
+            .fechaAprobacion(pago.getFechaAprobacion())
+            .fechaLiberacion(pago.getFechaLiberacion())
+            .arancelMp(pago.getArancelMp())
+            .netoRecibidoMp(pago.getNetoRecibidoMp())
+            .medioPago(pago.getMedioPago())
+            .tipoMedioPago(pago.getTipoMedioPago())
+            .cuotas(pago.getCuotas())
+            .ultimosCuatro(pago.getUltimosCuatro())
             .build();
     }
 }

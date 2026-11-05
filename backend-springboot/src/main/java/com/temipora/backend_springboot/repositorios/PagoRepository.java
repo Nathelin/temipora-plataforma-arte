@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,7 +16,8 @@ import com.temipora.backend_springboot.modelo.Pago;
 
 import jakarta.persistence.LockModeType;
 
-public interface PagoRepository extends JpaRepository<Pago, Long> {
+public interface PagoRepository
+        extends JpaRepository<Pago, Long>, JpaSpecificationExecutor<Pago> {
 
     Optional<Pago> findFirstByHitoPedidoIdHitoPedidoAndEstado(
         Long idHitoPedido, EstadoPago estado);

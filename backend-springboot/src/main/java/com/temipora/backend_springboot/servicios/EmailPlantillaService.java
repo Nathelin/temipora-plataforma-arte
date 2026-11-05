@@ -1,5 +1,8 @@
 package com.temipora.backend_springboot.servicios;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -76,7 +79,8 @@ public class EmailPlantillaService {
         vista.put("nombreServicio", oferta.nombreServicio());
         vista.put("nombreArtista", oferta.nombreArtista());
         vista.put("porcentaje", porcentaje(oferta));
-        vista.put("precioDesde", oferta.precioDesde());
+        vista.put("precioDesde", monto(oferta.precioDesde()));
+        vista.put("precioConDescuento", precioConDescuento(oferta));
         vista.put("moneda", oferta.moneda());
         vista.put("motivo", oferta.motivo());
         vista.put("url", oferta.url());
@@ -97,6 +101,46 @@ public class EmailPlantillaService {
         return oferta.porcentajeDescuento()
             .stripTrailingZeros()
             .toPlainString();
+    }
+
+    private String precioConDescuento(OfertaEmail oferta) {
+        if (oferta.precioDesde() == null || oferta.precioDesde().isBlank()
+                || oferta.porcentajeDescuento() == null) {
+            return null;
+        }
+        try {
+            BigDecimal base = new BigDecimal(oferta.precioDesde().trim());
+            BigDecimal porcentaje = oferta.porcentajeDescuento()
+                .max(BigDecimal.ZERO)
+                .min(BigDecimal.valueOf(100));
+            BigDecimal descuento = base.multiply(porcentaje)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            return formatearMonto(base.subtract(descuento).max(BigDecimal.ZERO));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private String monto(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return valor;
+        }
+        try {
+            return formatearMonto(new BigDecimal(valor.trim()));
+        } catch (NumberFormatException e) {
+            return valor;
+        }
+    }
+
+    private String formatearMonto(BigDecimal valor) {
+        if (valor == null) {
+            return null;
+        }
+        NumberFormat formato = NumberFormat.getNumberInstance(
+            Locale.forLanguageTag("es-AR"));
+        formato.setMinimumFractionDigits(0);
+        formato.setMaximumFractionDigits(2);
+        return formato.format(valor);
     }
 
     private String inicial(String nombre) {

@@ -62,6 +62,11 @@ function precioDesde(oferta) {
   return formatearPrecio(oferta.precioBase, oferta.moneda || 'ARS')
 }
 
+function precioConDescuento(oferta) {
+  if (oferta?.precioConDescuentoEstimado == null) return ''
+  return formatearPrecio(oferta.precioConDescuentoEstimado, oferta.moneda || 'ARS')
+}
+
 function fechaVencimiento(oferta) {
   if (!oferta?.fechaVencimiento) return ''
   return new Date(oferta.fechaVencimiento).toLocaleDateString('es-AR', {
@@ -229,8 +234,8 @@ onMounted(async () => {
           Propuestas para retomar
         </h1>
         <p class="mt-3 max-w-2xl text-lg leading-relaxed text-cafe/75">
-          Elegimos artistas que pueden interesarte y les aplicamos un descuento para que vuelvas a crear.
-          El descuento lo financia Temipora y se aplica sobre el presupuesto final.
+          Elegimos artistas que pueden interesarte y les aplicamos un descuento de reactivación para que vuelvas a crear.
+          Lo financia Temipora y se aplica sobre el presupuesto final.
         </p>
       </div>
       <router-link
@@ -370,15 +375,15 @@ onMounted(async () => {
         <article
           v-for="oferta in ofertas"
           :key="oferta.idOferta"
-          class="flex h-full flex-col overflow-hidden rounded-[28px] border border-borde/60 bg-superficie shadow-[0_12px_30px_rgba(74,29,46,0.08)]"
+          class="group flex h-full flex-col overflow-hidden rounded-[22px] border border-borde/60 bg-superficie shadow-[0_10px_28px_rgba(74,29,46,0.08)] transition duration-300 hover:-translate-y-1 hover:border-coral/40"
           :class="{ 'ring-2 ring-coral/60': String(oferta.idOferta) === ofertaDestacada }"
         >
-          <div class="relative aspect-[4/3] overflow-hidden bg-rosa/30">
+          <div class="relative aspect-video overflow-hidden bg-rosa/30">
             <img
               v-if="oferta.imagen"
               :src="oferta.imagen"
               :alt="`Trabajo de ${oferta.nombreArtista || oferta.nombreServicio}`"
-              class="h-full w-full object-cover"
+              class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
               loading="lazy"
             />
             <div
@@ -389,72 +394,83 @@ onMounted(async () => {
             </div>
             <span
               v-if="descuento(oferta)"
-              class="absolute left-3 top-3 rounded-full bg-coral px-3 py-1 text-xs font-extrabold text-white shadow-sm"
+              class="absolute left-3 top-3 rounded-full bg-coral px-2.5 py-1 text-[11px] font-extrabold text-white shadow-sm"
             >
               -{{ descuento(oferta) }}%
             </span>
             <span
               v-if="!oferta.vigente"
-              class="absolute right-3 top-3 rounded-full bg-granate/80 px-3 py-1 text-xs font-bold text-blanco"
+              class="absolute right-3 top-3 rounded-full bg-granate/80 px-2.5 py-1 text-[11px] font-bold text-blanco"
             >
               Vencida
             </span>
           </div>
 
-          <div class="flex flex-1 flex-col gap-3 p-5">
-            <div>
-              <p class="font-display text-xl font-extrabold leading-tight text-granate">
-                {{ oferta.nombreServicio }}
-              </p>
-              <p class="mt-1 text-sm text-cafe/60">@{{ oferta.nombreArtista }}</p>
+          <div class="flex flex-1 flex-col p-4">
+            <h3 class="line-clamp-1 font-display text-base font-bold leading-snug text-granate">
+              {{ oferta.nombreServicio }}
+            </h3>
+
+            <div class="mt-2 flex items-center gap-2">
+              <img
+                v-if="oferta.urlFotoArtista"
+                :src="oferta.urlFotoArtista"
+                alt=""
+                class="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-borde/50"
+              />
+              <span
+                v-else
+                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-rosa/40 text-[11px] font-bold text-granate ring-1 ring-borde/50"
+                aria-hidden="true"
+              >
+                {{ inicial(oferta) }}
+              </span>
+              <span class="line-clamp-1 text-xs font-semibold text-cafe/60">@{{ oferta.nombreArtista }}</span>
             </div>
 
-            <p v-if="oferta.descripcionServicio" class="line-clamp-2 text-sm leading-relaxed text-cafe/70">
-              {{ oferta.descripcionServicio }}
+            <div class="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-borde/40 pt-3">
+              <template v-if="precioConDescuento(oferta)">
+                <span class="font-display text-lg font-extrabold leading-none text-coral">
+                  {{ precioConDescuento(oferta) }}
+                </span>
+                <span
+                  class="text-[10px] font-semibold text-cafe/60 line-through"
+                  :title="`Precio base: ${precioDesde(oferta)}`"
+                >
+                  {{ precioDesde(oferta) }}
+                </span>
+              </template>
+              <span
+                v-else-if="precioDesde(oferta)"
+                class="font-display text-lg font-extrabold leading-none text-coral"
+              >
+                Desde {{ precioDesde(oferta) }}
+              </span>
+              <span v-if="oferta.fechaVencimiento" class="ml-auto text-[10px] font-medium text-cafe/55">
+                Hasta el {{ fechaVencimiento(oferta) }}
+              </span>
+            </div>
+
+            <p v-if="oferta.motivo" class="mt-1 line-clamp-1 text-[11px] text-cafe/55">
+              {{ oferta.motivo }}
             </p>
 
-            <div class="flex flex-wrap items-center gap-2">
-              <span
-                v-if="descuento(oferta)"
-                class="rounded-full bg-mantequilla px-2.5 py-1 text-xs font-bold text-tinta"
+            <div class="mt-auto flex flex-wrap gap-2 pt-3">
+              <button
+                type="button"
+                class="inline-flex min-h-9 flex-1 items-center justify-center rounded-full bg-coral px-3 text-xs font-bold text-white transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="!oferta.vigente || (autenticado && !mismaCuenta)"
+                @click="solicitar(oferta)"
               >
-                {{ descuento(oferta) }}% en el presupuesto final
-              </span>
-              <span
-                v-if="oferta.motivo"
-                class="rounded-full bg-rosa/30 px-2.5 py-1 text-xs font-semibold text-granate"
+                {{ autenticado ? 'Solicitar con descuento' : 'Iniciar sesión' }}
+              </button>
+              <button
+                type="button"
+                class="inline-flex min-h-9 items-center justify-center rounded-full border border-coral/40 px-3 text-xs font-bold text-coral transition hover:bg-coral/5"
+                @click="verServicio(oferta)"
               >
-                {{ oferta.motivo }}
-              </span>
-            </div>
-
-            <div class="mt-auto space-y-3">
-              <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span v-if="precioDesde(oferta)" class="font-bold text-granate">
-                  Desde {{ precioDesde(oferta) }}
-                </span>
-                <span v-if="oferta.fechaVencimiento" class="text-xs text-cafe/55">
-                  Hasta el {{ fechaVencimiento(oferta) }}
-                </span>
-              </div>
-
-              <div class="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  class="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-coral px-4 text-sm font-bold text-white transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 disabled:cursor-not-allowed disabled:opacity-50"
-                  :disabled="!oferta.vigente || (autenticado && !mismaCuenta)"
-                  @click="solicitar(oferta)"
-                >
-                  {{ autenticado ? 'Solicitar con descuento' : 'Iniciar sesión' }}
-                </button>
-                <button
-                  type="button"
-                  class="inline-flex min-h-11 items-center justify-center rounded-full border border-coral/40 px-4 text-sm font-bold text-coral transition hover:bg-coral/5"
-                  @click="verServicio(oferta)"
-                >
-                  Ver servicio
-                </button>
-              </div>
+                Ver servicio
+              </button>
             </div>
           </div>
         </article>

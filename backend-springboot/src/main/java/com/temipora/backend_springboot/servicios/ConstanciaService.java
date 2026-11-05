@@ -70,7 +70,7 @@ public class ConstanciaService {
             documento.add(new Paragraph(" "));
             documento.add(new Paragraph(
                 "Los hashes SHA-256 permiten verificar la integridad de los "
-                    + "archivos entregados. La comisión y el neto del artista "
+                    + "archivos entregados. La comisión, el arancel y tu neto "
                     + "solo se incluyen en la copia del artista y del admin.",
                 CHICO));
 
@@ -97,21 +97,56 @@ public class ConstanciaService {
                 + "   Límite de entrega: " + fecha(pedido.getLimiteEntrega())
                 + "   Finalizado: " + fechaHora(pedido.getFinalizadoEn()),
             TEXTO));
-        documento.add(new Paragraph(
-            "Total: " + monto(
-                pedido.getPrecioFinalMostrado(),
-                pedido.getMonedaMostrada()), TEXTO_BOLD));
-
-        if (pedido.getComisionMonto() != null) {
+        boolean incluyeComision = pedido.getComisionMonto() != null;
+        if (!incluyeComision) {
             documento.add(new Paragraph(
-                "Comisión de la plataforma ("
+                "Total a pagar: " + monto(
+                    pedido.getPrecioFinalClienteMostrado(),
+                    pedido.getMonedaMostrada()), TEXTO_BOLD));
+            if (pedido.getDescuentoMostrado() != null
+                    && pedido.getDescuentoMostrado().signum() > 0) {
+                documento.add(new Paragraph(
+                    "Precio original: " + monto(
+                        pedido.getPrecioFinalMostrado(),
+                        pedido.getMonedaMostrada())
+                        + "   Descuento de reactivación: "
+                        + monto(pedido.getDescuentoMostrado(),
+                            pedido.getMonedaMostrada()),
+                    TEXTO));
+            }
+        } else {
+            documento.add(new Paragraph(
+                "Precio del pedido: " + monto(
+                    pedido.getPrecioFinalMostrado(),
+                    pedido.getMonedaMostrada()), TEXTO_BOLD));
+            documento.add(new Paragraph(
+                "Comisión Temipora ("
                     + numero(pedido.getComisionPorcentaje()) + "%): "
                     + monto(pedido.getComisionMontoMostrado(),
                         pedido.getMonedaMostrada())
-                    + "   Neto del artista: "
+                    + "   Tu neto: "
                     + monto(pedido.getMontoNetoArtistaMostrado(),
                         pedido.getMonedaMostrada()),
                 TEXTO));
+            if (pedido.getArancelMpEstimadoMostrado() != null) {
+                documento.add(new Paragraph(
+                    "Arancel MercadoPago (estimado): " + monto(
+                        pedido.getArancelMpEstimadoMostrado(),
+                        pedido.getMonedaMostrada())
+                        + "   Recibís (estimado): " + monto(
+                            pedido.getMontoNetoArtistaConArancelMostrado(),
+                            pedido.getMonedaMostrada()),
+                    TEXTO));
+            }
+            if (pedido.getDescuentoMostrado() != null
+                    && pedido.getDescuentoMostrado().signum() > 0) {
+                documento.add(new Paragraph(
+                    "Descuento del cliente: " + monto(
+                        pedido.getDescuentoMostrado(),
+                        pedido.getMonedaMostrada())
+                        + " (lo financia Temipora; no reduce tu neto).",
+                    CHICO));
+            }
         }
 
         documento.add(new Paragraph(

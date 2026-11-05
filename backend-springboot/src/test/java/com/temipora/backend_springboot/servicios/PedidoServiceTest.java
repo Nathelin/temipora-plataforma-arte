@@ -30,6 +30,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.temipora.backend_springboot.modelo.ContadoresPedidosDTO;
+import com.temipora.backend_springboot.modelo.ArancelEstimadoDTO;
 import com.temipora.backend_springboot.modelo.Conversacion;
 import com.temipora.backend_springboot.modelo.EntregaHito;
 import com.temipora.backend_springboot.modelo.EntregaHitoMultipartRequest;
@@ -61,6 +62,7 @@ import com.temipora.backend_springboot.repositorios.MensajeRepository;
 import com.temipora.backend_springboot.repositorios.PagoRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
+import com.temipora.backend_springboot.servicios.pagos.ArancelEstimadoService;
 
 @ExtendWith(MockitoExtension.class)
 class PedidoServiceTest {
@@ -98,6 +100,8 @@ class PedidoServiceTest {
     private MensajeRepository mensajeRepository;
     @Mock
     private AuditoriaService auditoria;
+    @Mock
+    private ArancelEstimadoService arancelEstimadoService;
 
     @InjectMocks
     private PedidoService pedidoService;
@@ -116,6 +120,11 @@ class PedidoServiceTest {
     void setUp() {
         cliente = usuario(CLIENTE, "cliente");
         artista = usuario(ARTISTA, "artista");
+        lenient().when(arancelEstimadoService.estimar())
+            .thenReturn(new ArancelEstimadoDTO(
+                new BigDecimal("3.49"),
+                new BigDecimal("21"),
+                new BigDecimal("4.2229")));
 
         moneda = Moneda.builder()
             .idMoneda(3L)
@@ -712,6 +721,11 @@ class PedidoServiceTest {
 
         assertThat(dto.getRolVista()).isEqualTo("ADMIN");
         assertThat(dto.getComisionMonto()).isNotNull();
+        assertThat(dto.getArancelMpPorcentaje())
+            .isEqualByComparingTo("4.2229");
+        assertThat(dto.getArancelMpEstimado()).isNotNull();
+        assertThat(dto.getHitos()).isNotEmpty();
+        assertThat(dto.getHitos().get(0).getArancelMpEstimado()).isNotNull();
     }
 
     @Test

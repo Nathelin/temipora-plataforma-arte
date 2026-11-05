@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.servicios;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -56,6 +57,7 @@ import com.temipora.backend_springboot.repositorios.MensajeRepository;
 import com.temipora.backend_springboot.repositorios.PagoRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
+import com.temipora.backend_springboot.servicios.pagos.ArancelEstimadoService;
 
 @Service
 public class PedidoService {
@@ -146,6 +148,7 @@ public class PedidoService {
     private final ConversacionRepository conversacionRepository;
     private final MensajeRepository mensajeRepository;
     private final AuditoriaService auditoria;
+    private final ArancelEstimadoService arancelEstimadoService;
 
     public PedidoService(
             PedidoRepository pedidoRepository,
@@ -161,7 +164,8 @@ public class PedidoService {
             PedidoCierreService pedidoCierreService,
             ConversacionRepository conversacionRepository,
             MensajeRepository mensajeRepository,
-            AuditoriaService auditoria) {
+            AuditoriaService auditoria,
+            ArancelEstimadoService arancelEstimadoService) {
         this.pedidoRepository = pedidoRepository;
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.pagoRepository = pagoRepository;
@@ -176,6 +180,7 @@ public class PedidoService {
         this.conversacionRepository = conversacionRepository;
         this.mensajeRepository = mensajeRepository;
         this.auditoria = auditoria;
+        this.arancelEstimadoService = arancelEstimadoService;
     }
 
     @Transactional
@@ -1260,7 +1265,16 @@ public class PedidoService {
             finalClienteCobro = pedido.getPrecioFinalCobro();
         }
 
-        return PedidoDTO.builder()
+        BigDecimal comisionNominal = pedido.getPrecioFinal()
+            .subtract(neto)
+            .max(BigDecimal.ZERO)
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal comisionNominalCobro = pedido.getPrecioFinalCobro()
+            .subtract(netoCobro)
+            .max(BigDecimal.ZERO)
+            .setScale(2, RoundingMode.HALF_UP);
+
+        PedidoDTO dto = PedidoDTO.builder()
             .idPedido(pedido.getIdPedido())
             .idSolicitud(pedido.getSolicitud().getIdSolicitud())
             .idServicio(pedido.getServicio() != null
@@ -1341,6 +1355,17 @@ public class PedidoService {
                     factorCobro,
                     factorOrigen)
                 : null)
+            .comisionNominal(incluirComision ? comisionNominal : null)
+            .comisionNominalCobro(incluirComision ? comisionNominalCobro : null)
+            .comisionNominalMostrado(incluirComision
+                ? PresupuestoDTO.totalMostrado(
+                    comisionNominal,
+                    comisionNominalCobro,
+                    muestraOrigen,
+                    muestraCobro,
+                    factorCobro,
+                    factorOrigen)
+                : null)
             .terminosPlataformaVersion(pedido.getTerminosPlataformaVersion())
             .terminosPlataformaAceptadosEn(
                 pedido.getTerminosPlataformaAceptadosEn())
@@ -1371,6 +1396,12 @@ public class PedidoService {
             .puedeAutorizarPublicacion(puedeAutorizarPublicacion)
             .puedeOcultarPublicacion(puedeOcultarPublicacion)
             .build();
+
+        if (incluirComision) {
+            dto.aplicarArancelMp(
+                arancelEstimadoService.estimar().porcentajeTotal());
+        }
+        return dto;
     }
 
     private PedidoResumenDTO construirResumen(Pedido pedido, Long idVista) {

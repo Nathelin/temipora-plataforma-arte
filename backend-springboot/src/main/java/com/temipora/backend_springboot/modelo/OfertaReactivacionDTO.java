@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 import lombok.AllArgsConstructor;
@@ -27,6 +28,7 @@ public class OfertaReactivacionDTO {
     private String urlFotoArtista;
     private String imagen;
     private BigDecimal precioBase;
+    private BigDecimal precioConDescuentoEstimado;
     private String moneda;
     private BigDecimal porcentajeDescuento;
     private LocalDateTime fechaVencimiento;
@@ -77,6 +79,8 @@ public class OfertaReactivacionDTO {
             .urlFotoArtista(artista != null ? artista.getUrlFotoPerfil() : null)
             .imagen(servicio != null ? servicio.getImagenPortada() : null)
             .precioBase(servicio != null ? servicio.getPrecioBase() : null)
+            .precioConDescuentoEstimado(
+                precioConDescuento(servicio, porcentaje))
             .moneda(servicio != null && servicio.getMoneda() != null
                 ? servicio.getMoneda().getCodigo()
                 : null)
@@ -86,5 +90,21 @@ public class OfertaReactivacionDTO {
             .estado(oferta.getEstado() != null ? oferta.getEstado().name() : null)
             .vigente(vigente)
             .build();
+    }
+
+    private static BigDecimal precioConDescuento(
+            Servicio servicio,
+            BigDecimal porcentaje) {
+        if (servicio == null || servicio.getPrecioBase() == null
+                || porcentaje == null) {
+            return null;
+        }
+        BigDecimal descuento = servicio.getPrecioBase()
+            .multiply(porcentaje)
+            .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        return servicio.getPrecioBase()
+            .subtract(descuento)
+            .max(BigDecimal.ZERO)
+            .setScale(2, RoundingMode.HALF_UP);
     }
 }

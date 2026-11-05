@@ -15,6 +15,7 @@ import {
   textoTiempoEntrega,
 } from '../servicios/solicitudes'
 import { useNotificaciones } from '../composables/useNotificaciones'
+import ModalComoSeCalcula from '../components/ModalComoSeCalcula.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,6 +29,7 @@ const maxInicio = aFechaISO(sumarPlazo(hoy, 12, 'MESES'))
 
 const solicitud = ref(null)
 const comisionPorcentaje = ref(null)
+const arancelMp = ref(null)
 const configPedido = ref({
   maxHitos: 4,
   porcentajeMaxPrimerHito: 50,
@@ -39,6 +41,7 @@ const errorCarga = ref('')
 const enviando = ref(false)
 const errorEnvio = ref('')
 const paso = ref(1)
+const modalCalculoAbierto = ref(false)
 const fechasVisibles = ref({
   fechaInicioEstimada: '',
   fechaVencimiento: '',
@@ -197,10 +200,20 @@ function valorRecargo(recargo) {
   return Number.isFinite(valor) && valor > 0 ? valor : 0
 }
 
+function autoRecargosDe(item) {
+  return (item?.derechos || []).map((d) => ({
+    descripcion: d.nombre,
+    tipo: 'PORCENTAJE',
+    valor: Number(d.porcentajeExtra) || 0,
+    automatico: true,
+  }))
+}
+
 function subtotalItem(item) {
   let fijos = 0
   let porcentajes = 0
-  for (const recargo of item.recargos || []) {
+  const recargos = [...autoRecargosDe(item), ...(item.recargos || [])]
+  for (const recargo of recargos) {
     const valor = valorRecargo(recargo)
     if (recargo.tipo === 'PORCENTAJE') porcentajes += valor
     else fijos += valor
@@ -222,9 +235,20 @@ const comisionMonto = computed(() => {
   if (comisionPorcentaje.value == null) return null
   return Math.round(totalFinal.value * comisionPorcentaje.value) / 100
 })
-const netoArtista = computed(() => {
+const arancelMpEstimado = computed(() => {
+  if (arancelMp.value == null) return null
+  return Math.round(totalFinal.value * arancelMp.value) / 100
+})
+const netoSinArancel = computed(() => {
   if (comisionMonto.value == null) return null
   return Math.round((totalFinal.value - comisionMonto.value) * 100) / 100
+})
+const netoArtista = computed(() => {
+  if (netoSinArancel.value == null) return null
+  if (arancelMpEstimado.value == null) {
+    return netoSinArancel.value
+  }
+  return Math.round((netoSinArancel.value - arancelMpEstimado.value) * 100) / 100
 })
 const maxHitos = computed(() => Number(configPedido.value?.maxHitos) || 4)
 const porcentajeMaxPrimerHito = computed(
@@ -400,16 +424,27 @@ async function cargar() {
   cargando.value = true
   errorCarga.value = ''
   try {
-    const [res, resComision, resConfig, resConfigPresupuesto] = await Promise.all([
+    const [
+      res,
+      resComision,
+      resConfig,
+      resConfigPresupuesto,
+      resArancel,
+    ] = await Promise.all([
       api.get(`/solicitudes-servicio/${idSolicitud.value}`),
       api.get('/comisiones/vigentes').catch(() => null),
       api.get('/configuracion-pedido').catch(() => null),
       api.get('/presupuestos/configuracion-vencimiento').catch(() => null),
+      api.get('/pagos/arancel-estimado').catch(() => null),
     ])
     solicitud.value = res.data
     const porcentaje = Number(resComision?.data?.porcentajeServicio)
     if (Number.isFinite(porcentaje)) {
       comisionPorcentaje.value = porcentaje
+    }
+    const porcentajeArancel = Number(resArancel?.data?.porcentajeTotal)
+    if (Number.isFinite(porcentajeArancel)) {
+      arancelMp.value = porcentajeArancel
     }
     if (resConfig?.data) {
       configPedido.value = {
@@ -431,6 +466,7 @@ async function cargar() {
       nombre: item.nombre,
       nota: '',
       recargos: [],
+      derechos: item.derechos || [],
       respuestas: gruposDeRespuestas(item),
     }))
     form.value.hitos = hitosPorDefecto()
@@ -893,6 +929,26 @@ onMounted(cargar)
               Base {{ formatear(baseItem()) }}
             </p>
 
+            <div
+              v-if="autoRecargosDe(item).length"
+              class="mt-4 rounded-xl border border-coral/30 bg-coral/5 px-3 py-2.5"
+            >
+              <p class="text-xs font-semibold text-granate">Derechos de uso solicitados</p>
+              <ul class="mt-2 space-y-1">
+                <li
+                  v-for="(recargo, autoIndice) in autoRecargosDe(item)"
+                  :key="`auto-${item.idItemSolicitud}-${autoIndice}`"
+                  class="flex items-center justify-between gap-3 text-xs"
+                >
+                  <span class="min-w-0 text-cafe">{{ recargo.descripcion }}</span>
+                  <span class="shrink-0 font-semibold text-granate">+{{ recargo.valor }}%</span>
+                </li>
+              </ul>
+              <p class="mt-2 text-xs leading-relaxed text-cafe/55">
+                Estos recargos se agregan automáticamente sobre el precio base y no se pueden quitar.
+              </p>
+            </div>
+
             <details
               v-if="item.respuestas.length"
               class="mt-4 rounded-xl border border-rosa/40 bg-rosa/5 px-3 py-2"
@@ -1210,23 +1266,50 @@ onMounted(cargar)
                 <dd class="text-right font-medium text-cafe">{{ formatear(totalRecargos) }}</dd>
               </div>
               <div class="flex items-start justify-between gap-4 border-t border-coral/15 pt-3">
-                <dt class="text-base font-semibold text-granate">Total</dt>
+                <dt class="text-base font-semibold text-granate">Precio del presupuesto</dt>
                 <dd class="text-right text-2xl font-bold text-granate">{{ formatear(totalFinal) }}</dd>
               </div>
               <template v-if="comisionMonto !== null">
                 <div class="flex items-start justify-between gap-4 border-t border-coral/15 pt-3">
                   <dt class="text-cafe/55">
-                    Comisión de la plataforma ({{ formatearMonto(comisionPorcentaje) }}%)
+                    Comisión Temipora ({{ formatearMonto(comisionPorcentaje) }}%)
                   </dt>
                   <dd class="text-right font-medium text-cafe">− {{ formatear(comisionMonto) }}</dd>
                 </div>
+                <div class="flex items-start justify-between gap-4 border-t border-coral/15 pt-3">
+                  <dt class="font-semibold text-granate">Tu neto</dt>
+                  <dd class="text-right font-semibold text-granate">
+                    {{ formatear(netoSinArancel) }}
+                  </dd>
+                </div>
+                <div
+                  v-if="arancelMpEstimado !== null"
+                  class="flex items-start justify-between gap-4"
+                >
+                  <dt class="text-cafe/55">
+                    Arancel MercadoPago (estimado) ({{ formatearMonto(arancelMp) }}%)
+                  </dt>
+                  <dd class="text-right font-medium text-cafe">
+                    − {{ formatear(arancelMpEstimado) }}
+                  </dd>
+                </div>
                 <div class="flex items-start justify-between gap-4">
-                  <dt class="text-base font-semibold text-granate">Recibís</dt>
+                  <dt class="text-base font-semibold text-granate">Recibís (estimado)</dt>
                   <dd class="text-right text-xl font-bold text-granate">{{ formatear(netoArtista) }}</dd>
                 </div>
                 <p class="text-xs leading-relaxed text-cafe/50">
-                  La comisión se descuenta de tu precio. El cliente paga el total sin cambios.
+                  El cliente paga el precio del presupuesto. La comisión Temipora y el
+                  arancel de MercadoPago se descuentan de tu parte.
                 </p>
+                <div class="pt-1">
+                  <button
+                    type="button"
+                    class="text-xs font-semibold text-coral underline-offset-2 transition hover:text-rojizo hover:underline"
+                    @click="modalCalculoAbierto = true"
+                  >
+                    ¿Cómo se calcula?
+                  </button>
+                </div>
               </template>
             </dl>
           </div>
@@ -1313,5 +1396,20 @@ onMounted(cargar)
         </div>
       </form>
     </template>
+
+    <ModalComoSeCalcula
+      :abierto="modalCalculoAbierto"
+      contexto="presupuesto"
+      :moneda="moneda"
+      :precio="totalFinal"
+      :comision-porcentaje="comisionPorcentaje"
+      :comision-monto="comisionMonto"
+      :neto="netoSinArancel"
+      :arancel-porcentaje="arancelMp"
+      :arancel-monto="arancelMpEstimado"
+      :recibis="netoArtista"
+      estimado
+      @cerrar="modalCalculoAbierto = false"
+    />
   </div>
 </template>

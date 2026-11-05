@@ -133,8 +133,8 @@ const tarjetas = computed(() => {
     {
       etiqueta: 'Por cobrar',
       valor: formatearPrecio(dinero.value.porCobrar, dinero.value.monedaMostrada),
-      detalle: `Cobrado este mes: ${formatearPrecio(dinero.value.cobradoMes, dinero.value.monedaMostrada)}`,
-      to: '/configuracion/cobros',
+      detalle: `Recibido este mes: ${formatearPrecio(dinero.value.cobradoMes, dinero.value.monedaMostrada)}`,
+      to: '/panel/ventas',
       icono: ICONOS.dinero,
       monto: true,
     },

@@ -25,6 +25,7 @@ import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
 import com.temipora.backend_springboot.repositorios.PagoRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
+import com.temipora.backend_springboot.servicios.pagos.DatosPagoProveedor;
 import com.temipora.backend_springboot.servicios.pagos.EstadoCobroProveedor;
 import com.temipora.backend_springboot.servicios.pagos.ProveedorPago;
 import com.temipora.backend_springboot.servicios.pagos.ResultadoCobro;
@@ -201,7 +202,8 @@ public class PagoService {
                 estado.estado(),
                 estado.idPagoExterno(),
                 estado.estadoExterno(),
-                estado.detalle()));
+                estado.detalle(),
+                estado.datos()));
     }
 
     /**
@@ -216,10 +218,23 @@ public class PagoService {
             String idPagoExterno,
             String estadoExterno,
             String detalle) {
+        aplicarEstadoProveedor(
+            idPago, estado, idPagoExterno, estadoExterno, detalle, null);
+    }
+
+    @Transactional
+    public void aplicarEstadoProveedor(
+            Long idPago,
+            EstadoPago estado,
+            String idPagoExterno,
+            String estadoExterno,
+            String detalle,
+            DatosPagoProveedor datos) {
         Pago pago = pagoRepository.findByIdPagoForUpdate(idPago)
             .orElseThrow(() -> new NoSuchElementException(
                 "Pago no encontrado: " + idPago));
         Snapshot antes = Snapshot.de(pago, CAMPOS_PAGO);
+        aplicarDatosProveedor(pago, datos);
         pago.setIdPagoExterno(idPagoExterno);
         pago.setEstadoExterno(detalle != null && !detalle.isBlank()
             ? estadoExterno + " / " + detalle
@@ -254,6 +269,37 @@ public class PagoService {
         }
         pagoRepository.save(pago);
         auditarEstadoProveedor(pago, antes, estadoExterno);
+    }
+
+    private void aplicarDatosProveedor(
+            Pago pago, DatosPagoProveedor datos) {
+        if (datos == null) {
+            return;
+        }
+        if (datos.arancel() != null) {
+            pago.setArancelMp(datos.arancel());
+        }
+        if (datos.netoRecibido() != null) {
+            pago.setNetoRecibidoMp(datos.netoRecibido());
+        }
+        if (datos.fechaAprobacion() != null) {
+            pago.setFechaAprobacion(datos.fechaAprobacion());
+        }
+        if (datos.fechaLiberacion() != null) {
+            pago.setFechaLiberacion(datos.fechaLiberacion());
+        }
+        if (datos.medioPago() != null) {
+            pago.setMedioPago(datos.medioPago());
+        }
+        if (datos.tipoMedioPago() != null) {
+            pago.setTipoMedioPago(datos.tipoMedioPago());
+        }
+        if (datos.cuotas() != null) {
+            pago.setCuotas(datos.cuotas());
+        }
+        if (datos.ultimosCuatro() != null) {
+            pago.setUltimosCuatro(datos.ultimosCuatro());
+        }
     }
 
     private void auditarEstadoProveedor(

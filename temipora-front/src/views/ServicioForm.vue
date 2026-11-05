@@ -16,6 +16,7 @@ import VistaPreviaFormulario from '../components/VistaPreviaFormulario.vue'
 import VistaPreviaTerminos from '../components/VistaPreviaTerminos.vue'
 import AvisoCompletitudTerminos from '../components/AvisoCompletitudTerminos.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+import BurbujaInfo from '../components/BurbujaInfo.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -928,7 +929,14 @@ onBeforeUnmount(() => {
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_13rem] gap-6">
               <div>
-                <label class="block text-sm text-cafe mb-2">Precio base <span class="text-rojizo">*</span></label>
+                <div class="mb-2 flex items-center gap-1.5">
+                  <label class="block text-sm text-cafe">Precio base <span class="text-rojizo">*</span></label>
+                  <BurbujaInfo etiqueta="Cómo se calcula tu neto">
+                    El precio que fijás es el precio del servicio. De ahí se
+                    descuentan la comisión Temipora y el arancel de MercadoPago;
+                    lo que queda es tu neto.
+                  </BurbujaInfo>
+                </div>
                 <input :value="form.precioBase" type="text" inputmode="decimal" placeholder="1.000"
                   class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
                   @input="alEscribirPrecioBase" @blur="alSalirPrecioBase" />

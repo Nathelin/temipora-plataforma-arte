@@ -2,6 +2,8 @@ package com.temipora.backend_springboot.servicios.pagos.mercadopago;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,7 +47,8 @@ class MercadoPagoWebhookServiceTest {
         webhookService.procesarPago("123");
 
         verify(pagoService).aplicarEstadoProveedor(
-            30L, EstadoPago.APROBADO, "123", "approved", "accredited");
+            eq(30L), eq(EstadoPago.APROBADO), eq("123"), eq("approved"),
+            eq("accredited"), any());
     }
 
     @Test
@@ -62,7 +65,8 @@ class MercadoPagoWebhookServiceTest {
         webhookService.procesarPago("123");
 
         verify(pagoService).aplicarEstadoProveedor(
-            30L, EstadoPago.APROBADO, "123", "approved", "accredited");
+            eq(30L), eq(EstadoPago.APROBADO), eq("123"), eq("approved"),
+            eq("accredited"), any());
     }
 
     @Test
@@ -80,6 +84,7 @@ class MercadoPagoWebhookServiceTest {
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any());
     }
 
@@ -89,12 +94,13 @@ class MercadoPagoWebhookServiceTest {
             new MercadoPagoPago(
                 123L, "approved", "accredited",
                 new BigDecimal("50.00"), "ARS", null, "visa",
-                "credit_card", null));
+                "credit_card", null, null, null, null, null, null, null));
 
         webhookService.procesarPago("123");
 
         verify(pagoService, never()).aplicarEstadoProveedor(
             org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
             org.mockito.ArgumentMatchers.any(),
@@ -121,7 +127,13 @@ class MercadoPagoWebhookServiceTest {
         return new MercadoPagoPago(
             123L, estado, "accredited",
             new BigDecimal(monto), "ARS", "30", "visa",
-            "credit_card", null);
+            "credit_card", "2026-11-02T10:00:00.000-03:00",
+            "2026-11-05T10:00:00.000-03:00", "released",
+            new MercadoPagoPago.TransactionDetails(
+                new BigDecimal("45.50"), new BigDecimal(monto)),
+            java.util.List.of(new MercadoPagoPago.FeeDetail(
+                "mercadopago_fee", new BigDecimal("4.50"), "collector")),
+            3, new MercadoPagoPago.Card("1234"));
     }
 
     private Pago pago() {

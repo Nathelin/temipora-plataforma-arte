@@ -30,13 +30,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.AccionSolicitud;
+import com.temipora.backend_springboot.modelo.ArancelEstimadoDTO;
 import com.temipora.backend_springboot.modelo.Conversacion;
+import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.DisponibilidadServicioDTO;
 import com.temipora.backend_springboot.modelo.EstadoConversacion;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.Formulario;
 import com.temipora.backend_springboot.modelo.FormularioDTO;
+import com.temipora.backend_springboot.modelo.ItemSolicitudDerecho;
 import com.temipora.backend_springboot.modelo.ItemSolicitudRequest;
 import com.temipora.backend_springboot.modelo.ListaEspera;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
@@ -50,6 +53,7 @@ import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.SolicitudDTO;
 import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
 import com.temipora.backend_springboot.modelo.SolicitudServicioRequest;
+import com.temipora.backend_springboot.modelo.TerminoDerecho;
 import com.temipora.backend_springboot.modelo.Terminos;
 import com.temipora.backend_springboot.modelo.TerminosDTO;
 import com.temipora.backend_springboot.modelo.TipoAccionSolicitud;
@@ -62,6 +66,7 @@ import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
 import com.temipora.backend_springboot.repositorios.TerminosRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
+import com.temipora.backend_springboot.servicios.pagos.ArancelEstimadoService;
 
 @ExtendWith(MockitoExtension.class)
 class SolicitudServicioServiceTest {
@@ -123,6 +128,9 @@ class SolicitudServicioServiceTest {
 
     @Mock
     private AuditoriaService auditoria;
+
+    @Mock
+    private ArancelEstimadoService arancelEstimadoService;
 
     @InjectMocks
     private SolicitudServicioService solicitudServicioService;
@@ -196,6 +204,11 @@ class SolicitudServicioServiceTest {
         lenient().when(colaSolicitudesService.evaluar(any(Solicitud.class)))
             .thenReturn(new ColaSolicitudesService.EvaluacionPresupuesto(
                 false, null, null));
+        lenient().when(arancelEstimadoService.estimar())
+            .thenReturn(new ArancelEstimadoDTO(
+                new BigDecimal("3.49"),
+                new BigDecimal("21"),
+                new BigDecimal("4.2229")));
     }
 
     @Test
@@ -367,6 +380,79 @@ class SolicitudServicioServiceTest {
         assertThatThrownBy(() -> solicitudServicioService.crear(CLIENTE, request))
             .isInstanceOf(ConflictoException.class)
             .hasMessageContaining("Los términos del servicio cambiaron");
+    }
+
+    @Test
+    void crear_conDerechos_guardaSnapshotEnCadaItem() {
+        prepararCreacion();
+        configurarDerechos();
+        SolicitudServicioRequest request = request(1, false);
+        request.getItems().get(0).setDerechos(List.of(101L, 102L));
+
+        solicitudServicioService.crear(CLIENTE, request);
+
+        ArgumentCaptor<Solicitud> captor = ArgumentCaptor.forClass(Solicitud.class);
+        verify(solicitudRepository).save(captor.capture());
+        List<ItemSolicitudDerecho> derechos =
+            captor.getValue().getItems().get(0).getDerechos();
+
+        assertThat(derechos).hasSize(2);
+        assertThat(derechos.get(0).getCodigo()).isEqualTo("CONTENIDO");
+        assertThat(derechos.get(0).getNombre())
+            .isEqualTo("Uso comercial en producción de contenido");
+        assertThat(derechos.get(0).getPorcentajeExtra())
+            .isEqualByComparingTo("30.00");
+        assertThat(derechos.get(1).getCodigo()).isEqualTo("MERCHANDISING");
+        assertThat(derechos.get(1).getPorcentajeExtra())
+            .isEqualByComparingTo("20.00");
+    }
+
+    @Test
+    void crear_sinDerechos_dejaListaVacia() {
+        prepararCreacion();
+
+        solicitudServicioService.crear(CLIENTE, request(1, false));
+
+        ArgumentCaptor<Solicitud> captor = ArgumentCaptor.forClass(Solicitud.class);
+        verify(solicitudRepository).save(captor.capture());
+        assertThat(captor.getValue().getItems().get(0).getDerechos()).isEmpty();
+    }
+
+    @Test
+    void crear_derechoNoDisponible_lanzaError() {
+        prepararCreacion();
+        terminos.reemplazarDerechos(List.of(derechoTermino(
+            101L, "CONTENIDO", "Contenido", "30", false, false)));
+        SolicitudServicioRequest request = request(1, false);
+        request.getItems().get(0).setDerechos(List.of(101L));
+
+        assertThatThrownBy(() -> solicitudServicioService.crear(CLIENTE, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("no está disponible");
+    }
+
+    @Test
+    void crear_derechoPersonal_lanzaError() {
+        prepararCreacion();
+        configurarDerechos();
+        SolicitudServicioRequest request = request(1, false);
+        request.getItems().get(0).setDerechos(List.of(103L));
+
+        assertThatThrownBy(() -> solicitudServicioService.crear(CLIENTE, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("uso personal");
+    }
+
+    @Test
+    void crear_derechoPiezaUnica_lanzaError() {
+        prepararCreacion();
+        configurarDerechos();
+        SolicitudServicioRequest request = request(1, false);
+        request.getItems().get(0).setDerechos(List.of(104L));
+
+        assertThatThrownBy(() -> solicitudServicioService.crear(CLIENTE, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("no está disponible para comisiones");
     }
 
     @Test
@@ -912,6 +998,37 @@ class SolicitudServicioServiceTest {
         }
         request.setItems(items);
         return request;
+    }
+
+    private void configurarDerechos() {
+        terminos.reemplazarDerechos(List.of(
+            derechoTermino(101L, "CONTENIDO",
+                "Uso comercial en producción de contenido", "30", true, false),
+            derechoTermino(102L, "MERCHANDISING",
+                "Uso comercial como merchandising", "20", true, false),
+            derechoTermino(103L, "PERSONAL", "Uso personal", null, true, false),
+            derechoTermino(104L, "REVENTA", "Reventa", "100", true, true)));
+    }
+
+    private TerminoDerecho derechoTermino(
+            Long id,
+            String codigo,
+            String nombre,
+            String porcentaje,
+            boolean disponible,
+            boolean piezaUnica) {
+        DerechoTermino derecho = new DerechoTermino();
+        derecho.setIdDerechoTermino(id);
+        derecho.setCodigo(codigo);
+        derecho.setNombre(nombre);
+        derecho.setRequierePiezaUnica(piezaUnica);
+
+        TerminoDerecho terminoDerecho = new TerminoDerecho();
+        terminoDerecho.setDerecho(derecho);
+        terminoDerecho.setDisponible(disponible);
+        terminoDerecho.setPorcentajeExtra(
+            porcentaje != null ? new BigDecimal(porcentaje) : null);
+        return terminoDerecho;
     }
 
     private ListaEspera listaEspera(int posicion) {
