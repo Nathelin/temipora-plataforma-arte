@@ -62,6 +62,16 @@ public class PedidoDTO {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal montoNetoArtistaMostrado;
 
+    // Comisión nominal, antes de financiar el descuento de reactivación.
+    // precioFinal - comisionNominal = montoNetoArtista (el neto no cambia).
+    // comisionNominal - descuentoMonto = comisionMonto (efectiva retenida).
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal comisionNominal;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal comisionNominalCobro;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal comisionNominalMostrado;
+
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal arancelMpPorcentaje;
     @JsonInclude(JsonInclude.Include.NON_NULL)

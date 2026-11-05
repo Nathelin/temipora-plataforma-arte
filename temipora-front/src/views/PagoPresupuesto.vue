@@ -39,9 +39,26 @@ const descuentoMostrado = computed(
     ?? presupuesto.value?.descuentoMonto
     ?? 0,
 )
+const precioOriginal = computed(
+  () => presupuesto.value?.precioFinalMostrado
+    ?? presupuesto.value?.precioFinal
+    ?? null,
+)
+const precioCliente = computed(
+  () => presupuesto.value?.precioFinalClienteMostrado
+    ?? presupuesto.value?.precioFinalMostrado
+    ?? presupuesto.value?.precioFinal
+    ?? null,
+)
 const esArtista = computed(
   () => solicitud.value?.artista?.idUsuario === idActual,
 )
+const muestraPrecioOriginal = computed(() => (
+  !esArtista.value
+  && Number(descuentoMostrado.value) > 0
+  && precioOriginal.value != null
+  && Number(precioOriginal.value) > Number(precioCliente.value)
+))
 const puedePagar = computed(() => solicitud.value?.estado === 'PRESUPUESTADA'
   && !esArtista.value
   && Boolean(presupuesto.value))
@@ -173,7 +190,16 @@ onMounted(cargar)
             <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
               Total del presupuesto
             </p>
-            <p class="mt-1 text-3xl font-bold text-granate">{{ total }}</p>
+            <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <p class="text-3xl font-bold text-granate">{{ total }}</p>
+              <p
+                v-if="muestraPrecioOriginal"
+                class="text-lg font-semibold text-cafe/45 line-through decoration-cafe/50"
+              >
+                <span class="sr-only">Precio sin descuento: </span>
+                {{ formatear(precioOriginal) }}
+              </p>
+            </div>
             <p
               v-if="Number(descuentoMostrado) > 0"
               class="mt-2 inline-flex items-center gap-2 rounded-full bg-mantequilla px-3 py-1 text-xs font-bold text-tinta"

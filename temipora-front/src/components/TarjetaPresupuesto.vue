@@ -101,15 +101,41 @@ const comisionPorcentaje = computed(() => {
   const valor = Number(props.presupuesto?.comisionPorcentaje)
   return Number.isFinite(valor) ? valor : null
 })
-const comisionMostrada = computed(
-  () => props.presupuesto?.comisionMontoMostrado ?? props.presupuesto?.comisionMonto,
-)
 const netoMostrado = computed(
   () => props.presupuesto?.montoNetoArtistaMostrado ?? props.presupuesto?.montoNetoArtista,
 )
+const comisionNominalMostrada = computed(() => {
+  const directo = props.presupuesto?.comisionNominalMostrado
+    ?? props.presupuesto?.comisionNominal
+  if (directo != null) return directo
+  const precio = Number(
+    props.presupuesto?.precioFinalMostrado ?? props.presupuesto?.precioFinal,
+  )
+  const neto = Number(
+    props.presupuesto?.montoNetoArtistaMostrado ?? props.presupuesto?.montoNetoArtista,
+  )
+  if (!Number.isFinite(precio) || !Number.isFinite(neto)) return null
+  return Math.round((precio - neto) * 100) / 100
+})
 const muestraComision = computed(
-  () => comisionPorcentaje.value != null && comisionMostrada.value != null,
+  () => comisionPorcentaje.value != null && comisionNominalMostrada.value != null,
 )
+const tieneDescuento = computed(() => Number(descuentoMostrado.value) > 0)
+const sinComision = computed(
+  () => comisionNominalMostrada.value != null
+    && Number(comisionNominalMostrada.value) <= 0,
+)
+const precioOriginalMostrado = computed(
+  () => props.presupuesto?.precioFinalMostrado
+    ?? props.presupuesto?.precioFinal
+    ?? null,
+)
+const muestraPrecioOriginal = computed(() => (
+  !props.esArtista
+  && Number(descuentoMostrado.value) > 0
+  && precioOriginalMostrado.value != null
+  && Number(precioOriginalMostrado.value) > Number(totalMostrado.value)
+))
 const arancelMpPorcentaje = computed(() => {
   const valor = Number(props.presupuesto?.arancelMpPorcentaje)
   return Number.isFinite(valor) ? valor : null
@@ -172,9 +198,18 @@ function formatearRecargo(recargo) {
       </span>
     </div>
 
-    <p class="mt-4 text-3xl font-bold text-granate">
-      {{ formatearMoneda(totalMostrado) }}
-    </p>
+    <div class="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <p class="text-3xl font-bold text-granate">
+        {{ formatearMoneda(totalMostrado) }}
+      </p>
+      <p
+        v-if="muestraPrecioOriginal"
+        class="text-lg font-semibold text-cafe/45 line-through decoration-cafe/50"
+      >
+        <span class="sr-only">Precio sin descuento: </span>
+        {{ formatearMoneda(precioOriginalMostrado) }}
+      </p>
+    </div>
     <p class="mt-1 text-xs text-cafe/50">
       Precio base {{ formatearMoneda(baseMostrada) }} + recargos
     </p>
@@ -185,6 +220,22 @@ function formatearRecargo(recargo) {
       Descuento de reactivación ({{ descuentoPorcentaje }}%):
       − {{ formatearMoneda(descuentoMostrado) }}
     </p>
+    <div
+      v-if="esArtista && tieneDescuento"
+      class="mt-3 rounded-xl border border-coral/30 bg-mantequilla px-3 py-2 text-xs leading-relaxed text-tinta"
+    >
+      <p class="font-bold">
+        Este cliente aplicó un descuento de reactivación del
+        {{ formatearMonto(descuentoPorcentaje) }}%
+        ({{ formatearMoneda(descuentoMostrado) }}).
+      </p>
+      <p class="mt-1">
+        Lo financia Temipora con su comisión: el cliente paga
+        {{ formatearMoneda(presupuesto.precioFinalClienteMostrado
+          ?? presupuesto.precioFinalCliente) }}
+        y tu liquidación es la misma que sin descuento.
+      </p>
+    </div>
     <p
       v-if="cobroDistinto"
       class="mt-2 text-sm font-semibold text-granate"
@@ -209,10 +260,22 @@ function formatearRecargo(recargo) {
       </p>
       <dl class="mt-2 space-y-1.5 text-sm">
         <div class="flex items-center justify-between gap-3">
+          <dt class="text-cafe/60">Tu presupuesto</dt>
+          <dd class="text-cafe">{{ formatearMoneda(totalMostrado) }}</dd>
+        </div>
+        <div v-if="!sinComision" class="flex items-center justify-between gap-3">
           <dt class="text-cafe/60">
-            Comisión ({{ formatearMonto(comisionPorcentaje) }}%)
+            Comisión Temipora ({{ formatearMonto(comisionPorcentaje) }}%)
           </dt>
-          <dd class="text-cafe">− {{ formatearMoneda(comisionMostrada) }}</dd>
+          <dd class="text-cafe">− {{ formatearMoneda(comisionNominalMostrada) }}</dd>
+        </div>
+        <div v-else class="flex items-center justify-between gap-3">
+          <dt class="text-cafe/60">Comisión Temipora</dt>
+          <dd class="text-cafe">Sin comisión en esta operación</dd>
+        </div>
+        <div class="flex items-center justify-between gap-3 border-t border-cafe/10 pt-1.5">
+          <dt class="font-semibold text-granate">Tu neto</dt>
+          <dd class="font-semibold text-granate">{{ formatearMoneda(netoMostrado) }}</dd>
         </div>
         <div v-if="muestraArancelMp" class="flex items-center justify-between gap-3">
           <dt class="text-cafe/60">
@@ -220,17 +283,14 @@ function formatearRecargo(recargo) {
           </dt>
           <dd class="text-cafe">− {{ formatearMoneda(arancelMpEstimado) }}</dd>
         </div>
-        <div
-          v-if="esArtista"
-          class="flex items-center justify-between gap-3 border-t border-cafe/10 pt-1.5"
-        >
-          <dt class="font-semibold text-granate">Recibís</dt>
+        <div class="flex items-center justify-between gap-3 border-t border-cafe/10 pt-1.5">
+          <dt class="font-semibold text-granate">Recibís estimado</dt>
           <dd class="text-base font-bold text-granate">{{ formatearMoneda(netoConArancel) }}</dd>
         </div>
       </dl>
       <p class="mt-2 text-xs leading-relaxed text-cafe/50">
-        {{ Number(descuentoMostrado) > 0
-          ? 'El descuento de reactivación lo absorbe la plataforma: tu neto no cambia.'
+        {{ tieneDescuento
+          ? 'El descuento de reactivación lo financia Temipora: reduce lo que paga el cliente, no tu neto.'
           : 'La comisión se descuenta de tu precio. El cliente paga el total sin cambios.' }}
         <span v-if="muestraArancelMp">
           El arancel de MercadoPago es una estimación y puede variar según el medio de pago
@@ -262,8 +322,14 @@ function formatearRecargo(recargo) {
             </p>
           </div>
           <div class="shrink-0 text-right">
+            <p v-if="esArtista" class="text-[11px] uppercase tracking-wide text-cafe/45">
+              El cliente paga
+            </p>
             <p class="text-sm font-semibold text-granate">
               {{ formatearMoneda(hito.montoMostrado ?? hito.monto) }}
+            </p>
+            <p v-if="esArtista" class="text-xs text-cafe/60">
+              Tu neto {{ formatearMoneda(hito.montoNetoMostrado ?? hito.montoNeto) }}
             </p>
             <p
               v-if="esArtista && hito.arancelMpEstimadoMostrado != null"
@@ -272,7 +338,7 @@ function formatearRecargo(recargo) {
               Arancel MP est. − {{ formatearMoneda(hito.arancelMpEstimadoMostrado) }}
             </p>
             <p v-if="esArtista" class="text-xs text-cafe/50">
-              Recibís {{ formatearMoneda(
+              Recibís est. {{ formatearMoneda(
                 hito.montoNetoConArancelMostrado
                   ?? hito.montoNetoMostrado
                   ?? hito.montoNeto,

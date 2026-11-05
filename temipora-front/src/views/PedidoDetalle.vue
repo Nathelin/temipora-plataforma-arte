@@ -132,6 +132,22 @@ const descuentoMostrado = computed(
     ?? pedido.value?.descuentoMonto
     ?? 0,
 )
+const comisionNominalMostrada = computed(() => {
+  const directo = pedido.value?.comisionNominalMostrado
+    ?? pedido.value?.comisionNominal
+  if (directo != null) return directo
+  const precio = Number(pedido.value?.precioFinalMostrado ?? pedido.value?.precioFinal)
+  const neto = Number(
+    pedido.value?.montoNetoArtistaMostrado ?? pedido.value?.montoNetoArtista,
+  )
+  if (!Number.isFinite(precio) || !Number.isFinite(neto)) return null
+  return Math.round((precio - neto) * 100) / 100
+})
+const tieneDescuento = computed(() => Number(descuentoMostrado.value) > 0)
+const sinComision = computed(
+  () => comisionNominalMostrada.value != null
+    && Number(comisionNominalMostrada.value) <= 0,
+)
 const cobroDistinto = computed(
   () => pedido.value?.precioFinalCobro != null
     && moneda.value !== monedaCobro.value,
@@ -915,11 +931,25 @@ onMounted(async () => {
             <dt class="text-xs text-cafe/50">Total</dt>
             <dd class="mt-0.5 text-xl font-bold text-granate">{{ total }}</dd>
             <dd
-              v-if="esCliente && Number(descuentoMostrado) > 0"
+              v-if="esCliente && tieneDescuento"
               class="mt-1 text-xs font-semibold text-coral"
             >
               Descuento ({{ Number(pedido.descuentoPorcentaje) }}%):
               − {{ formatearPrecio(descuentoMostrado, moneda) }}
+            </dd>
+            <dd
+              v-if="esArtista && tieneDescuento"
+              class="mt-1 text-xs leading-relaxed text-tinta"
+            >
+              Este cliente aplicó un descuento de reactivación del
+              {{ Number(pedido.descuentoPorcentaje) }}%
+              ({{ formatearPrecio(descuentoMostrado, moneda) }}).
+              Lo financia Temipora: el cliente paga
+              {{ formatearPrecio(
+                pedido.precioFinalClienteMostrado ?? pedido.precioFinalCliente,
+                moneda,
+              ) }}
+              y tu liquidación no cambia.
             </dd>
             <dd v-if="cobroDistinto" class="text-xs text-cafe/50">
               A pagar: {{ formatearPrecio(
@@ -959,11 +989,30 @@ onMounted(async () => {
           </p>
           <dl class="mt-2 space-y-1.5 text-sm">
             <div class="flex items-center justify-between gap-3">
+              <dt class="text-cafe/60">Tu presupuesto</dt>
+              <dd class="text-cafe">
+                {{ formatearPrecio(pedido.precioFinalMostrado ?? pedido.precioFinal, moneda) }}
+              </dd>
+            </div>
+            <div v-if="!sinComision" class="flex items-center justify-between gap-3">
               <dt class="text-cafe/60">
-                Comisión ({{ pedido.comisionPorcentaje }}%)
+                Comisión Temipora ({{ pedido.comisionPorcentaje }}%)
               </dt>
               <dd class="text-cafe">
-                − {{ formatearPrecio(pedido.comisionMontoMostrado ?? pedido.comisionMonto, moneda) }}
+                − {{ formatearPrecio(comisionNominalMostrada, moneda) }}
+              </dd>
+            </div>
+            <div v-else class="flex items-center justify-between gap-3">
+              <dt class="text-cafe/60">Comisión Temipora</dt>
+              <dd class="text-cafe">Sin comisión en esta operación</dd>
+            </div>
+            <div class="flex items-center justify-between gap-3 border-t border-cafe/10 pt-1.5">
+              <dt class="font-semibold text-granate">Tu neto</dt>
+              <dd class="font-semibold text-granate">
+                {{ formatearPrecio(
+                  pedido.montoNetoArtistaMostrado ?? pedido.montoNetoArtista,
+                  moneda,
+                ) }}
               </dd>
             </div>
             <div
@@ -978,7 +1027,7 @@ onMounted(async () => {
               </dd>
             </div>
             <div class="flex items-center justify-between gap-3 border-t border-cafe/10 pt-1.5">
-              <dt class="font-semibold text-granate">Recibís</dt>
+              <dt class="font-semibold text-granate">Recibís estimado</dt>
               <dd class="text-base font-bold text-granate">
                 {{ formatearPrecio(
                   pedido.montoNetoArtistaConArancelMostrado
@@ -989,6 +1038,13 @@ onMounted(async () => {
               </dd>
             </div>
           </dl>
+          <p
+            v-if="tieneDescuento"
+            class="mt-2 text-xs leading-relaxed text-cafe/50"
+          >
+            El descuento de reactivación lo financia Temipora: reduce lo que paga el cliente,
+            no tu neto.
+          </p>
           <p
             v-if="pedido.arancelMpEstimadoMostrado != null"
             class="mt-2 text-xs leading-relaxed text-cafe/50"
@@ -1302,6 +1358,12 @@ onMounted(async () => {
 
                   <div class="ml-auto flex items-center gap-2">
                     <div class="flex flex-col items-end gap-2">
+                      <p
+                        v-if="esArtista"
+                        class="text-[11px] uppercase tracking-wide text-cafe/45"
+                      >
+                        El cliente paga
+                      </p>
                       <p class="text-lg font-bold text-granate">{{ formatearMontoHito(hito) }}</p>
                       <button
                         v-if="hito.puedePagar"
@@ -1421,8 +1483,14 @@ onMounted(async () => {
             class="mt-3 rounded-lg bg-cafe/5 px-3 py-2 text-xs text-cafe/65"
           >
             <div class="flex flex-wrap items-center justify-between gap-2">
-              <span>
+              <span v-if="Number(hito.comisionMonto) > 0">
                 Comisión Temipora: − {{ formatearPrecio(hito.comisionMontoMostrado ?? hito.comisionMonto, moneda) }}
+              </span>
+              <span v-else-if="tieneDescuento" class="text-cafe/60">
+                Comisión Temipora: la absorbe el descuento
+              </span>
+              <span class="text-cafe/60">
+                Tu neto: {{ formatearPrecio(hito.montoNetoMostrado ?? hito.montoNeto, moneda) }}
               </span>
               <span v-if="tieneDatosMp(hito)">
                 Arancel MercadoPago: − {{ arancelMpHito(hito) }}

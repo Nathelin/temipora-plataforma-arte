@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.servicios;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -1264,6 +1265,15 @@ public class PedidoService {
             finalClienteCobro = pedido.getPrecioFinalCobro();
         }
 
+        BigDecimal comisionNominal = pedido.getPrecioFinal()
+            .subtract(neto)
+            .max(BigDecimal.ZERO)
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal comisionNominalCobro = pedido.getPrecioFinalCobro()
+            .subtract(netoCobro)
+            .max(BigDecimal.ZERO)
+            .setScale(2, RoundingMode.HALF_UP);
+
         PedidoDTO dto = PedidoDTO.builder()
             .idPedido(pedido.getIdPedido())
             .idSolicitud(pedido.getSolicitud().getIdSolicitud())
@@ -1340,6 +1350,17 @@ public class PedidoService {
                 ? PresupuestoDTO.totalMostrado(
                     neto,
                     netoCobro,
+                    muestraOrigen,
+                    muestraCobro,
+                    factorCobro,
+                    factorOrigen)
+                : null)
+            .comisionNominal(incluirComision ? comisionNominal : null)
+            .comisionNominalCobro(incluirComision ? comisionNominalCobro : null)
+            .comisionNominalMostrado(incluirComision
+                ? PresupuestoDTO.totalMostrado(
+                    comisionNominal,
+                    comisionNominalCobro,
                     muestraOrigen,
                     muestraCobro,
                     factorCobro,

@@ -64,6 +64,16 @@ public class PresupuestoDTO {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal montoNetoArtistaMostrado;
 
+    // Comisión nominal, antes de financiar el descuento de reactivación.
+    // precioFinal - comisionNominal = montoNetoArtista (el neto no cambia).
+    // comisionNominal - descuentoMonto = comisionMonto (efectiva retenida).
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal comisionNominal;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal comisionNominalCobro;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal comisionNominalMostrado;
+
     // Arancel estimado de MercadoPago, informado solo al artista/admin.
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private BigDecimal arancelMpPorcentaje;
@@ -226,6 +236,17 @@ public class PresupuestoDTO {
             .montoNetoArtistaCobro(incluirComision
                 ? presupuesto.getMontoNetoArtistaCobro() : null)
             .montoNetoArtistaMostrado(netoMostrado)
+            .comisionNominal(incluirComision
+                ? restar(presupuesto.getPrecioFinal(),
+                    presupuesto.getMontoNetoArtista())
+                : null)
+            .comisionNominalCobro(incluirComision
+                ? restar(presupuesto.getPrecioFinalCobro(),
+                    presupuesto.getMontoNetoArtistaCobro())
+                : null)
+            .comisionNominalMostrado(incluirComision
+                ? restar(finalMostrado, netoMostrado)
+                : null)
             .tiempoEntregaValor(presupuesto.getTiempoEntregaValor())
             .tiempoEntregaUnidad(presupuesto.getTiempoEntregaUnidad() != null
                 ? presupuesto.getTiempoEntregaUnidad().name()
