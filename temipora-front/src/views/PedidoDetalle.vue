@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearMonto, formatearPrecio } from '../servicios/moneda'
 import { descripcionMedioPago } from '../servicios/ventas'
+import BurbujaInfo from '../components/BurbujaInfo.vue'
+import ModalComoSeCalcula from '../components/ModalComoSeCalcula.vue'
 import EntregasHito from '../components/EntregasHito.vue'
 import HiloConversacion from '../components/HiloConversacion.vue'
 import IconoDescarga from '../components/IconoDescarga.vue'
@@ -115,6 +117,7 @@ const puedeVerResenias = computed(() => (
 ))
 const estadoInfo = computed(() => estadoPedidoDe(pedido.value?.estado))
 const hitos = computed(() => pedido.value?.hitos || [])
+const modalCalculoAbierto = ref(false)
 const moneda = computed(
   () => pedido.value?.monedaMostrada || pedido.value?.moneda || 'ARS',
 )
@@ -148,6 +151,23 @@ const sinComision = computed(
   () => comisionNominalMostrada.value != null
     && Number(comisionNominalMostrada.value) <= 0,
 )
+const precioOriginalMostrado = computed(
+  () => pedido.value?.precioFinalMostrado
+    ?? pedido.value?.precioFinal
+    ?? null,
+)
+const precioClienteMostrado = computed(
+  () => pedido.value?.precioFinalClienteMostrado
+    ?? pedido.value?.precioFinalMostrado
+    ?? pedido.value?.precioFinal
+    ?? null,
+)
+const muestraPrecioOriginal = computed(() => (
+  esCliente.value
+  && tieneDescuento.value
+  && precioOriginalMostrado.value != null
+  && Number(precioOriginalMostrado.value) > Number(precioClienteMostrado.value)
+))
 const cobroDistinto = computed(
   () => pedido.value?.precioFinalCobro != null
     && moneda.value !== monedaCobro.value,
@@ -928,28 +948,25 @@ onMounted(async () => {
                 : 'sm:grid-cols-3'"
             >
           <div class="rounded-xl bg-rosa/10 px-3 py-2">
-            <dt class="text-xs text-cafe/50">Total</dt>
-            <dd class="mt-0.5 text-xl font-bold text-granate">{{ total }}</dd>
+            <dt class="text-xs text-cafe/50">
+              {{ esCliente ? 'Total a pagar' : 'Precio del pedido' }}
+            </dt>
+            <dd class="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span class="text-xl font-bold text-granate">{{ total }}</span>
+              <span
+                v-if="muestraPrecioOriginal"
+                class="text-sm font-semibold text-cafe/45 line-through decoration-cafe/50"
+              >
+                <span class="sr-only">Precio sin descuento: </span>
+                {{ formatearPrecio(precioOriginalMostrado, moneda) }}
+              </span>
+            </dd>
             <dd
               v-if="esCliente && tieneDescuento"
               class="mt-1 text-xs font-semibold text-coral"
             >
-              Descuento ({{ Number(pedido.descuentoPorcentaje) }}%):
+              Descuento de reactivación ({{ Number(pedido.descuentoPorcentaje) }}%):
               − {{ formatearPrecio(descuentoMostrado, moneda) }}
-            </dd>
-            <dd
-              v-if="esArtista && tieneDescuento"
-              class="mt-1 text-xs leading-relaxed text-tinta"
-            >
-              Este cliente aplicó un descuento de reactivación del
-              {{ Number(pedido.descuentoPorcentaje) }}%
-              ({{ formatearPrecio(descuentoMostrado, moneda) }}).
-              Lo financia Temipora: el cliente paga
-              {{ formatearPrecio(
-                pedido.precioFinalClienteMostrado ?? pedido.precioFinalCliente,
-                moneda,
-              ) }}
-              y tu liquidación no cambia.
             </dd>
             <dd v-if="cobroDistinto" class="text-xs text-cafe/50">
               A pagar: {{ formatearPrecio(
@@ -984,19 +1001,45 @@ onMounted(async () => {
           v-if="(esArtista || pedido.rolVista === 'ADMIN') && pedido.comisionMonto != null"
           class="mt-4 rounded-xl border border-cafe/15 bg-cafe/5 p-4"
         >
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/50">
-            Comisión de la plataforma
-          </p>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/50">
+              Tu liquidación
+            </p>
+            <button
+              type="button"
+              class="text-xs font-semibold text-coral underline-offset-2 transition hover:text-rojizo hover:underline"
+              @click="modalCalculoAbierto = true"
+            >
+              ¿Cómo se calcula?
+            </button>
+          </div>
           <dl class="mt-2 space-y-1.5 text-sm">
             <div class="flex items-center justify-between gap-3">
-              <dt class="text-cafe/60">Tu presupuesto</dt>
+              <dt class="text-cafe/60">Precio del pedido</dt>
               <dd class="text-cafe">
                 {{ formatearPrecio(pedido.precioFinalMostrado ?? pedido.precioFinal, moneda) }}
               </dd>
             </div>
             <div v-if="!sinComision" class="flex items-center justify-between gap-3">
               <dt class="text-cafe/60">
-                Comisión Temipora ({{ pedido.comisionPorcentaje }}%)
+                <span class="inline-flex items-center gap-1.5">
+                  Comisión Temipora ({{ pedido.comisionPorcentaje }}%)
+                  <BurbujaInfo
+                    v-if="tieneDescuento"
+                    tono="descuento"
+                    etiqueta="Descuento financiado por Temipora"
+                  >
+                    Este cliente aplicó un descuento de reactivación del
+                    {{ Number(pedido.descuentoPorcentaje) }}%
+                    ({{ formatearPrecio(descuentoMostrado, moneda) }}).
+                    El cliente paga
+                    {{ formatearPrecio(
+                      pedido.precioFinalClienteMostrado ?? pedido.precioFinalCliente,
+                      moneda,
+                    ) }}
+                    (descuento financiado por Temipora) y tu liquidación no cambia.
+                  </BurbujaInfo>
+                </span>
               </dt>
               <dd class="text-cafe">
                 − {{ formatearPrecio(comisionNominalMostrada, moneda) }}
@@ -1020,7 +1063,7 @@ onMounted(async () => {
               class="flex items-center justify-between gap-3"
             >
               <dt class="text-cafe/60">
-                Arancel MercadoPago estimado ({{ formatearMonto(pedido.arancelMpPorcentaje) }}%)
+                Arancel MercadoPago (estimado) ({{ formatearMonto(pedido.arancelMpPorcentaje) }}%)
               </dt>
               <dd class="text-cafe">
                 − {{ formatearPrecio(pedido.arancelMpEstimadoMostrado, moneda) }}
@@ -1038,13 +1081,6 @@ onMounted(async () => {
               </dd>
             </div>
           </dl>
-          <p
-            v-if="tieneDescuento"
-            class="mt-2 text-xs leading-relaxed text-cafe/50"
-          >
-            El descuento de reactivación lo financia Temipora: reduce lo que paga el cliente,
-            no tu neto.
-          </p>
           <p
             v-if="pedido.arancelMpEstimadoMostrado != null"
             class="mt-2 text-xs leading-relaxed text-cafe/50"
@@ -1278,7 +1314,14 @@ onMounted(async () => {
           <div class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
             <div class="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h2 class="text-xl font-semibold text-granate">Plan de pagos</h2>
+                <div class="flex items-center gap-1.5">
+                  <h2 class="text-xl font-semibold text-granate">Plan de pagos</h2>
+                  <BurbujaInfo etiqueta="Cómo se prorratean los montos por hito">
+                    La comisión Temipora y el arancel de MercadoPago se prorratean
+                    según el porcentaje de cada hito. El último hito absorbe el
+                    redondeo.
+                  </BurbujaInfo>
+                </div>
                 <p class="mt-1 text-sm text-cafe/60">
                   {{ resumen.pagados }} de {{ resumen.total }} hitos pagados
                 </p>
@@ -1289,6 +1332,19 @@ onMounted(async () => {
                   de {{ formatearPrecio(resumen.montoTotal, moneda) }}
                 </span>
               </p>
+            </div>
+            <div
+              v-if="(esArtista || pedido.rolVista === 'ADMIN') && tieneDescuento"
+              class="mt-3 rounded-xl border border-coral/60 bg-granate px-3 py-2 text-xs leading-relaxed text-white"
+            >
+              El plan de pagos suma
+              {{ formatearPrecio(pedido.precioFinalClienteMostrado
+                ?? pedido.precioFinalCliente, moneda) }},
+              no el precio de {{ formatearPrecio(pedido.precioFinalMostrado
+                ?? pedido.precioFinal, moneda) }}, porque incluye el descuento de
+              reactivación del {{ Number(pedido.descuentoPorcentaje) }}%
+              ({{ formatearPrecio(descuentoMostrado, moneda) }}), financiado por
+              Temipora. Tu liquidación no cambia.
             </div>
             <div
               class="mt-3 h-2 overflow-hidden rounded-full bg-rosa/30"
@@ -1808,6 +1864,28 @@ onMounted(async () => {
       :texto-confirmar="confirmacion.textoConfirmar"
       @confirmar="confirmarAccion"
       @cerrar="cerrarConfirmacion"
+    />
+
+    <ModalComoSeCalcula
+      v-if="pedido"
+      :abierto="modalCalculoAbierto"
+      contexto="pedido"
+      :moneda="moneda"
+      :precio="pedido.precioFinalMostrado ?? pedido.precioFinal"
+      :comision-porcentaje="pedido.comisionPorcentaje"
+      :comision-monto="comisionNominalMostrada"
+      :neto="pedido.montoNetoArtistaMostrado ?? pedido.montoNetoArtista"
+      :arancel-porcentaje="pedido.arancelMpPorcentaje"
+      :arancel-monto="pedido.arancelMpEstimadoMostrado"
+      :recibis="pedido.montoNetoArtistaConArancelMostrado
+        ?? pedido.montoNetoArtistaMostrado
+        ?? pedido.montoNetoArtista"
+      :descuento-porcentaje="pedido.descuentoPorcentaje"
+      :descuento-monto="descuentoMostrado"
+      :cliente-paga="pedido.precioFinalClienteMostrado
+        ?? pedido.precioFinalCliente"
+      estimado
+      @cerrar="modalCalculoAbierto = false"
     />
   </div>
 </template>

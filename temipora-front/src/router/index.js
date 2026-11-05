@@ -380,7 +380,7 @@ const routes = [
         path: 'ajustes/comisiones',
         name: 'comisiones-admin',
         component: ComisionAdmin,
-        meta: { title: 'Comisión de la plataforma' },
+        meta: { title: 'Comisión Temipora' },
       },
       {
         path: 'campanas/promociones',

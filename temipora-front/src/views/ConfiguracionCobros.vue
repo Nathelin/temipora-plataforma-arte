@@ -93,8 +93,8 @@ onMounted(() => {
     <template v-else>
       <p class="mt-2 text-sm text-cafe/70">
         Conectá tu cuenta de MercadoPago para recibir los pagos de tus pedidos.
-        Temipora retiene la comisión configurada y el resto se acredita en tu
-        cuenta.
+        Temipora retiene la comisión Temipora y el arancel de MercadoPago; el
+        resto se acredita en tu cuenta.
       </p>
 
       <p v-if="cargando" class="py-10 text-center text-cafe/60">Cargando...</p>

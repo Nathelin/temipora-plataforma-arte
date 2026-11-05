@@ -234,8 +234,8 @@ onMounted(async () => {
           Propuestas para retomar
         </h1>
         <p class="mt-3 max-w-2xl text-lg leading-relaxed text-cafe/75">
-          Elegimos artistas que pueden interesarte y les aplicamos un descuento para que vuelvas a crear.
-          El descuento lo financia Temipora y se aplica sobre el presupuesto final.
+          Elegimos artistas que pueden interesarte y les aplicamos un descuento de reactivación para que vuelvas a crear.
+          Lo financia Temipora y se aplica sobre el presupuesto final.
         </p>
       </div>
       <router-link

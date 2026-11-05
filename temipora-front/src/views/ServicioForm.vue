@@ -16,6 +16,7 @@ import VistaPreviaFormulario from '../components/VistaPreviaFormulario.vue'
 import VistaPreviaTerminos from '../components/VistaPreviaTerminos.vue'
 import AvisoCompletitudTerminos from '../components/AvisoCompletitudTerminos.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+import BurbujaInfo from '../components/BurbujaInfo.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -930,22 +931,11 @@ onBeforeUnmount(() => {
               <div>
                 <div class="mb-2 flex items-center gap-1.5">
                   <label class="block text-sm text-cafe">Precio base <span class="text-rojizo">*</span></label>
-                  <span class="group relative inline-flex">
-                    <button
-                      type="button"
-                      class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-cafe/30 text-[11px] font-bold leading-none text-cafe/60 transition hover:border-coral/50 hover:bg-rosa/30 hover:text-granate focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral"
-                      aria-label="El monto que recibirás variará según las comisiones cobradas por Temipora y los proveedores de pago."
-                    >
-                      i
-                    </button>
-                    <span
-                      class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-64 -translate-x-1/2 rounded-xl bg-granate px-3 py-2 text-xs font-normal leading-relaxed text-white opacity-0 shadow-lg transition group-hover:opacity-100 group-focus-within:opacity-100"
-                      role="tooltip"
-                    >
-                      El monto que recibirás variará según las comisiones cobradas por
-                      Temipora y los proveedores de pago.
-                    </span>
-                  </span>
+                  <BurbujaInfo etiqueta="Cómo se calcula tu neto">
+                    El precio que fijás es el precio del servicio. De ahí se
+                    descuentan la comisión Temipora y el arancel de MercadoPago;
+                    lo que queda es tu neto.
+                  </BurbujaInfo>
                 </div>
                 <input :value="form.precioBase" type="text" inputmode="decimal" placeholder="1.000"
                   class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"

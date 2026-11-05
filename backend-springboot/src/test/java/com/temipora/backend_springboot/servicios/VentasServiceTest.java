@@ -126,6 +126,31 @@ class VentasServiceTest {
     }
 
     @Test
+    void descuento_loFinanciaTemiporaYSeProrrateaPorPago() {
+        Pago pago = pago(30L, "cliente1", "Ilustración");
+        Pedido pedido = pago.getHitoPedido().getPedido();
+        pedido.setDescuentoPorcentaje(new BigDecimal("5.00"));
+        pedido.setDescuentoMontoCobro(new BigDecimal("125.00"));
+        pedido.setPrecioFinalClienteCobro(new BigDecimal("2375.00"));
+        when(pagoRepository.findAll(
+            ArgumentMatchers.<Specification<Pago>>any(),
+            any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(pago),
+                PageRequest.of(0, 10), 1));
+
+        VentaDTO venta = ventasService.listar(
+            ARTISTA, null, null, null, 0, 10).getContenido().get(0);
+
+        assertThat(venta.getDescuentoPorcentaje())
+            .isEqualByComparingTo("5.00");
+        // 125.00 * 100.00 / 2375.00 = 5.26
+        assertThat(venta.getDescuentoMontoCobro())
+            .isEqualByComparingTo("5.26");
+        assertThat(venta.getDescuentoMostrado())
+            .isEqualByComparingTo("5.26");
+    }
+
+    @Test
     void estadoInvalidoFalla() {
         assertThatThrownBy(() -> ventasService.listar(
             ARTISTA, "INVALIDO", null, null, 0, 10))

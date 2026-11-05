@@ -15,6 +15,7 @@ import {
   textoTiempoEntrega,
 } from '../servicios/solicitudes'
 import { useNotificaciones } from '../composables/useNotificaciones'
+import ModalComoSeCalcula from '../components/ModalComoSeCalcula.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -40,6 +41,7 @@ const errorCarga = ref('')
 const enviando = ref(false)
 const errorEnvio = ref('')
 const paso = ref(1)
+const modalCalculoAbierto = ref(false)
 const fechasVisibles = ref({
   fechaInicioEstimada: '',
   fechaVencimiento: '',
@@ -237,13 +239,16 @@ const arancelMpEstimado = computed(() => {
   if (arancelMp.value == null) return null
   return Math.round(totalFinal.value * arancelMp.value) / 100
 })
-const netoArtista = computed(() => {
+const netoSinArancel = computed(() => {
   if (comisionMonto.value == null) return null
-  const neto = totalFinal.value - comisionMonto.value
+  return Math.round((totalFinal.value - comisionMonto.value) * 100) / 100
+})
+const netoArtista = computed(() => {
+  if (netoSinArancel.value == null) return null
   if (arancelMpEstimado.value == null) {
-    return Math.round(neto * 100) / 100
+    return netoSinArancel.value
   }
-  return Math.round((neto - arancelMpEstimado.value) * 100) / 100
+  return Math.round((netoSinArancel.value - arancelMpEstimado.value) * 100) / 100
 })
 const maxHitos = computed(() => Number(configPedido.value?.maxHitos) || 4)
 const porcentajeMaxPrimerHito = computed(
@@ -1261,36 +1266,50 @@ onMounted(cargar)
                 <dd class="text-right font-medium text-cafe">{{ formatear(totalRecargos) }}</dd>
               </div>
               <div class="flex items-start justify-between gap-4 border-t border-coral/15 pt-3">
-                <dt class="text-base font-semibold text-granate">Total</dt>
+                <dt class="text-base font-semibold text-granate">Precio del presupuesto</dt>
                 <dd class="text-right text-2xl font-bold text-granate">{{ formatear(totalFinal) }}</dd>
               </div>
               <template v-if="comisionMonto !== null">
                 <div class="flex items-start justify-between gap-4 border-t border-coral/15 pt-3">
                   <dt class="text-cafe/55">
-                    Comisión de la plataforma ({{ formatearMonto(comisionPorcentaje) }}%)
+                    Comisión Temipora ({{ formatearMonto(comisionPorcentaje) }}%)
                   </dt>
                   <dd class="text-right font-medium text-cafe">− {{ formatear(comisionMonto) }}</dd>
+                </div>
+                <div class="flex items-start justify-between gap-4 border-t border-coral/15 pt-3">
+                  <dt class="font-semibold text-granate">Tu neto</dt>
+                  <dd class="text-right font-semibold text-granate">
+                    {{ formatear(netoSinArancel) }}
+                  </dd>
                 </div>
                 <div
                   v-if="arancelMpEstimado !== null"
                   class="flex items-start justify-between gap-4"
                 >
                   <dt class="text-cafe/55">
-                    Arancel MercadoPago estimado ({{ formatearMonto(arancelMp) }}%)
+                    Arancel MercadoPago (estimado) ({{ formatearMonto(arancelMp) }}%)
                   </dt>
                   <dd class="text-right font-medium text-cafe">
                     − {{ formatear(arancelMpEstimado) }}
                   </dd>
                 </div>
                 <div class="flex items-start justify-between gap-4">
-                  <dt class="text-base font-semibold text-granate">Recibís</dt>
+                  <dt class="text-base font-semibold text-granate">Recibís (estimado)</dt>
                   <dd class="text-right text-xl font-bold text-granate">{{ formatear(netoArtista) }}</dd>
                 </div>
                 <p class="text-xs leading-relaxed text-cafe/50">
-                  La comisión se descuenta de tu precio. El cliente paga el total sin cambios.
-                  El arancel de MercadoPago es una estimación y puede variar según el medio de
-                  pago y las cuotas.
+                  El cliente paga el precio del presupuesto. La comisión Temipora y el
+                  arancel de MercadoPago se descuentan de tu parte.
                 </p>
+                <div class="pt-1">
+                  <button
+                    type="button"
+                    class="text-xs font-semibold text-coral underline-offset-2 transition hover:text-rojizo hover:underline"
+                    @click="modalCalculoAbierto = true"
+                  >
+                    ¿Cómo se calcula?
+                  </button>
+                </div>
               </template>
             </dl>
           </div>
@@ -1377,5 +1396,20 @@ onMounted(cargar)
         </div>
       </form>
     </template>
+
+    <ModalComoSeCalcula
+      :abierto="modalCalculoAbierto"
+      contexto="presupuesto"
+      :moneda="moneda"
+      :precio="totalFinal"
+      :comision-porcentaje="comisionPorcentaje"
+      :comision-monto="comisionMonto"
+      :neto="netoSinArancel"
+      :arancel-porcentaje="arancelMp"
+      :arancel-monto="arancelMpEstimado"
+      :recibis="netoArtista"
+      estimado
+      @cerrar="modalCalculoAbierto = false"
+    />
   </div>
 </template>

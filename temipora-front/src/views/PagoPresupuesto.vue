@@ -188,7 +188,7 @@ onMounted(cargar)
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
-              Total del presupuesto
+              Total a pagar
             </p>
             <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <p class="text-3xl font-bold text-granate">{{ total }}</p>

@@ -444,9 +444,9 @@ onBeforeUnmount(() => {
             : 'border-rojizo/30 bg-rojizo/5 text-rojizo'"
         >
           <template v-if="ofertaAplicable">
-            <p class="font-bold">Descuento del {{ descuentoOferta }}% aplicado</p>
+            <p class="font-bold">Descuento de reactivación del {{ descuentoOferta }}%</p>
             <p class="mt-1 text-cafe/75">
-              Temipora financia el descuento. Se va a aplicar sobre el presupuesto que envíe el artista.
+              Lo financia Temipora. Se aplica sobre el presupuesto que envíe el artista.
             </p>
           </template>
           <template v-else>

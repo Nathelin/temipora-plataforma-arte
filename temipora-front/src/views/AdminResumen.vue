@@ -340,7 +340,7 @@ onMounted(cargar)
 
           <div class="rounded-2xl border border-rosa/60 bg-blanco p-4">
             <div class="flex items-center justify-between gap-2">
-              <span class="text-[11px] font-semibold uppercase tracking-wide text-cafe/55">Comisión generada</span>
+              <span class="text-[11px] font-semibold uppercase tracking-wide text-cafe/55">Comisión Temipora generada</span>
               <Percent class="h-4 w-4 text-coral/60" aria-hidden="true" />
             </div>
             <p
@@ -368,7 +368,7 @@ onMounted(cargar)
           </div>
         </div>
         <!--p class="mt-2 text-[11px] text-cafe/45">
-          Volumen y comisión de pagos aprobados. La comisión no descuenta el costo de MercadoPago.
+          Volumen y comisión de pagos aprobados. La comisión Temipora no incluye el arancel de MercadoPago.
         </p-->
       </section>
 

@@ -127,6 +127,18 @@ public class VentasService {
         Pedido pedido = hito.getPedido();
         BigDecimal netoMostrado = convertir(
             pago.getMontoNetoCobro(), mostrada, pago.getFechaCreacion());
+        // El descuento lo financia Temipora: se prorratea por el monto de este
+        // pago sobre el total que paga el cliente.
+        BigDecimal descuentoCobro = BigDecimal.ZERO;
+        if (pedido.getDescuentoMontoCobro() != null
+                && pedido.getPrecioFinalClienteCobro() != null
+                && pedido.getPrecioFinalClienteCobro().signum() > 0
+                && pago.getMontoCobro() != null) {
+            descuentoCobro = pedido.getDescuentoMontoCobro()
+                .multiply(pago.getMontoCobro())
+                .divide(pedido.getPrecioFinalClienteCobro(),
+                    2, RoundingMode.HALF_UP);
+        }
 
         return VentaDTO.builder()
             .idPago(pago.getIdPago())
@@ -154,6 +166,10 @@ public class VentasService {
             .comisionMontoCobro(pago.getComisionMontoCobro())
             .montoNetoCobro(pago.getMontoNetoCobro())
             .netoMostrado(netoMostrado)
+            .descuentoPorcentaje(pedido.getDescuentoPorcentaje())
+            .descuentoMontoCobro(descuentoCobro)
+            .descuentoMostrado(convertir(
+                descuentoCobro, mostrada, pago.getFechaCreacion()))
             .monedaMostrada(mostrada != null ? mostrada.getCodigo() : null)
             .arancelMp(pago.getArancelMp())
             .netoRecibidoMp(pago.getNetoRecibidoMp())

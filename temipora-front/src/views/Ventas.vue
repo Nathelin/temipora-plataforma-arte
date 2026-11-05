@@ -11,6 +11,7 @@ import {
   necesitaSincronizar,
 } from '../servicios/ventas'
 import { usePanelArtista } from '../composables/usePanelArtista'
+import ModalComoSeCalcula from '../components/ModalComoSeCalcula.vue'
 
 const router = useRouter()
 
@@ -31,15 +32,16 @@ const error = ref('')
 const errorAccion = ref('')
 const sincronizando = ref([])
 const servicios = ref([])
+const modalCalculoAbierto = ref(false)
 
 const tarjetas = computed(() => [
   {
-    etiqueta: 'Cobrado total',
+    etiqueta: 'Recibido total',
     valor: formatearPrecio(dinero.value.cobradoTotal, dinero.value.monedaMostrada),
     detalle: 'Neto de todos tus pagos acreditados.',
   },
   {
-    etiqueta: 'Cobrado este mes',
+    etiqueta: 'Recibido este mes',
     valor: formatearPrecio(dinero.value.cobradoMes, dinero.value.monedaMostrada),
     detalle: 'Neto acreditado en el mes corriente.',
   },
@@ -64,6 +66,21 @@ function monedaNetoDe(venta) {
 
 function netoDe(venta) {
   return venta.netoRecibidoMp ?? venta.netoMostrado ?? venta.montoNetoCobro
+}
+
+function netoVenta(venta) {
+  return venta.netoMostrado ?? venta.montoNetoCobro
+}
+
+function formatearNeto(venta) {
+  return formatearPrecio(
+    netoVenta(venta),
+    venta.monedaMostrada || venta.monedaCobro,
+  )
+}
+
+function tieneDescuento(venta) {
+  return Number(venta.descuentoMontoCobro) > 0
 }
 
 function liberacionDe(venta) {
@@ -174,9 +191,16 @@ onMounted(() => {
           Ventas
         </h1>
         <p class="mt-2 max-w-2xl text-sm leading-relaxed text-cafe/65">
-          Todo lo que cobraste por tus pedidos: lo que pagó el cliente, la comisión de
-          Temipora y lo que te queda.
+          Todo lo que recibiste por tus pedidos: lo que pagó el cliente, la comisión
+          Temipora, el arancel de MercadoPago y tu neto.
         </p>
+        <button
+          type="button"
+          class="mt-2 text-xs font-semibold text-coral underline-offset-2 transition hover:text-rojizo hover:underline"
+          @click="modalCalculoAbierto = true"
+        >
+          ¿Cómo se calcula?
+        </button>
       </div>
       <span
         v-if="!cargando && !error"
@@ -315,9 +339,10 @@ onMounted(() => {
               <th class="px-4 py-3 font-semibold">Fecha</th>
               <th class="px-4 py-3 font-semibold">Cliente</th>
               <th class="px-4 py-3 font-semibold">Servicio / hito</th>
-              <th class="px-4 py-3 text-right font-semibold">Cobrado</th>
-              <th class="px-4 py-3 text-right font-semibold">Comisión</th>
-              <th class="px-4 py-3 text-right font-semibold">Arancel MP</th>
+              <th class="px-4 py-3 text-right font-semibold">El cliente pagó</th>
+              <th class="px-4 py-3 text-right font-semibold">Comisión Temipora</th>
+              <th class="px-4 py-3 text-right font-semibold">Tu neto</th>
+              <th class="px-4 py-3 text-right font-semibold">Arancel MercadoPago</th>
               <th class="px-4 py-3 text-right font-semibold">Recibís</th>
               <th class="px-4 py-3 font-semibold">Medio de pago</th>
               <th class="px-4 py-3 font-semibold">Estado</th>
@@ -347,9 +372,19 @@ onMounted(() => {
               </td>
               <td class="px-4 py-3 text-right whitespace-nowrap text-cafe/80">
                 {{ formatearPrecio(venta.montoCobro, venta.monedaCobro) }}
+                <span
+                  v-if="tieneDescuento(venta)"
+                  class="mt-0.5 block text-[11px] text-cafe/50"
+                >
+                  Desc. {{ formatearPrecio(venta.descuentoMontoCobro, venta.monedaCobro) }}
+                  · lo financia Temipora
+                </span>
               </td>
               <td class="px-4 py-3 text-right whitespace-nowrap text-cafe/60">
                 {{ formatearPrecio(venta.comisionMontoCobro, venta.monedaCobro) }}
+              </td>
+              <td class="px-4 py-3 text-right whitespace-nowrap font-semibold text-granate">
+                {{ formatearNeto(venta) }}
               </td>
               <td class="px-4 py-3 text-right whitespace-nowrap">
                 <span class="block text-cafe/70">
@@ -422,30 +457,42 @@ onMounted(() => {
               </dd>
             </div>
             <div>
-              <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Cobrado</dt>
+              <dt class="text-[11px] uppercase tracking-wide text-cafe/45">El cliente pagó</dt>
               <dd class="text-cafe/70">
                 {{ formatearPrecio(venta.montoCobro, venta.monedaCobro) }}
               </dd>
             </div>
             <div class="text-right">
-              <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Comisión</dt>
+              <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Tu neto</dt>
+              <dd class="text-cafe/80">
+                {{ formatearNeto(venta) }}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Comisión Temipora</dt>
               <dd class="text-cafe/60">
                 {{ formatearPrecio(venta.comisionMontoCobro, venta.monedaCobro) }}
               </dd>
             </div>
-            <div>
-              <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Arancel MP</dt>
+            <div class="text-right">
+              <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Arancel MercadoPago</dt>
               <dd class="text-cafe/60">
                 {{ formatearPrecio(venta.arancelMp, venta.monedaCobro) }}
               </dd>
             </div>
-            <div class="text-right">
+            <div class="col-span-2 flex items-center justify-between">
               <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Liberación</dt>
               <dd class="text-cafe/60">
                 {{ formatearFecha(liberacionDe(venta)) }}
               </dd>
             </div>
           </dl>
+
+          <p v-if="tieneDescuento(venta)" class="mt-2 text-xs text-cafe/55">
+            Descuento del cliente:
+            {{ formatearPrecio(venta.descuentoMontoCobro, venta.monedaCobro) }}
+            · lo financia Temipora
+          </p>
 
           <p class="mt-2 text-xs text-cafe/55">
             Medio de pago: {{ descripcionMedioPago(venta) }}
@@ -470,6 +517,11 @@ onMounted(() => {
           </div>
         </li>
       </ul>
+
+      <p class="mt-3 text-xs leading-relaxed text-cafe/50">
+        “Recibís” usa el arancel real de MercadoPago cuando está disponible; si no,
+        es una estimación.
+      </p>
 
       <div
         v-if="totalPaginas > 1"
@@ -498,5 +550,12 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <ModalComoSeCalcula
+      :abierto="modalCalculoAbierto"
+      contexto="venta"
+      :moneda="dinero.monedaMostrada || 'ARS'"
+      @cerrar="modalCalculoAbierto = false"
+    />
   </div>
 </template>

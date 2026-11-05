@@ -33,6 +33,11 @@ public class VentaDTO {
     private BigDecimal comisionMontoCobro;
     private BigDecimal montoNetoCobro;
     private BigDecimal netoMostrado;
+    // Descuento de reactivación prorrateado para este pago. Lo financia
+    // Temipora: no reduce el neto del artista.
+    private BigDecimal descuentoPorcentaje;
+    private BigDecimal descuentoMontoCobro;
+    private BigDecimal descuentoMostrado;
     private String monedaMostrada;
     private BigDecimal arancelMp;
     private BigDecimal netoRecibidoMp;

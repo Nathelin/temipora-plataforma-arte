@@ -96,7 +96,7 @@ function textoEntrega(s) {
         v-if="descuentoOferta"
         class="absolute bottom-3 left-3 rounded-full bg-coral px-2.5 py-1 text-[11px] font-extrabold text-white shadow-sm"
       >
-        ¡Tenés un descuento del {{ descuentoOferta }}%!
+        Descuento de reactivación -{{ descuentoOferta }}%
       </span>
 
       <button

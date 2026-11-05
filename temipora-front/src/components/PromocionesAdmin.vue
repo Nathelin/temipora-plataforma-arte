@@ -369,7 +369,7 @@ onMounted(cargar)
               El descuento supera la comisión vigente ({{ comisionTexto }}).
             </p>
             <p v-else class="font-semibold text-granate">
-              El descuento lo absorbe la plataforma.
+              El descuento lo financia Temipora.
             </p>
             <p class="mt-1">
               El artista siempre cobra su neto completo. Si querés descontar más
@@ -416,7 +416,7 @@ onMounted(cargar)
               <dd class="text-cafe">{{ comisionTexto }}</dd>
             </div>
             <div class="flex justify-between gap-3">
-              <dt class="text-xs text-cafe/50">Descuento efectivo</dt>
+              <dt class="text-xs text-cafe/50">Descuento efectivo (lo financia Temipora)</dt>
               <dd class="font-semibold text-granate">{{ formatearNumero(descuentoEfectivo) }}%</dd>
             </div>
             <div class="flex justify-between gap-3">
