@@ -4,10 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
 import { useSesion } from '../composables/useSesion'
+import { useAccesoEnlace } from '../composables/useAccesoEnlace'
 
 const route = useRoute()
 const router = useRouter()
-const { guardarSesion, usuarioActual, estaAutenticado } = useSesion()
+const { usuarioActual, estaAutenticado } = useSesion()
+const { consumirSiCorresponde, avisoAcceso, errorAcceso } = useAccesoEnlace()
 
 const ofertas = ref([])
 const campana = ref(null)
@@ -15,22 +17,14 @@ const cargando = ref(true)
 const error = ref('')
 const autenticado = ref(estaAutenticado())
 const cuentaActual = ref(usuarioActual())
-
-const accesoToken = ref('')
-const objetivoAcceso = ref(null)
-const mostrarPrompt = ref(false)
-const procesandoAcceso = ref(false)
-const accesoError = ref('')
-const puedeCanjearAcceso = ref(false)
+const accesoNombre = ref(avisoAcceso())
+const mensajeAcceso = ref(errorAcceso())
 
 const token = computed(() => route.params.token || null)
 const esCampana = computed(() => !!token.value)
 const ofertaDestacada = computed(() => String(route.query.oferta || ''))
 
-const cuentaOferta = computed(() => {
-  const objetivo = objetivoAcceso.value?.nombreUsuario
-  return objetivo || campana.value?.nombreUsuario || ''
-})
+const cuentaOferta = computed(() => campana.value?.nombreUsuario || '')
 
 const mismaCuenta = computed(() => {
   if (!cuentaOferta.value) return true
@@ -81,87 +75,13 @@ function inicial(oferta) {
   return String(nombre).charAt(0).toUpperCase()
 }
 
-function urlSinAcceso() {
-  const query = { ...route.query }
-  delete query.acceso
-  return router.resolve({
-    name: route.name,
-    params: route.params,
-    query,
-  }).href
-}
-
-function limpiarAcceso() {
-  const query = { ...route.query }
-  delete query.acceso
-  router.replace({ query })
-}
-
-function mensajeAcceso(e) {
-  return e.response?.data?.message
-    || 'El enlace de acceso venció o ya fue usado. Iniciá sesión manualmente.'
-}
-
-async function consumirAcceso() {
-  if (!accesoToken.value) return
-  procesandoAcceso.value = true
-  accesoError.value = ''
-  try {
-    const { data } = await api.post('/auth/acceso-oferta', {
-      tokenCampana: token.value,
-      tokenAcceso: accesoToken.value,
-    })
-    guardarSesion(data)
-    window.location.replace(urlSinAcceso())
-  } catch (e) {
-    accesoError.value = mensajeAcceso(e)
-    mostrarPrompt.value = false
-    objetivoAcceso.value = null
-    puedeCanjearAcceso.value = false
-    limpiarAcceso()
-  } finally {
-    procesandoAcceso.value = false
-  }
-}
-
-async function procesarAcceso() {
-  const acceso = route.query.acceso
-  if (!acceso || !esCampana.value) return
-  accesoToken.value = String(acceso)
-  try {
-    const { data } = await api.post('/auth/acceso-oferta/verificar', {
-      tokenCampana: token.value,
-      tokenAcceso: accesoToken.value,
-    })
-    objetivoAcceso.value = data
-    puedeCanjearAcceso.value = true
-    if (!cuentaActual.value) {
-      await consumirAcceso()
-      return
-    }
-    if (mismaCuenta.value) {
-      limpiarAcceso()
-      return
-    }
-    mostrarPrompt.value = true
-  } catch (e) {
-    accesoError.value = mensajeAcceso(e)
-    puedeCanjearAcceso.value = false
-    limpiarAcceso()
-  }
-}
-
-function seguirConMiCuenta() {
-  mostrarPrompt.value = false
-  limpiarAcceso()
-}
-
-function cambiarOCuenta() {
-  if (puedeCanjearAcceso.value) {
-    consumirAcceso()
-  } else {
-    irALogin()
-  }
+function cerrarSesionAcceso() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('rol')
+  localStorage.removeItem('nombreUsuario')
+  localStorage.removeItem('idUsuario')
+  localStorage.removeItem('urlFotoPerfil')
+  router.push({ name: 'login' })
 }
 
 function irALogin() {
@@ -218,8 +138,11 @@ async function cargar() {
 }
 
 onMounted(async () => {
+  const acceso = await consumirSiCorresponde()
+  if (acceso.habiaEnlace) {
+    return
+  }
   await cargar()
-  await procesarAcceso()
 })
 </script>
 
@@ -247,41 +170,30 @@ onMounted(async () => {
     </div>
 
     <div
-      v-if="mostrarPrompt"
-      class="mt-6 rounded-[24px] border border-coral/30 bg-coral/5 px-5 py-4"
+      v-if="accesoNombre"
+      class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-coral/25 bg-coral/5 px-5 py-4"
     >
       <p class="text-sm leading-relaxed text-granate">
-        Esta oferta es para <strong>@{{ objetivoAcceso?.nombreUsuario }}</strong>,
-        pero estás con <strong>@{{ cuentaActual }}</strong>. ¿Querés cambiar de cuenta?
+        Entraste con el enlace de <strong>@{{ accesoNombre }}</strong>.
       </p>
-      <div class="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          class="inline-flex min-h-10 items-center rounded-full bg-coral px-5 text-sm font-bold text-white transition hover:bg-rojizo disabled:opacity-60"
-          :disabled="procesandoAcceso"
-          @click="consumirAcceso"
-        >
-          {{ procesandoAcceso ? 'Cambiando...' : 'Cambiar de cuenta' }}
-        </button>
-        <button
-          type="button"
-          class="inline-flex min-h-10 items-center rounded-full border border-coral/40 px-5 text-sm font-bold text-coral transition hover:bg-coral/5"
-          @click="seguirConMiCuenta"
-        >
-          Seguir con mi cuenta
-        </button>
-      </div>
+      <button
+        type="button"
+        class="inline-flex min-h-10 items-center rounded-full border border-coral/40 px-5 text-sm font-bold text-coral transition hover:bg-coral/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+        @click="cerrarSesionAcceso"
+      >
+        Cerrar sesión
+      </button>
     </div>
 
     <p
-      v-if="accesoError"
+      v-if="mensajeAcceso"
       class="mt-6 rounded-2xl border border-rojizo/20 bg-rojizo/5 px-4 py-3 text-sm text-rojizo"
     >
-      {{ accesoError }}
+      {{ mensajeAcceso }}
     </p>
 
     <div
-      v-if="cuentaOferta && !mismaCuenta && !mostrarPrompt"
+      v-if="cuentaOferta && !mismaCuenta"
       class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-coral/25 bg-coral/5 px-5 py-4"
     >
       <p class="text-sm leading-relaxed text-granate">
@@ -291,17 +203,10 @@ onMounted(async () => {
       </p>
       <button
         type="button"
-        class="inline-flex min-h-10 items-center rounded-full bg-coral px-5 text-sm font-bold text-white transition hover:bg-rojizo disabled:opacity-60"
-        :disabled="procesandoAcceso"
-        @click="cambiarOCuenta"
+        class="inline-flex min-h-10 items-center rounded-full bg-coral px-5 text-sm font-bold text-white transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+        @click="irALogin"
       >
-        {{ procesandoAcceso
-          ? 'Procesando...'
-          : puedeCanjearAcceso
-            ? 'Cambiar de cuenta'
-            : autenticado
-              ? 'Iniciar sesión con otra cuenta'
-              : 'Iniciar sesión' }}
+        {{ autenticado ? 'Iniciar sesión con otra cuenta' : 'Iniciar sesión' }}
       </button>
     </div>
 

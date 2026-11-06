@@ -74,6 +74,8 @@ public final class AccionesAdmin {
     public static final String USUARIO_CAMBIAR_TELEFONO = "USUARIO_CAMBIAR_TELEFONO";
     public static final String USUARIO_QUITAR_TELEFONO = "USUARIO_QUITAR_TELEFONO";
     public static final String LOGIN_FALLIDO = "LOGIN_FALLIDO";
+    public static final String SESION_ACCESO_ENLACE = "SESION_ACCESO_ENLACE";
+    public static final String SESION_ACCESO_ENLACE_FALLIDO = "SESION_ACCESO_ENLACE_FALLIDO";
     public static final String SERVICIO_CREAR = "SERVICIO_CREAR";
     public static final String SERVICIO_MODIFICAR = "SERVICIO_MODIFICAR";
     public static final String SERVICIO_PAUSAR = "SERVICIO_PAUSAR";

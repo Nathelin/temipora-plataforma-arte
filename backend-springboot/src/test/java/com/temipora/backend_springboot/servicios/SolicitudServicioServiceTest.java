@@ -135,6 +135,9 @@ class SolicitudServicioServiceTest {
     @Mock
     private CuposEventPublisher cuposEventPublisher;
 
+    @Mock
+    private CierreEmailService cierreEmailService;
+
     @InjectMocks
     private SolicitudServicioService solicitudServicioService;
 

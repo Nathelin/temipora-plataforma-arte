@@ -349,7 +349,7 @@ public class SustitucionService {
      * servicio. Genera (o reutiliza) el evento y devuelve el resumen junto
      * con las alternativas.
      */
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public CierreSustitucionDTO detalleCierrePorSolicitud(
             Long idSolicitud,
             Long idCliente) {
@@ -372,7 +372,7 @@ public class SustitucionService {
             idCliente);
     }
 
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public CierreSustitucionDTO detalleCierrePorPedido(
             Long idPedido,
             Long idCliente) {

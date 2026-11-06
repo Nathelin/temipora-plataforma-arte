@@ -106,6 +106,9 @@ class PedidoServiceTest {
     @Mock
     private CuposEventPublisher cuposEventPublisher;
 
+    @Mock
+    private CierreEmailService cierreEmailService;
+
     @InjectMocks
     private PedidoService pedidoService;
 

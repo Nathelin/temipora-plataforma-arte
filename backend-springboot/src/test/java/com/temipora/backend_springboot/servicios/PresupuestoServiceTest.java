@@ -104,6 +104,9 @@ class PresupuestoServiceTest {
     @Mock
     private CuposEventPublisher cuposEventPublisher;
 
+    @Mock
+    private CierreEmailService cierreEmailService;
+
     @InjectMocks
     private PresupuestoService presupuestoService;
 

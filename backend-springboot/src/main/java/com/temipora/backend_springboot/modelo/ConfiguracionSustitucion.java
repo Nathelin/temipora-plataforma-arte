@@ -51,6 +51,18 @@ public class ConfiguracionSustitucion {
     @Column(name = "dias_retencion", nullable = false)
     private int diasRetencion = 180;
 
+    @Column(name = "email_cierre_habilitado", nullable = false)
+    private boolean emailCierreHabilitado = true;
+
+    @Column(name = "email_cierre_minutos", nullable = false)
+    private int emailCierreMinutos = 10;
+
+    @Column(name = "email_cierre_max", nullable = false)
+    private int emailCierreMax = 5;
+
+    @Column(name = "email_cierre_vigencia_horas", nullable = false)
+    private int emailCierreVigenciaHoras = 72;
+
     @Column(name = "fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
 }

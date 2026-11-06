@@ -9,6 +9,8 @@ const errorAccion = ref('')
 const mensaje = ref('')
 const config = ref(null)
 const resumen = ref(null)
+const procesandoCierres = ref(false)
+const resultadoCierres = ref(null)
 
 const form = ref({
   habilitado: true,
@@ -20,6 +22,10 @@ const form = ref({
   mostrarEnExplorar: true,
   minutosDedupe: 30,
   diasRetencion: 180,
+  emailCierreHabilitado: true,
+  emailCierreMinutos: 10,
+  emailCierreMax: 5,
+  emailCierreVigenciaHoras: 72,
 })
 
 const tasaTexto = computed(() => {
@@ -53,6 +59,10 @@ async function cargar() {
       mostrarEnExplorar: d.mostrarEnExplorar !== false,
       minutosDedupe: Number(d.minutosDedupe ?? 30),
       diasRetencion: Number(d.diasRetencion ?? 180),
+      emailCierreHabilitado: d.emailCierreHabilitado !== false,
+      emailCierreMinutos: Number(d.emailCierreMinutos ?? 10),
+      emailCierreMax: Number(d.emailCierreMax ?? 5),
+      emailCierreVigenciaHoras: Number(d.emailCierreVigenciaHoras ?? 72),
     }
   } catch (e) {
     error.value =
@@ -86,6 +96,15 @@ function validar() {
   if (f.diasRetencion < 0) {
     return 'Los días de retención no pueden ser negativos.'
   }
+  if (f.emailCierreMinutos < 0 || f.emailCierreMinutos > 1440) {
+    return 'La agrupación de mails debe estar entre 0 y 1440 minutos.'
+  }
+  if (f.emailCierreMax < 1 || f.emailCierreMax > 20) {
+    return 'Cada mail puede incluir entre 1 y 20 cierres.'
+  }
+  if (f.emailCierreVigenciaHoras < 1 || f.emailCierreVigenciaHoras > 720) {
+    return 'El enlace del mail debe durar entre 1 y 720 horas.'
+  }
   return ''
 }
 
@@ -100,6 +119,10 @@ function payload() {
     mostrarEnExplorar: form.value.mostrarEnExplorar,
     minutosDedupe: Number(form.value.minutosDedupe),
     diasRetencion: Number(form.value.diasRetencion),
+    emailCierreHabilitado: form.value.emailCierreHabilitado,
+    emailCierreMinutos: Number(form.value.emailCierreMinutos),
+    emailCierreMax: Number(form.value.emailCierreMax),
+    emailCierreVigenciaHoras: Number(form.value.emailCierreVigenciaHoras),
   }
 }
 
@@ -122,6 +145,28 @@ async function guardar() {
       'No se pudo guardar la configuración de sustituciones.'
   } finally {
     guardando.value = false
+  }
+}
+
+async function procesarCierres() {
+  if (procesandoCierres.value) return
+  procesandoCierres.value = true
+  errorAccion.value = ''
+  mensaje.value = ''
+  try {
+    const { data } = await api.post('/admin/cierres-email/procesar')
+    resultadoCierres.value = data
+    mensaje.value = data.enviados
+      ? `Se enviaron ${data.enviados} mail(s) de cierre.`
+      : 'No había mails listos para enviar.'
+    const resumenRes = await api.get('/admin/sustituciones/resumen')
+    resumen.value = resumenRes.data
+  } catch (e) {
+    errorAccion.value =
+      e.response?.data?.message ||
+      'No se pudieron procesar los mails pendientes.'
+  } finally {
+    procesandoCierres.value = false
   }
 }
 
@@ -301,6 +346,77 @@ onMounted(cargar)
           </div>
         </section>
 
+        <section class="border-t border-rosa/40 pt-6">
+          <h2 class="text-base text-granate">Mails de cierre</h2>
+          <p class="mt-1 text-xs leading-relaxed text-cafe/50">
+            Cuando una solicitud o un pedido se cierra por una causa que el cliente no
+            eligió (rechazo, retiro, vencimiento, baja del servicio o impago), se le avisa
+            por mail con el resumen y alternativas. Los cierres se agrupan por usuario.
+          </p>
+
+          <label class="mt-4 flex items-start gap-3 rounded-2xl bg-crema p-4">
+            <input
+              v-model="form.emailCierreHabilitado"
+              type="checkbox"
+              class="mt-0.5 h-4 w-4 rounded border-borde text-coral focus:ring-coral"
+            />
+            <span class="text-sm text-cafe">
+              Enviar mail de cierre al cliente.
+              <span class="mt-0.5 block text-xs text-cafe/55">
+                No depende de la preferencia de promociones: es un aviso transaccional.
+              </span>
+            </span>
+          </label>
+
+          <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <label for="email-cierre-minutos" class="mb-1.5 block text-sm text-cafe">
+                Agrupar durante (minutos)
+              </label>
+              <input
+                id="email-cierre-minutos"
+                v-model.number="form.emailCierreMinutos"
+                type="number"
+                min="0"
+                max="1440"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-1.5 text-xs text-cafe/50">
+                0 envía en la próxima corrida del job.
+              </p>
+            </div>
+            <div>
+              <label for="email-cierre-max" class="mb-1.5 block text-sm text-cafe">
+                Cierres por mail
+              </label>
+              <input
+                id="email-cierre-max"
+                v-model.number="form.emailCierreMax"
+                type="number"
+                min="1"
+                max="20"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+            </div>
+            <div>
+              <label for="email-cierre-vigencia" class="mb-1.5 block text-sm text-cafe">
+                Vigencia del enlace (horas)
+              </label>
+              <input
+                id="email-cierre-vigencia"
+                v-model.number="form.emailCierreVigenciaHoras"
+                type="number"
+                min="1"
+                max="720"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+            </div>
+          </div>
+        </section>
+
         <p v-if="errorAccion" class="text-sm text-rojizo">{{ errorAccion }}</p>
         <p v-else-if="mensaje" class="text-sm text-green-700">{{ mensaje }}</p>
 
@@ -311,6 +427,14 @@ onMounted(cargar)
             @click="guardar"
           >
             {{ guardando ? 'Guardando...' : 'Guardar cambios' }}
+          </button>
+          <button
+            type="button"
+            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
+            :disabled="procesandoCierres"
+            @click="procesarCierres"
+          >
+            {{ procesandoCierres ? 'Procesando...' : 'Procesar mails pendientes' }}
           </button>
         </div>
       </div>
@@ -338,6 +462,10 @@ onMounted(cargar)
             <div class="flex justify-between gap-3">
               <dt class="text-xs text-cafe/50">Abiertas sin resolver</dt>
               <dd class="text-cafe">{{ resumen?.abiertas ?? 0 }}</dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="text-xs text-cafe/50">Mails de cierre pendientes</dt>
+              <dd class="font-semibold text-granate">{{ resumen?.emailsCierrePendientes ?? 0 }}</dd>
             </div>
           </dl>
         </div>

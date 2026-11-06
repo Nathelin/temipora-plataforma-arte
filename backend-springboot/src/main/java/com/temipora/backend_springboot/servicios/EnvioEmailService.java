@@ -40,23 +40,33 @@ public class EnvioEmailService {
         EnvioEmail existente = envioEmailRepository
             .findByClaveIdempotencia(claveIdempotencia)
             .orElse(null);
-        if (existente != null) {
-            log.debug("Envío ya registrado para {}", claveIdempotencia);
+        if (existente != null
+                && existente.getEstado() == EstadoEnvioEmail.ENVIADO) {
+            log.debug("Envío ya realizado para {}", claveIdempotencia);
             return existente;
         }
 
-        EnvioEmail envio = new EnvioEmail();
-        envio.setUsuario(usuario);
-        envio.setTipo(tipo);
-        envio.setIdReferencia(idReferencia);
-        envio.setTipoReferencia(tipoReferencia);
-        envio.setDestinatario(
-            usuario.getCorreo() != null ? usuario.getCorreo() : "");
-        envio.setAsunto(asunto);
-        envio.setClaveIdempotencia(claveIdempotencia);
-        envio.setEstado(EstadoEnvioEmail.PENDIENTE);
-        envio.setFechaCreacion(LocalDateTime.now());
-        envio = envioEmailRepository.save(envio);
+        EnvioEmail envio;
+        if (existente != null) {
+            // Un envío pendiente o fallido se reintenta sobre el mismo registro.
+            envio = existente;
+            envio.setEstado(EstadoEnvioEmail.PENDIENTE);
+            envio.setError(null);
+            envio.setFechaEnvio(null);
+        } else {
+            envio = new EnvioEmail();
+            envio.setUsuario(usuario);
+            envio.setTipo(tipo);
+            envio.setIdReferencia(idReferencia);
+            envio.setTipoReferencia(tipoReferencia);
+            envio.setDestinatario(
+                usuario.getCorreo() != null ? usuario.getCorreo() : "");
+            envio.setAsunto(asunto);
+            envio.setClaveIdempotencia(claveIdempotencia);
+            envio.setEstado(EstadoEnvioEmail.PENDIENTE);
+            envio.setFechaCreacion(LocalDateTime.now());
+            envio = envioEmailRepository.save(envio);
+        }
 
         if (usuario.getCorreo() == null || usuario.getCorreo().isBlank()) {
             envio.setEstado(EstadoEnvioEmail.FALLIDO);

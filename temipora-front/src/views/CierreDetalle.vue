@@ -9,15 +9,20 @@ import {
 } from '../servicios/sustituciones'
 import { formatearPrecio } from '../servicios/moneda'
 import { useNotificaciones } from '../composables/useNotificaciones'
+import { useAccesoEnlace } from '../composables/useAccesoEnlace'
 
 const route = useRoute()
 const router = useRouter()
 const { error: notificarError } = useNotificaciones()
+const { consumirSiCorresponde, avisoAcceso, errorAcceso } = useAccesoEnlace()
 
 const cargando = ref(true)
 const error = ref('')
 const detalle = ref(null)
 const eligiendo = ref(null)
+const accesoNombre = ref(avisoAcceso())
+const mensajeAcceso = ref(errorAcceso())
+const requiereLogin = ref(false)
 
 const esPedido = computed(() => route.name === 'pedido-resultado')
 const idSolicitud = computed(() => Number(route.params.idSolicitud))
@@ -65,12 +70,24 @@ async function cargar() {
       ? await detalleCierrePedido(idPedido.value)
       : await detalleCierreSolicitud(idSolicitud.value)
   } catch (e) {
-    error.value =
-      e.response?.data?.message ||
-      'No pudimos cargar el resultado de este cierre.'
+    if (e.response?.status === 401) {
+      requiereLogin.value = true
+      error.value = 'Iniciá sesión para ver el resultado de este cierre.'
+    } else {
+      error.value =
+        e.response?.data?.message ||
+        'No pudimos cargar el resultado de este cierre.'
+    }
   } finally {
     cargando.value = false
   }
+}
+
+function irALogin() {
+  router.push({
+    name: 'login',
+    query: { redirect: route.fullPath },
+  })
 }
 
 function irASolicitar(id) {
@@ -111,7 +128,22 @@ async function solicitar(opcion) {
   }
 }
 
-onMounted(cargar)
+function cerrarSesionAcceso() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('rol')
+  localStorage.removeItem('nombreUsuario')
+  localStorage.removeItem('idUsuario')
+  localStorage.removeItem('urlFotoPerfil')
+  router.push({ name: 'login' })
+}
+
+onMounted(async () => {
+  const acceso = await consumirSiCorresponde()
+  if (acceso.habiaEnlace) {
+    return
+  }
+  await cargar()
+})
 </script>
 
 <template>
@@ -122,6 +154,29 @@ onMounted(cargar)
     >
       ← Volver a mis {{ esPedido ? 'pedidos' : 'solicitudes' }}
     </router-link>
+
+    <div
+      v-if="accesoNombre"
+      class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-coral/25 bg-coral/5 px-5 py-4"
+    >
+      <p class="text-sm leading-relaxed text-granate">
+        Entraste con el enlace de <strong>@{{ accesoNombre }}</strong>.
+      </p>
+      <button
+        type="button"
+        class="inline-flex min-h-10 items-center rounded-full border border-coral/40 px-5 text-sm font-bold text-coral transition hover:bg-coral/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+        @click="cerrarSesionAcceso"
+      >
+        Cerrar sesión
+      </button>
+    </div>
+
+    <p
+      v-if="mensajeAcceso"
+      class="mt-6 rounded-2xl border border-rojizo/20 bg-rojizo/5 px-4 py-3 text-sm text-rojizo"
+    >
+      {{ mensajeAcceso }}
+    </p>
 
     <div v-if="cargando" class="mt-10 space-y-6">
       <div class="h-40 animate-pulse rounded-[28px] bg-rosa/25"></div>
@@ -136,6 +191,15 @@ onMounted(cargar)
     >
       <p class="text-sm text-rojizo">{{ error }}</p>
       <button
+        v-if="requiereLogin"
+        type="button"
+        class="mt-4 inline-flex min-h-10 items-center rounded-full bg-coral px-5 text-sm font-bold text-white transition hover:bg-rojizo"
+        @click="irALogin"
+      >
+        Iniciar sesión
+      </button>
+      <button
+        v-else
         type="button"
         class="mt-4 inline-flex min-h-10 items-center rounded-full border border-borde/60 bg-crema px-5 text-sm font-semibold text-granate transition hover:bg-rosa/25"
         @click="cargar"

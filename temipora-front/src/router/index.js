@@ -166,12 +166,6 @@ const routes = [
               title: (route) => `Solicitud #${route.params.idSolicitud}`,
             },
           },
-          {
-            path: ':idSolicitud/resultado',
-            name: 'solicitud-resultado',
-            component: CierreDetalle,
-            meta: { title: 'Resultado de la solicitud' },
-          },
         ],
       },
       {
@@ -203,13 +197,19 @@ const routes = [
               title: (route) => `Pedido #${route.params.idPedido}`,
             },
           },
-          {
-            path: ':idPedido/resultado',
-            name: 'pedido-resultado',
-            component: CierreDetalle,
-            meta: { title: 'Resultado del pedido' },
-          },
         ],
+      },
+      {
+        path: 'solicitudes/:idSolicitud/resultado',
+        name: 'solicitud-resultado',
+        component: CierreDetalle,
+        meta: { title: 'Resultado de la solicitud' },
+      },
+      {
+        path: 'pedidos/:idPedido/resultado',
+        name: 'pedido-resultado',
+        component: CierreDetalle,
+        meta: { title: 'Resultado del pedido' },
       },
       { path: 'mis-compras', redirect: { name: 'pedidos' } },
       {

@@ -20,6 +20,7 @@ public class SustitucionResumenDTO {
     private long resueltasConCola;
     private long descartadas;
     private long abiertas;
+    private long emailsCierrePendientes;
     private double tasaSustitucion;
     private List<OrigenFrecuente> origenesFrecuentes;
 

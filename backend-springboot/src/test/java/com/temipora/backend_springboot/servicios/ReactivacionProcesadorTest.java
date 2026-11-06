@@ -2,6 +2,7 @@ package com.temipora.backend_springboot.servicios;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -63,6 +64,9 @@ class ReactivacionProcesadorTest {
 
     @Mock
     private MonedaService monedaService;
+
+    @Mock
+    private AccesoEnlaceService accesoEnlaceService;
 
     @InjectMocks
     private ReactivacionProcesador procesador;
@@ -253,6 +257,8 @@ class ReactivacionProcesadorTest {
         when(comisionService.obtener()).thenReturn(comision);
         when(campanaRepository.save(any(CampanaReactivacion.class)))
             .thenAnswer(inv -> inv.getArgument(0));
+        when(accesoEnlaceService.generar(any(), any(), any(), anyInt()))
+            .thenReturn("token-acceso");
     }
 
     private CampanaReactivacion campanaCapturada() {

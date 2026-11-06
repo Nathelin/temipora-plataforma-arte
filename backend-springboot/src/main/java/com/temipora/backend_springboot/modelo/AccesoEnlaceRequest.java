@@ -8,11 +8,8 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class AccesoOfertaRequest {
+public class AccesoEnlaceRequest {
 
     @NotBlank
-    private String tokenCampana;
-
-    @NotBlank
-    private String tokenAcceso;
+    private String token;
 }

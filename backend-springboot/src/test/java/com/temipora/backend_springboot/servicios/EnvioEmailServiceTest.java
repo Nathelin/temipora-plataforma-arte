@@ -32,6 +32,7 @@ class EnvioEmailServiceTest {
     @Test
     void enviar_claveYaRegistrada_devuelveElExistenteSinEnviar() {
         EnvioEmail existente = new EnvioEmail();
+        existente.setEstado(EstadoEnvioEmail.ENVIADO);
         when(envioEmailRepository.findByClaveIdempotencia("k"))
             .thenReturn(Optional.of(existente));
 

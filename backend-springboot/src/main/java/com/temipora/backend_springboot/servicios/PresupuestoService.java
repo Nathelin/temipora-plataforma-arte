@@ -26,6 +26,7 @@ import com.temipora.backend_springboot.modelo.ItemPresupuestoRequest;
 import com.temipora.backend_springboot.modelo.ItemSolicitud;
 import com.temipora.backend_springboot.modelo.ItemSolicitudDerecho;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.MotivoSustitucion;
 import com.temipora.backend_springboot.modelo.OfertaReactivacion;
 import com.temipora.backend_springboot.modelo.Presupuesto;
 import com.temipora.backend_springboot.modelo.PresupuestoRequest;
@@ -70,6 +71,7 @@ public class PresupuestoService {
     private final AuditoriaService auditoria;
     private final ArancelEstimadoService arancelEstimadoService;
     private final CuposEventPublisher cuposEventPublisher;
+    private final CierreEmailService cierreEmailService;
 
     private static final String ENTIDAD = "Presupuesto";
     private static final List<CampoAuditado> CAMPOS = List.of(
@@ -103,7 +105,8 @@ public class PresupuestoService {
             OfertaReactivacionService ofertaReactivacionService,
             AuditoriaService auditoria,
             ArancelEstimadoService arancelEstimadoService,
-            CuposEventPublisher cuposEventPublisher) {
+            CuposEventPublisher cuposEventPublisher,
+            CierreEmailService cierreEmailService) {
         this.solicitudRepository = solicitudRepository;
         this.servicioRepository = servicioRepository;
         this.presupuestoRepository = presupuestoRepository;
@@ -118,6 +121,7 @@ public class PresupuestoService {
         this.auditoria = auditoria;
         this.arancelEstimadoService = arancelEstimadoService;
         this.cuposEventPublisher = cuposEventPublisher;
+        this.cierreEmailService = cierreEmailService;
     }
 
     @Transactional
@@ -471,6 +475,12 @@ public class PresupuestoService {
             solicitud.setEstado(EstadoSolicitud.VENCIDA);
             solicitud.setFechaActualizacion(ahora);
             notificarVencimiento(solicitud);
+            cierreEmailService.encolar(
+                solicitud.getCliente(),
+                solicitud,
+                null,
+                MotivoSustitucion.PRESUPUESTO_VENCIDO,
+                ahora);
             if (solicitud.getServicio() != null) {
                 cuposEventPublisher.publicar(solicitud.getServicio().getIdServicio());
             }

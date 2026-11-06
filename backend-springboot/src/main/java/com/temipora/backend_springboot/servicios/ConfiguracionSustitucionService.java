@@ -24,7 +24,11 @@ public class ConfiguracionSustitucionService {
         CampoAuditado.de("factorTiempoMax", "Tope de tiempo de entrega"),
         CampoAuditado.de("mostrarEnExplorar", "Mostrar sin cupos en Explorar"),
         CampoAuditado.de("minutosDedupe", "Minutos de agrupación"),
-        CampoAuditado.de("diasRetencion", "Días de retención"));
+        CampoAuditado.de("diasRetencion", "Días de retención"),
+        CampoAuditado.de("emailCierreHabilitado", "Mails de cierre"),
+        CampoAuditado.de("emailCierreMinutos", "Minutos de agrupación del mail"),
+        CampoAuditado.de("emailCierreMax", "Cierres por mail"),
+        CampoAuditado.de("emailCierreVigenciaHoras", "Vigencia del enlace del mail"));
 
     private final ConfiguracionSustitucionRepository repository;
     private final AuditoriaService auditoria;
@@ -96,6 +100,12 @@ public class ConfiguracionSustitucionService {
         config.setMostrarEnExplorar(cambios.isMostrarEnExplorar());
         config.setMinutosDedupe(clamp(cambios.getMinutosDedupe(), 0, 1440));
         config.setDiasRetencion(Math.max(0, cambios.getDiasRetencion()));
+        config.setEmailCierreHabilitado(cambios.isEmailCierreHabilitado());
+        config.setEmailCierreMinutos(
+            clamp(cambios.getEmailCierreMinutos(), 0, 1440));
+        config.setEmailCierreMax(clamp(cambios.getEmailCierreMax(), 1, 20));
+        config.setEmailCierreVigenciaHoras(
+            clamp(cambios.getEmailCierreVigenciaHoras(), 1, 720));
         config.setFechaActualizacion(LocalDateTime.now());
         ConfiguracionSustitucion guardada = repository.save(config);
         auditoria.registrar(

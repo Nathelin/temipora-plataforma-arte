@@ -30,6 +30,7 @@ import com.temipora.backend_springboot.modelo.ItemSolicitudRequest;
 import com.temipora.backend_springboot.modelo.ListaEspera;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.MotivoSustitucion;
 import com.temipora.backend_springboot.modelo.OfertaReactivacion;
 import com.temipora.backend_springboot.modelo.Pregunta;
 import com.temipora.backend_springboot.modelo.PreguntaDTO;
@@ -127,6 +128,7 @@ public class SolicitudServicioService {
     private final ArancelEstimadoService arancelEstimadoService;
     private final SustitucionService sustitucionService;
     private final CuposEventPublisher cuposEventPublisher;
+    private final CierreEmailService cierreEmailService;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -149,7 +151,8 @@ public class SolicitudServicioService {
             AuditoriaService auditoria,
             ArancelEstimadoService arancelEstimadoService,
             SustitucionService sustitucionService,
-            CuposEventPublisher cuposEventPublisher) {
+            CuposEventPublisher cuposEventPublisher,
+            CierreEmailService cierreEmailService) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -171,6 +174,7 @@ public class SolicitudServicioService {
         this.arancelEstimadoService = arancelEstimadoService;
         this.sustitucionService = sustitucionService;
         this.cuposEventPublisher = cuposEventPublisher;
+        this.cierreEmailService = cierreEmailService;
     }
 
     @Transactional(readOnly = true)
@@ -599,6 +603,13 @@ public class SolicitudServicioService {
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
 
+        cierreEmailService.encolar(
+            solicitud.getCliente(),
+            solicitud,
+            null,
+            MotivoSustitucion.PRESUPUESTO_RETIRADO,
+            ahora);
+
         if (solicitud.getServicio() != null) {
             cuposEventPublisher.publicar(solicitud.getServicio().getIdServicio());
         }
@@ -654,6 +665,15 @@ public class SolicitudServicioService {
             descripcion,
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
+
+        cierreEmailService.encolar(
+            solicitud.getCliente(),
+            solicitud,
+            null,
+            ORIGEN_BAJA_SERVICIO.equals(origen)
+                ? MotivoSustitucion.SERVICIO_DADO_DE_BAJA
+                : MotivoSustitucion.SOLICITUD_RECHAZADA,
+            ahora);
 
         conversacionService.archivarPorSolicitud(
             solicitud.getCliente(), solicitud.getArtista());

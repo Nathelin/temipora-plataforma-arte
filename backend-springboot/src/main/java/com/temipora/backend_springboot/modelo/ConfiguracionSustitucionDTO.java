@@ -54,6 +54,20 @@ public class ConfiguracionSustitucionDTO {
     @Min(0)
     private int diasRetencion;
 
+    private boolean emailCierreHabilitado;
+
+    @Min(0)
+    @Max(1440)
+    private int emailCierreMinutos;
+
+    @Min(1)
+    @Max(20)
+    private int emailCierreMax;
+
+    @Min(1)
+    @Max(720)
+    private int emailCierreVigenciaHoras;
+
     public static ConfiguracionSustitucionDTO desdeEntidad(
             ConfiguracionSustitucion config) {
         return ConfiguracionSustitucionDTO.builder()
@@ -66,6 +80,10 @@ public class ConfiguracionSustitucionDTO {
             .mostrarEnExplorar(config.isMostrarEnExplorar())
             .minutosDedupe(config.getMinutosDedupe())
             .diasRetencion(config.getDiasRetencion())
+            .emailCierreHabilitado(config.isEmailCierreHabilitado())
+            .emailCierreMinutos(config.getEmailCierreMinutos())
+            .emailCierreMax(config.getEmailCierreMax())
+            .emailCierreVigenciaHoras(config.getEmailCierreVigenciaHoras())
             .build();
     }
 }
