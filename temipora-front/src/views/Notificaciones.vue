@@ -1,6 +1,10 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import {
+  destinoDe as destinoCompartido,
+  textoDestino as textoCompartido,
+} from '../servicios/notificaciones'
 import { useNotificacionesSistema } from '../composables/useNotificacionesSistema'
 
 const router = useRouter()
@@ -20,54 +24,17 @@ const esArtista = localStorage.getItem('rol') === 'ARTISTA'
 const hayNotificaciones = computed(() => notificaciones.value.length > 0)
 const hayNoLeidas = computed(() => noLeidas.value > 0)
 
+const rolActual = localStorage.getItem('rol') || ''
+
 function destinoDe(notificacion) {
-  const tipo = notificacion?.tipoReferencia
-  if (tipo !== 'SOLICITUD' && tipo !== 'PEDIDO' && tipo !== 'RESENIA'
-    && tipo !== 'CONVERSACION' && tipo !== 'OFERTA_REACTIVACION') return null
-
-  const rol = localStorage.getItem('rol')
-  if (rol !== 'ARTISTA' && rol !== 'CLIENTE' && rol !== 'ADMIN') return null
-
-  if (tipo === 'RESENIA') {
-    return rol === 'ADMIN' ? { name: 'admin-resenias-reportadas' } : null
-  }
-
-  if (tipo === 'OFERTA_REACTIVACION') {
-    return rol === 'ADMIN' ? null : { name: 'ofertas' }
-  }
-
-  const id = Number(notificacion.idReferencia)
-  if (!Number.isInteger(id) || id <= 0) return null
-
-  if (tipo === 'CONVERSACION') {
-    if (rol === 'ADMIN') return null
-    return router.currentRoute.value.path.startsWith('/panel')
-      ? { name: 'panel-conversacion', params: { idConversacion: id } }
-      : { name: 'conversacion', params: { idConversacion: id } }
-  }
-
-  if (tipo === 'SOLICITUD') {
-    if (rol === 'ADMIN') return null
-    return notificacion.rolReferencia === 'ARTISTA'
-      ? { name: 'panel-solicitud-detalle', params: { idSolicitud: id } }
-      : { name: 'solicitud-detalle', params: { idSolicitud: id } }
-  }
-
-  if (rol === 'ADMIN') {
-    return { name: 'admin-pedido-detalle', params: { idPedido: id } }
-  }
-  return notificacion.rolReferencia === 'ARTISTA'
-    ? { name: 'panel-pedido-detalle', params: { idPedido: id } }
-    : { name: 'pedido-detalle', params: { idPedido: id } }
+  return destinoCompartido(notificacion, {
+    rol: rolActual,
+    pathActual: router.currentRoute.value.path,
+  })
 }
 
 function textoDestino(notificacion) {
-  if (notificacion?.tipoReferencia === 'PEDIDO') return 'Ver pedido →'
-  if (notificacion?.tipoReferencia === 'SOLICITUD') return 'Ver solicitud →'
-  if (notificacion?.tipoReferencia === 'RESENIA') return 'Ver reportes →'
-  if (notificacion?.tipoReferencia === 'CONVERSACION') return 'Ver conversación →'
-  if (notificacion?.tipoReferencia === 'OFERTA_REACTIVACION') return 'Ver ofertas →'
-  return ''
+  return textoCompartido(notificacion, rolActual)
 }
 
 async function abrir(notificacion) {

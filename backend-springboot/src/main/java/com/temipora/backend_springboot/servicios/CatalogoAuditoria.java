@@ -99,6 +99,7 @@ public final class CatalogoAuditoria {
             AccionesAdmin.MONEDA_REACTIVAR,
             AccionesAdmin.MONEDA_PREDETERMINADA,
             AccionesAdmin.SERVICIO_CREAR,
+            AccionesAdmin.SERVICIO_MODO_AUTOMATICO,
             AccionesAdmin.SERVICIO_MODIFICAR,
             AccionesAdmin.SERVICIO_PAUSAR,
             AccionesAdmin.SERVICIO_REACTIVAR,

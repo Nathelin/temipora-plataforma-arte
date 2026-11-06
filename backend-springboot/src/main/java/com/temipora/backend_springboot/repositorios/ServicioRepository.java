@@ -12,6 +12,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.EstadoServicio;
+import com.temipora.backend_springboot.modelo.EstadoSolicitud;
+import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.Servicio;
 
 import jakarta.persistence.LockModeType;
@@ -71,4 +73,40 @@ public interface ServicioRepository extends JpaRepository<Servicio, Long>, JpaSp
 
     boolean existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndIdServicioNotAndEstadoNot(
             Long idUsuario, Long idTipoServicio, String nombre, Long idServicio, EstadoServicio estado);
+
+    /**
+     * Servicios publicados como abiertos que ya no tienen cupo libre. El job
+     * de reconciliación los pasa a lista de espera si un evento se perdió.
+     */
+    @Query("""
+        SELECT s FROM Servicio s
+         WHERE s.estado = :publicado
+           AND s.modoRecepcion = :abierta
+           AND s.cupos <= (SELECT COUNT(sol) FROM Solicitud sol
+                            WHERE sol.servicio = s
+                              AND sol.estado IN :estados)
+        """)
+    List<Servicio> buscarLlenos(
+        @Param("publicado") EstadoServicio publicado,
+        @Param("abierta") ModoRecepcionSolicitud abierta,
+        @Param("estados") Collection<EstadoSolicitud> estados);
+
+    /**
+     * Servicios que el sistema pasó a lista de espera y que ya tienen cupo
+     * libre otra vez.
+     */
+    @Query("""
+        SELECT s FROM Servicio s
+         WHERE s.estado = :publicado
+           AND s.modoRecepcion = :espera
+           AND s.modoRecepcionPreferido = :abierta
+           AND s.cupos > (SELECT COUNT(sol) FROM Solicitud sol
+                           WHERE sol.servicio = s
+                             AND sol.estado IN :estados)
+        """)
+    List<Servicio> buscarReabribles(
+        @Param("publicado") EstadoServicio publicado,
+        @Param("espera") ModoRecepcionSolicitud espera,
+        @Param("abierta") ModoRecepcionSolicitud abierta,
+        @Param("estados") Collection<EstadoSolicitud> estados);
 }

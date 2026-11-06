@@ -38,6 +38,9 @@ class PedidoCierreServiceTest {
     @Mock
     private EntregaHitoRepository entregaHitoRepository;
 
+    @Mock
+    private CuposEventPublisher cuposEventPublisher;
+
     @InjectMocks
     private PedidoCierreService pedidoCierreService;
 

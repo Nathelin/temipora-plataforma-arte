@@ -8,5 +8,6 @@ public enum DisparadorSustitucion {
     EXPLORAR,
     PERFIL,
     FAVORITOS,
-    INTENTO_SOLICITUD
+    INTENTO_SOLICITUD,
+    CIERRE
 }

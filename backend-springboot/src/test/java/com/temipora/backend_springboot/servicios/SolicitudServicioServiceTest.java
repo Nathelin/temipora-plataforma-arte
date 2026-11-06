@@ -132,6 +132,9 @@ class SolicitudServicioServiceTest {
     @Mock
     private ArancelEstimadoService arancelEstimadoService;
 
+    @Mock
+    private CuposEventPublisher cuposEventPublisher;
+
     @InjectMocks
     private SolicitudServicioService solicitudServicioService;
 

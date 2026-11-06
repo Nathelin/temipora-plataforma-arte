@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.modelo;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import lombok.AllArgsConstructor;
@@ -21,5 +22,9 @@ public class SustitucionDTO {
     private boolean puedeQuedarEnCola;
     private Integer cuposDisponibles;
     private Integer cuposTotales;
+    private Long idSolicitud;
+    private Long idPedido;
+    private LocalDateTime fechaCreacion;
+    private ServicioDTO servicioOrigen;
     private List<SustitucionOpcionDTO> opciones;
 }

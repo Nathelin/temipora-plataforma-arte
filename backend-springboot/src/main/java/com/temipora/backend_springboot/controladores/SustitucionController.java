@@ -2,12 +2,14 @@ package com.temipora.backend_springboot.controladores;
 
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.temipora.backend_springboot.modelo.CierreSustitucionDTO;
 import com.temipora.backend_springboot.modelo.CrearSustitucionRequest;
 import com.temipora.backend_springboot.modelo.ElegirSustitucionRequest;
 import com.temipora.backend_springboot.modelo.SustitucionDTO;
@@ -54,6 +56,32 @@ public class SustitucionController {
             @PathVariable Long id,
             Authentication authentication) {
         sustitucionService.descartar(id, idAutenticado(authentication));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('CLIENTE','ARTISTA')")
+    public SustitucionDTO obtener(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return sustitucionService.obtener(id, idAutenticado(authentication));
+    }
+
+    @PostMapping("/por-solicitud/{idSolicitud}")
+    @PreAuthorize("hasAnyRole('CLIENTE','ARTISTA')")
+    public CierreSustitucionDTO cierrePorSolicitud(
+            @PathVariable Long idSolicitud,
+            Authentication authentication) {
+        return sustitucionService.detalleCierrePorSolicitud(
+            idSolicitud, idAutenticado(authentication));
+    }
+
+    @PostMapping("/por-pedido/{idPedido}")
+    @PreAuthorize("hasAnyRole('CLIENTE','ARTISTA')")
+    public CierreSustitucionDTO cierrePorPedido(
+            @PathVariable Long idPedido,
+            Authentication authentication) {
+        return sustitucionService.detalleCierrePorPedido(
+            idPedido, idAutenticado(authentication));
     }
 
     private Long idAutenticado(Authentication authentication) {

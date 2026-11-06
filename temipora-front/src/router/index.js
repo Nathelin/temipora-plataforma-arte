@@ -42,6 +42,7 @@ import ServicioDetalle from '../views/ServicioDetalle.vue'
 import AlternativasServicio from '../views/AlternativasServicio.vue'
 import SolicitudServicio from '../views/SolicitudServicio.vue'
 import SolicitudDetalle from '../views/SolicitudDetalle.vue'
+import CierreDetalle from '../views/CierreDetalle.vue'
 import Solicitudes from '../views/Solicitudes.vue'
 import PresupuestoForm from '../views/PresupuestoForm.vue'
 import PagoPresupuesto from '../views/PagoPresupuesto.vue'
@@ -165,6 +166,12 @@ const routes = [
               title: (route) => `Solicitud #${route.params.idSolicitud}`,
             },
           },
+          {
+            path: ':idSolicitud/resultado',
+            name: 'solicitud-resultado',
+            component: CierreDetalle,
+            meta: { title: 'Resultado de la solicitud' },
+          },
         ],
       },
       {
@@ -195,6 +202,12 @@ const routes = [
             meta: {
               title: (route) => `Pedido #${route.params.idPedido}`,
             },
+          },
+          {
+            path: ':idPedido/resultado',
+            name: 'pedido-resultado',
+            component: CierreDetalle,
+            meta: { title: 'Resultado del pedido' },
           },
         ],
       },
@@ -448,6 +461,11 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.path !== from.path) return { top: 0 }
+    return false
+  },
 })
 
 const { subidaEnCurso, publicadasEnSesion, proteccionActiva } = useSubirImagen()

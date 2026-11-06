@@ -13,24 +13,34 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.AccionSolicitud;
+import com.temipora.backend_springboot.modelo.CierreSustitucionDTO;
 import com.temipora.backend_springboot.modelo.ConfiguracionSustitucion;
 import com.temipora.backend_springboot.modelo.CrearSustitucionRequest;
 import com.temipora.backend_springboot.modelo.DisparadorSustitucion;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
+import com.temipora.backend_springboot.modelo.EstadoPagoHito;
+import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.EstadoSustitucion;
+import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.MotivoSustitucion;
+import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
+import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.Sustitucion;
 import com.temipora.backend_springboot.modelo.SustitucionDTO;
 import com.temipora.backend_springboot.modelo.SustitucionOpcion;
 import com.temipora.backend_springboot.modelo.SustitucionOpcionDTO;
 import com.temipora.backend_springboot.modelo.SustitucionResumenDTO;
+import com.temipora.backend_springboot.modelo.TipoAccionSolicitud;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.AccionSolicitudRepository;
+import com.temipora.backend_springboot.repositorios.PedidoRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
 import com.temipora.backend_springboot.repositorios.SustitucionOpcionRepository;
@@ -61,6 +71,8 @@ public class SustitucionService {
     private final SustitucionOpcionRepository opcionRepository;
     private final ServicioRepository servicioRepository;
     private final SolicitudRepository solicitudRepository;
+    private final PedidoRepository pedidoRepository;
+    private final AccionSolicitudRepository accionSolicitudRepository;
     private final UsuarioRepository usuarioRepository;
     private final ServicioService servicioService;
     private final RecomendacionService recomendacionService;
@@ -73,6 +85,8 @@ public class SustitucionService {
             SustitucionOpcionRepository opcionRepository,
             ServicioRepository servicioRepository,
             SolicitudRepository solicitudRepository,
+            PedidoRepository pedidoRepository,
+            AccionSolicitudRepository accionSolicitudRepository,
             UsuarioRepository usuarioRepository,
             ServicioService servicioService,
             RecomendacionService recomendacionService,
@@ -83,6 +97,8 @@ public class SustitucionService {
         this.opcionRepository = opcionRepository;
         this.servicioRepository = servicioRepository;
         this.solicitudRepository = solicitudRepository;
+        this.pedidoRepository = pedidoRepository;
+        this.accionSolicitudRepository = accionSolicitudRepository;
         this.usuarioRepository = usuarioRepository;
         this.servicioService = servicioService;
         this.recomendacionService = recomendacionService;
@@ -122,20 +138,39 @@ public class SustitucionService {
         DisparadorSustitucion disparador = parseDisparador(request.getDisparador());
 
         Sustitucion reutilizable = buscarReutilizable(
-            idCliente, origen.getIdServicio(), config);
+            idCliente, origen.getIdServicio(), motivo, config);
         if (reutilizable != null) {
             return aDTO(reutilizable, idCliente);
         }
 
-        List<Servicio> candidatos = candidatos(idCliente, origen);
         List<RecomendacionService.ServicioPuntuado> ranked =
-            recomendacionService.similares(
-                origen,
-                candidatos,
-                idCliente,
-                monedaPreferidaDe(idCliente),
-                opcionesDeSimilitud(config));
+            rankear(idCliente, origen, config);
+        Sustitucion guardada = guardarEvento(
+            idCliente, origen, motivo, disparador, null, null, ranked);
+        return armarDto(guardada, ranked, idCliente, motivo,
+            cuposDisponibles, cuposTotales);
+    }
 
+    private List<RecomendacionService.ServicioPuntuado> rankear(
+            Long idCliente,
+            Servicio origen,
+            ConfiguracionSustitucion config) {
+        return recomendacionService.similares(
+            origen,
+            candidatos(idCliente, origen),
+            idCliente,
+            monedaPreferidaDe(idCliente),
+            opcionesDeSimilitud(config));
+    }
+
+    private Sustitucion guardarEvento(
+            Long idCliente,
+            Servicio origen,
+            MotivoSustitucion motivo,
+            DisparadorSustitucion disparador,
+            Long idSolicitud,
+            Long idPedido,
+            List<RecomendacionService.ServicioPuntuado> ranked) {
         Sustitucion sustitucion = new Sustitucion();
         sustitucion.setCliente(idCliente != null
             ? usuarioRepository.findByIdUsuario(idCliente).orElse(null)
@@ -146,6 +181,14 @@ public class SustitucionService {
         sustitucion.setDisparador(disparador);
         sustitucion.setEstado(EstadoSustitucion.ABIERTA);
         sustitucion.setCantidadOpciones(ranked.size());
+        if (idSolicitud != null) {
+            sustitucion.setSolicitud(
+                solicitudRepository.findByIdSolicitud(idSolicitud).orElse(null));
+        }
+        if (idPedido != null) {
+            sustitucion.setPedido(
+                pedidoRepository.findById(idPedido).orElse(null));
+        }
 
         int orden = 0;
         for (RecomendacionService.ServicioPuntuado item : ranked) {
@@ -161,10 +204,7 @@ public class SustitucionService {
             opcion.setMoneda(servicio.getMoneda());
             sustitucion.agregarOpcion(opcion);
         }
-
-        Sustitucion guardada = sustitucionRepository.save(sustitucion);
-        return armarDto(guardada, ranked, idCliente, motivo,
-            cuposDisponibles, cuposTotales);
+        return sustitucionRepository.save(sustitucion);
     }
 
     @Transactional
@@ -290,6 +330,185 @@ public class SustitucionService {
             .build();
     }
 
+    @Transactional(readOnly = true)
+    public SustitucionDTO obtener(Long idSustitucion, Long idCliente) {
+        Sustitucion sustitucion = sustitucionRepository.findById(idSustitucion)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Búsqueda de alternativas no encontrada: " + idSustitucion));
+        if (sustitucion.getCliente() == null
+                || !sustitucion.getCliente().getIdUsuario().equals(idCliente)) {
+            throw new IllegalArgumentException(
+                "No podés ver una búsqueda de alternativas que no es tuya.");
+        }
+        return aDTO(sustitucion, idCliente);
+    }
+
+    /**
+     * Resultado de una solicitud cerrada por una causa que el cliente no
+     * eligió: rechazo, retiro o vencimiento del presupuesto, o baja del
+     * servicio. Genera (o reutiliza) el evento y devuelve el resumen junto
+     * con las alternativas.
+     */
+    @Transactional
+    public CierreSustitucionDTO detalleCierrePorSolicitud(
+            Long idSolicitud,
+            Long idCliente) {
+        Solicitud solicitud = solicitudRepository.findByIdSolicitud(idSolicitud)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Solicitud no encontrada: " + idSolicitud));
+        if (solicitud.getCliente() == null
+                || !solicitud.getCliente().getIdUsuario().equals(idCliente)) {
+            throw new IllegalArgumentException(
+                "No podés ver el resultado de esta solicitud.");
+        }
+        MotivoSustitucion motivo = motivoCierreSolicitud(solicitud);
+        return construirCierre(
+            "SOLICITUD",
+            solicitud.getServicio(),
+            motivo,
+            solicitud.getIdSolicitud(),
+            null,
+            fechaCierreSolicitud(solicitud),
+            idCliente);
+    }
+
+    @Transactional
+    public CierreSustitucionDTO detalleCierrePorPedido(
+            Long idPedido,
+            Long idCliente) {
+        Pedido pedido = pedidoRepository.findById(idPedido)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Pedido no encontrado: " + idPedido));
+        if (pedido.getCliente() == null
+                || !pedido.getCliente().getIdUsuario().equals(idCliente)) {
+            throw new IllegalArgumentException("No podés ver el resultado de este pedido.");
+        }
+        if (pedido.getEstado() != EstadoPedido.IMPAGO) {
+            throw new ConflictoException(
+                "Este pedido no está cerrado por falta de pago.");
+        }
+        HitoPedido vencido = pedido.getHitos().stream()
+            .filter(hito -> hito.getEstadoPago() == EstadoPagoHito.VENCIDO)
+            .findFirst()
+            .orElse(null);
+        LocalDateTime fecha = vencido != null && vencido.getFechaLimitePago() != null
+            ? vencido.getFechaLimitePago()
+            : pedido.getFechaCreacion();
+        return construirCierre(
+            "PEDIDO",
+            pedido.getServicio(),
+            MotivoSustitucion.PEDIDO_IMPAGO,
+            pedido.getSolicitud() != null
+                ? pedido.getSolicitud().getIdSolicitud()
+                : null,
+            pedido.getIdPedido(),
+            fecha,
+            idCliente);
+    }
+
+    private MotivoSustitucion motivoCierreSolicitud(Solicitud solicitud) {
+        if (solicitud.getEstado() == EstadoSolicitud.VENCIDA) {
+            return MotivoSustitucion.PRESUPUESTO_VENCIDO;
+        }
+        if (solicitud.getEstado() != EstadoSolicitud.RECHAZADA) {
+            throw new ConflictoException(
+                "Esta solicitud todavía está activa: no hay un cierre para mostrar.");
+        }
+        if (solicitud.getServicio() != null
+                && solicitud.getServicio().getEstado() == EstadoServicio.ARCHIVADO) {
+            return MotivoSustitucion.SERVICIO_DADO_DE_BAJA;
+        }
+        AccionSolicitud ultima = accionSolicitudRepository
+            .findFirstBySolicitudIdSolicitudOrderByFechaDescIdAccionSolicitudDesc(
+                solicitud.getIdSolicitud())
+            .orElse(null);
+        if (ultima != null
+                && ultima.getTipoAccion() == TipoAccionSolicitud.RETIRO_PRESUPUESTO) {
+            return MotivoSustitucion.PRESUPUESTO_RETIRADO;
+        }
+        return MotivoSustitucion.SOLICITUD_RECHAZADA;
+    }
+
+    private LocalDateTime fechaCierreSolicitud(Solicitud solicitud) {
+        return accionSolicitudRepository
+            .findFirstBySolicitudIdSolicitudOrderByFechaDescIdAccionSolicitudDesc(
+                solicitud.getIdSolicitud())
+            .map(AccionSolicitud::getFecha)
+            .orElse(solicitud.getFechaActualizacion());
+    }
+
+    private CierreSustitucionDTO construirCierre(
+            String contexto,
+            Servicio origen,
+            MotivoSustitucion motivo,
+            Long idSolicitud,
+            Long idPedido,
+            LocalDateTime fecha,
+            Long idCliente) {
+        ConfiguracionSustitucion config = configuracionService.obtener();
+        if (origen == null) {
+            return CierreSustitucionDTO.builder()
+                .contexto(contexto)
+                .idSolicitud(idSolicitud)
+                .idPedido(idPedido)
+                .motivo(motivo.name())
+                .titulo(titulo(motivo))
+                .detalle(mensaje(motivo))
+                .fecha(fecha)
+                .procesoHabilitado(false)
+                .opciones(List.of())
+                .build();
+        }
+
+        ServicioDTO origenDto = servicioService
+            .convertirParaVisor(List.of(origen), idCliente)
+            .get(origen.getIdServicio());
+
+        if (!config.isHabilitado()) {
+            return CierreSustitucionDTO.builder()
+                .contexto(contexto)
+                .idSolicitud(idSolicitud)
+                .idPedido(idPedido)
+                .motivo(motivo.name())
+                .titulo(titulo(motivo))
+                .detalle(mensaje(motivo))
+                .fecha(fecha)
+                .servicio(origenDto)
+                .procesoHabilitado(false)
+                .opciones(List.of())
+                .build();
+        }
+
+        Sustitucion evento = buscarReutilizable(
+            idCliente, origen.getIdServicio(), motivo, config);
+        if (evento == null) {
+            List<RecomendacionService.ServicioPuntuado> ranked =
+                rankear(idCliente, origen, config);
+            evento = guardarEvento(
+                idCliente,
+                origen,
+                motivo,
+                DisparadorSustitucion.CIERRE,
+                idSolicitud,
+                idPedido,
+                ranked);
+        }
+        SustitucionDTO dto = aDTO(evento, idCliente);
+        return CierreSustitucionDTO.builder()
+            .contexto(contexto)
+            .idSolicitud(idSolicitud)
+            .idPedido(idPedido)
+            .idSustitucion(dto.getIdSustitucion())
+            .motivo(motivo.name())
+            .titulo(titulo(motivo))
+            .detalle(mensaje(motivo))
+            .fecha(fecha)
+            .servicio(origenDto)
+            .procesoHabilitado(true)
+            .opciones(dto.getOpciones())
+            .build();
+    }
+
     private Sustitucion buscarPropia(Long idSustitucion, Long idCliente) {
         Sustitucion sustitucion = sustitucionRepository.findById(idSustitucion)
             .orElseThrow(() -> new NoSuchElementException(
@@ -311,6 +530,7 @@ public class SustitucionService {
     private Sustitucion buscarReutilizable(
             Long idCliente,
             Long idServicioOrigen,
+            MotivoSustitucion motivo,
             ConfiguracionSustitucion config) {
         if (idCliente == null || config.getMinutosDedupe() <= 0) {
             return null;
@@ -320,6 +540,7 @@ public class SustitucionService {
         List<Sustitucion> recientes = sustitucionRepository.recientes(
             idCliente,
             idServicioOrigen,
+            motivo,
             EstadoSustitucion.ABIERTA,
             desde,
             PageRequest.of(0, 1));
@@ -428,6 +649,33 @@ public class SustitucionService {
                 "El artista no está recibiendo solicitudes para este servicio.";
             case PAUSADO -> "El servicio está pausado.";
             case ARCHIVADO -> "El servicio ya no está disponible.";
+            case SOLICITUD_RECHAZADA ->
+                "El artista rechazó tu solicitud. Podés buscar otro artista con "
+                    + "características parecidas y volver a intentarlo.";
+            case PRESUPUESTO_RETIRADO ->
+                "El artista retiró el presupuesto. Estas son otras propuestas con cupo.";
+            case PRESUPUESTO_VENCIDO ->
+                "El presupuesto venció y el cupo quedó liberado. "
+                    + "Si todavía querés la pieza, podés elegir otra propuesta.";
+            case SERVICIO_DADO_DE_BAJA ->
+                "El artista dio de baja este servicio. Te dejamos alternativas parecidas.";
+            case PEDIDO_IMPAGO ->
+                "El pedido se cerró por falta de pago. Podés retomar con otro artista.";
+        };
+    }
+
+    private String titulo(MotivoSustitucion motivo) {
+        return switch (motivo) {
+            case SIN_CUPOS -> "Sin cupos por ahora";
+            case SOLO_ESPERA -> "Solo lista de espera";
+            case CERRADA -> "Recepción cerrada";
+            case PAUSADO -> "Servicio pausado";
+            case ARCHIVADO -> "Servicio no disponible";
+            case SOLICITUD_RECHAZADA -> "El artista rechazó tu solicitud";
+            case PRESUPUESTO_RETIRADO -> "El artista retiró el presupuesto";
+            case PRESUPUESTO_VENCIDO -> "El presupuesto venció";
+            case SERVICIO_DADO_DE_BAJA -> "El servicio ya no está disponible";
+            case PEDIDO_IMPAGO -> "El pedido se cerró por falta de pago";
         };
     }
 
@@ -491,6 +739,19 @@ public class SustitucionService {
             .puedeQuedarEnCola(puedeQuedarEnCola(motivo))
             .cuposDisponibles(cuposDisponibles)
             .cuposTotales(cuposTotales)
+            .idSolicitud(sustitucion != null && sustitucion.getSolicitud() != null
+                ? sustitucion.getSolicitud().getIdSolicitud()
+                : null)
+            .idPedido(sustitucion != null && sustitucion.getPedido() != null
+                ? sustitucion.getPedido().getIdPedido()
+                : null)
+            .fechaCreacion(sustitucion != null ? sustitucion.getFechaCreacion() : null)
+            .servicioOrigen(sustitucion != null
+                && sustitucion.getServicioOrigen() != null
+                ? servicioService.convertirParaVisor(
+                    List.of(sustitucion.getServicioOrigen()), idCliente)
+                    .get(sustitucion.getServicioOrigen().getIdServicio())
+                : null)
             .opciones(opciones)
             .build();
     }
@@ -534,6 +795,17 @@ public class SustitucionService {
             .puedeQuedarEnCola(puedeQuedarEnCola(sustitucion.getMotivo()))
             .cuposDisponibles(cuposDisponibles)
             .cuposTotales(cuposTotales)
+            .idSolicitud(sustitucion.getSolicitud() != null
+                ? sustitucion.getSolicitud().getIdSolicitud()
+                : null)
+            .idPedido(sustitucion.getPedido() != null
+                ? sustitucion.getPedido().getIdPedido()
+                : null)
+            .fechaCreacion(sustitucion.getFechaCreacion())
+            .servicioOrigen(origen != null
+                ? servicioService.convertirParaVisor(List.of(origen), idCliente)
+                    .get(origen.getIdServicio())
+                : null)
             .opciones(resultado)
             .build();
     }

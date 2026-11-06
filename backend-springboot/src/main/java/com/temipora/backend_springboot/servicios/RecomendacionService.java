@@ -88,9 +88,24 @@ public class RecomendacionService {
         public static final PesosSimilitud POR_DEFECTO = new PesosSimilitud(
             0.40, 0.15, 0.15, 0.10, 0.10, 0.05, 0.05, 0);
 
+        /**
+         * Pesos del proceso de sustituciones: lo que más importa es que el
+         * servicio sea del mismo tipo, con un precio parecido y etiquetas
+         * similares. El resto del puntaje queda como desempate.
+         */
+        public static final PesosSimilitud SUSTITUCION = new PesosSimilitud(
+            0.35, 0.05, 0.30, 0.03, 0.25, 0.02, 0, 0);
+
         public static PesosSimilitud conBonusFavorito(double bonus) {
             return new PesosSimilitud(
-                0.40, 0.15, 0.15, 0.10, 0.10, 0.05, 0.05, bonus);
+                SUSTITUCION.etiquetas,
+                SUSTITUCION.categorias,
+                SUSTITUCION.tipo,
+                SUSTITUCION.medio,
+                SUSTITUCION.precio,
+                SUSTITUCION.rating,
+                SUSTITUCION.afinidad,
+                bonus);
         }
     }
 
@@ -650,7 +665,7 @@ public class RecomendacionService {
     }
 
     private boolean mismo(Object a, Object b) {
-        return a == b || Objects.equals(a, b);
+        return a != null && b != null && (a == b || Objects.equals(a, b));
     }
 
     private String motivo(
@@ -708,13 +723,13 @@ public class RecomendacionService {
         if (esFavorito) {
             return "Artista que seguís";
         }
-        if (tagSim >= 0.4) {
-            return "Mismo estilo";
-        }
         if (tipoSim > 0) {
             return "Mismo tipo de servicio";
         }
-        if (precioSim >= 0.6) {
+        if (tagSim >= 0.30) {
+            return "Mismo estilo";
+        }
+        if (precioSim >= 0.60) {
             return "Precio similar";
         }
         return "Tiene cupos disponibles";

@@ -48,6 +48,7 @@ public class ServicioDTO {
     private Integer cuposDisponibles;
     private boolean disponibleAhora;
     private String modoRecepcion;
+    private String modoRecepcionPreferido;
     private Integer maxDibujosPorSolicitud;
     private boolean permiteListaEspera;
     private boolean habilitarCuposTrasEntrega;
@@ -129,6 +130,9 @@ public class ServicioDTO {
                 && s.getModoRecepcion() == ModoRecepcionSolicitud.ABIERTA
                 && s.getCupos() != null && s.getCupos() > 0)
             .modoRecepcion(s.getModoRecepcion() != null ? s.getModoRecepcion().name() : null)
+            .modoRecepcionPreferido(s.getModoRecepcionPreferido() != null
+                ? s.getModoRecepcionPreferido().name()
+                : null)
             .maxDibujosPorSolicitud(s.getMaxDibujosPorSolicitud())
             .permiteListaEspera(s.isPermiteListaEspera())
             .habilitarCuposTrasEntrega(s.isHabilitarCuposTrasEntrega())

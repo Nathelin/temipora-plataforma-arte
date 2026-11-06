@@ -68,6 +68,10 @@ public class Sustitucion {
     @JoinColumn(name = "id_solicitud")
     private Solicitud solicitud;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_pedido")
+    private Pedido pedido;
+
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion = LocalDateTime.now();
 

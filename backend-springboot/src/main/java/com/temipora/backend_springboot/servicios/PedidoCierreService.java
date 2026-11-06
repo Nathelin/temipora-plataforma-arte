@@ -30,16 +30,19 @@ public class PedidoCierreService {
     private final SolicitudRepository solicitudRepository;
     private final NotificacionService notificacionService;
     private final EntregaHitoRepository entregaHitoRepository;
+    private final CuposEventPublisher cuposEventPublisher;
 
     public PedidoCierreService(
             PedidoRepository pedidoRepository,
             SolicitudRepository solicitudRepository,
             NotificacionService notificacionService,
-            EntregaHitoRepository entregaHitoRepository) {
+            EntregaHitoRepository entregaHitoRepository,
+            CuposEventPublisher cuposEventPublisher) {
         this.pedidoRepository = pedidoRepository;
         this.solicitudRepository = solicitudRepository;
         this.notificacionService = notificacionService;
         this.entregaHitoRepository = entregaHitoRepository;
+        this.cuposEventPublisher = cuposEventPublisher;
     }
 
     @Transactional
@@ -61,6 +64,9 @@ public class PedidoCierreService {
         }
 
         notificarFinalizado(pedido);
+        if (pedido.getServicio() != null) {
+            cuposEventPublisher.publicar(pedido.getServicio().getIdServicio());
+        }
     }
 
     private void marcarEntregaFinal(Pedido pedido) {

@@ -69,6 +69,7 @@ public class PresupuestoService {
     private final OfertaReactivacionService ofertaReactivacionService;
     private final AuditoriaService auditoria;
     private final ArancelEstimadoService arancelEstimadoService;
+    private final CuposEventPublisher cuposEventPublisher;
 
     private static final String ENTIDAD = "Presupuesto";
     private static final List<CampoAuditado> CAMPOS = List.of(
@@ -101,7 +102,8 @@ public class PresupuestoService {
             MonedaVistaService monedaVistaService,
             OfertaReactivacionService ofertaReactivacionService,
             AuditoriaService auditoria,
-            ArancelEstimadoService arancelEstimadoService) {
+            ArancelEstimadoService arancelEstimadoService,
+            CuposEventPublisher cuposEventPublisher) {
         this.solicitudRepository = solicitudRepository;
         this.servicioRepository = servicioRepository;
         this.presupuestoRepository = presupuestoRepository;
@@ -115,6 +117,7 @@ public class PresupuestoService {
         this.ofertaReactivacionService = ofertaReactivacionService;
         this.auditoria = auditoria;
         this.arancelEstimadoService = arancelEstimadoService;
+        this.cuposEventPublisher = cuposEventPublisher;
     }
 
     @Transactional
@@ -396,6 +399,7 @@ public class PresupuestoService {
         solicitud.setEstado(EstadoSolicitud.PRESUPUESTADA);
         solicitud.setFechaActualizacion(ahora);
         listaEsperaService.marcarConvertida(solicitud);
+        cuposEventPublisher.publicar(servicio.getIdServicio());
 
         String importeCliente = detalleImporte(
             presupuesto.getPrecioFinalCliente(),
@@ -467,6 +471,9 @@ public class PresupuestoService {
             solicitud.setEstado(EstadoSolicitud.VENCIDA);
             solicitud.setFechaActualizacion(ahora);
             notificarVencimiento(solicitud);
+            if (solicitud.getServicio() != null) {
+                cuposEventPublisher.publicar(solicitud.getServicio().getIdServicio());
+            }
             expirados++;
         }
         return expirados;

@@ -88,6 +88,7 @@ public class ServicioService {
     private final RecomendacionService recomendacionService;
     private final OfertaReactivacionService ofertaReactivacionService;
     private final AuditoriaService auditoria;
+    private final CuposEventPublisher cuposEventPublisher;
 
     private static final String ENTIDAD = "Servicio";
     private static final List<CampoAuditado> CAMPOS = List.of(
@@ -124,7 +125,8 @@ public class ServicioService {
             ReseniaPublicaService reseniaPublicaService,
             RecomendacionService recomendacionService,
             OfertaReactivacionService ofertaReactivacionService,
-            AuditoriaService auditoria) {
+            AuditoriaService auditoria,
+            CuposEventPublisher cuposEventPublisher) {
         this.servicioRepository = servicioRepository;
         this.solicitudRepository = solicitudRepository;
         this.usuarioRepository = usuarioRepository;
@@ -139,6 +141,7 @@ public class ServicioService {
         this.recomendacionService = recomendacionService;
         this.ofertaReactivacionService = ofertaReactivacionService;
         this.auditoria = auditoria;
+        this.cuposEventPublisher = cuposEventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -847,7 +850,9 @@ public class ServicioService {
 
     @Transactional
     public ServicioDTO modificar(Long idServicio, Long idArtista, ServicioRequest request) {
-        Servicio servicio = obtenerEntidad(idServicio);
+        Servicio servicio = servicioRepository.findByIdServicioForUpdate(idServicio)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Servicio no encontrado: " + idServicio));
         verificarDuenio(servicio, idArtista);
         Snapshot antes = Snapshot.de(servicio, CAMPOS);
         validarUnico(idArtista, request.getIdTipoServicio(), request.getNombre(), idServicio);
@@ -864,6 +869,7 @@ public class ServicioService {
         auditoria.registrar(
             AccionesAdmin.SERVICIO_MODIFICAR, ENTIDAD, guardado.getIdServicio(),
             "Modificó el servicio “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
+        cuposEventPublisher.publicar(guardado.getIdServicio());
         return aDTO(guardado, false, monedaPreferidaDe(idArtista), cuposOcupados);
     }
 
@@ -906,6 +912,7 @@ public class ServicioService {
         auditoria.registrar(
             AccionesAdmin.SERVICIO_REACTIVAR, ENTIDAD, servicio.getIdServicio(),
             "Reactivó el servicio “" + servicio.getNombre() + "”", antes, servicio, CAMPOS);
+        cuposEventPublisher.publicar(servicio.getIdServicio());
         return aDTO(servicio, false, monedaPreferidaDe(idArtista));
     }
 
@@ -973,6 +980,7 @@ public class ServicioService {
         servicio.setTiempoEntregaDias(r.getTiempoEntregaValor() * r.getTiempoEntregaUnidad().getFactorDias());
         servicio.setCupos(r.getCupos());
         servicio.setModoRecepcion(modo);
+        servicio.setModoRecepcionPreferido(null);
         servicio.setMaxDibujosPorSolicitud(maxDibujos);
         servicio.setPermiteListaEspera(modo == ModoRecepcionSolicitud.SOLO_ESPERA);
         servicio.setHabilitarCuposTrasEntrega(false);

@@ -101,6 +101,9 @@ class PresupuestoServiceTest {
     @Mock
     private ArancelEstimadoService arancelEstimadoService;
 
+    @Mock
+    private CuposEventPublisher cuposEventPublisher;
+
     @InjectMocks
     private PresupuestoService presupuestoService;
 

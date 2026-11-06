@@ -126,6 +126,7 @@ public class SolicitudServicioService {
     private final AuditoriaService auditoria;
     private final ArancelEstimadoService arancelEstimadoService;
     private final SustitucionService sustitucionService;
+    private final CuposEventPublisher cuposEventPublisher;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -147,7 +148,8 @@ public class SolicitudServicioService {
             OfertaReactivacionService ofertaReactivacionService,
             AuditoriaService auditoria,
             ArancelEstimadoService arancelEstimadoService,
-            SustitucionService sustitucionService) {
+            SustitucionService sustitucionService,
+            CuposEventPublisher cuposEventPublisher) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -168,6 +170,7 @@ public class SolicitudServicioService {
         this.auditoria = auditoria;
         this.arancelEstimadoService = arancelEstimadoService;
         this.sustitucionService = sustitucionService;
+        this.cuposEventPublisher = cuposEventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -539,6 +542,10 @@ public class SolicitudServicioService {
         accionSolicitudRepository.save(accion);
 
         notificarCancelacion(solicitud, motivoLimpio, estadoAnterior);
+        if (estadoAnterior == EstadoSolicitud.PRESUPUESTADA
+                && solicitud.getServicio() != null) {
+            cuposEventPublisher.publicar(solicitud.getServicio().getIdServicio());
+        }
 
         auditoria.registrar(
             AccionesAdmin.SOLICITUD_CANCELAR, ENTIDAD_SOLICITUD, solicitud.getIdSolicitud(),
@@ -591,6 +598,10 @@ public class SolicitudServicioService {
                 + "'. Podés volver a enviar tu solicitud.",
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
+
+        if (solicitud.getServicio() != null) {
+            cuposEventPublisher.publicar(solicitud.getServicio().getIdServicio());
+        }
 
         auditoria.registrar(
             AccionesAdmin.SOLICITUD_RETIRAR_PRESUPUESTO, ENTIDAD_SOLICITUD,
