@@ -39,7 +39,6 @@ const artista = ref(null)
 const resumenArtista = ref(null)
 const artistasSimilares = ref([])
 const sustitucion = ref(null)
-const cargandoAlternativas = ref(false)
 const modalCola = ref(false)
 
 const resumenResenias = ref(null)
@@ -194,10 +193,6 @@ const motivoEstado = computed(() => {
 const detalleEstado = computed(() =>
   datosMotivo(sustitucion.value?.motivo || motivoEstado.value),
 )
-const opcionesDestacadas = computed(() =>
-  (sustitucion.value?.opciones || []).slice(0, 3),
-)
-const totalOpciones = computed(() => sustitucion.value?.opciones?.length || 0)
 const puedeEsperar = computed(
   () =>
     sustitucion.value?.puedeQuedarEnCola ??
@@ -397,7 +392,6 @@ function confirmarCola() {
 }
 
 async function cargarAlternativas() {
-  cargandoAlternativas.value = true
   try {
     sustitucion.value = await buscarAlternativas(
       servicio.value.idServicio,
@@ -405,8 +399,6 @@ async function cargarAlternativas() {
     )
   } catch {
     sustitucion.value = null
-  } finally {
-    cargandoAlternativas.value = false
   }
 }
 
@@ -789,7 +781,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
             </button>
           </div>
 
-          <p class="text-sm text-cafe/60">Ejemplos de trabajos hechos con este servicio.</p>
+          <!--p class="text-sm text-cafe/60">Ejemplos de trabajos hechos con este servicio.</p-->
         </section>
 
         <aside class="order-2 h-fit rounded-[32px] border border-rosa/40 bg-superficie p-6 shadow-[0_10px_28px_rgba(194,24,91,0.10)] sm:p-8 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-2 lg:row-start-1">
@@ -1023,61 +1015,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
             <p v-if="!esDuenio" class="text-xs leading-relaxed text-cafe/75">
               {{ mensajeSolicitud || 'Revisá los términos y condiciones antes de enviar tu solicitud.' }}
             </p>
-          </div>
-
-          <div
-            v-if="noDisponibleAhora && opcionesDestacadas.length"
-            class="mt-5 rounded-2xl border border-rosa/40 bg-fondo/60 p-4"
-          >
-            <div class="flex items-center justify-between gap-2">
-              <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/60">
-                Artistas con cupo
-              </p>
-              <span v-if="cargandoAlternativas" class="text-[11px] text-cafe/50">Buscando…</span>
-            </div>
-            <ul class="mt-2 space-y-1">
-              <li v-for="opcion in opcionesDestacadas" :key="opcion.idServicio">
-                <router-link
-                  :to="{ name: 'servicio-detalle', params: { id: opcion.idServicio } }"
-                  class="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-rosa/25"
-                >
-                  <img
-                    v-if="opcion.servicio.urlFotoArtista"
-                    :src="opcion.servicio.urlFotoArtista"
-                    alt=""
-                    class="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-borde/50"
-                  />
-                  <span
-                    v-else
-                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rosa/40 text-xs font-bold text-granate"
-                    aria-hidden="true"
-                  >
-                    {{ (opcion.servicio.nombreArtista || '?').charAt(0).toUpperCase() }}
-                  </span>
-                  <span class="min-w-0 flex-1">
-                    <span class="block truncate text-sm font-semibold text-granate">
-                      {{ opcion.servicio.nombre }}
-                    </span>
-                    <span class="block truncate text-[11px] text-cafe/60">
-                      @{{ opcion.servicio.nombreArtista }} · {{ opcion.motivo }}
-                    </span>
-                  </span>
-                  <span class="shrink-0 text-xs font-bold text-coral">
-                    {{ formatearPrecio(
-                      opcion.servicio.precioBaseMostrado ?? opcion.servicio.precioBase,
-                      opcion.servicio.monedaMostrada ?? opcion.servicio.moneda,
-                    ) }}
-                  </span>
-                </router-link>
-              </li>
-            </ul>
-            <button
-              type="button"
-              class="mt-2 text-sm font-semibold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
-              @click="irAAlternativas"
-            >
-              Ver las {{ totalOpciones }} opciones →
-            </button>
           </div>
         </aside>
 
