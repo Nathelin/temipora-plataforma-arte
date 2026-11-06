@@ -125,6 +125,7 @@ public class SolicitudServicioService {
     private final OfertaReactivacionService ofertaReactivacionService;
     private final AuditoriaService auditoria;
     private final ArancelEstimadoService arancelEstimadoService;
+    private final SustitucionService sustitucionService;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -145,7 +146,8 @@ public class SolicitudServicioService {
             ConversacionRepository conversacionRepository,
             OfertaReactivacionService ofertaReactivacionService,
             AuditoriaService auditoria,
-            ArancelEstimadoService arancelEstimadoService) {
+            ArancelEstimadoService arancelEstimadoService,
+            SustitucionService sustitucionService) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -165,6 +167,7 @@ public class SolicitudServicioService {
         this.ofertaReactivacionService = ofertaReactivacionService;
         this.auditoria = auditoria;
         this.arancelEstimadoService = arancelEstimadoService;
+        this.sustitucionService = sustitucionService;
     }
 
     @Transactional(readOnly = true)
@@ -188,11 +191,18 @@ public class SolicitudServicioService {
         boolean permiteListaEspera = modo == ModoRecepcionSolicitud.SOLO_ESPERA;
         boolean puedeSolicitarCupo = idCliente != null
             && !tieneSolicitudActiva
-            && modo == ModoRecepcionSolicitud.ABIERTA;
+            && modo == ModoRecepcionSolicitud.ABIERTA
+            && cuposDisponibles > 0;
         boolean puedeListaEspera = idCliente != null
             && !tieneSolicitudActiva
             && modo == ModoRecepcionSolicitud.SOLO_ESPERA;
-        boolean puedeSolicitar = puedeSolicitarCupo || puedeListaEspera;
+        boolean puedeQuedarEnCola = idCliente != null
+            && !tieneSolicitudActiva
+            && modo == ModoRecepcionSolicitud.ABIERTA
+            && cuposDisponibles <= 0;
+        boolean puedeSolicitar = puedeSolicitarCupo
+            || puedeListaEspera
+            || puedeQuedarEnCola;
 
         String mensaje;
         if (idCliente == null) {
@@ -222,6 +232,7 @@ public class SolicitudServicioService {
             .tieneSolicitudEnEspera(tieneSolicitudEnEspera)
             .puedeSolicitarCupo(puedeSolicitarCupo)
             .puedeListaEspera(puedeListaEspera)
+            .puedeQuedarEnCola(puedeQuedarEnCola)
             .puedeSolicitar(puedeSolicitar)
             .mensaje(mensaje)
             .build();
@@ -369,6 +380,14 @@ public class SolicitudServicioService {
             oferta.setSolicitud(solicitud);
         }
         solicitudRepository.save(solicitud);
+
+        if (request.getIdSustitucion() != null) {
+            sustitucionService.resolverPorSolicitud(
+                request.getIdSustitucion(),
+                idCliente,
+                solicitud.getIdSolicitud(),
+                servicio.getIdServicio());
+        }
 
         auditoria.registrar(
             AccionesAdmin.SOLICITUD_CREAR, ENTIDAD_SOLICITUD, solicitud.getIdSolicitud(),

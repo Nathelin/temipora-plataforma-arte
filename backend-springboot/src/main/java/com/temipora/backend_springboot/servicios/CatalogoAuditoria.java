@@ -113,6 +113,7 @@ public final class CatalogoAuditoria {
             AccionesAdmin.RESENIA_CONFIG_ACTUALIZAR,
             AccionesAdmin.INACTIVIDAD_CONFIG_ACTUALIZAR,
             AccionesAdmin.REACTIVACION_EJECUTAR,
+            AccionesAdmin.SUSTITUCION_CONFIG_ACTUALIZAR,
             AccionesAdmin.COTIZACION_ACTUALIZAR,
             AccionesAdmin.CRITERIO_CREAR,
             AccionesAdmin.CRITERIO_MODIFICAR,

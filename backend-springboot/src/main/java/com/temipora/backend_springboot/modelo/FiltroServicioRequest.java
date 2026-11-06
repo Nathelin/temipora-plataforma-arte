@@ -16,4 +16,10 @@ public class FiltroServicioRequest {
     private BigDecimal precioMin;
     private BigDecimal precioMax;
     private Integer tiempoMaxDias;
+    /**
+     * Incluye en el catálogo los servicios que hoy no pueden recibir una
+     * solicitud (sin cupos, solo espera o cerrados), siempre después de los
+     * disponibles. Por defecto se incluyen.
+     */
+    private Boolean incluirSinCupos;
 }

@@ -25,6 +25,7 @@ import com.temipora.backend_springboot.modelo.ServicioRequest;
 import com.temipora.backend_springboot.modelo.ServicioResumenEstadoDTO;
 import com.temipora.backend_springboot.servicios.ServicioBajaService;
 import com.temipora.backend_springboot.servicios.ServicioService;
+import com.temipora.backend_springboot.servicios.ConfiguracionSustitucionService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 import com.temipora.backend_springboot.servicios.VisitaService;
 
@@ -38,16 +39,19 @@ public class ServicioController {
     private final ServicioBajaService servicioBajaService;
     private final UsuarioService usuarioService;
     private final VisitaService visitaService;
+    private final ConfiguracionSustitucionService configuracionSustitucionService;
 
     public ServicioController(
             ServicioService servicioService,
             ServicioBajaService servicioBajaService,
             UsuarioService usuarioService,
-            VisitaService visitaService) {
+            VisitaService visitaService,
+            ConfiguracionSustitucionService configuracionSustitucionService) {
         this.servicioService = servicioService;
         this.servicioBajaService = servicioBajaService;
         this.usuarioService = usuarioService;
         this.visitaService = visitaService;
+        this.configuracionSustitucionService = configuracionSustitucionService;
     }
 
     @GetMapping("/mis-servicios")
@@ -65,6 +69,7 @@ public class ServicioController {
             @RequestParam(required = false) BigDecimal precioMin,
             @RequestParam(required = false) BigDecimal precioMax,
             @RequestParam(required = false) Integer tiempoMaxDias,
+            @RequestParam(required = false) Boolean incluirSinCupos,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "24") int tamanio,
             @RequestParam(defaultValue = "RELEVANCIA") OrdenServicio orden,
@@ -77,6 +82,10 @@ public class ServicioController {
         filtro.setPrecioMin(precioMin);
         filtro.setPrecioMax(precioMax);
         filtro.setTiempoMaxDias(tiempoMaxDias);
+        boolean incluir = incluirSinCupos == null || incluirSinCupos;
+        boolean mostrarSinCupos =
+            configuracionSustitucionService.obtener().isMostrarEnExplorar();
+        filtro.setIncluirSinCupos(incluir && mostrarSinCupos);
         return servicioService.listarActivosPaginado(
             filtro, idVisor(authentication), pagina, tamanio, orden);
     }

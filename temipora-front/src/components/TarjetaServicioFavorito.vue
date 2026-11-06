@@ -12,7 +12,13 @@ function estadoServicio(favorito) {
   const estado = favorito?.servicio?.estado
   if (estado === 'PAUSADO') return 'Pausado por el artista'
   if (estado === 'ARCHIVADO') return 'Archivado'
+  if (favorito?.servicio?.disponibleAhora === false) return 'Sin cupos'
   return 'No disponible'
+}
+
+function esSinCupos(favorito) {
+  return favorito?.servicio?.estado === 'PUBLICADO'
+    && favorito?.servicio?.disponibleAhora === false
 }
 </script>
 
@@ -56,10 +62,23 @@ function estadoServicio(favorito) {
         Por @{{ favorito.servicio.nombreArtista }}
       </router-link>
       <p class="mt-2 text-xs leading-relaxed text-cafe/70">
-        El artista pausó o archivó este servicio. Podés quitarlo de tus favoritos.
+        <template v-if="esSinCupos(favorito)">
+          El artista no tiene cupos libres en este momento. Podés buscar otra
+          propuesta parecida.
+        </template>
+        <template v-else>
+          El artista pausó o archivó este servicio. Podés quitarlo de tus favoritos.
+        </template>
       </p>
 
-      <div class="mt-auto flex justify-end border-t border-borde/40 pt-3">
+      <div class="mt-auto flex flex-wrap justify-end gap-2 border-t border-borde/40 pt-3">
+        <router-link
+          v-if="esSinCupos(favorito)"
+          :to="{ name: 'servicio-alternativas', params: { id: favorito.idServicio }, query: { disparador: 'FAVORITOS' } }"
+          class="inline-flex items-center gap-1.5 rounded-full bg-coral px-3 py-1.5 text-xs font-bold text-white transition hover:bg-rojizo"
+        >
+          Ver artistas con cupo
+        </router-link>
         <button
           type="button"
           class="inline-flex items-center gap-1.5 rounded-full border border-coral/40 px-3 py-1.5 text-xs font-bold text-coral transition hover:bg-coral hover:text-white disabled:cursor-wait disabled:opacity-60"

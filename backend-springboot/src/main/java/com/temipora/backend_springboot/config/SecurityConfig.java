@@ -73,6 +73,7 @@ public class SecurityConfig {
                     "/images/**",
                     "/error",
                     "/api/servicios/**",
+                    "/api/sustituciones",
                     "/api/perfil/**",
                     "/api/portfolio/**",
                     "/api/galeria/**",

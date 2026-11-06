@@ -16,6 +16,7 @@ const error = ref('')
 const favoritos = ref(new Set())
 const actualizandoFavorito = ref(new Set())
 const orden = ref('RELEVANCIA')
+const soloConCupos = ref(false)
 const pagina = ref(0)
 const tamanio = 24
 const totalElementos = ref(0)
@@ -62,6 +63,7 @@ async function cargar({ reiniciar = true } = {}) {
     if (f.precioMin !== '') params.precioMin = f.precioMin
     if (f.precioMax !== '') params.precioMax = f.precioMax
     if (f.tiempoMaxDias !== '') params.tiempoMaxDias = f.tiempoMaxDias
+    if (soloConCupos.value) params.incluirSinCupos = false
 
     const res = await api.get('/servicios', { params })
     if (miSecuencia !== secuencia) return
@@ -141,6 +143,11 @@ watch(filtros, () => {
 }, { deep: true })
 
 watch(orden, () => {
+  if (temporizador) clearTimeout(temporizador)
+  void cargar()
+})
+
+watch(soloConCupos, () => {
   if (temporizador) clearTimeout(temporizador)
   void cargar()
 })
@@ -253,6 +260,15 @@ onMounted(async () => {
             <option value="PRECIO_ASC">Precio: menor a mayor</option>
             <option value="PRECIO_DESC">Precio: mayor a menor</option>
           </select>
+        </label>
+
+        <label class="inline-flex min-h-10 items-center gap-2 rounded-full border border-borde/60 bg-crema px-4 text-sm font-semibold text-cafe transition hover:bg-rosa/30 focus-within:ring-2 focus-within:ring-coral/60">
+          <input
+            v-model="soloConCupos"
+            type="checkbox"
+            class="h-4 w-4 rounded border-borde text-coral focus:ring-coral"
+          />
+          Solo con cupos
         </label>
 
         <button

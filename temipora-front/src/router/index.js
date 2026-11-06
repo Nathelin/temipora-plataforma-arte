@@ -13,6 +13,7 @@ import MonedasAdmin from '../components/MonedasAdmin.vue'
 import PresupuestoAdmin from '../components/PresupuestoAdmin.vue'
 import ComisionAdmin from '../components/ComisionAdmin.vue'
 import PromocionesAdmin from '../components/PromocionesAdmin.vue'
+import SustitucionesAdmin from '../components/SustitucionesAdmin.vue'
 import PedidoConfigAdmin from '../components/PedidoConfigAdmin.vue'
 import ConfiguracionMensajeriaAdmin from '../components/ConfiguracionMensajeriaAdmin.vue'
 import TerminosPlataformaAdmin from '../components/TerminosPlataformaAdmin.vue'
@@ -38,6 +39,7 @@ import FavoritosArtistas from '../views/FavoritosArtistas.vue'
 import FavoritosServicios from '../views/FavoritosServicios.vue'
 import Servicios from '../views/Servicios.vue'
 import ServicioDetalle from '../views/ServicioDetalle.vue'
+import AlternativasServicio from '../views/AlternativasServicio.vue'
 import SolicitudServicio from '../views/SolicitudServicio.vue'
 import SolicitudDetalle from '../views/SolicitudDetalle.vue'
 import Solicitudes from '../views/Solicitudes.vue'
@@ -82,6 +84,12 @@ const routes = [
       { path: 'servicios/:id', name: 'servicio-detalle', component: ServicioDetalle,
         props: (route) => ({ id: Number(route.params.id) }),
         meta: { title: 'Detalle del servicio' }
+      },
+      {
+        path: 'servicios/:id/alternativas',
+        name: 'servicio-alternativas',
+        component: AlternativasServicio,
+        meta: { title: 'Artistas con cupo' },
       },
       {
         path: 'servicios/:id/solicitar',
@@ -387,6 +395,12 @@ const routes = [
         name: 'admin-promociones',
         component: PromocionesAdmin,
         meta: { title: 'Promociones' },
+      },
+      {
+        path: 'campanas/sustituciones',
+        name: 'admin-sustituciones',
+        component: SustitucionesAdmin,
+        meta: { title: 'Sustituciones de artistas' },
       },
       {
         path: 'ajustes/pedidos',

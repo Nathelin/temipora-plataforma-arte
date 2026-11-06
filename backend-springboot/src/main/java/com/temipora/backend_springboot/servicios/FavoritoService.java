@@ -17,6 +17,8 @@ import com.temipora.backend_springboot.modelo.ArtistaFavoritoDTO;
 import com.temipora.backend_springboot.modelo.ArtistaFavoritoId;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
+import com.temipora.backend_springboot.modelo.EstadoSolicitud;
+import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.PerfilArtisticoDTO;
 import com.temipora.backend_springboot.modelo.Servicio;
@@ -34,6 +36,10 @@ import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 public class FavoritoService {
 
     private static final int TAMANIO_MAXIMO = 48;
+
+    private static final List<EstadoSolicitud> ESTADOS_QUE_OCUPAN_CUPO = List.of(
+        EstadoSolicitud.PRESUPUESTADA,
+        EstadoSolicitud.PAGADA);
 
     private final ArtistaFavoritoRepository artistaFavoritoRepository;
     private final ServicioFavoritoRepository servicioFavoritoRepository;
@@ -156,6 +162,8 @@ public class FavoritoService {
             patronBusqueda(q),
             normalizarEstado(estado),
             EstadoServicio.PUBLICADO,
+            ModoRecepcionSolicitud.ABIERTA,
+            ESTADOS_QUE_OCUPAN_CUPO,
             pageRequest(pagina, tamanio, ordenServicios(orden)));
 
         List<Long> idsServicios = paginaFavoritos.getContent().stream()
@@ -170,11 +178,11 @@ public class FavoritoService {
 
         List<ServicioFavoritoDTO> contenido = paginaFavoritos.getContent().stream()
             .map(favorito -> {
-                Servicio servicio = favorito.getServicio();
+                ServicioDTO dto = servicios.get(favorito.getId().getIdServicio());
                 return ServicioFavoritoDTO.desde(
                     favorito,
-                    servicios.get(favorito.getId().getIdServicio()),
-                    servicio.getEstado() == EstadoServicio.PUBLICADO);
+                    dto,
+                    dto != null && dto.isDisponibleAhora());
             })
             .toList();
 
@@ -221,7 +229,8 @@ public class FavoritoService {
             .convertirParaVisor(List.of(servicio), usuario.getIdUsuario())
             .get(servicio.getIdServicio());
 
-        return ServicioFavoritoDTO.desde(favorito, dto, true);
+        return ServicioFavoritoDTO.desde(
+            favorito, dto, dto != null && dto.isDisponibleAhora());
     }
 
     @Transactional

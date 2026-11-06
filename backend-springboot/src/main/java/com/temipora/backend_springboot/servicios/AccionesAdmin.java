@@ -57,6 +57,7 @@ public final class AccionesAdmin {
     public static final String RESENIA_CONFIG_ACTUALIZAR = "RESENIA_CONFIG_ACTUALIZAR";
     public static final String INACTIVIDAD_CONFIG_ACTUALIZAR = "INACTIVIDAD_CONFIG_ACTUALIZAR";
     public static final String REACTIVACION_EJECUTAR = "REACTIVACION_EJECUTAR";
+    public static final String SUSTITUCION_CONFIG_ACTUALIZAR = "SUSTITUCION_CONFIG_ACTUALIZAR";
     public static final String COTIZACION_ACTUALIZAR = "COTIZACION_ACTUALIZAR";
     public static final String COTIZACION_REFRESCAR = "COTIZACION_REFRESCAR";
     public static final String RESENIA_CREAR = "RESENIA_CREAR";

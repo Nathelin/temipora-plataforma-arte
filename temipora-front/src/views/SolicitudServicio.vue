@@ -17,6 +17,7 @@ const solicitudPublica = ref(null)
 const paso = ref(1)
 const errores = ref([])
 const errorEnvio = ref('')
+const conflictoSustitucion = ref(false)
 const enviando = ref(false)
 const enviado = ref(false)
 const solicitud = ref(null)
@@ -31,6 +32,10 @@ const oferta = ref(null)
 
 const idOferta = computed(() => {
   const valor = Number(route.query.oferta)
+  return Number.isFinite(valor) && valor > 0 ? valor : null
+})
+const idSustitucion = computed(() => {
+  const valor = Number(route.query.sustitucion)
   return Number.isFinite(valor) && valor > 0 ? valor : null
 })
 const ofertaAplicable = computed(() =>
@@ -340,6 +345,7 @@ function olvidarImagen(url) {
 async function enviar() {
   errores.value = []
   errorEnvio.value = ''
+  conflictoSustitucion.value = false
 
   if (!terminosValidos.value || !aceptaTerminos.value) {
     paso.value = 1
@@ -364,6 +370,7 @@ async function enviar() {
     const payload = {
       idServicio: idServicio.value,
       idOferta: ofertaAplicable.value?.idOferta ?? null,
+      idSustitucion: idSustitucion.value,
       idTerminos: terminos.value.idTerminos,
       terminosVersion: terminos.value.version,
       aceptaTerminos: true,
@@ -391,6 +398,7 @@ async function enviar() {
     const mensaje =
       e.response?.data?.message || 'No se pudo enviar la solicitud. Intentá de nuevo.'
     if (e.response?.status === 409) {
+      conflictoSustitucion.value = !!idSustitucion.value
       await cargar()
       paso.value = 1
       aceptaTerminos.value = false
@@ -504,6 +512,13 @@ onBeforeUnmount(() => {
         <ul class="list-disc pl-5 text-sm text-rojizo space-y-1">
           <li v-for="(e, i) in errores" :key="i">{{ e }}</li>
         </ul>
+        <router-link
+          v-if="conflictoSustitucion"
+          :to="{ name: 'servicio-alternativas', params: { id: idServicio }, query: { disparador: 'INTENTO_SOLICITUD' } }"
+          class="mt-2 inline-block text-sm font-semibold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
+        >
+          La alternativa que elegiste se llenó. Ver otras opciones →
+        </router-link>
       </div>
 
       <!-- Paso 1: términos -->
@@ -562,7 +577,11 @@ onBeforeUnmount(() => {
             <div class="rounded-xl bg-rosa/20 p-4">
               <p class="text-xs uppercase tracking-wide text-cafe/50">Recepción</p>
               <p class="mt-1 text-sm text-granate">
-                {{ esSoloEspera ? 'Solo lista de espera' : (estaCerrado ? 'Cerrada' : 'Abierta') }}
+                {{ esSoloEspera
+                  ? 'Solo lista de espera'
+                  : (estaCerrado
+                    ? 'Cerrada'
+                    : (cuposDisponibles <= 0 ? 'Abierta · sin cupos' : 'Abierta')) }}
               </p>
             </div>
           </div>
@@ -588,6 +607,14 @@ onBeforeUnmount(() => {
           :class="planValido ? 'border-rosa/50 bg-rosa/10' : 'border-rojizo/30 bg-rojizo/5'"
         >
           <p class="text-sm" :class="planValido ? 'text-cafe' : 'text-rojizo'">{{ mensajePlan }}</p>
+
+          <router-link
+            v-if="cuposDisponibles <= 0 && !estaCerrado"
+            :to="{ name: 'servicio-alternativas', params: { id: idServicio }, query: { disparador: 'INTENTO_SOLICITUD' } }"
+            class="mt-2 inline-block text-sm font-semibold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
+          >
+            Ver artistas con cupo →
+          </router-link>
 
           <label v-if="esSoloEspera" class="mt-4 flex items-start gap-2 text-sm text-cafe">
             <input v-model="aceptaEspera" type="checkbox" class="mt-0.5 accent-coral" />
@@ -791,6 +818,19 @@ onBeforeUnmount(() => {
 
           <p v-if="errorEnvio" class="mt-5 rounded-xl border border-rojizo/30 bg-rojizo/5 px-4 py-3 text-sm text-rojizo">
             {{ errorEnvio }}
+          </p>
+
+          <p
+            v-if="conflictoSustitucion"
+            class="mt-3 rounded-xl border border-borde/60 bg-crema px-4 py-3 text-sm text-cafe"
+          >
+            La alternativa que habías elegido dejó de tener cupo.
+            <router-link
+              :to="{ name: 'servicio-alternativas', params: { id: idServicio }, query: { disparador: 'INTENTO_SOLICITUD' } }"
+              class="font-semibold text-coral underline decoration-coral/40 underline-offset-2 transition hover:text-rojizo"
+            >
+              Ver otras opciones →
+            </router-link>
           </p>
 
           <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-rosa/50 pt-5">

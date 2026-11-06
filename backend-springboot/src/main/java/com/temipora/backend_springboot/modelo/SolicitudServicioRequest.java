@@ -22,6 +22,12 @@ public class SolicitudServicioRequest {
      */
     private Long idOferta;
 
+    /**
+     * Búsqueda de alternativas desde la que el cliente llegó a este servicio.
+     * Es opcional y sirve para cerrar el registro del proceso de sustitución.
+     */
+    private Long idSustitucion;
+
     @NotNull(message = "Los términos aceptados son obligatorios.")
     private Long idTerminos;
 

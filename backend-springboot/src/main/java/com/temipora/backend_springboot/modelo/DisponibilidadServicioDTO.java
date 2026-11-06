@@ -24,6 +24,7 @@ public class DisponibilidadServicioDTO {
     private boolean tieneSolicitudEnEspera;
     private boolean puedeSolicitarCupo;
     private boolean puedeListaEspera;
+    private boolean puedeQuedarEnCola;
     private boolean puedeSolicitar;
     private String mensaje;
 }

@@ -30,6 +30,7 @@ import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.servicios.ConfiguracionSustitucionService;
 import com.temipora.backend_springboot.servicios.ServicioBajaService;
 import com.temipora.backend_springboot.servicios.ServicioService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
@@ -65,6 +66,9 @@ class ServicioControllerTest {
 
     @MockitoBean
     private VisitaService visitaService;
+
+    @MockitoBean
+    private ConfiguracionSustitucionService configuracionSustitucionService;
 
     @MockitoBean
     private UserDetailsService userDetailsService;

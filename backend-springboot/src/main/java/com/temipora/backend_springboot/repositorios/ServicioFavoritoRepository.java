@@ -11,6 +11,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.EstadoServicio;
+import com.temipora.backend_springboot.modelo.EstadoSolicitud;
+import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.ServicioFavorito;
 import com.temipora.backend_springboot.modelo.ServicioFavoritoId;
 
@@ -27,8 +29,18 @@ public interface ServicioFavoritoRepository
                OR LOWER(a.nombreUsuario) LIKE :q
                OR LOWER(COALESCE(a.nombreDisplay, '')) LIKE :q)
           AND (:estado IS NULL
-               OR (:estado = 'DISPONIBLE' AND s.estado = :publicado)
-               OR (:estado = 'NO_DISPONIBLE' AND s.estado <> :publicado))
+               OR (:estado = 'DISPONIBLE'
+                   AND s.estado = :publicado
+                   AND s.modoRecepcion = :abierta
+                   AND s.cupos > (SELECT COUNT(sol) FROM Solicitud sol
+                                   WHERE sol.servicio = s
+                                     AND sol.estado IN :estadosCupo))
+               OR (:estado = 'NO_DISPONIBLE'
+                   AND (s.estado <> :publicado
+                        OR s.modoRecepcion <> :abierta
+                        OR s.cupos <= (SELECT COUNT(sol) FROM Solicitud sol
+                                        WHERE sol.servicio = s
+                                          AND sol.estado IN :estadosCupo))))
         """,
         countQuery = """
         SELECT COUNT(f) FROM ServicioFavorito f
@@ -40,8 +52,18 @@ public interface ServicioFavoritoRepository
                OR LOWER(a.nombreUsuario) LIKE :q
                OR LOWER(COALESCE(a.nombreDisplay, '')) LIKE :q)
           AND (:estado IS NULL
-               OR (:estado = 'DISPONIBLE' AND s.estado = :publicado)
-               OR (:estado = 'NO_DISPONIBLE' AND s.estado <> :publicado))
+               OR (:estado = 'DISPONIBLE'
+                   AND s.estado = :publicado
+                   AND s.modoRecepcion = :abierta
+                   AND s.cupos > (SELECT COUNT(sol) FROM Solicitud sol
+                                   WHERE sol.servicio = s
+                                     AND sol.estado IN :estadosCupo))
+               OR (:estado = 'NO_DISPONIBLE'
+                   AND (s.estado <> :publicado
+                        OR s.modoRecepcion <> :abierta
+                        OR s.cupos <= (SELECT COUNT(sol) FROM Solicitud sol
+                                        WHERE sol.servicio = s
+                                          AND sol.estado IN :estadosCupo))))
         """)
     @EntityGraph(attributePaths = {
         "servicio",
@@ -55,6 +77,8 @@ public interface ServicioFavoritoRepository
         @Param("q") String q,
         @Param("estado") String estado,
         @Param("publicado") EstadoServicio publicado,
+        @Param("abierta") ModoRecepcionSolicitud abierta,
+        @Param("estadosCupo") java.util.Collection<EstadoSolicitud> estadosCupo,
         Pageable pageable);
 
     @Query("SELECT f.id.idServicio FROM ServicioFavorito f WHERE f.id.idUsuario = :idUsuario")
