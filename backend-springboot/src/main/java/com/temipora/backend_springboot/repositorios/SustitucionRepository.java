@@ -32,12 +32,4 @@ public interface SustitucionRepository extends JpaRepository<Sustitucion, Long> 
             Pageable pageable);
 
     long countByEstado(EstadoSustitucion estado);
-
-    @Query("""
-        SELECT s.servicioOrigen.idServicio, s.servicioOrigen.nombre, COUNT(s)
-          FROM Sustitucion s
-         GROUP BY s.servicioOrigen.idServicio, s.servicioOrigen.nombre
-         ORDER BY COUNT(s) DESC
-        """)
-    List<Object[]> origenesFrecuentes(Pageable pageable);
 }

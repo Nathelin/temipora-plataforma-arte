@@ -92,7 +92,7 @@ const grupos = [
         rutas: ['/admin/ajustes/presupuestos', '/admin/ajustes/pedidos'],
         icono: Receipt,
       },
-      { nombre: 'Promociones y reactivación', to: '/admin/campanas/promociones', icono: Megaphone },
+      { nombre: 'Ofertas por inactividad', to: '/admin/campanas/promociones', icono: Megaphone },
       { nombre: 'Sustituciones de artistas', to: '/admin/campanas/sustituciones', icono: Users },
       { nombre: 'Comisiones', to: '/admin/ajustes/comisiones', icono: Percent },
       {

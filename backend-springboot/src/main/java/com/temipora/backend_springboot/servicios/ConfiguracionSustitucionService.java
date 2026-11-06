@@ -3,12 +3,14 @@ package com.temipora.backend_springboot.servicios;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.ConfiguracionSustitucion;
 import com.temipora.backend_springboot.modelo.ConfiguracionSustitucionDTO;
+import com.temipora.backend_springboot.modelo.PesoPuntajeDTO;
 import com.temipora.backend_springboot.repositorios.ConfiguracionSustitucionRepository;
 
 @Service
@@ -52,7 +54,7 @@ public class ConfiguracionSustitucionService {
 
     @Transactional
     public ConfiguracionSustitucionDTO obtenerDto() {
-        return ConfiguracionSustitucionDTO.desdeEntidad(obtener());
+        return aDto(obtener());
     }
 
     @Transactional
@@ -77,9 +79,10 @@ public class ConfiguracionSustitucionService {
         }
         BigDecimal bonus = cambios.getBonusFavorito()
             .setScale(3, RoundingMode.HALF_UP);
-        if (bonus.signum() < 0 || bonus.compareTo(BigDecimal.ONE) > 0) {
+        if (bonus.signum() < 0
+                || bonus.compareTo(new BigDecimal("0.300")) > 0) {
             throw new IllegalArgumentException(
-                "El peso extra para artistas seguidos debe estar entre 0 y 1.");
+                "El peso de los artistas que el cliente sigue debe estar entre 0 y 30%.");
         }
         BigDecimal factorTiempo = cambios.getFactorTiempoMax()
             .setScale(2, RoundingMode.HALF_UP);
@@ -113,7 +116,38 @@ public class ConfiguracionSustitucionService {
             guardada.getIdConfiguracion(),
             "Actualizó la configuración de sustituciones de artistas",
             antes, guardada, CAMPOS);
-        return ConfiguracionSustitucionDTO.desdeEntidad(guardada);
+        return aDto(guardada);
+    }
+
+    private ConfiguracionSustitucionDTO aDto(ConfiguracionSustitucion config) {
+        ConfiguracionSustitucionDTO dto =
+            ConfiguracionSustitucionDTO.desdeEntidad(config);
+        dto.setDistribucionBase(distribucionBase());
+        return dto;
+    }
+
+    /**
+     * Porciones del puntaje de similitud. Son las mismas que usa el motor;
+     * se envían al panel para que el admin vea el reparto completo.
+     */
+    private List<PesoPuntajeDTO> distribucionBase() {
+        RecomendacionService.PesosSimilitud pesos =
+            RecomendacionService.PesosSimilitud.SUSTITUCION;
+        return List.of(
+            peso("etiquetas", "Estilo (etiquetas)", pesos.etiquetas()),
+            peso("tipo", "Tipo de servicio", pesos.tipo()),
+            peso("precio", "Precio", pesos.precio()),
+            peso("categorias", "Categoría", pesos.categorias()),
+            peso("medio", "Medio", pesos.medio()),
+            peso("rating", "Reseñas", pesos.rating()));
+    }
+
+    private PesoPuntajeDTO peso(String clave, String etiqueta, double valor) {
+        return new PesoPuntajeDTO(
+            clave,
+            etiqueta,
+            BigDecimal.valueOf(valor * 100)
+                .setScale(1, RoundingMode.HALF_UP));
     }
 
     private int clamp(int valor, int minimo, int maximo) {

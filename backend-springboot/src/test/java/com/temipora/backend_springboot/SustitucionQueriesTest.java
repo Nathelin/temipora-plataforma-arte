@@ -35,10 +35,4 @@ class SustitucionQueriesTest {
         assertThat(sustitucionRepository.countByEstado(EstadoSustitucion.ABIERTA))
             .isGreaterThanOrEqualTo(0L);
     }
-
-    @Test
-    void origenesFrecuentes_esValido() {
-        assertThat(sustitucionRepository.origenesFrecuentes(PageRequest.of(0, 5)))
-            .isNotNull();
-    }
 }

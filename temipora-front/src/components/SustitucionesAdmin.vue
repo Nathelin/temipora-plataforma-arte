@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import api from '../servicios/api'
+import BurbujaInfo from './BurbujaInfo.vue'
 
 const cargando = ref(true)
 const guardando = ref(false)
@@ -9,6 +10,7 @@ const errorAccion = ref('')
 const mensaje = ref('')
 const config = ref(null)
 const resumen = ref(null)
+const distribucionBase = ref([])
 const procesandoCierres = ref(false)
 const resultadoCierres = ref(null)
 
@@ -17,7 +19,7 @@ const form = ref({
   maxAlternativas: 6,
   maxPorArtista: 1,
   rangoPrecioPct: 40,
-  bonusFavorito: 0.1,
+  bonusFavoritoPct: 10,
   factorTiempoMax: 3,
   mostrarEnExplorar: true,
   minutosDedupe: 30,
@@ -33,9 +35,22 @@ const tasaTexto = computed(() => {
   return `${valor.toLocaleString('es-AR', { maximumFractionDigits: 2 })}%`
 })
 
-const bonusTexto = computed(() => {
-  const valor = Number(form.value.bonusFavorito) || 0
-  return `${(valor * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })}%`
+const distribucionEfectiva = computed(() => {
+  const pct = Math.min(30, Math.max(0, Number(form.value.bonusFavoritoPct) || 0))
+  const factor = 1 - pct / 100
+  const base = (distribucionBase.value || []).map((item) => ({
+    clave: item.clave,
+    etiqueta: item.etiqueta,
+    porcentaje: Number((Number(item.porcentaje) * factor).toFixed(1)),
+  }))
+  return [
+    ...base,
+    {
+      clave: 'favorito',
+      etiqueta: 'Artistas que seguís',
+      porcentaje: Number(pct.toFixed(1)),
+    },
+  ]
 })
 
 async function cargar() {
@@ -48,13 +63,16 @@ async function cargar() {
     ])
     config.value = configRes.data
     resumen.value = resumenRes.data
+    distribucionBase.value = Array.isArray(configRes.data?.distribucionBase)
+      ? configRes.data.distribucionBase
+      : []
     const d = configRes.data || {}
     form.value = {
       habilitado: d.habilitado !== false,
       maxAlternativas: Number(d.maxAlternativas ?? 6),
       maxPorArtista: Number(d.maxPorArtista ?? 1),
       rangoPrecioPct: Number(d.rangoPrecioPct ?? 40),
-      bonusFavorito: Number(d.bonusFavorito ?? 0.1),
+      bonusFavoritoPct: Number(d.bonusFavorito ?? 0.1) * 100,
       factorTiempoMax: Number(d.factorTiempoMax ?? 3),
       mostrarEnExplorar: d.mostrarEnExplorar !== false,
       minutosDedupe: Number(d.minutosDedupe ?? 30),
@@ -84,8 +102,8 @@ function validar() {
   if (f.rangoPrecioPct < 0 || f.rangoPrecioPct > 200) {
     return 'La diferencia de precio admitida debe estar entre 0 y 200%.'
   }
-  if (f.bonusFavorito < 0 || f.bonusFavorito > 1) {
-    return 'El peso extra para artistas seguidos debe estar entre 0 y 1.'
+  if (f.bonusFavoritoPct < 0 || f.bonusFavoritoPct > 30) {
+    return 'El peso de los artistas que el cliente sigue debe estar entre 0 y 30%.'
   }
   if (f.factorTiempoMax < 1 || f.factorTiempoMax > 10) {
     return 'El tope de tiempo de entrega debe estar entre 1 y 10 veces.'
@@ -114,7 +132,7 @@ function payload() {
     maxAlternativas: Number(form.value.maxAlternativas),
     maxPorArtista: Number(form.value.maxPorArtista),
     rangoPrecioPct: Number(form.value.rangoPrecioPct),
-    bonusFavorito: Number(form.value.bonusFavorito),
+    bonusFavorito: Number(form.value.bonusFavoritoPct) / 100,
     factorTiempoMax: Number(form.value.factorTiempoMax),
     mostrarEnExplorar: form.value.mostrarEnExplorar,
     minutosDedupe: Number(form.value.minutosDedupe),
@@ -286,33 +304,85 @@ onMounted(cargar)
                 Se descartan alternativas que tarden mucho más que el servicio original.
               </p>
             </div>
-            <div>
+            <div class="sm:col-span-2">
               <label for="bonus-favorito" class="mb-1.5 block text-sm text-cafe">
-                Peso extra para artistas que el cliente sigue
+                Peso de los artistas que seguís (%)
               </label>
-              <input
-                id="bonus-favorito"
-                v-model.number="form.bonusFavorito"
-                type="number"
-                min="0"
-                max="1"
-                step="0.01"
-                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-              />
-              <p class="mt-1.5 text-xs text-cafe/50">
-                Valor entre 0 y 1. Hoy equivale a {{ bonusTexto }} del puntaje.
-              </p>
+              <div class="flex flex-wrap items-center gap-3">
+                <input
+                  id="bonus-favorito"
+                  v-model.number="form.bonusFavoritoPct"
+                  type="number"
+                  min="0"
+                  max="30"
+                  step="1"
+                  class="block w-32 rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                />
+                <p class="text-xs text-cafe/50">
+                  Entre 0 y 30% del puntaje se reserva para los artistas que el cliente sigue.
+                </p>
+              </div>
+
+              <div
+                v-if="distribucionEfectiva.length"
+                class="mt-3 rounded-xl border border-borde/60 bg-crema p-4"
+              >
+                <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/50">
+                  Cómo se reparte el puntaje
+                </p>
+                <ul class="mt-2 space-y-1.5">
+                  <li
+                    v-for="item in distribucionEfectiva"
+                    :key="item.clave"
+                    class="flex items-center gap-3 text-xs"
+                  >
+                    <span class="w-36 shrink-0 text-cafe/70">{{ item.etiqueta }}</span>
+                    <span class="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-rosa/30">
+                      <span
+                        class="block h-full rounded-full bg-coral"
+                        :style="{ width: `${Math.min(100, item.porcentaje)}%` }"
+                      ></span>
+                    </span>
+                    <span class="w-12 shrink-0 text-right font-semibold text-granate">
+                      {{ item.porcentaje }}%
+                    </span>
+                  </li>
+                </ul>
+                <p class="mt-2 text-[11px] leading-relaxed text-cafe/50">
+                  El resto se reparte entre estilo, tipo, precio, categoría, medio y reseñas.
+                  Un artista que el cliente sigue arranca con esos puntos; si no lo sigue, ese
+                  porcentaje no se suma.
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
         <section class="border-t border-rosa/40 pt-6">
-          <h2 class="text-base text-granate">Registro</h2>
+          <h2 class="text-base text-granate">Medición</h2>
           <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label for="minutos-dedupe" class="mb-1.5 block text-sm text-cafe">
-                Minutos para agrupar visitas repetidas
-              </label>
+              <div class="mb-1.5 flex items-center gap-1.5">
+                <label for="minutos-dedupe" class="block text-sm text-cafe">
+                  Ventana para contar una sola búsqueda (minutos)
+                </label>
+                <BurbujaInfo etiqueta="Cómo se cuenta una búsqueda">
+                  <span class="block">
+                    Si el mismo cliente vuelve a ver las alternativas del mismo servicio y
+                    por el mismo motivo dentro de estos minutos, se registra una sola
+                    búsqueda y se reutilizan las opciones ya sugeridas: no se generan
+                    recomendaciones nuevas.
+                  </span>
+                  <span class="mt-2 block">
+                    Al mostrarlas se revisa que sigan disponibles y con el precio actual.
+                    Pasada la ventana, la próxima visita cuenta como una búsqueda nueva y
+                    recalcula las alternativas. 0 = cada visita se registra y recalcula.
+                  </span>
+                  <span class="mt-2 block text-white/75">
+                    Ejemplo: 10:00 y 10:05 cuentan una vez; 10:40 cuenta otra.
+                  </span>
+                </BurbujaInfo>
+              </div>
               <input
                 id="minutos-dedupe"
                 v-model.number="form.minutosDedupe"
@@ -323,13 +393,12 @@ onMounted(cargar)
                 class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
               />
               <p class="mt-1.5 text-xs text-cafe/50">
-                Si el cliente vuelve a mirar las alternativas dentro de esta ventana,
-                se reutiliza el mismo registro. 0 desactiva la agrupación.
+                Agrupa visitas repetidas para no inflar las métricas.
               </p>
             </div>
             <div>
               <label for="dias-retencion" class="mb-1.5 block text-sm text-cafe">
-                Días de retención del registro
+                Días de retención de las búsquedas
               </label>
               <input
                 id="dias-retencion"
@@ -468,20 +537,6 @@ onMounted(cargar)
               <dd class="font-semibold text-granate">{{ resumen?.emailsCierrePendientes ?? 0 }}</dd>
             </div>
           </dl>
-        </div>
-
-        <div v-if="resumen?.origenesFrecuentes?.length" class="border-t border-rosa/40 pt-4">
-          <h3 class="text-sm font-semibold text-granate">Servicios que más alternativas disparan</h3>
-          <ul class="mt-2 space-y-2 text-xs text-cafe/70">
-            <li
-              v-for="origen in resumen.origenesFrecuentes"
-              :key="origen.idServicio"
-              class="flex justify-between gap-3"
-            >
-              <span class="min-w-0 break-words">{{ origen.nombre }}</span>
-              <span class="shrink-0 font-semibold text-granate">{{ origen.cantidad }}</span>
-            </li>
-          </ul>
         </div>
 
         <p class="border-t border-rosa/40 pt-4 text-xs leading-relaxed text-cafe/50">

@@ -310,15 +310,6 @@ public class SustitucionService {
                 .setScale(2, RoundingMode.HALF_UP).doubleValue()
             : 0;
 
-        List<SustitucionResumenDTO.OrigenFrecuente> origenes = new ArrayList<>();
-        for (Object[] fila : sustitucionRepository.origenesFrecuentes(
-                PageRequest.of(0, 5))) {
-            origenes.add(new SustitucionResumenDTO.OrigenFrecuente(
-                ((Number) fila[0]).longValue(),
-                (String) fila[1],
-                ((Number) fila[2]).longValue()));
-        }
-
         return SustitucionResumenDTO.builder()
             .totalEventos(total)
             .resueltasConAlternativa(alternativa)
@@ -326,7 +317,6 @@ public class SustitucionService {
             .descartadas(descartadas)
             .abiertas(abiertas)
             .tasaSustitucion(tasa)
-            .origenesFrecuentes(origenes)
             .build();
     }
 
@@ -599,7 +589,7 @@ public class SustitucionService {
             ? config.getFactorTiempoMax().doubleValue()
             : 0;
         return new RecomendacionService.OpcionesSimilitud(
-            RecomendacionService.PesosSimilitud.conBonusFavorito(bonus),
+            RecomendacionService.PesosSimilitud.conPesoFavorito(bonus),
             Math.max(1, config.getMaxAlternativas()),
             Math.max(1, config.getMaxPorArtista()),
             factorTiempo);

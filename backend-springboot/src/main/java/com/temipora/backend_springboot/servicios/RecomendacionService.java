@@ -96,7 +96,7 @@ public class RecomendacionService {
         public static final PesosSimilitud SUSTITUCION = new PesosSimilitud(
             0.35, 0.05, 0.30, 0.03, 0.25, 0.02, 0, 0);
 
-        public static PesosSimilitud conBonusFavorito(double bonus) {
+        public static PesosSimilitud conPesoFavorito(double peso) {
             return new PesosSimilitud(
                 SUSTITUCION.etiquetas,
                 SUSTITUCION.categorias,
@@ -105,7 +105,7 @@ public class RecomendacionService {
                 SUSTITUCION.precio,
                 SUSTITUCION.rating,
                 SUSTITUCION.afinidad,
-                bonus);
+                peso);
         }
     }
 
@@ -330,14 +330,19 @@ public class RecomendacionService {
             double rating = ratingScore(promedios.get(servicio.getIdServicio()));
             double usuario = (esFavorito ? 0.5 : 0) + (visitado ? 0.5 : 0);
 
-            double score = pesos.etiquetas() * tagSim
+            double base = pesos.etiquetas() * tagSim
                 + pesos.categorias() * categoriaSim
                 + pesos.tipo() * tipoSim
                 + pesos.medio() * medioSim
                 + pesos.precio() * precioSim
                 + pesos.rating() * rating
-                + pesos.afinidad() * usuario
-                + pesos.bonusFavorito() * (esFavorito ? 1 : 0);
+                + pesos.afinidad() * usuario;
+            // El peso de favoritos es una porción del puntaje total: el resto
+            // se reparte entre las señales de parecido, así nunca lo supera.
+            double pesoFavorito = Math.max(0,
+                Math.min(1, pesos.bonusFavorito()));
+            double score = (1 - pesoFavorito) * base
+                + pesoFavorito * (esFavorito ? 1 : 0);
 
             puntuados.add(new ServicioPuntuado(
                 servicio, score, motivoSimilar(tagSim, precioSim, tipoSim, esFavorito)));

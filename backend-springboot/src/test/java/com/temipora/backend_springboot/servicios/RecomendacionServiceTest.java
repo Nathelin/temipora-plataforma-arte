@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.servicios;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
@@ -168,6 +169,42 @@ class RecomendacionServiceTest {
         assertThat(resultado)
             .extracting(item -> item.servicio().getIdServicio())
             .doesNotContain(2L);
+    }
+
+    @Test
+    void similares_pesoFavoritoEsUnaPorcionDelPuntaje() {
+        CategoriaEtiqueta categoria = CategoriaEtiqueta.builder()
+            .idCategoriaEtiqueta(1L)
+            .nombre("Estilo")
+            .build();
+        Etiqueta etiqueta = Etiqueta.builder()
+            .idEtiqueta(5L)
+            .nombre("Anime")
+            .categoria(categoria)
+            .build();
+
+        Servicio origen = servicio(1L, "Origen", 99L, "100");
+        origen.setEtiquetas(etiquetas(etiqueta));
+
+        Servicio favorito = servicio(2L, "Favorito", 20L, "100");
+        favorito.setEtiquetas(etiquetas(etiqueta));
+
+        when(recomendacionRepository.artistasFavoritos(1L)).thenReturn(List.of(20L));
+
+        List<RecomendacionService.ServicioPuntuado> resultado =
+            recomendacionService.similares(
+                origen,
+                List.of(favorito),
+                1L,
+                ars,
+                new RecomendacionService.OpcionesSimilitud(
+                    RecomendacionService.PesosSimilitud.conPesoFavorito(0.10),
+                    10, 2, 0));
+
+        // base: etiquetas 0,35 + categoría 0,05 + precio 0,25 + reseñas 0,01 = 0,66
+        // puntaje: 0,90 * 0,66 + 0,10 = 0,694
+        assertThat(resultado).hasSize(1);
+        assertThat(resultado.get(0).score()).isCloseTo(0.694, within(0.0001));
     }
 
     private Servicio servicio(Long id, String nombre, Long idArtista, String precio) {

@@ -1,7 +1,5 @@
 package com.temipora.backend_springboot.modelo;
 
-import java.util.List;
-
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -22,8 +20,4 @@ public class SustitucionResumenDTO {
     private long abiertas;
     private long emailsCierrePendientes;
     private double tasaSustitucion;
-    private List<OrigenFrecuente> origenesFrecuentes;
-
-    public record OrigenFrecuente(Long idServicio, String nombre, long cantidad) {
-    }
 }

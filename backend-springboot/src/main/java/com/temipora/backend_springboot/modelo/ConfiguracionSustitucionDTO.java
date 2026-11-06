@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -37,7 +38,7 @@ public class ConfiguracionSustitucionDTO {
 
     @NotNull
     @DecimalMin("0.000")
-    @DecimalMax("1.000")
+    @DecimalMax("0.300")
     private BigDecimal bonusFavorito;
 
     @NotNull
@@ -67,6 +68,12 @@ public class ConfiguracionSustitucionDTO {
     @Min(1)
     @Max(720)
     private int emailCierreVigenciaHoras;
+
+    /**
+     * Distribución base del puntaje (sin aplicar el peso de favoritos), para
+     * que el panel muestre de dónde sale cada porcentaje.
+     */
+    private List<PesoPuntajeDTO> distribucionBase;
 
     public static ConfiguracionSustitucionDTO desdeEntidad(
             ConfiguracionSustitucion config) {
