@@ -8,6 +8,7 @@ const props = defineProps({
   mostrarFavorito: { type: Boolean, default: false },
   esFavorito: { type: Boolean, default: false },
   actualizandoFavorito: { type: Boolean, default: false },
+  motivo: { type: String, default: '' },
 })
 
 const emit = defineEmits(['alternar-favorito'])
@@ -21,6 +22,7 @@ const ETIQUETAS_SENSIBLE = {
 }
 
 const esSensible = computed(() => !!props.servicio.contenidoSensible)
+const sinCupos = computed(() => props.servicio.disponibleAhora === false)
 const requiereAdvertencia = computed(() => !!props.servicio.requiereAdvertencia)
 const tiposSensibles = computed(() => {
   const tipos = props.servicio.contenidosSensibles || []
@@ -98,6 +100,12 @@ function textoEntrega(s) {
       >
         Descuento de reactivación -{{ descuentoOferta }}%
       </span>
+      <span
+        v-if="sinCupos"
+        class="absolute bottom-3 right-3 rounded-full bg-superficie/95 px-2.5 py-1 text-[11px] font-bold text-granate ring-1 ring-borde/70 backdrop-blur-sm"
+      >
+        Sin cupos
+      </span>
 
       <button
         v-if="mostrarFavorito"
@@ -128,6 +136,14 @@ function textoEntrega(s) {
     </div>
 
     <div class="flex flex-1 flex-col p-4">
+      <p
+        v-if="motivo"
+        class="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-mantequilla/70 px-2.5 py-1 text-[11px] font-bold text-granate"
+      >
+        <span aria-hidden="true">✦</span>
+        {{ motivo }}
+      </p>
+
       <h3 class="line-clamp-1 font-display text-base font-bold leading-snug text-granate">
         {{ servicio.nombre }}
       </h3>
@@ -205,6 +221,13 @@ function textoEntrega(s) {
         >
           {{ revelado ? 'Ocultar' : 'Ver de todos modos' }}
         </button>
+      </div>
+
+      <div
+        v-if="$slots.acciones"
+        class="relative z-20 mt-auto flex flex-wrap gap-2 pt-3"
+      >
+        <slot name="acciones" />
       </div>
     </div>
   </article>

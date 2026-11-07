@@ -13,6 +13,8 @@ import org.springframework.data.domain.Sort;
 
 import com.temipora.backend_springboot.modelo.ArtistaFavorito;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
+import com.temipora.backend_springboot.modelo.EstadoSolicitud;
+import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.ServicioFavorito;
 import com.temipora.backend_springboot.repositorios.ArtistaFavoritoRepository;
 import com.temipora.backend_springboot.repositorios.ServicioFavoritoRepository;
@@ -20,6 +22,9 @@ import com.temipora.backend_springboot.repositorios.ServicioRepository;
 
 @SpringBootTest
 class FavoritoQueriesTest {
+
+	private static final List<EstadoSolicitud> ESTADOS_QUE_OCUPAN_CUPO = List.of(
+		EstadoSolicitud.PRESUPUESTADA, EstadoSolicitud.PAGADA);
 
 	@Autowired
 	private ArtistaFavoritoRepository artistaFavoritoRepository;
@@ -59,6 +64,8 @@ class FavoritoQueriesTest {
 			null,
 			null,
 			EstadoServicio.PUBLICADO,
+			ModoRecepcionSolicitud.ABIERTA,
+			ESTADOS_QUE_OCUPAN_CUPO,
 			PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "fechaAgregado")));
 
 		assertThat(pagina.getContent()).isEmpty();
@@ -72,6 +79,8 @@ class FavoritoQueriesTest {
 			"%retrato%",
 			"DISPONIBLE",
 			EstadoServicio.PUBLICADO,
+			ModoRecepcionSolicitud.ABIERTA,
+			ESTADOS_QUE_OCUPAN_CUPO,
 			PageRequest.of(0, 10, Sort.by(Sort.Direction.ASC, "servicio.nombre")));
 
 		assertThat(pagina.getContent()).isEmpty();
@@ -85,6 +94,8 @@ class FavoritoQueriesTest {
 			null,
 			"NO_DISPONIBLE",
 			EstadoServicio.PUBLICADO,
+			ModoRecepcionSolicitud.ABIERTA,
+			ESTADOS_QUE_OCUPAN_CUPO,
 			PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "fechaAgregado")));
 
 		assertThat(pagina.getContent()).isEmpty();

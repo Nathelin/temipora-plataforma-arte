@@ -47,7 +47,9 @@ public final class CatalogoAuditoria {
             AccionesAdmin.USUARIO_CAMBIAR_CONTRASENIA,
             AccionesAdmin.USUARIO_CAMBIAR_TELEFONO,
             AccionesAdmin.USUARIO_QUITAR_TELEFONO,
-            AccionesAdmin.LOGIN_FALLIDO);
+            AccionesAdmin.LOGIN_FALLIDO,
+            AccionesAdmin.SESION_ACCESO_ENLACE,
+            AccionesAdmin.SESION_ACCESO_ENLACE_FALLIDO);
 
         registrar(CategoriaAuditoria.MODERACION,
             AccionesAdmin.RESENIA_CREAR,
@@ -99,6 +101,7 @@ public final class CatalogoAuditoria {
             AccionesAdmin.MONEDA_REACTIVAR,
             AccionesAdmin.MONEDA_PREDETERMINADA,
             AccionesAdmin.SERVICIO_CREAR,
+            AccionesAdmin.SERVICIO_MODO_AUTOMATICO,
             AccionesAdmin.SERVICIO_MODIFICAR,
             AccionesAdmin.SERVICIO_PAUSAR,
             AccionesAdmin.SERVICIO_REACTIVAR,
@@ -113,6 +116,7 @@ public final class CatalogoAuditoria {
             AccionesAdmin.RESENIA_CONFIG_ACTUALIZAR,
             AccionesAdmin.INACTIVIDAD_CONFIG_ACTUALIZAR,
             AccionesAdmin.REACTIVACION_EJECUTAR,
+            AccionesAdmin.SUSTITUCION_CONFIG_ACTUALIZAR,
             AccionesAdmin.COTIZACION_ACTUALIZAR,
             AccionesAdmin.CRITERIO_CREAR,
             AccionesAdmin.CRITERIO_MODIFICAR,

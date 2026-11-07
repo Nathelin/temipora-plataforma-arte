@@ -30,6 +30,7 @@ import com.temipora.backend_springboot.modelo.ItemSolicitudRequest;
 import com.temipora.backend_springboot.modelo.ListaEspera;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.MotivoSustitucion;
 import com.temipora.backend_springboot.modelo.OfertaReactivacion;
 import com.temipora.backend_springboot.modelo.Pregunta;
 import com.temipora.backend_springboot.modelo.PreguntaDTO;
@@ -125,6 +126,9 @@ public class SolicitudServicioService {
     private final OfertaReactivacionService ofertaReactivacionService;
     private final AuditoriaService auditoria;
     private final ArancelEstimadoService arancelEstimadoService;
+    private final SustitucionService sustitucionService;
+    private final CuposEventPublisher cuposEventPublisher;
+    private final CierreEmailService cierreEmailService;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -145,7 +149,10 @@ public class SolicitudServicioService {
             ConversacionRepository conversacionRepository,
             OfertaReactivacionService ofertaReactivacionService,
             AuditoriaService auditoria,
-            ArancelEstimadoService arancelEstimadoService) {
+            ArancelEstimadoService arancelEstimadoService,
+            SustitucionService sustitucionService,
+            CuposEventPublisher cuposEventPublisher,
+            CierreEmailService cierreEmailService) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -165,6 +172,9 @@ public class SolicitudServicioService {
         this.ofertaReactivacionService = ofertaReactivacionService;
         this.auditoria = auditoria;
         this.arancelEstimadoService = arancelEstimadoService;
+        this.sustitucionService = sustitucionService;
+        this.cuposEventPublisher = cuposEventPublisher;
+        this.cierreEmailService = cierreEmailService;
     }
 
     @Transactional(readOnly = true)
@@ -188,11 +198,18 @@ public class SolicitudServicioService {
         boolean permiteListaEspera = modo == ModoRecepcionSolicitud.SOLO_ESPERA;
         boolean puedeSolicitarCupo = idCliente != null
             && !tieneSolicitudActiva
-            && modo == ModoRecepcionSolicitud.ABIERTA;
+            && modo == ModoRecepcionSolicitud.ABIERTA
+            && cuposDisponibles > 0;
         boolean puedeListaEspera = idCliente != null
             && !tieneSolicitudActiva
             && modo == ModoRecepcionSolicitud.SOLO_ESPERA;
-        boolean puedeSolicitar = puedeSolicitarCupo || puedeListaEspera;
+        boolean puedeQuedarEnCola = idCliente != null
+            && !tieneSolicitudActiva
+            && modo == ModoRecepcionSolicitud.ABIERTA
+            && cuposDisponibles <= 0;
+        boolean puedeSolicitar = puedeSolicitarCupo
+            || puedeListaEspera
+            || puedeQuedarEnCola;
 
         String mensaje;
         if (idCliente == null) {
@@ -222,6 +239,7 @@ public class SolicitudServicioService {
             .tieneSolicitudEnEspera(tieneSolicitudEnEspera)
             .puedeSolicitarCupo(puedeSolicitarCupo)
             .puedeListaEspera(puedeListaEspera)
+            .puedeQuedarEnCola(puedeQuedarEnCola)
             .puedeSolicitar(puedeSolicitar)
             .mensaje(mensaje)
             .build();
@@ -369,6 +387,14 @@ public class SolicitudServicioService {
             oferta.setSolicitud(solicitud);
         }
         solicitudRepository.save(solicitud);
+
+        if (request.getIdSustitucion() != null) {
+            sustitucionService.resolverPorSolicitud(
+                request.getIdSustitucion(),
+                idCliente,
+                solicitud.getIdSolicitud(),
+                servicio.getIdServicio());
+        }
 
         auditoria.registrar(
             AccionesAdmin.SOLICITUD_CREAR, ENTIDAD_SOLICITUD, solicitud.getIdSolicitud(),
@@ -520,6 +546,10 @@ public class SolicitudServicioService {
         accionSolicitudRepository.save(accion);
 
         notificarCancelacion(solicitud, motivoLimpio, estadoAnterior);
+        if (estadoAnterior == EstadoSolicitud.PRESUPUESTADA
+                && solicitud.getServicio() != null) {
+            cuposEventPublisher.publicar(solicitud.getServicio().getIdServicio());
+        }
 
         auditoria.registrar(
             AccionesAdmin.SOLICITUD_CANCELAR, ENTIDAD_SOLICITUD, solicitud.getIdSolicitud(),
@@ -573,6 +603,17 @@ public class SolicitudServicioService {
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
 
+        cierreEmailService.encolar(
+            solicitud.getCliente(),
+            solicitud,
+            null,
+            MotivoSustitucion.PRESUPUESTO_RETIRADO,
+            ahora);
+
+        if (solicitud.getServicio() != null) {
+            cuposEventPublisher.publicar(solicitud.getServicio().getIdServicio());
+        }
+
         auditoria.registrar(
             AccionesAdmin.SOLICITUD_RETIRAR_PRESUPUESTO, ENTIDAD_SOLICITUD,
             solicitud.getIdSolicitud(), "Retiró el presupuesto de la solicitud",
@@ -624,6 +665,15 @@ public class SolicitudServicioService {
             descripcion,
             solicitud.getIdSolicitud(),
             TIPO_REFERENCIA_SOLICITUD);
+
+        cierreEmailService.encolar(
+            solicitud.getCliente(),
+            solicitud,
+            null,
+            ORIGEN_BAJA_SERVICIO.equals(origen)
+                ? MotivoSustitucion.SERVICIO_DADO_DE_BAJA
+                : MotivoSustitucion.SOLICITUD_RECHAZADA,
+            ahora);
 
         conversacionService.archivarPorSolicitud(
             solicitud.getCliente(), solicitud.getArtista());

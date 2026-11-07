@@ -7,11 +7,11 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HexFormat;
 
-public final class TokenAccesoOferta {
+public final class TokenAccesoUtil {
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private TokenAccesoOferta() {
+    private TokenAccesoUtil() {
     }
 
     public static String generar() {

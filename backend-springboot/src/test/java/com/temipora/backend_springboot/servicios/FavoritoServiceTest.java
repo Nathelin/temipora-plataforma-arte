@@ -366,12 +366,12 @@ class FavoritoServiceTest {
         when(usuarioRepository.findByNombreUsuarioIgnoreCase("cliente"))
             .thenReturn(Optional.of(cliente));
         when(servicioFavoritoRepository.buscar(
-                eq(1L), isNull(), isNull(), eq(EstadoServicio.PUBLICADO), any(Pageable.class)))
+                eq(1L), isNull(), isNull(), eq(EstadoServicio.PUBLICADO), any(), any(), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(favorito), PageRequest.of(0, 12), 1));
         when(servicioRepository.findByIdServicioIn(List.of(5L)))
             .thenReturn(List.of(servicio));
         when(servicioService.convertirParaVisor(List.of(servicio), 1L))
-            .thenReturn(Map.of(5L, servicioDto(5L, "Retrato digital")));
+            .thenReturn(Map.of(5L, servicioDto(5L, "Retrato digital", true)));
 
         PaginaDTO<ServicioFavoritoDTO> resultado = favoritoService.listarServicios(
             "cliente", 0, 12, null, "recientes", "todos");
@@ -394,12 +394,12 @@ class FavoritoServiceTest {
         when(usuarioRepository.findByNombreUsuarioIgnoreCase("cliente"))
             .thenReturn(Optional.of(cliente));
         when(servicioFavoritoRepository.buscar(
-                eq(1L), isNull(), isNull(), eq(EstadoServicio.PUBLICADO), any(Pageable.class)))
+                eq(1L), isNull(), isNull(), eq(EstadoServicio.PUBLICADO), any(), any(), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(favorito), PageRequest.of(0, 12), 1));
         when(servicioRepository.findByIdServicioIn(List.of(5L)))
             .thenReturn(List.of(servicio));
         when(servicioService.convertirParaVisor(List.of(servicio), 1L))
-            .thenReturn(Map.of(5L, servicioDto(5L, "Retrato digital")));
+            .thenReturn(Map.of(5L, servicioDto(5L, "Retrato digital", false)));
 
         PaginaDTO<ServicioFavoritoDTO> resultado = favoritoService.listarServicios(
             "cliente", 0, 12, null, "recientes", "todos");
@@ -416,7 +416,7 @@ class FavoritoServiceTest {
             .thenReturn(Optional.of(cliente));
         when(servicioFavoritoRepository.buscar(
                 eq(1L), eq("%retrato%"), eq("DISPONIBLE"),
-                eq(EstadoServicio.PUBLICADO), any(Pageable.class)))
+                eq(EstadoServicio.PUBLICADO), any(), any(), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 12), 0));
 
         PaginaDTO<ServicioFavoritoDTO> resultado = favoritoService.listarServicios(
@@ -435,7 +435,7 @@ class FavoritoServiceTest {
             .thenReturn(Optional.of(cliente));
         when(servicioFavoritoRepository.buscar(
                 eq(1L), isNull(), eq("NO_DISPONIBLE"),
-                eq(EstadoServicio.PUBLICADO), any(Pageable.class)))
+                eq(EstadoServicio.PUBLICADO), any(), any(), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 12), 0));
 
         PaginaDTO<ServicioFavoritoDTO> resultado = favoritoService.listarServicios(
@@ -457,7 +457,7 @@ class FavoritoServiceTest {
             .hasMessageContaining("archivados");
 
         verify(servicioFavoritoRepository, never()).buscar(
-            any(), any(), any(), any(), any());
+            any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -467,7 +467,7 @@ class FavoritoServiceTest {
         when(usuarioRepository.findByNombreUsuarioIgnoreCase("cliente"))
             .thenReturn(Optional.of(cliente));
         when(servicioFavoritoRepository.buscar(
-                eq(1L), isNull(), isNull(), eq(EstadoServicio.PUBLICADO), any(Pageable.class)))
+                eq(1L), isNull(), isNull(), eq(EstadoServicio.PUBLICADO), any(), any(), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 12), 0));
 
         favoritoService.listarServicios(
@@ -475,7 +475,8 @@ class FavoritoServiceTest {
 
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
         verify(servicioFavoritoRepository).buscar(
-            eq(1L), isNull(), isNull(), eq(EstadoServicio.PUBLICADO), captor.capture());
+            eq(1L), isNull(), isNull(), eq(EstadoServicio.PUBLICADO),
+            any(), any(), captor.capture());
         Sort.Order orden = captor.getValue().getSort().getOrderFor("servicio.nombre");
         assertThat(orden).isNotNull();
         assertThat(orden.getDirection()).isEqualTo(Sort.Direction.ASC);
@@ -501,7 +502,7 @@ class FavoritoServiceTest {
         when(servicioFavoritoRepository.save(any(ServicioFavorito.class)))
             .thenAnswer(inv -> inv.getArgument(0));
         when(servicioService.convertirParaVisor(List.of(servicio), 1L))
-            .thenReturn(Map.of(5L, servicioDto(5L, "Retrato digital")));
+            .thenReturn(Map.of(5L, servicioDto(5L, "Retrato digital", true)));
 
         ServicioFavoritoDTO resultado = favoritoService.agregarServicio("cliente", 5L);
 
@@ -531,7 +532,7 @@ class FavoritoServiceTest {
                 .findByUsuarioIdUsuarioAndServicioIdServicio(1L, 5L))
             .thenReturn(Optional.of(existente));
         when(servicioService.convertirParaVisor(List.of(servicio), 1L))
-            .thenReturn(Map.of(5L, servicioDto(5L, "Retrato digital")));
+            .thenReturn(Map.of(5L, servicioDto(5L, "Retrato digital", true)));
 
         ServicioFavoritoDTO resultado = favoritoService.agregarServicio("cliente", 5L);
 
@@ -706,10 +707,15 @@ class FavoritoServiceTest {
     }
 
     private ServicioDTO servicioDto(Long id, String nombre) {
+        return servicioDto(id, nombre, false);
+    }
+
+    private ServicioDTO servicioDto(Long id, String nombre, boolean disponibleAhora) {
         return ServicioDTO.builder()
             .idServicio(id)
             .nombre(nombre)
             .nombreArtista("artista")
+            .disponibleAhora(disponibleAhora)
             .build();
     }
 

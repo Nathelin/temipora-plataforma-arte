@@ -3,6 +3,8 @@ package com.temipora.backend_springboot.servicios;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,15 +23,44 @@ public class EmailPlantillaService {
         "Ofertas para retomar tus compras en Temipora";
 
     private static final String PLANTILLA_REACTIVACION = "emails/reactivacion";
+    private static final String PLANTILLA_CIERRE = "emails/cierre";
     private static final String PLANTILLA_BAJA_CONFIRMADA = "emails/baja-confirmada";
     private static final String PLANTILLA_BAJA_INVALIDA = "emails/baja-invalida";
     private static final String PREHEADER_REACTIVACION =
         "Tenés ofertas con descuento esperándote en Temipora.";
+    private static final String PREHEADER_CIERRE =
+        "Novedades sobre tus solicitudes y pedidos en Temipora.";
+
+    private static final DateTimeFormatter FECHA_CIERRE =
+        DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    public record CierreEmail(
+            String contexto,
+            Long idSolicitud,
+            Long idPedido,
+            String nombreServicio,
+            String nombreArtista,
+            String imagen,
+            String titulo,
+            String detalle,
+            LocalDateTime fecha) {
+    }
+
+    public record AlternativaEmail(
+            String nombreServicio,
+            String nombreArtista,
+            String imagen,
+            String precio,
+            String moneda) {
+    }
 
     private final SpringTemplateEngine templateEngine;
 
     @Value("${temipora.mail.api-url:http://localhost:8080}")
     private String apiUrl;
+
+    @Value("${temipora.mail.base-url:http://localhost:5173}")
+    private String frontUrl;
 
     public EmailPlantillaService(SpringTemplateEngine templateEngine) {
         this.templateEngine = templateEngine;
@@ -47,6 +78,37 @@ public class EmailPlantillaService {
         return templateEngine.process(PLANTILLA_REACTIVACION, contexto);
     }
 
+    public String asuntoCierre(List<CierreEmail> cierres) {
+        if (cierres == null || cierres.isEmpty()) {
+            return "Novedades sobre tus pedidos en Temipora";
+        }
+        if (cierres.size() == 1) {
+            CierreEmail cierre = cierres.get(0);
+            String entidad = "PEDIDO".equals(cierre.contexto())
+                ? "pedido"
+                : "solicitud";
+            return "Se cerró tu " + entidad + " de «"
+                + cierre.nombreServicio() + "»";
+        }
+        return "Se cerraron " + cierres.size()
+            + " de tus solicitudes y pedidos";
+    }
+
+    public String cierre(
+            String nombre,
+            List<CierreEmail> cierres,
+            List<AlternativaEmail> alternativas,
+            String tokenAcceso) {
+        Context contexto = contexto();
+        contexto.setVariable("nombre", nombre);
+        contexto.setVariable("preheader", PREHEADER_CIERRE);
+        contexto.setVariable("cierres", vistaCierres(cierres, tokenAcceso));
+        contexto.setVariable("alternativas",
+            vistaAlternativas(alternativas, cierres, tokenAcceso));
+        contexto.setVariable("urlExplorar", baseFront() + "/servicios");
+        return templateEngine.process(PLANTILLA_CIERRE, contexto);
+    }
+
     public String bajaConfirmada(String nombre) {
         Context contexto = contexto();
         contexto.setVariable("nombre", nombre);
@@ -59,6 +121,95 @@ public class EmailPlantillaService {
 
     private Context contexto() {
         return new Context(Locale.forLanguageTag("es-AR"));
+    }
+
+    private List<Map<String, Object>> vistaCierres(
+            List<CierreEmail> cierres, String tokenAcceso) {
+        List<Map<String, Object>> vistas = new ArrayList<>();
+        if (cierres == null) {
+            return vistas;
+        }
+        for (CierreEmail cierre : cierres) {
+            vistas.add(vistaCierre(cierre, tokenAcceso));
+        }
+        return vistas;
+    }
+
+    private Map<String, Object> vistaCierre(
+            CierreEmail cierre, String tokenAcceso) {
+        Map<String, Object> vista = new LinkedHashMap<>();
+        vista.put("imagenUrl", urlImagenSeguro(cierre.imagen()));
+        vista.put("inicial", inicial(cierre.nombreServicio()));
+        vista.put("nombreServicio", cierre.nombreServicio());
+        vista.put("nombreArtista", cierre.nombreArtista());
+        vista.put("titulo", cierre.titulo());
+        vista.put("detalle", cierre.detalle());
+        vista.put("fecha", cierre.fecha() != null
+            ? FECHA_CIERRE.format(cierre.fecha())
+            : null);
+        vista.put("url", urlCierre(cierre, tokenAcceso));
+        vista.put("etiqueta", "PEDIDO".equals(cierre.contexto())
+            ? "Ver pedido"
+            : "Ver solicitud");
+        return vista;
+    }
+
+    private List<Map<String, Object>> vistaAlternativas(
+            List<AlternativaEmail> alternativas,
+            List<CierreEmail> cierres,
+            String tokenAcceso) {
+        List<Map<String, Object>> vistas = new ArrayList<>();
+        if (alternativas == null) {
+            return vistas;
+        }
+        CierreEmail primero = cierres != null && !cierres.isEmpty()
+            ? cierres.get(0)
+            : null;
+        String url = primero != null
+            ? urlCierre(primero, tokenAcceso)
+            : baseFront() + "/servicios";
+        for (AlternativaEmail alternativa : alternativas) {
+            Map<String, Object> vista = new LinkedHashMap<>();
+            vista.put("imagenUrl", urlImagenSeguro(alternativa.imagen()));
+            vista.put("inicial", inicial(alternativa.nombreServicio()));
+            vista.put("nombreServicio", alternativa.nombreServicio());
+            vista.put("nombreArtista", alternativa.nombreArtista());
+            vista.put("precio", monto(alternativa.precio()));
+            vista.put("moneda", alternativa.moneda());
+            vista.put("url", url);
+            vistas.add(vista);
+        }
+        return vistas;
+    }
+
+    private String urlCierre(CierreEmail cierre, String tokenAcceso) {
+        String path;
+        if ("PEDIDO".equals(cierre.contexto()) && cierre.idPedido() != null) {
+            path = "/pedidos/" + cierre.idPedido() + "/resultado";
+        } else if (cierre.idSolicitud() != null) {
+            path = "/solicitudes/" + cierre.idSolicitud() + "/resultado";
+        } else {
+            path = "/servicios";
+        }
+        return baseFront() + path
+            + enlaceAcceso(tokenAcceso);
+    }
+
+    private String enlaceAcceso(String tokenAcceso) {
+        return tokenAcceso == null || tokenAcceso.isBlank()
+            ? ""
+            : "?acceso=" + tokenAcceso;
+    }
+
+    private String urlImagenSeguro(String imagen) {
+        if (imagen == null || imagen.isBlank()) {
+            return null;
+        }
+        return urlImagen(imagen);
+    }
+
+    private String baseFront() {
+        return frontUrl == null ? "" : frontUrl;
     }
 
     private List<Map<String, Object>> vistaOfertas(List<OfertaEmail> ofertas) {

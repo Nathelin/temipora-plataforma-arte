@@ -408,7 +408,10 @@ function irAPerfil() {
     </header>
 
     <main class="flex-1 w-full">
-      <router-view />
+      <!-- La key cubre cualquier parámetro (servicio, perfil, pedido, token):
+           sin esto Vue reutiliza la vista al cambiar solo el parámetro y las
+           pantallas que cargan en onMounted no se recargan. -->
+      <router-view :key="JSON.stringify(route.params)" />
     </main>
 
 

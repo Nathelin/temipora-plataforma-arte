@@ -8,6 +8,7 @@ import ResumenResenias from '../components/ResumenResenias.vue'
 import TarjetaReseniaPublica from '../components/TarjetaReseniaPublica.vue'
 import ModalResenias from '../components/ModalResenias.vue'
 import VisorImagenes from '../components/VisorImagenes.vue'
+import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import TarjetaArtistaRecomendado from '../components/TarjetaArtistaRecomendado.vue'
 import {
   cargarReseniasServicio,
@@ -15,6 +16,7 @@ import {
   formatearPromedio,
 } from '../servicios/resenias'
 import { esImagenVerificada } from '../servicios/imagenes'
+import { buscarAlternativas, datosMotivo } from '../servicios/sustituciones'
 import { useNotificaciones } from '../composables/useNotificaciones'
 
 const route = useRoute()
@@ -36,6 +38,8 @@ const actualizandoFavorito = ref(false)
 const artista = ref(null)
 const resumenArtista = ref(null)
 const artistasSimilares = ref([])
+const sustitucion = ref(null)
+const modalCola = ref(false)
 
 const resumenResenias = ref(null)
 const reseniasPreview = ref([])
@@ -167,6 +171,34 @@ const cuposDisponibles = computed(() => {
 const cuposTotales = computed(
   () => disponibilidad.value?.cuposTotales ?? servicio.value?.cupos ?? 0,
 )
+
+const noDisponibleAhora = computed(() => {
+  const actual = servicio.value
+  if (actual && typeof actual.disponibleAhora === 'boolean') {
+    return !actual.disponibleAhora
+  }
+  const d = disponibilidad.value
+  if (!d) return false
+  return d.modoRecepcion !== 'ABIERTA' || (d.cuposDisponibles ?? 0) <= 0
+})
+
+const motivoEstado = computed(() => {
+  if (servicio.value?.estado === 'PAUSADO') return 'PAUSADO'
+  if (servicio.value?.estado === 'ARCHIVADO') return 'ARCHIVADO'
+  if (disponibilidad.value?.modoRecepcion === 'CERRADA') return 'CERRADA'
+  if (disponibilidad.value?.modoRecepcion === 'SOLO_ESPERA') return 'SOLO_ESPERA'
+  return 'SIN_CUPOS'
+})
+
+const detalleEstado = computed(() =>
+  datosMotivo(sustitucion.value?.motivo || motivoEstado.value),
+)
+const puedeEsperar = computed(
+  () =>
+    sustitucion.value?.puedeQuedarEnCola ??
+    disponibilidad.value?.puedeListaEspera ??
+    false,
+)
 const maxDibujos = computed(
   () =>
     disponibilidad.value?.maxDibujosPorSolicitud ??
@@ -177,8 +209,42 @@ const modoRecepcionTexto = computed(() => {
   const modo = disponibilidad.value?.modoRecepcion
   if (modo === 'SOLO_ESPERA') return 'Solo lista de espera'
   if (modo === 'CERRADA') return 'Recepción cerrada'
-  if (modo) return 'Recepción abierta'
-  return ''
+  if (!modo) return ''
+  if (cuposDisponibles.value <= 0) return 'Sin cupos · en cola'
+  return 'Recepción abierta'
+})
+
+const clasesEstadoRecepcion = computed(() => {
+  const modo = disponibilidad.value?.modoRecepcion
+  if (modo === 'CERRADA') return 'bg-rojizo/10 text-rojizo'
+  if (modo === 'ABIERTA' && cuposDisponibles.value <= 0) {
+    return 'bg-mantequilla/80 text-granate'
+  }
+  return 'bg-rosa/30 text-cafe'
+})
+
+const esSoloEspera = computed(
+  () => disponibilidad.value?.modoRecepcion === 'SOLO_ESPERA',
+)
+
+const etiquetaCola = computed(() =>
+  esSoloEspera.value ? 'Unirme a la lista de espera' : 'Lista de espera',
+)
+
+const tituloCola = computed(() =>
+  esSoloEspera.value
+    ? 'Unirte a la lista de espera'
+    : 'Unirte a la lista de espera',
+)
+
+const mensajeCola = computed(() => {
+  const artista = servicio.value?.nombreArtista
+    ? `@${servicio.value.nombreArtista}`
+    : 'El artista'
+  if (esSoloEspera.value) {
+    return `${artista} recibe solicitudes solo en lista de espera. Tu solicitud quedará anotada y no se promueve automáticamente. ¿Querés continuar?`
+  }
+  return `${artista} no tiene cupos libres ahora. Tu solicitud quedará pendiente podrá presupuestarla cuando se libere un cupo. No reserva un cupo todavía. ¿Querés continuar?`
 })
 
 const galeria = computed(() => {
@@ -284,6 +350,56 @@ function irASolicitar() {
     params: { id: servicio.value.idServicio },
     query: idOferta ? { oferta: idOferta } : {},
   })
+}
+
+function irAAlternativas() {
+  router.push({
+    name: 'servicio-alternativas',
+    params: { id: servicio.value.idServicio },
+    query: { disparador: 'INTENTO_SOLICITUD' },
+  })
+}
+
+function irASolicitarEnEspera() {
+  if (!autenticado.value) {
+    router.push({ name: 'login' })
+    return
+  }
+  const query = {}
+  const idOferta = servicio.value?.idOferta ?? route.query.oferta
+  if (idOferta) query.oferta = idOferta
+  if (sustitucion.value?.idSustitucion) {
+    query.sustitucion = sustitucion.value.idSustitucion
+  }
+  router.push({
+    name: 'solicitud-servicio',
+    params: { id: servicio.value.idServicio },
+    query,
+  })
+}
+
+function abrirModalCola() {
+  if (!autenticado.value) {
+    router.push({ name: 'login' })
+    return
+  }
+  modalCola.value = true
+}
+
+function confirmarCola() {
+  modalCola.value = false
+  irASolicitarEnEspera()
+}
+
+async function cargarAlternativas() {
+  try {
+    sustitucion.value = await buscarAlternativas(
+      servicio.value.idServicio,
+      'DETALLE',
+    )
+  } catch {
+    sustitucion.value = null
+  }
 }
 
 function irAResenias() {
@@ -397,6 +513,9 @@ async function cargar() {
     }
   } finally {
     cargando.value = false
+  }
+  if (!error.value && noDisponibleAhora.value) {
+    void cargarAlternativas()
   }
 }
 
@@ -662,7 +781,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
             </button>
           </div>
 
-          <p class="text-sm text-cafe/60">Ejemplos de trabajos hechos con este servicio.</p>
+          <!--p class="text-sm text-cafe/60">Ejemplos de trabajos hechos con este servicio.</p-->
         </section>
 
         <aside class="order-2 h-fit rounded-[32px] border border-rosa/40 bg-superficie p-6 shadow-[0_10px_28px_rgba(194,24,91,0.10)] sm:p-8 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-2 lg:row-start-1">
@@ -735,10 +854,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
                 El artista lo cargó como {{ formatearPrecio(servicio.precioBase, servicio.moneda) }}
               </p>
             </div>
-            <div class="rounded-[22px] bg-durazno/60 px-4 py-4">
+            <div v-if="!noDisponibleAhora" class="rounded-[22px] bg-durazno/60 px-4 py-4">
               <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/90">Cupos disponibles</p>
               <p class="mt-1 font-display text-3xl font-extrabold text-coral">{{ cuposDisponibles }}</p>
               <p v-if="cuposTotales" class="mt-1 text-xs text-cafe/85">de {{ cuposTotales }} en total</p>
+            </div>
+            <div v-else class="rounded-[22px] border border-borde/60 bg-durazno/60 px-4 py-4">
+              <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/90">Disponibilidad</p>
+              <p class="mt-1 font-display text-xl font-extrabold leading-tight text-granate">
+                {{ detalleEstado.titulo }}
+              </p>
+              <p class="mt-1 text-xs leading-relaxed text-cafe/85">
+                {{ detalleEstado.detalle }}
+              </p>
+              <p v-if="cuposTotales" class="mt-1 text-xs text-cafe/70">
+                {{ cuposDisponibles }} de {{ cuposTotales }} cupos libres
+              </p>
             </div>
           </div>
 
@@ -753,9 +884,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
             <span
               v-if="modoRecepcionTexto"
               class="rounded-full px-3 py-1 text-xs font-semibold"
-              :class="disponibilidad?.modoRecepcion === 'CERRADA'
-                ? 'bg-rojizo/10 text-rojizo'
-                : 'bg-rosa/30 text-cafe'"
+              :class="clasesEstadoRecepcion"
             >
               {{ modoRecepcionTexto }}
             </span>
@@ -802,23 +931,42 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
           <div class="mt-6 space-y-3 border-t border-rosa/40 pt-5">
             <div class="flex items-stretch gap-3">
               <template v-if="!esDuenio">
-                <button
-                  v-if="!autenticado"
-                  type="button"
-                  class="min-h-14 flex-1 rounded-full bg-coral px-5 text-base font-bold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2"
-                  @click="irASolicitar"
-                >
-                  Iniciá sesión para solicitar
-                </button>
-                <button
-                  v-else
-                  type="button"
-                  class="min-h-14 flex-1 rounded-full bg-coral px-5 text-base font-bold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  :disabled="!puedeSolicitar"
-                  @click="irASolicitar"
-                >
-                  Solicitar servicio
-                </button>
+                <template v-if="noDisponibleAhora">
+                  <button
+                    type="button"
+                    class="min-h-14 flex-1 rounded-full bg-coral px-5 text-base font-bold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2"
+                    @click="irAAlternativas"
+                  >
+                    Ver artistas con cupo
+                  </button>
+                  <button
+                    v-if="puedeEsperar"
+                    type="button"
+                    class="min-h-14 shrink-0 rounded-full border-2 border-coral/60 px-5 text-sm font-bold text-granate transition hover:border-coral hover:bg-coral hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2"
+                    @click="abrirModalCola"
+                  >
+                    {{ etiquetaCola }}
+                  </button>
+                </template>
+                <template v-else>
+                  <button
+                    v-if="!autenticado"
+                    type="button"
+                    class="min-h-14 flex-1 rounded-full bg-coral px-5 text-base font-bold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2"
+                    @click="irASolicitar"
+                  >
+                    Iniciá sesión para solicitar
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    class="min-h-14 flex-1 rounded-full bg-coral px-5 text-base font-bold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="!puedeSolicitar"
+                    @click="irASolicitar"
+                  >
+                    Solicitar servicio
+                  </button>
+                </template>
               </template>
               <router-link
                 v-else
@@ -1046,7 +1194,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
         </div>
       </section>
 
-      <section v-if="artistasSimilares.length" class="mt-12">
+        <section v-if="artistasSimilares.length && !noDisponibleAhora" class="mt-12">
         <div class="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p class="text-xs font-bold uppercase tracking-[0.18em] text-coral">
@@ -1084,6 +1232,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
         :descripcion="servicio.nombre"
         @cerrar="visorAbierto = false"
         @actualizar:indice="actualizarIndiceVisor"
+      />
+
+      <ModalConfirmacion
+        :abierto="modalCola"
+        :titulo="tituloCola"
+        :mensaje="mensajeCola"
+        :texto-confirmar="etiquetaCola"
+        texto-cancelar="Volver"
+        @confirmar="confirmarCola"
+        @cerrar="modalCola = false"
       />
     </template>
   </div>

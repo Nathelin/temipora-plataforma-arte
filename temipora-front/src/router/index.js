@@ -13,6 +13,7 @@ import MonedasAdmin from '../components/MonedasAdmin.vue'
 import PresupuestoAdmin from '../components/PresupuestoAdmin.vue'
 import ComisionAdmin from '../components/ComisionAdmin.vue'
 import PromocionesAdmin from '../components/PromocionesAdmin.vue'
+import SustitucionesAdmin from '../components/SustitucionesAdmin.vue'
 import PedidoConfigAdmin from '../components/PedidoConfigAdmin.vue'
 import ConfiguracionMensajeriaAdmin from '../components/ConfiguracionMensajeriaAdmin.vue'
 import TerminosPlataformaAdmin from '../components/TerminosPlataformaAdmin.vue'
@@ -38,8 +39,10 @@ import FavoritosArtistas from '../views/FavoritosArtistas.vue'
 import FavoritosServicios from '../views/FavoritosServicios.vue'
 import Servicios from '../views/Servicios.vue'
 import ServicioDetalle from '../views/ServicioDetalle.vue'
+import AlternativasServicio from '../views/AlternativasServicio.vue'
 import SolicitudServicio from '../views/SolicitudServicio.vue'
 import SolicitudDetalle from '../views/SolicitudDetalle.vue'
+import CierreDetalle from '../views/CierreDetalle.vue'
 import Solicitudes from '../views/Solicitudes.vue'
 import PresupuestoForm from '../views/PresupuestoForm.vue'
 import PagoPresupuesto from '../views/PagoPresupuesto.vue'
@@ -82,6 +85,12 @@ const routes = [
       { path: 'servicios/:id', name: 'servicio-detalle', component: ServicioDetalle,
         props: (route) => ({ id: Number(route.params.id) }),
         meta: { title: 'Detalle del servicio' }
+      },
+      {
+        path: 'servicios/:id/alternativas',
+        name: 'servicio-alternativas',
+        component: AlternativasServicio,
+        meta: { title: 'Artistas con cupo' },
       },
       {
         path: 'servicios/:id/solicitar',
@@ -189,6 +198,18 @@ const routes = [
             },
           },
         ],
+      },
+      {
+        path: 'solicitudes/:idSolicitud/resultado',
+        name: 'solicitud-resultado',
+        component: CierreDetalle,
+        meta: { title: 'Resultado de la solicitud' },
+      },
+      {
+        path: 'pedidos/:idPedido/resultado',
+        name: 'pedido-resultado',
+        component: CierreDetalle,
+        meta: { title: 'Resultado del pedido' },
       },
       { path: 'mis-compras', redirect: { name: 'pedidos' } },
       {
@@ -389,6 +410,12 @@ const routes = [
         meta: { title: 'Promociones' },
       },
       {
+        path: 'campanas/sustituciones',
+        name: 'admin-sustituciones',
+        component: SustitucionesAdmin,
+        meta: { title: 'Sustituciones de artistas' },
+      },
+      {
         path: 'ajustes/pedidos',
         name: 'pedidos-admin',
         component: PedidoConfigAdmin,
@@ -434,6 +461,11 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.path !== from.path) return { top: 0 }
+    return false
+  },
 })
 
 const { subidaEnCurso, publicadasEnSesion, proteccionActiva } = useSubirImagen()

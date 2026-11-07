@@ -70,6 +70,57 @@ public class RecomendacionService {
     public record ResultadoRanking(List<ServicioPuntuado> items, boolean personalizado) {
     }
 
+    /**
+     * Pesos de la similitud entre un servicio y otro. Se parametrizan para
+     * que el proceso de sustituciones pueda priorizar a los artistas que el
+     * cliente sigue sin duplicar la fórmula.
+     */
+    public record PesosSimilitud(
+            double etiquetas,
+            double categorias,
+            double tipo,
+            double medio,
+            double precio,
+            double rating,
+            double afinidad,
+            double bonusFavorito) {
+
+        public static final PesosSimilitud POR_DEFECTO = new PesosSimilitud(
+            0.40, 0.15, 0.15, 0.10, 0.10, 0.05, 0.05, 0);
+
+        /**
+         * Pesos del proceso de sustituciones: lo que más importa es que el
+         * servicio sea del mismo tipo, con un precio parecido y etiquetas
+         * similares. El resto del puntaje queda como desempate.
+         */
+        public static final PesosSimilitud SUSTITUCION = new PesosSimilitud(
+            0.35, 0.05, 0.30, 0.03, 0.25, 0.02, 0, 0);
+
+        public static PesosSimilitud conPesoFavorito(double peso) {
+            return new PesosSimilitud(
+                SUSTITUCION.etiquetas,
+                SUSTITUCION.categorias,
+                SUSTITUCION.tipo,
+                SUSTITUCION.medio,
+                SUSTITUCION.precio,
+                SUSTITUCION.rating,
+                SUSTITUCION.afinidad,
+                peso);
+        }
+    }
+
+    public record OpcionesSimilitud(
+            PesosSimilitud pesos,
+            int limite,
+            int maxPorArtista,
+            double factorTiempoMax) {
+
+        public static OpcionesSimilitud porDefecto(int limite, int maxPorArtista) {
+            return new OpcionesSimilitud(
+                PesosSimilitud.POR_DEFECTO, limite, maxPorArtista, 0);
+        }
+    }
+
     private record Senales(
             Set<Long> artistasFavoritos,
             Set<Long> serviciosFavoritos,
@@ -201,11 +252,31 @@ public class RecomendacionService {
             List<Servicio> candidatos,
             Long idUsuario,
             Moneda monedaDestino) {
+        ConfiguracionRecomendacion config = configuracionService.obtener();
+        return similares(origen, candidatos, idUsuario, monedaDestino,
+            OpcionesSimilitud.porDefecto(
+                config.getMaxSugerencias(), config.getMaxPorArtista()));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ServicioPuntuado> similares(
+            Servicio origen,
+            List<Servicio> candidatos,
+            Long idUsuario,
+            Moneda monedaDestino,
+            OpcionesSimilitud opciones) {
         if (origen == null || candidatos == null || candidatos.isEmpty()) {
             return List.of();
         }
 
         ConfiguracionRecomendacion config = configuracionService.obtener();
+        OpcionesSimilitud efectivas = opciones != null
+            ? opciones
+            : OpcionesSimilitud.porDefecto(
+                config.getMaxSugerencias(), config.getMaxPorArtista());
+        PesosSimilitud pesos = efectivas.pesos() != null
+            ? efectivas.pesos()
+            : PesosSimilitud.POR_DEFECTO;
         Set<Long> tagsOrigen = tagsDe(origen);
         Set<Long> categoriasOrigen = categoriasDe(origen);
         BigDecimal precioOrigen = precioConvertido(origen, monedaDestino);
@@ -241,6 +312,12 @@ public class RecomendacionService {
             if (idArtista != null && idArtista.equals(idArtistaOrigen)) {
                 continue;
             }
+            if (!respetaTiempoEntrega(origen, servicio, efectivas.factorTiempoMax())) {
+                continue;
+            }
+
+            boolean esFavorito = idArtista != null && favoritos.contains(idArtista);
+            boolean visitado = idArtista != null && visitados.contains(idArtista);
 
             double tagSim = jaccard(tagsDe(servicio), tagsOrigen);
             double categoriaSim = jaccard(categoriasDe(servicio), categoriasOrigen);
@@ -251,27 +328,32 @@ public class RecomendacionService {
                 precioConvertido(servicio, monedaDestino),
                 config.getRangoPrecioPct());
             double rating = ratingScore(promedios.get(servicio.getIdServicio()));
-            double usuario = (idArtista != null && favoritos.contains(idArtista) ? 0.5 : 0)
-                + (idArtista != null && visitados.contains(idArtista) ? 0.5 : 0);
+            double usuario = (esFavorito ? 0.5 : 0) + (visitado ? 0.5 : 0);
 
-            double score = 0.40 * tagSim
-                + 0.15 * categoriaSim
-                + 0.15 * tipoSim
-                + 0.10 * medioSim
-                + 0.10 * precioSim
-                + 0.05 * rating
-                + 0.05 * usuario;
+            double base = pesos.etiquetas() * tagSim
+                + pesos.categorias() * categoriaSim
+                + pesos.tipo() * tipoSim
+                + pesos.medio() * medioSim
+                + pesos.precio() * precioSim
+                + pesos.rating() * rating
+                + pesos.afinidad() * usuario;
+            // El peso de favoritos es una porción del puntaje total: el resto
+            // se reparte entre las señales de parecido, así nunca lo supera.
+            double pesoFavorito = Math.max(0,
+                Math.min(1, pesos.bonusFavorito()));
+            double score = (1 - pesoFavorito) * base
+                + pesoFavorito * (esFavorito ? 1 : 0);
 
             puntuados.add(new ServicioPuntuado(
-                servicio, score, motivoSimilar(tagSim, precioSim, tipoSim)));
+                servicio, score, motivoSimilar(tagSim, precioSim, tipoSim, esFavorito)));
         }
 
         puntuados.sort(Comparator.comparingDouble(ServicioPuntuado::score).reversed());
 
         List<ServicioPuntuado> resultado = new ArrayList<>();
         Map<Long, Integer> porArtista = new HashMap<>();
-        int limite = Math.max(1, config.getMaxSugerencias());
-        int maxPorArtista = Math.max(1, config.getMaxPorArtista());
+        int limite = Math.max(1, efectivas.limite());
+        int maxPorArtista = Math.max(1, efectivas.maxPorArtista());
         for (ServicioPuntuado item : puntuados) {
             Long idArtista = item.servicio().getArtista() != null
                 ? item.servicio().getArtista().getIdUsuario()
@@ -588,7 +670,7 @@ public class RecomendacionService {
     }
 
     private boolean mismo(Object a, Object b) {
-        return a == b || Objects.equals(a, b);
+        return a != null && b != null && (a == b || Objects.equals(a, b));
     }
 
     private String motivo(
@@ -623,14 +705,36 @@ public class RecomendacionService {
         return "Tiene cupos disponibles";
     }
 
-    private String motivoSimilar(double tagSim, double precioSim, double tipoSim) {
-        if (tagSim >= 0.4) {
-            return "Mismo estilo";
+    private boolean respetaTiempoEntrega(
+            Servicio origen,
+            Servicio candidato,
+            double factorTiempoMax) {
+        if (factorTiempoMax <= 1) {
+            return true;
+        }
+        Integer diasOrigen = origen.getTiempoEntregaDias();
+        Integer diasCandidato = candidato.getTiempoEntregaDias();
+        if (diasOrigen == null || diasCandidato == null || diasOrigen <= 0) {
+            return true;
+        }
+        return diasCandidato <= Math.ceil(diasOrigen * factorTiempoMax);
+    }
+
+    private String motivoSimilar(
+            double tagSim,
+            double precioSim,
+            double tipoSim,
+            boolean esFavorito) {
+        if (esFavorito) {
+            return "Artista que seguís";
         }
         if (tipoSim > 0) {
             return "Mismo tipo de servicio";
         }
-        if (precioSim >= 0.6) {
+        if (tagSim >= 0.30) {
+            return "Mismo estilo";
+        }
+        if (precioSim >= 0.60) {
             return "Precio similar";
         }
         return "Tiene cupos disponibles";

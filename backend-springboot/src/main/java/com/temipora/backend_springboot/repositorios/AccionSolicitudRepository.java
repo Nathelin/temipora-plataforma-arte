@@ -11,4 +11,7 @@ public interface AccionSolicitudRepository extends JpaRepository<AccionSolicitud
 
     Optional<AccionSolicitud> findFirstBySolicitudIdSolicitudAndTipoAccionOrderByFechaDesc(
             Long idSolicitud, TipoAccionSolicitud tipoAccion);
+
+    Optional<AccionSolicitud> findFirstBySolicitudIdSolicitudOrderByFechaDescIdAccionSolicitudDesc(
+            Long idSolicitud);
 }

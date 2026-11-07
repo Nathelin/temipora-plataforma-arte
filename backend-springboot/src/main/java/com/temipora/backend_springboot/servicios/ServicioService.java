@@ -88,6 +88,7 @@ public class ServicioService {
     private final RecomendacionService recomendacionService;
     private final OfertaReactivacionService ofertaReactivacionService;
     private final AuditoriaService auditoria;
+    private final CuposEventPublisher cuposEventPublisher;
 
     private static final String ENTIDAD = "Servicio";
     private static final List<CampoAuditado> CAMPOS = List.of(
@@ -124,7 +125,8 @@ public class ServicioService {
             ReseniaPublicaService reseniaPublicaService,
             RecomendacionService recomendacionService,
             OfertaReactivacionService ofertaReactivacionService,
-            AuditoriaService auditoria) {
+            AuditoriaService auditoria,
+            CuposEventPublisher cuposEventPublisher) {
         this.servicioRepository = servicioRepository;
         this.solicitudRepository = solicitudRepository;
         this.usuarioRepository = usuarioRepository;
@@ -139,6 +141,7 @@ public class ServicioService {
         this.recomendacionService = recomendacionService;
         this.ofertaReactivacionService = ofertaReactivacionService;
         this.auditoria = auditoria;
+        this.cuposEventPublisher = cuposEventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -206,63 +209,49 @@ public class ServicioService {
         boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
         Moneda moneda = monedaPreferidaDe(viewerId);
 
-        Specification<Servicio> spec = activos(ocultarSensibles)
-            .and(disponibleAhora());
+        Specification<Servicio> base = activos(ocultarSensibles);
         if (viewerId != null) {
-            spec = spec.and((root, query, cb) ->
+            base = base.and((root, query, cb) ->
                 cb.notEqual(root.get("artista").get("idUsuario"), viewerId));
         }
-        spec = aplicarFiltros(spec, filtro);
+        base = aplicarFiltros(base, filtro);
 
-        List<Long> ids = idsSegunSpec(spec);
-        if (ids.isEmpty()) {
+        List<Long> idsDisponibles = idsSegunSpec(base.and(disponibleAhora()));
+        boolean incluirSinCupos = filtro == null
+            || filtro.getIncluirSinCupos() == null
+            || filtro.getIncluirSinCupos();
+        List<Long> idsSinCupos = incluirSinCupos
+            ? idsSegunSpec(base.and(noDisponibleAhora()))
+            : List.of();
+
+        int totalDisponibles = idsDisponibles.size();
+        int total = totalDisponibles + idsSinCupos.size();
+        if (total == 0) {
             return paginaVacia(paginaSegura, tamanioSeguro);
         }
 
-        List<Servicio> candidatos = servicioRepository.findByIdServicioIn(ids);
-        Map<Long, Servicio> porId = new HashMap<>();
-        for (Servicio servicio : candidatos) {
-            porId.put(servicio.getIdServicio(), servicio);
-        }
-        List<Servicio> ordenados = new ArrayList<>();
-        for (Long id : ids) {
-            Servicio servicio = porId.get(id);
-            if (servicio != null) {
-                ordenados.add(servicio);
-            }
-        }
-        ordenados.sort(Comparator.comparing(
-            Servicio::getNombre, String.CASE_INSENSITIVE_ORDER));
-
-        boolean personalizado = false;
-        if (ordenSeguro == OrdenServicio.RELEVANCIA) {
-            RecomendacionService.ResultadoRanking ranking =
-                recomendacionService.rankear(ordenados, viewerId, moneda);
-            ordenados = new ArrayList<>(ranking.items().stream()
-                .map(RecomendacionService.ServicioPuntuado::servicio)
-                .toList());
-            personalizado = ranking.personalizado();
-        } else if (ordenSeguro == OrdenServicio.PRECIO_ASC
-                || ordenSeguro == OrdenServicio.PRECIO_DESC) {
-            Map<Long, BigDecimal> precios = new HashMap<>();
-            for (Servicio servicio : ordenados) {
-                precios.put(
-                    servicio.getIdServicio(),
-                    precioConvertido(servicio, moneda));
-            }
-            Comparator<Servicio> comparator = Comparator.comparing(
-                s -> precios.getOrDefault(s.getIdServicio(), BigDecimal.ZERO));
-            if (ordenSeguro == OrdenServicio.PRECIO_DESC) {
-                comparator = comparator.reversed();
-            }
-            ordenados.sort(comparator.thenComparing(
-                Servicio::getNombre, String.CASE_INSENSITIVE_ORDER));
-        }
-
-        int total = ordenados.size();
         int desde = Math.min(paginaSegura * tamanioSeguro, total);
         int hasta = Math.min(desde + tamanioSeguro, total);
-        List<Servicio> paginaServicios = ordenados.subList(desde, hasta);
+
+        boolean personalizado = false;
+        List<Servicio> paginaServicios = new ArrayList<>();
+
+        if (desde < totalDisponibles) {
+            Ordenados disponibles = ordenar(
+                idsDisponibles, ordenSeguro, viewerId, moneda);
+            personalizado = disponibles.personalizado();
+            int fin = Math.min(hasta, totalDisponibles);
+            paginaServicios.addAll(disponibles.items().subList(desde, fin));
+        }
+        if (hasta > totalDisponibles) {
+            Ordenados sinCupos = ordenar(
+                idsSinCupos, ordenSeguro, viewerId, moneda);
+            int inicioSin = Math.max(0, desde - totalDisponibles);
+            int finSin = Math.min(hasta - totalDisponibles, sinCupos.items().size());
+            if (inicioSin < finSin) {
+                paginaServicios.addAll(sinCupos.items().subList(inicioSin, finSin));
+            }
+        }
 
         Map<Long, Integer> ocupados = cuposOcupados(
             paginaServicios.stream().map(Servicio::getIdServicio).toList());
@@ -283,6 +272,60 @@ public class ServicioService {
             .hayMas(hasta < total)
             .personalizado(personalizado)
             .build();
+    }
+
+    private record Ordenados(List<Servicio> items, boolean personalizado) {
+    }
+
+    private Ordenados ordenar(
+            List<Long> ids,
+            OrdenServicio orden,
+            Long viewerId,
+            Moneda moneda) {
+        if (ids == null || ids.isEmpty()) {
+            return new Ordenados(List.of(), false);
+        }
+
+        List<Servicio> candidatos = servicioRepository.findByIdServicioIn(ids);
+        Map<Long, Servicio> porId = new HashMap<>();
+        for (Servicio servicio : candidatos) {
+            porId.put(servicio.getIdServicio(), servicio);
+        }
+        List<Servicio> ordenados = new ArrayList<>();
+        for (Long id : ids) {
+            Servicio servicio = porId.get(id);
+            if (servicio != null) {
+                ordenados.add(servicio);
+            }
+        }
+        ordenados.sort(Comparator.comparing(
+            Servicio::getNombre, String.CASE_INSENSITIVE_ORDER));
+
+        boolean personalizado = false;
+        if (orden == OrdenServicio.RELEVANCIA) {
+            RecomendacionService.ResultadoRanking ranking =
+                recomendacionService.rankear(ordenados, viewerId, moneda);
+            ordenados = new ArrayList<>(ranking.items().stream()
+                .map(RecomendacionService.ServicioPuntuado::servicio)
+                .toList());
+            personalizado = ranking.personalizado();
+        } else if (orden == OrdenServicio.PRECIO_ASC
+                || orden == OrdenServicio.PRECIO_DESC) {
+            Map<Long, BigDecimal> precios = new HashMap<>();
+            for (Servicio servicio : ordenados) {
+                precios.put(
+                    servicio.getIdServicio(),
+                    precioConvertido(servicio, moneda));
+            }
+            Comparator<Servicio> comparator = Comparator.comparing(
+                s -> precios.getOrDefault(s.getIdServicio(), BigDecimal.ZERO));
+            if (orden == OrdenServicio.PRECIO_DESC) {
+                comparator = comparator.reversed();
+            }
+            ordenados.sort(comparator.thenComparing(
+                Servicio::getNombre, String.CASE_INSENSITIVE_ORDER));
+        }
+        return new Ordenados(ordenados, personalizado);
     }
 
     @Transactional(readOnly = true)
@@ -570,6 +613,24 @@ public class ServicioService {
         };
     }
 
+    private Specification<Servicio> noDisponibleAhora() {
+        return (root, query, cb) -> {
+            Subquery<Long> ocupados = query.subquery(Long.class);
+            Root<Solicitud> solicitud = ocupados.from(Solicitud.class);
+            ocupados.select(cb.count(solicitud));
+            ocupados.where(
+                cb.equal(solicitud.get("servicio").get("idServicio"),
+                    root.get("idServicio")),
+                solicitud.get("estado").in(ESTADOS_QUE_OCUPAN_CUPO));
+
+            Path<Integer> cupos = root.get("cupos");
+            Predicate hayLugar = cb.and(
+                cb.equal(root.get("modoRecepcion"), ModoRecepcionSolicitud.ABIERTA),
+                cb.greaterThan(cupos.as(Long.class), ocupados));
+            return cb.not(hayLugar);
+        };
+    }
+
     private List<Long> idsSegunSpec(Specification<Servicio> spec) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Long> query = cb.createQuery(Long.class);
@@ -662,9 +723,17 @@ public class ServicioService {
             : null;
         ServicioDTO dto = ServicioDTO.desdeServicio(s, requiereAdvertencia, monedaDestino, factor);
         dto.setCuposOcupados(ocupados);
-        dto.setCuposDisponibles(Math.max(0,
-            (s.getCupos() == null ? 0 : s.getCupos()) - ocupados));
+        int disponibles = Math.max(0,
+            (s.getCupos() == null ? 0 : s.getCupos()) - ocupados);
+        dto.setCuposDisponibles(disponibles);
+        dto.setDisponibleAhora(esDisponibleAhora(s, disponibles));
         return dto;
+    }
+
+    private boolean esDisponibleAhora(Servicio s, int disponibles) {
+        return s.getEstado() == EstadoServicio.PUBLICADO
+            && s.getModoRecepcion() == ModoRecepcionSolicitud.ABIERTA
+            && disponibles > 0;
     }
 
     private boolean aceptaSolicitudesYPodriaPresupuestar(Servicio servicio) {
@@ -776,12 +845,14 @@ public class ServicioService {
         auditoria.registrar(
             AccionesAdmin.SERVICIO_CREAR, ENTIDAD, guardado.getIdServicio(),
             "Creó el servicio “" + guardado.getNombre() + "”", null, guardado, CAMPOS);
-        return ServicioDTO.desdeServicio(guardado);
+        return aDTO(guardado, false, monedaPreferidaDe(idArtista));
     }
 
     @Transactional
     public ServicioDTO modificar(Long idServicio, Long idArtista, ServicioRequest request) {
-        Servicio servicio = obtenerEntidad(idServicio);
+        Servicio servicio = servicioRepository.findByIdServicioForUpdate(idServicio)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Servicio no encontrado: " + idServicio));
         verificarDuenio(servicio, idArtista);
         Snapshot antes = Snapshot.de(servicio, CAMPOS);
         validarUnico(idArtista, request.getIdTipoServicio(), request.getNombre(), idServicio);
@@ -798,7 +869,8 @@ public class ServicioService {
         auditoria.registrar(
             AccionesAdmin.SERVICIO_MODIFICAR, ENTIDAD, guardado.getIdServicio(),
             "Modificó el servicio “" + guardado.getNombre() + "”", antes, guardado, CAMPOS);
-        return ServicioDTO.desdeServicio(guardado);
+        cuposEventPublisher.publicar(guardado.getIdServicio());
+        return aDTO(guardado, false, monedaPreferidaDe(idArtista), cuposOcupados);
     }
 
     @Transactional
@@ -827,7 +899,7 @@ public class ServicioService {
                 "El servicio está archivado: solo un administrador puede restaurarlo.");
         }
         if (servicio.getEstado() == EstadoServicio.PUBLICADO) {
-            return ServicioDTO.desdeServicio(servicio);
+            return aDTO(servicio, false, monedaPreferidaDe(idArtista));
         }
         if (!terminosService.tieneTerminosValidos(idServicio, idArtista)) {
             throw new IllegalArgumentException(
@@ -840,7 +912,8 @@ public class ServicioService {
         auditoria.registrar(
             AccionesAdmin.SERVICIO_REACTIVAR, ENTIDAD, servicio.getIdServicio(),
             "Reactivó el servicio “" + servicio.getNombre() + "”", antes, servicio, CAMPOS);
-        return ServicioDTO.desdeServicio(servicio);
+        cuposEventPublisher.publicar(servicio.getIdServicio());
+        return aDTO(servicio, false, monedaPreferidaDe(idArtista));
     }
 
     private Servicio bloquearPropio(Long idServicio, Long idArtista) {
@@ -907,6 +980,7 @@ public class ServicioService {
         servicio.setTiempoEntregaDias(r.getTiempoEntregaValor() * r.getTiempoEntregaUnidad().getFactorDias());
         servicio.setCupos(r.getCupos());
         servicio.setModoRecepcion(modo);
+        servicio.setModoRecepcionPreferido(null);
         servicio.setMaxDibujosPorSolicitud(maxDibujos);
         servicio.setPermiteListaEspera(modo == ModoRecepcionSolicitud.SOLO_ESPERA);
         servicio.setHabilitarCuposTrasEntrega(false);

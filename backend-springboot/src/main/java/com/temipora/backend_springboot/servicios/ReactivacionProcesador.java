@@ -25,6 +25,7 @@ import com.temipora.backend_springboot.modelo.EstadoOfertaReactivacion;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.OfertaReactivacion;
+import com.temipora.backend_springboot.modelo.PropositoToken;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.CampanaReactivacionRepository;
@@ -55,6 +56,7 @@ public class ReactivacionProcesador {
     private final EnvioEmailService envioEmailService;
     private final EmailPlantillaService emailPlantillaService;
     private final MonedaService monedaService;
+    private final AccesoEnlaceService accesoEnlaceService;
 
     @Value("${temipora.mail.base-url:http://localhost:5173}")
     private String baseUrl;
@@ -68,7 +70,8 @@ public class ReactivacionProcesador {
             NotificacionService notificacionService,
             EnvioEmailService envioEmailService,
             EmailPlantillaService emailPlantillaService,
-            MonedaService monedaService) {
+            MonedaService monedaService,
+            AccesoEnlaceService accesoEnlaceService) {
         this.usuarioRepository = usuarioRepository;
         this.solicitudRepository = solicitudRepository;
         this.comisionService = comisionService;
@@ -78,6 +81,7 @@ public class ReactivacionProcesador {
         this.envioEmailService = envioEmailService;
         this.emailPlantillaService = emailPlantillaService;
         this.monedaService = monedaService;
+        this.accesoEnlaceService = accesoEnlaceService;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -147,9 +151,6 @@ public class ReactivacionProcesador {
         campana.setFechaCreacion(ahora);
         campana.setFechaVencimiento(
             ahora.plusHours(Math.max(1, config.getVigenciaHoras())));
-        String tokenAcceso = TokenAccesoOferta.generar();
-        campana.setTokenAccesoHash(TokenAccesoOferta.hash(tokenAcceso));
-        campana.setTokenAccesoExpira(campana.getFechaVencimiento());
 
         for (RecomendacionService.ServicioPuntuado item : seleccionados) {
             Servicio servicio = item.servicio();
@@ -164,7 +165,12 @@ public class ReactivacionProcesador {
             oferta.setFechaVencimiento(campana.getFechaVencimiento());
             campana.agregarOferta(oferta);
         }
-        campanaRepository.save(campana);
+        CampanaReactivacion guardada = campanaRepository.save(campana);
+        String tokenAcceso = accesoEnlaceService.generar(
+            usuario,
+            PropositoToken.OFERTA,
+            guardada.getIdCampana(),
+            Math.max(1, config.getVigenciaHoras()));
 
         String porcentaje = porcentajeEfectivo
             .stripTrailingZeros()
@@ -179,11 +185,11 @@ public class ReactivacionProcesador {
             TIPO_REFERENCIA);
 
         if (usuario.isRecibirEmailsPromocionales()) {
-            enviarEmail(usuario, campana, motivos, tokenAcceso);
+            enviarEmail(usuario, guardada, motivos, tokenAcceso);
         }
 
         log.info("Campaña {} generada para el usuario {} con {} oferta(s).",
-            campana.getIdCampana(), idUsuario, seleccionados.size());
+            guardada.getIdCampana(), idUsuario, seleccionados.size());
         return 1;
     }
 

@@ -38,6 +38,7 @@ import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.HitoPedidoDTO;
 import com.temipora.backend_springboot.modelo.HitoPresupuesto;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.MotivoSustitucion;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Pago;
 import com.temipora.backend_springboot.modelo.PagoDTO;
@@ -149,6 +150,8 @@ public class PedidoService {
     private final MensajeRepository mensajeRepository;
     private final AuditoriaService auditoria;
     private final ArancelEstimadoService arancelEstimadoService;
+    private final CuposEventPublisher cuposEventPublisher;
+    private final CierreEmailService cierreEmailService;
 
     public PedidoService(
             PedidoRepository pedidoRepository,
@@ -165,7 +168,9 @@ public class PedidoService {
             ConversacionRepository conversacionRepository,
             MensajeRepository mensajeRepository,
             AuditoriaService auditoria,
-            ArancelEstimadoService arancelEstimadoService) {
+            ArancelEstimadoService arancelEstimadoService,
+            CuposEventPublisher cuposEventPublisher,
+            CierreEmailService cierreEmailService) {
         this.pedidoRepository = pedidoRepository;
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.pagoRepository = pagoRepository;
@@ -181,6 +186,8 @@ public class PedidoService {
         this.mensajeRepository = mensajeRepository;
         this.auditoria = auditoria;
         this.arancelEstimadoService = arancelEstimadoService;
+        this.cuposEventPublisher = cuposEventPublisher;
+        this.cierreEmailService = cierreEmailService;
     }
 
     @Transactional
@@ -534,6 +541,9 @@ public class PedidoService {
         solicitud.setFechaActualizacion(ahora);
         solicitudRepository.save(solicitud);
         notificarCancelacion(pedido);
+        if (pedido.getServicio() != null) {
+            cuposEventPublisher.publicar(pedido.getServicio().getIdServicio());
+        }
         auditoria.registrar(
             AccionesAdmin.PEDIDO_CANCELAR, ENTIDAD_PEDIDO, pedido.getIdPedido(),
             "Canceló el pedido", antesPedido, pedido, CAMPOS_PEDIDO);
@@ -1135,6 +1145,15 @@ public class PedidoService {
             solicitud.setFechaActualizacion(ahora);
             solicitudRepository.save(solicitud);
             notificarImpago(pedido, hito);
+            cierreEmailService.encolar(
+                pedido.getCliente(),
+                solicitud,
+                pedido,
+                MotivoSustitucion.PEDIDO_IMPAGO,
+                ahora);
+            if (pedido.getServicio() != null) {
+                cuposEventPublisher.publicar(pedido.getServicio().getIdServicio());
+            }
             auditoria.registrarSistema(
                 AccionesAdmin.HITO_VENCER, ENTIDAD_HITO,
                 hito.getIdHitoPedido(),

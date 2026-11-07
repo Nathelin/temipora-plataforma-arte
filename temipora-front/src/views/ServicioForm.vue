@@ -310,7 +310,7 @@ async function cargar() {
         tiempoEntregaValor: d.tiempoEntregaValor ?? '',
         tiempoEntregaUnidad: d.tiempoEntregaUnidad || 'DIAS',
         cupos: d.cupos ?? '',
-        modoRecepcion: d.modoRecepcion || 'ABIERTA',
+        modoRecepcion: d.modoRecepcionPreferido || d.modoRecepcion || 'ABIERTA',
         maxDibujosPorSolicitud: d.maxDibujosPorSolicitud ?? 3,
         imagenPortada: d.imagenPortada || '',
         imagenes: Array.isArray(d.imagenes) ? [...d.imagenes] : [],

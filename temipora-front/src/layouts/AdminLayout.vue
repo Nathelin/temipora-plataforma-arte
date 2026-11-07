@@ -92,7 +92,8 @@ const grupos = [
         rutas: ['/admin/ajustes/presupuestos', '/admin/ajustes/pedidos'],
         icono: Receipt,
       },
-      { nombre: 'Promociones y reactivación', to: '/admin/campanas/promociones', icono: Megaphone },
+      { nombre: 'Ofertas por inactividad', to: '/admin/campanas/promociones', icono: Megaphone },
+      { nombre: 'Sustituciones de artistas', to: '/admin/campanas/sustituciones', icono: Users },
       { nombre: 'Comisiones', to: '/admin/ajustes/comisiones', icono: Percent },
       {
         nombre: 'Monedas y cotización',
@@ -518,7 +519,7 @@ function cerrarSesion() {
 
       <!-- Contenido -->
       <main class="min-w-0 flex-1 bg-blanco">
-        <router-view />
+        <router-view :key="JSON.stringify(route.params)" />
       </main>
     </div>
   </div>

@@ -57,6 +57,7 @@ public final class AccionesAdmin {
     public static final String RESENIA_CONFIG_ACTUALIZAR = "RESENIA_CONFIG_ACTUALIZAR";
     public static final String INACTIVIDAD_CONFIG_ACTUALIZAR = "INACTIVIDAD_CONFIG_ACTUALIZAR";
     public static final String REACTIVACION_EJECUTAR = "REACTIVACION_EJECUTAR";
+    public static final String SUSTITUCION_CONFIG_ACTUALIZAR = "SUSTITUCION_CONFIG_ACTUALIZAR";
     public static final String COTIZACION_ACTUALIZAR = "COTIZACION_ACTUALIZAR";
     public static final String COTIZACION_REFRESCAR = "COTIZACION_REFRESCAR";
     public static final String RESENIA_CREAR = "RESENIA_CREAR";
@@ -73,12 +74,15 @@ public final class AccionesAdmin {
     public static final String USUARIO_CAMBIAR_TELEFONO = "USUARIO_CAMBIAR_TELEFONO";
     public static final String USUARIO_QUITAR_TELEFONO = "USUARIO_QUITAR_TELEFONO";
     public static final String LOGIN_FALLIDO = "LOGIN_FALLIDO";
+    public static final String SESION_ACCESO_ENLACE = "SESION_ACCESO_ENLACE";
+    public static final String SESION_ACCESO_ENLACE_FALLIDO = "SESION_ACCESO_ENLACE_FALLIDO";
     public static final String SERVICIO_CREAR = "SERVICIO_CREAR";
     public static final String SERVICIO_MODIFICAR = "SERVICIO_MODIFICAR";
     public static final String SERVICIO_PAUSAR = "SERVICIO_PAUSAR";
     public static final String SERVICIO_REACTIVAR = "SERVICIO_REACTIVAR";
     public static final String SERVICIO_ARCHIVAR = "SERVICIO_ARCHIVAR";
     public static final String SERVICIO_RESTAURAR = "SERVICIO_RESTAURAR";
+    public static final String SERVICIO_MODO_AUTOMATICO = "SERVICIO_MODO_AUTOMATICO";
     public static final String PRESUPUESTO_CREAR = "PRESUPUESTO_CREAR";
     public static final String PEDIDO_CREAR = "PEDIDO_CREAR";
     public static final String PEDIDO_CANCELAR = "PEDIDO_CANCELAR";

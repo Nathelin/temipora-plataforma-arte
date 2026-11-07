@@ -100,6 +100,14 @@ public class Servicio {
     @Column(name = "modo_recepcion", nullable = false, length = 20)
     private ModoRecepcionSolicitud modoRecepcion = ModoRecepcionSolicitud.ABIERTA;
 
+    /**
+     * Preferencia del artista cuando el sistema ajusta el modo efectivo por
+     * falta de cupos. NULL significa que el modo efectivo es su decisión.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "modo_recepcion_preferido", length = 20)
+    private ModoRecepcionSolicitud modoRecepcionPreferido;
+
     @Column(name = "max_dibujos_por_solicitud", nullable = false)
     private Integer maxDibujosPorSolicitud = 3;
 

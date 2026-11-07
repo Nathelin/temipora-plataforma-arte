@@ -140,6 +140,44 @@ public class AuditoriaService {
         }
     }
 
+    /**
+     * Acceso por enlace de mail. Se registra aparte del login con contraseña
+     * para no ensuciar el contador de intentos fallidos.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void registrarAccesoEnlace(
+            String usuario, String proposito, boolean exito, String motivo) {
+        try {
+            EventoAuditoria evento = new EventoAuditoria();
+            evento.setOcurridoEn(LocalDateTime.now());
+            evento.setAccion(exito
+                ? AccionesAdmin.SESION_ACCESO_ENLACE
+                : AccionesAdmin.SESION_ACCESO_ENLACE_FALLIDO);
+            evento.setEntidad("Usuario");
+            String resumen;
+            if (exito) {
+                resumen = "Ingresó con un enlace de acceso"
+                    + (proposito != null ? " (" + proposito + ")" : "");
+            } else {
+                resumen = "Intento fallido de acceso con enlace"
+                    + (motivo != null ? ": " + motivo : "");
+            }
+            evento.setResumen(recortar(resumen, RESUMEN_MAXIMO));
+            evento.setCambios(serializar(List.of()));
+            evento.setMotivo(recortar(motivo, MOTIVO_MAXIMO));
+            evento.setResultado(exito ? "OK" : "ERROR");
+            evento.setOrigen("SISTEMA");
+            evento.setActorNombre(usuario != null
+                ? recortar(usuario, 60)
+                : null);
+            completarRequest(evento);
+            eventoRepository.save(evento);
+        } catch (RuntimeException e) {
+            log.warn("No se pudo registrar el acceso por enlace: {}",
+                e.getMessage());
+        }
+    }
+
     @Transactional(readOnly = true)
     public PaginaDTO<EventoAuditoriaDTO> listar(
             FiltroAuditoria filtro,

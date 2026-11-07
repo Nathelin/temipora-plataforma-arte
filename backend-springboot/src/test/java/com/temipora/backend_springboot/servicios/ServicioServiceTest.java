@@ -91,6 +91,9 @@ class ServicioServiceTest {
     @Mock
     private AuditoriaService auditoriaService;
 
+    @Mock
+    private CuposEventPublisher cuposEventPublisher;
+
     @InjectMocks
     private ServicioService servicioService;
 
@@ -180,7 +183,8 @@ class ServicioServiceTest {
     @Test
     void modificar_noPermiteBajarCuposPorDebajoDeOcupados() {
         Servicio servicio = servicioLista(1L, ModoRecepcionSolicitud.ABIERTA, 5);
-        when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio));
+        when(servicioRepository.findByIdServicioForUpdate(1L))
+            .thenReturn(Optional.of(servicio));
         when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndIdServicioNotAndEstadoNot(
             5L, 1L, "Ilustración", 1L, EstadoServicio.ARCHIVADO)).thenReturn(false);
         when(solicitudRepository.countByServicioIdServicioAndEstadoIn(any(Long.class), any()))
@@ -363,7 +367,8 @@ class ServicioServiceTest {
 
     @Test
     void modificar_ok() {
-        when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio(1L, 5L)));
+        when(servicioRepository.findByIdServicioForUpdate(1L))
+            .thenReturn(Optional.of(servicio(1L, 5L)));
         when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndIdServicioNotAndEstadoNot(5L, 1L, "Ilustración", 1L, EstadoServicio.ARCHIVADO))
             .thenReturn(false);
         when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
@@ -379,7 +384,8 @@ class ServicioServiceTest {
 
     @Test
     void modificar_sinTerminosValidos_lanzaError() {
-        when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio(1L, 5L)));
+        when(servicioRepository.findByIdServicioForUpdate(1L))
+            .thenReturn(Optional.of(servicio(1L, 5L)));
         when(servicioRepository.existsByArtistaIdUsuarioAndTipoServicioIdTipoServicioAndNombreIgnoreCaseAndIdServicioNotAndEstadoNot(5L, 1L, "Ilustración", 1L, EstadoServicio.ARCHIVADO))
             .thenReturn(false);
         when(tipoServicioRepository.findByIdTipoServicio(1L)).thenReturn(Optional.of(tipoServicio(1L, "Ilustración digital")));
@@ -396,7 +402,8 @@ class ServicioServiceTest {
 
     @Test
     void modificar_noDuenio_lanzaError() {
-        when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio(1L, 99L)));
+        when(servicioRepository.findByIdServicioForUpdate(1L))
+            .thenReturn(Optional.of(servicio(1L, 99L)));
 
         assertThatThrownBy(() -> servicioService.modificar(1L, 5L, request()))
             .isInstanceOf(IllegalArgumentException.class)
@@ -405,7 +412,7 @@ class ServicioServiceTest {
 
     @Test
     void modificar_inexistente_lanzaNoSuchElement() {
-        when(servicioRepository.findByIdServicio(99L)).thenReturn(Optional.empty());
+        when(servicioRepository.findByIdServicioForUpdate(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicioService.modificar(99L, 5L, request()))
             .isInstanceOf(NoSuchElementException.class)
