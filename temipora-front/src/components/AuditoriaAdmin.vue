@@ -773,8 +773,8 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <aside class="hidden xl:block">
-        <div class="sticky top-24 rounded-2xl border border-rosa/50 bg-blanco p-4">
+      <aside class="sticky top-24 hidden max-h-[calc(100vh-7rem)] self-start overflow-y-auto xl:block">
+        <div class="rounded-2xl border border-rosa/50 bg-blanco p-4">
           <AuditoriaDetalle
             :evento="seleccionado"
             @cerrar="cerrarDetalle"
