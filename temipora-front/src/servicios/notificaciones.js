@@ -28,15 +28,17 @@ export function destinoDe(notificacion, { rol, pathActual = '' } = {}) {
     return rol === 'ADMIN' ? null : { name: 'ofertas' }
   }
 
-  const id = Number(notificacion.idReferencia)
-  if (!Number.isInteger(id) || id <= 0) return null
-
   if (tipo === 'CONVERSACION') {
     if (rol === 'ADMIN') return null
+    const usuario = notificacion.nombreUsuarioReferencia
+    if (!usuario) return null
     return pathActual.startsWith('/panel')
-      ? { name: 'panel-conversacion', params: { idConversacion: id } }
-      : { name: 'conversacion', params: { idConversacion: id } }
+      ? { name: 'panel-conversacion', params: { nombreUsuario: `@${usuario}` } }
+      : { name: 'conversacion', params: { nombreUsuario: `@${usuario}` } }
   }
+
+  const id = Number(notificacion.idReferencia)
+  if (!Number.isInteger(id) || id <= 0) return null
 
   if (tipo === 'SOLICITUD') {
     if (rol === 'ADMIN') return null

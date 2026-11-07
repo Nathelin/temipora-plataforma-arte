@@ -67,8 +67,7 @@ public class MensajeService {
             MensajeRequest request) {
         Conversacion conversacion = obtenerConversacion(idConversacion);
         if (!conversacion.involucra(idRemitente)) {
-            throw new AccesoDenegadoException(
-                "No podés enviar mensajes en esta conversación.");
+            throw new NoSuchElementException("Conversación no encontrada.");
         }
         Usuario remitente = usuarioRepository.findByIdUsuario(idRemitente)
             .orElseThrow(() -> new NoSuchElementException(
@@ -147,8 +146,7 @@ public class MensajeService {
             Integer tamanio) {
         Conversacion conversacion = obtenerConversacion(idConversacion);
         if (!conversacion.involucra(idUsuario)) {
-            throw new AccesoDenegadoException(
-                "No podés ver esta conversación.");
+            throw new NoSuchElementException("Conversación no encontrada.");
         }
 
         int limite = tamanio == null
@@ -189,8 +187,7 @@ public class MensajeService {
     public void marcarLeido(Long idConversacion, Long idUsuario) {
         Conversacion conversacion = obtenerConversacion(idConversacion);
         if (!conversacion.involucra(idUsuario)) {
-            throw new AccesoDenegadoException(
-                "No podés marcar esta conversación como leída.");
+            throw new NoSuchElementException("Conversación no encontrada.");
         }
         if (conversacion.getEstado() != EstadoConversacion.ACEPTADA) {
             return;

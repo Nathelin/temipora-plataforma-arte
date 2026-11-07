@@ -157,9 +157,11 @@ function cambiarVista(clave) {
 }
 
 function abrirConversacion(conversacion) {
+  const usuario = conversacion.contraparte?.nombreUsuario
+  if (!usuario) return
   router.push({
     name: enPanel.value ? 'panel-conversacion' : 'conversacion',
-    params: { idConversacion: conversacion.idConversacion },
+    params: { nombreUsuario: `@${usuario}` },
   })
 }
 

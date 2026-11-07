@@ -46,7 +46,7 @@ export function useHiloConversacion(idConversacion, { activo } = {}) {
   const mensajes = ref([])
   const cursor = ref(null)
   const hayMas = ref(false)
-  const cargando = ref(true)
+  const cargando = ref(false)
   const cargandoMas = ref(false)
   const error = ref('')
   const errorEnvio = ref('')
@@ -214,6 +214,7 @@ export function useHiloConversacion(idConversacion, { activo } = {}) {
   }
 
   async function inicializar() {
+    if (!id.value) return
     idCargado = id.value
     cargando.value = true
     error.value = ''
@@ -234,8 +235,9 @@ export function useHiloConversacion(idConversacion, { activo } = {}) {
   }
 
   function reiniciar() {
-    if (!activoRef.value) {
+    if (!activoRef.value || !id.value) {
       reset()
+      if (iniciado) detener()
       return
     }
     if (!iniciado) {
@@ -253,6 +255,7 @@ export function useHiloConversacion(idConversacion, { activo } = {}) {
     mensajes.value = []
     cursor.value = null
     hayMas.value = false
+    cargando.value = false
     texto.value = ''
     error.value = ''
     errorEnvio.value = ''
@@ -552,6 +555,7 @@ export function useHiloConversacion(idConversacion, { activo } = {}) {
     nombreContraparte,
     inicializar,
     reiniciar,
+    cargarConfiguracion,
     cargarAnteriores,
     enviar,
     avisarEscribiendo,

@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -445,7 +446,7 @@ class ConversacionServiceTest {
     }
 
     @Test
-    void marcarEscribiendo_noParticipante_lanzaAccesoDenegado() {
+    void marcarEscribiendo_noParticipante_lanzaNoEncontrada() {
         Usuario iniciador = usuario(1L, "cliente", ERol.CLIENTE);
         Usuario destinatario = usuario(2L, "artista", ERol.ARTISTA);
         Conversacion conversacion = conversacion(
@@ -454,8 +455,8 @@ class ConversacionServiceTest {
             .thenReturn(Optional.of(conversacion));
 
         assertThatThrownBy(() -> conversacionService.marcarEscribiendo(10L, 3L))
-            .isInstanceOf(AccesoDenegadoException.class)
-            .hasMessageContaining("No podés indicar escritura");
+            .isInstanceOf(NoSuchElementException.class)
+            .hasMessageContaining("Conversación no encontrada");
     }
 
     @Test

@@ -1,26 +1,45 @@
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { formatearFechaHora, inicialDe } from '../servicios/mensajes'
+import {
+  enviarSolicitudMensaje,
+  formatearFechaHora,
+  inicialDe,
+  obtenerEstadoConUsuario,
+} from '../servicios/mensajes'
 import { useHiloConversacion } from '../composables/useHiloConversacion'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import HiloConversacion from '../components/HiloConversacion.vue'
 import ModalRechazoConversacion from '../components/ModalRechazoConversacion.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+import ModalSolicitudMensaje from '../components/ModalSolicitudMensaje.vue'
 
 const route = useRoute()
 const router = useRouter()
 const { exito } = useNotificaciones()
 
-const idConversacion = computed(() => Number(route.params.idConversacion))
+function normalizarUsuario(valor) {
+  const texto = Array.isArray(valor) ? valor[0] : String(valor || '')
+  return (texto.startsWith('@') ? texto.slice(1) : texto).trim()
+}
+
+const nombreUsuario = computed(() => normalizarUsuario(route.params.nombreUsuario))
+
+const idConversacion = ref(null)
+const estadoRelacion = ref(null)
+const resolviendo = ref(true)
+const errorResolucion = ref('')
+const modalSolicitud = ref(false)
+const enviandoSolicitud = ref(false)
+const errorSolicitud = ref('')
 
 const {
   conversacion,
   mensajes,
   hayMas,
-  cargando,
+  cargando: cargandoHilo,
   cargandoMas,
-  error,
+  error: errorHilo,
   errorEnvio,
   texto,
   enviando,
@@ -40,6 +59,7 @@ const {
   primerMensaje,
   nombreContraparte,
   inicializar,
+  cargarConfiguracion,
   cargarAnteriores,
   enviar,
   avisarEscribiendo,
@@ -73,16 +93,98 @@ const etiquetaVolver = computed(() => {
   return 'Volver a mensajes'
 })
 
+const datosContraparte = computed(() => estadoRelacion.value?.contraparte || null)
+const nombreContacto = computed(
+  () =>
+    datosContraparte.value?.nombreDisplay ||
+    datosContraparte.value?.nombreUsuario ||
+    nombreUsuario.value,
+)
+const motivoNoSolicitable = computed(
+  () =>
+    estadoRelacion.value?.motivoNoSolicitable ||
+    'No podés enviar una solicitud de mensaje a esta persona en este momento.',
+)
+
+watch(nombreUsuario, () => {
+  void resolver()
+})
+
 watch(idConversacion, () => {
   modalRechazo.value = false
   modalCancelar.value = false
 })
 
+async function resolver() {
+  idConversacion.value = null
+  estadoRelacion.value = null
+  errorResolucion.value = ''
+  modalSolicitud.value = false
+  resolviendo.value = true
+  if (!nombreUsuario.value) {
+    errorResolucion.value = 'No encontramos a esa persona.'
+    resolviendo.value = false
+    return
+  }
+  try {
+    const res = await obtenerEstadoConUsuario(nombreUsuario.value)
+    const estado = res.data
+    if (estado?.idConversacion) {
+      idConversacion.value = estado.idConversacion
+    } else {
+      estadoRelacion.value = estado
+      void cargarConfiguracion()
+    }
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    errorResolucion.value = e.response?.status === 404
+      ? `No encontramos a @${nombreUsuario.value}.`
+      : (e.response?.data?.message || 'No pudimos abrir esta conversación.')
+  } finally {
+    resolviendo.value = false
+  }
+}
+
+function abrirSolicitud() {
+  errorSolicitud.value = ''
+  modalSolicitud.value = true
+}
+
+async function enviarSolicitud(datos) {
+  if (enviandoSolicitud.value) return
+  enviandoSolicitud.value = true
+  errorSolicitud.value = ''
+  try {
+    await enviarSolicitudMensaje({
+      nombreUsuarioDestinatario: nombreUsuario.value,
+      ...datos,
+    })
+    modalSolicitud.value = false
+    exito(`Enviaste la solicitud de mensaje a @${nombreUsuario.value}.`)
+    await resolver()
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return
+    }
+    errorSolicitud.value =
+      e.response?.data?.message || 'No se pudo enviar la solicitud.'
+  } finally {
+    enviandoSolicitud.value = false
+  }
+}
+
 function irAlPerfil() {
-  if (!contraparte.value?.nombreUsuario) return
+  const usuario = contraparte.value?.nombreUsuario
+    || datosContraparte.value?.nombreUsuario
+    || nombreUsuario.value
+  if (!usuario) return
   router.push({
     name: 'perfil',
-    params: { nombreUsuario: contraparte.value.nombreUsuario },
+    params: { nombreUsuario: usuario },
   })
 }
 
@@ -136,6 +238,10 @@ async function alternarArchivadoYVolver() {
     router.push({ name: nombreBandeja.value, query: { vista: 'archivadas' } })
   }
 }
+
+onMounted(() => {
+  void resolver()
+})
 </script>
 
 <template>
@@ -148,17 +254,95 @@ async function alternarArchivadoYVolver() {
       ← {{ etiquetaVolver }}
     </button>
 
-    <div v-if="cargando" class="mt-6 space-y-3" role="status" aria-live="polite">
+    <div v-if="resolviendo || cargandoHilo" class="mt-6 space-y-3" role="status" aria-live="polite">
       <span class="sr-only">Cargando conversación...</span>
       <div class="h-20 animate-pulse rounded-2xl border border-rosa/40 bg-blanco"></div>
       <div class="h-64 animate-pulse rounded-2xl border border-rosa/40 bg-blanco"></div>
     </div>
 
     <div
-      v-else-if="error"
+      v-else-if="errorResolucion"
       class="mt-8 rounded-2xl border border-rojizo/25 bg-rojizo/5 px-4 py-8 text-center"
     >
-      <p class="text-sm text-rojizo">{{ error }}</p>
+      <p class="text-sm text-rojizo">{{ errorResolucion }}</p>
+      <button
+        type="button"
+        class="mt-4 min-h-10 rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+        @click="resolver"
+      >
+        Reintentar
+      </button>
+    </div>
+
+    <template v-else-if="!idConversacion">
+      <section class="mt-6 rounded-3xl border border-rosa/50 bg-blanco p-5 sm:p-6">
+        <div class="flex min-w-0 items-center gap-3">
+          <img
+            v-if="datosContraparte?.urlFotoPerfil || datosContraparte?.urlFotoPerfilMiniatura"
+            :src="datosContraparte?.urlFotoPerfilMiniatura || datosContraparte?.urlFotoPerfil"
+            alt=""
+            class="h-12 w-12 shrink-0 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-rosa/70"
+          />
+          <span
+            v-else
+            class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-rosa text-base font-bold text-granate ring-1 ring-white/70"
+            aria-hidden="true"
+          >
+            {{ inicialDe(nombreUsuario) }}
+          </span>
+          <div class="min-w-0">
+            <p class="truncate font-display text-lg font-bold text-granate">
+              {{ nombreContacto }}
+            </p>
+            <p class="truncate text-xs text-cafe/55">@{{ nombreUsuario }}</p>
+          </div>
+        </div>
+
+        <p
+          v-if="estadoRelacion?.puedeSolicitar"
+          class="mt-4 text-sm leading-relaxed text-cafe/70"
+        >
+          Todavía no tienen una conversación. Si le enviás una solicitud de mensaje,
+          va a recibir tu motivo y tu primer mensaje, y podrán escribirse cuando la acepte.
+        </p>
+
+        <div v-if="estadoRelacion?.puedeSolicitar" class="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="min-h-10 rounded-full bg-coral px-5 text-sm font-bold text-white shadow-sm transition hover:bg-rojizo"
+            @click="abrirSolicitud"
+          >
+            Enviar solicitud de mensaje
+          </button>
+          <button
+            type="button"
+            class="min-h-10 rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-cafe transition hover:bg-rosa/20"
+            @click="irAlPerfil"
+          >
+            Ver perfil
+          </button>
+        </div>
+
+        <div v-else class="mt-4">
+          <p class="rounded-xl border border-borde/60 bg-superficie-alt px-3.5 py-2.5 text-sm text-cafe/70">
+            {{ motivoNoSolicitable }}
+          </p>
+          <button
+            type="button"
+            class="mt-3 min-h-10 rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+            @click="irAlPerfil"
+          >
+            Ver perfil
+          </button>
+        </div>
+      </section>
+    </template>
+
+    <div
+      v-else-if="errorHilo"
+      class="mt-8 rounded-2xl border border-rojizo/25 bg-rojizo/5 px-4 py-8 text-center"
+    >
+      <p class="text-sm text-rojizo">{{ errorHilo }}</p>
       <button
         type="button"
         class="mt-4 min-h-10 rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
@@ -384,6 +568,17 @@ async function alternarArchivadoYVolver() {
       destructivo
       @cerrar="modalCancelar = false"
       @confirmar="cancelarSolicitud"
+    />
+
+    <ModalSolicitudMensaje
+      :abierto="modalSolicitud"
+      :destinatario="datosContraparte"
+      :motivo-maximo="maxMotivo"
+      :mensaje-maximo="maxMensaje"
+      :cargando="enviandoSolicitud"
+      :error="errorSolicitud"
+      @cerrar="modalSolicitud = false"
+      @enviar="enviarSolicitud"
     />
   </div>
 </template>

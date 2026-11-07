@@ -24,6 +24,7 @@ public class NotificacionDTO {
     private Long idReferencia;
     private String tipoReferencia;
     private String rolReferencia;
+    private String nombreUsuarioReferencia;
     private boolean leida;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaLectura;

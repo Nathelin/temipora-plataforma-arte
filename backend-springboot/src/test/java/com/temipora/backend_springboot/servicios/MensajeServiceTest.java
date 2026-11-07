@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -68,7 +69,7 @@ class MensajeServiceTest {
     private MensajeService mensajeService;
 
     @Test
-    void enviar_noParticipante_lanzaAccesoDenegado() {
+    void enviar_noParticipante_lanzaNoEncontrada() {
         Conversacion conversacion = conversacion(
             EstadoConversacion.ACEPTADA,
             usuario(1L, "cliente", ERol.CLIENTE),
@@ -78,8 +79,8 @@ class MensajeServiceTest {
 
         assertThatThrownBy(() -> mensajeService.enviar(
                 10L, 3L, request("Hola")))
-            .isInstanceOf(AccesoDenegadoException.class)
-            .hasMessageContaining("No podés enviar mensajes");
+            .isInstanceOf(NoSuchElementException.class)
+            .hasMessageContaining("Conversación no encontrada");
     }
 
     @Test

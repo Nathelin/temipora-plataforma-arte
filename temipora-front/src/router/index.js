@@ -219,7 +219,7 @@ const routes = [
         meta: { title: 'Mensajes', requiresAuth: true, requiresComprador: true },
       },
       {
-        path: 'mensajes/:idConversacion',
+        path: 'mensajes/:nombreUsuario',
         name: 'conversacion',
         component: Conversacion,
         meta: {
@@ -245,7 +245,7 @@ const routes = [
           { path: 'pedidos/:idPedido', name: 'panel-pedido-detalle', component: PedidoDetalle, meta: { title: 'Pedido' } },
           { path: 'ventas', name: 'panel-ventas', component: Ventas, meta: { title: 'Ventas' } },
           { path: 'mensajes', name: 'panel-mensajes', component: Mensajes, meta: { title: 'Mensajes' } },
-          { path: 'mensajes/:idConversacion', name: 'panel-conversacion', component: Conversacion, meta: { title: 'Conversación' } },
+          { path: 'mensajes/:nombreUsuario', name: 'panel-conversacion', component: Conversacion, meta: { title: 'Conversación' } },
           { path: 'formulario-pedidos', name: 'panel-formulario-pedidos', component: ConfiguracionFormularioPedidos, meta: { title: 'Formulario de pedidos' } },
           { path: 'terminos', name: 'panel-terminos', component: ConfiguracionTerminosArtista, meta: { title: 'Términos y condiciones' } },
           { path: 'etiquetas', name: 'panel-etiquetas', component: ConfiguracionEtiquetas, meta: { title: 'Mis etiquetas' } },

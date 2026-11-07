@@ -16,6 +16,7 @@ import lombok.Setter;
 public class EstadoRelacionMensajeDTO {
 
     private EstadoRelacionMensaje estadoRelacion;
+    private UsuarioResumenDTO contraparte;
     private Long idConversacion;
     private boolean puedeSolicitar;
     private String motivoNoSolicitable;

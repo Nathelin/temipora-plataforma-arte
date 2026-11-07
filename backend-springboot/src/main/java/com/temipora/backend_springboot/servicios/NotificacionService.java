@@ -12,6 +12,7 @@ import com.temipora.backend_springboot.modelo.NotificacionDTO;
 import com.temipora.backend_springboot.modelo.NotificacionUsuario;
 import com.temipora.backend_springboot.modelo.TipoNotificacion;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.ConversacionRepository;
 import com.temipora.backend_springboot.repositorios.NotificacionRepository;
 import com.temipora.backend_springboot.repositorios.NotificacionUsuarioRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
@@ -31,6 +32,7 @@ public class NotificacionService {
     private final UsuarioRepository usuarioRepository;
     private final PedidoRepository pedidoRepository;
     private final SolicitudRepository solicitudRepository;
+    private final ConversacionRepository conversacionRepository;
 
     public NotificacionService(
             NotificacionRepository notificacionRepository,
@@ -38,13 +40,15 @@ public class NotificacionService {
             TipoNotificacionRepository tipoNotificacionRepository,
             UsuarioRepository usuarioRepository,
             PedidoRepository pedidoRepository,
-            SolicitudRepository solicitudRepository) {
+            SolicitudRepository solicitudRepository,
+            ConversacionRepository conversacionRepository) {
         this.notificacionRepository = notificacionRepository;
         this.notificacionUsuarioRepository = notificacionUsuarioRepository;
         this.tipoNotificacionRepository = tipoNotificacionRepository;
         this.usuarioRepository = usuarioRepository;
         this.pedidoRepository = pedidoRepository;
         this.solicitudRepository = solicitudRepository;
+        this.conversacionRepository = conversacionRepository;
     }
 
     @Transactional
@@ -120,6 +124,21 @@ public class NotificacionService {
             default -> null;
         };
         dto.setRolReferencia(rol);
+
+        if ("CONVERSACION".equals(dto.getTipoReferencia())) {
+            dto.setNombreUsuarioReferencia(
+                usuarioContraparteConversacion(dto.getIdReferencia(), idUsuario));
+        }
+    }
+
+    private String usuarioContraparteConversacion(
+            Long idConversacion,
+            Long idUsuario) {
+        return conversacionRepository.findByIdConversacion(idConversacion)
+            .filter(conversacion -> conversacion.involucra(idUsuario))
+            .map(conversacion -> conversacion.contraparteDe(idUsuario))
+            .map(Usuario::getNombreUsuario)
+            .orElse(null);
     }
 
     private String rolEnPedido(Long idPedido, Long idUsuario) {
