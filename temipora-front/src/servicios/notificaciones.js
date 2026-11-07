@@ -1,7 +1,15 @@
 /**
  * Destino y texto de cada notificación. Vive en un solo lugar para que la
- * campana y la página completa no divergan.
+ * campana y la página completa no diverjan.
  */
+
+export const CATEGORIAS_NOTIFICACION = [
+  { clave: 'SOLICITUDES', texto: 'Solicitudes' },
+  { clave: 'PEDIDOS', texto: 'Pedidos y pagos' },
+  { clave: 'MENSAJES', texto: 'Mensajes' },
+  { clave: 'RESENIAS', texto: 'Reseñas' },
+  { clave: 'PROMOCIONES', texto: 'Promociones' },
+]
 
 const CODIGOS_CIERRE = [
   'SOLICITUD_RECHAZADA',

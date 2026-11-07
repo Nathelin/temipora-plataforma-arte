@@ -29,6 +29,9 @@ public class TipoNotificacion {
     @Column(nullable = false, length = 100)
     private String nombre;
 
+    @Column(length = 30)
+    private String categoria;
+
     @Column(nullable = false, length = 20)
     private String frecuencia = "EVENTO";
 

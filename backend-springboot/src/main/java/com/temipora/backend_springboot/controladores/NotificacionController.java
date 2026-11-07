@@ -8,9 +8,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.temipora.backend_springboot.modelo.ContadorNotificacionesDTO;
 import com.temipora.backend_springboot.modelo.NotificacionDTO;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.servicios.NotificacionService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -29,13 +32,38 @@ public class NotificacionController {
     }
 
     @GetMapping
-    public List<NotificacionDTO> listar(Authentication authentication) {
-        return notificacionService.listar(idAutenticado(authentication));
+    public PaginaDTO<NotificacionDTO> listar(
+            @RequestParam(required = false) String categoria,
+            @RequestParam(defaultValue = "false") boolean soloNoLeidas,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "20") int tamanio,
+            Authentication authentication) {
+        return notificacionService.listar(
+            idAutenticado(authentication),
+            categoria,
+            soloNoLeidas,
+            pagina,
+            tamanio);
+    }
+
+    @GetMapping("/recientes")
+    public List<NotificacionDTO> recientes(
+            @RequestParam(required = false) Integer limite,
+            Authentication authentication) {
+        return notificacionService.recientes(
+            idAutenticado(authentication), limite);
     }
 
     @GetMapping("/contador")
-    public Map<String, Long> contador(Authentication authentication) {
-        return Map.of("noLeidas", notificacionService.contarNoLeidas(idAutenticado(authentication)));
+    public ContadorNotificacionesDTO contador(Authentication authentication) {
+        return notificacionService.contador(idAutenticado(authentication));
+    }
+
+    @PostMapping("/leer-todas")
+    public Map<String, Integer> marcarTodas(Authentication authentication) {
+        return Map.of(
+            "marcadas",
+            notificacionService.marcarTodasLeidas(idAutenticado(authentication)));
     }
 
     @PostMapping("/{idNotificacionUsuario}/leer")

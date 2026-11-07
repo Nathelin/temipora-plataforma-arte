@@ -13,11 +13,12 @@ const rutaNotificaciones = localStorage.getItem('rol') === 'ADMIN'
   : { name: 'notificaciones' }
 
 const {
-  notificaciones,
+  recientes,
   noLeidas,
-  cargando,
-  error,
-  cargar,
+  cargandoRecientes,
+  errorRecientes,
+  cargarRecientes,
+  refrescarContador,
   marcarLeida,
   marcarTodasLeidas,
   iniciarPolling,
@@ -28,14 +29,15 @@ const abierto = ref(false)
 const marcandoTodas = ref(false)
 const contenedor = ref(null)
 
-const hayNotificaciones = computed(() => notificaciones.value.length > 0)
+const hayNotificaciones = computed(() => recientes.value.length > 0)
 const hayNoLeidas = computed(() => noLeidas.value > 0)
 const etiquetaContador = computed(() => (noLeidas.value > 9 ? '9+' : String(noLeidas.value)))
 
 function alternar() {
   abierto.value = !abierto.value
   if (abierto.value) {
-    cargar({ silencioso: hayNotificaciones.value })
+    void cargarRecientes()
+    void refrescarContador()
   }
 }
 
@@ -82,6 +84,8 @@ async function marcarTodas() {
   marcandoTodas.value = true
   try {
     await marcarTodasLeidas()
+  } catch {
+    // El próximo refresco del contador vuelve a mostrar el estado real.
   } finally {
     marcandoTodas.value = false
   }
@@ -102,7 +106,7 @@ function formatearFecha(valor) {
 }
 
 onMounted(() => {
-  cargar()
+  void refrescarContador()
   iniciarPolling()
   document.addEventListener('click', manejarClickExterior)
   document.addEventListener('keydown', manejarTecla)
@@ -159,16 +163,16 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <div v-if="cargando && !hayNotificaciones" class="px-4 py-8 text-center text-sm text-cafe/60">
+      <div v-if="cargandoRecientes && !hayNotificaciones" class="px-4 py-8 text-center text-sm text-cafe/60">
         Cargando notificaciones...
       </div>
 
-      <div v-else-if="error && !hayNotificaciones" class="flex flex-col items-center gap-3 px-4 py-8 text-center">
-        <p class="text-sm text-cafe/70">{{ error }}</p>
+      <div v-else-if="errorRecientes && !hayNotificaciones" class="flex flex-col items-center gap-3 px-4 py-8 text-center">
+        <p class="text-sm text-cafe/70">{{ errorRecientes }}</p>
         <button
           type="button"
           class="rounded-full border border-rosa bg-blanco px-4 py-1.5 text-xs font-semibold text-granate transition hover:bg-rosa/20"
-          @click="cargar()"
+          @click="cargarRecientes()"
         >
           Reintentar
         </button>
@@ -182,7 +186,7 @@ onBeforeUnmount(() => {
       </div>
 
       <ul v-else class="max-h-96 divide-y divide-rosa/30 overflow-y-auto">
-        <li v-for="notificacion in notificaciones" :key="notificacion.idNotificacionUsuario">
+        <li v-for="notificacion in recientes" :key="notificacion.idNotificacionUsuario">
           <button
             type="button"
             class="flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-rosa/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/50"
