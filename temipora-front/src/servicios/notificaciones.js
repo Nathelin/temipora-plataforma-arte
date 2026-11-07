@@ -1,7 +1,15 @@
 /**
  * Destino y texto de cada notificación. Vive en un solo lugar para que la
- * campana y la página completa no divergan.
+ * campana y la página completa no diverjan.
  */
+
+export const CATEGORIAS_NOTIFICACION = [
+  { clave: 'SOLICITUDES', texto: 'Solicitudes' },
+  { clave: 'PEDIDOS', texto: 'Pedidos y pagos' },
+  { clave: 'MENSAJES', texto: 'Mensajes' },
+  { clave: 'RESENIAS', texto: 'Reseñas' },
+  { clave: 'PROMOCIONES', texto: 'Promociones' },
+]
 
 const CODIGOS_CIERRE = [
   'SOLICITUD_RECHAZADA',
@@ -28,15 +36,17 @@ export function destinoDe(notificacion, { rol, pathActual = '' } = {}) {
     return rol === 'ADMIN' ? null : { name: 'ofertas' }
   }
 
-  const id = Number(notificacion.idReferencia)
-  if (!Number.isInteger(id) || id <= 0) return null
-
   if (tipo === 'CONVERSACION') {
     if (rol === 'ADMIN') return null
+    const usuario = notificacion.nombreUsuarioReferencia
+    if (!usuario) return null
     return pathActual.startsWith('/panel')
-      ? { name: 'panel-conversacion', params: { idConversacion: id } }
-      : { name: 'conversacion', params: { idConversacion: id } }
+      ? { name: 'panel-conversacion', params: { nombreUsuario: `@${usuario}` } }
+      : { name: 'conversacion', params: { nombreUsuario: `@${usuario}` } }
   }
+
+  const id = Number(notificacion.idReferencia)
+  if (!Number.isInteger(id) || id <= 0) return null
 
   if (tipo === 'SOLICITUD') {
     if (rol === 'ADMIN') return null

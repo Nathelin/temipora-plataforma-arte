@@ -91,13 +91,21 @@ const {
   avisarEscribiendo: chatAvisarEscribiendo,
 } = useHiloConversacion(idConversacionChat, { activo: chatActivo })
 
+const usuarioContrapartePedido = computed(() => {
+  if (pedido.value?.rolVista === 'ADMIN') return null
+  const persona = pedido.value?.rolVista === 'ARTISTA'
+    ? pedido.value?.cliente
+    : pedido.value?.artista
+  return persona?.nombreUsuario || null
+})
+
 const enlaceConversacion = computed(() => {
-  const idConversacion = chatConversacion.value?.idConversacion
-    ?? idConversacionChat.value
-  if (!idConversacion) return null
+  const usuario = chatContraparte.value?.nombreUsuario
+    || usuarioContrapartePedido.value
+  if (!usuario) return null
   return {
     name: route.path.startsWith('/panel') ? 'panel-conversacion' : 'conversacion',
-    params: { idConversacion },
+    params: { nombreUsuario: `@${usuario}` },
     query: { volverA: 'pedido', idPedido: idPedido.value },
   }
 })

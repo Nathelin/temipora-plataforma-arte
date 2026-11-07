@@ -18,9 +18,11 @@ const detalle = computed(() => ({
 }))
 const chat = computed(() => {
   if (!props.pedido.idConversacion) return null
+  const usuario = props.pedido.contraparte?.nombreUsuario
+  if (!usuario) return null
   return {
     name: enPanel.value ? 'panel-conversacion' : 'conversacion',
-    params: { idConversacion: props.pedido.idConversacion },
+    params: { nombreUsuario: `@${usuario}` },
     query: { volverA: 'pedido', idPedido: props.pedido.idPedido },
   }
 })

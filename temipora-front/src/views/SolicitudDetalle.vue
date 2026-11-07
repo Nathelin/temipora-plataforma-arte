@@ -271,14 +271,14 @@ function irAlPerfil() {
 }
 
 function irAlChat() {
-  const idConversacion = solicitud.value?.idConversacion
-  if (!idConversacion) {
+  const usuario = contraparte.value?.nombreUsuario
+  if (!usuario) {
     irAlPerfil()
     return
   }
   router.push({
     name: route.path.startsWith('/panel') ? 'panel-conversacion' : 'conversacion',
-    params: { idConversacion },
+    params: { nombreUsuario: `@${usuario}` },
     query: { volverA: 'solicitud', idSolicitud: solicitud.value.idSolicitud },
   })
 }

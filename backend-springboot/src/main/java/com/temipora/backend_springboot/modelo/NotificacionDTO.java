@@ -21,9 +21,11 @@ public class NotificacionDTO {
     private String descripcion;
     private String estado;
     private String codigoTipo;
+    private String categoria;
     private Long idReferencia;
     private String tipoReferencia;
     private String rolReferencia;
+    private String nombreUsuarioReferencia;
     private boolean leida;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaLectura;
@@ -38,6 +40,9 @@ public class NotificacionDTO {
             .estado(notificacion != null ? notificacion.getEstado() : null)
             .codigoTipo(notificacion != null && notificacion.getTipoNotificacion() != null
                 ? notificacion.getTipoNotificacion().getCodigo()
+                : null)
+            .categoria(notificacion != null && notificacion.getTipoNotificacion() != null
+                ? notificacion.getTipoNotificacion().getCategoria()
                 : null)
             .idReferencia(notificacion != null ? notificacion.getIdReferencia() : null)
             .tipoReferencia(notificacion != null ? notificacion.getTipoReferencia() : null)

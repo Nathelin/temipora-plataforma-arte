@@ -3,6 +3,7 @@ package com.temipora.backend_springboot.servicios;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -17,14 +18,21 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
+import com.temipora.backend_springboot.modelo.ContadorNotificacionesDTO;
 import com.temipora.backend_springboot.modelo.Notificacion;
 import com.temipora.backend_springboot.modelo.NotificacionDTO;
 import com.temipora.backend_springboot.modelo.NotificacionUsuario;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.TipoNotificacion;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.ConversacionRepository;
 import com.temipora.backend_springboot.repositorios.NotificacionRepository;
 import com.temipora.backend_springboot.repositorios.NotificacionUsuarioRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
@@ -52,6 +60,9 @@ class NotificacionServiceTest {
 
     @Mock
     private SolicitudRepository solicitudRepository;
+
+    @Mock
+    private ConversacionRepository conversacionRepository;
 
     @InjectMocks
     private NotificacionService service;
@@ -122,60 +133,125 @@ class NotificacionServiceTest {
     }
 
     // ---------------------------------------------------------------
-    // listar / contar / marcar
+    // listar / recientes / contador / marcar
     // ---------------------------------------------------------------
 
     @Test
     void listar_completaElRolDeArtista() {
         Notificacion notificacion = notificacion(1L, "PEDIDO", 7L);
-        when(notificacionUsuarioRepository.listarPorUsuario(1L))
-            .thenReturn(List.of(destinatario(notificacion, 3L)));
+        when(notificacionUsuarioRepository.listarPaginado(
+                eq(1L), eq(""), eq(false), any(Pageable.class)))
+            .thenReturn(pagina(destinatario(notificacion, 3L)));
+
         Pedido pedido = new Pedido();
+        pedido.setIdPedido(7L);
         pedido.setArtista(usuario(1L));
         pedido.setCliente(usuario(2L));
-        when(pedidoRepository.findById(7L)).thenReturn(Optional.of(pedido));
+        when(pedidoRepository.findAllById(any())).thenReturn(List.of(pedido));
 
-        List<NotificacionDTO> resultado = service.listar(1L);
+        PaginaDTO<NotificacionDTO> resultado = service.listar(1L, null, false, 0, 20);
 
-        assertThat(resultado).hasSize(1);
-        assertThat(resultado.get(0).getRolReferencia()).isEqualTo("ARTISTA");
+        assertThat(resultado.getContenido()).hasSize(1);
+        assertThat(resultado.getContenido().get(0).getRolReferencia()).isEqualTo("ARTISTA");
     }
 
     @Test
     void listar_rolClienteYReferenciaDesconocida() {
         Notificacion solicitud = notificacion(1L, "SOLICITUD", 4L);
         Notificacion otra = notificacion(2L, "OTRO", 5L);
-        when(notificacionUsuarioRepository.listarPorUsuario(1L))
-            .thenReturn(List.of(destinatario(solicitud, 3L), destinatario(otra, 4L)));
+        when(notificacionUsuarioRepository.listarPaginado(
+                eq(1L), eq(""), eq(false), any(Pageable.class)))
+            .thenReturn(pagina(
+                destinatario(solicitud, 3L),
+                destinatario(otra, 4L)));
 
         Solicitud s = new Solicitud();
+        s.setIdSolicitud(4L);
         s.setArtista(usuario(8L));
         s.setCliente(usuario(1L));
-        when(solicitudRepository.findById(4L)).thenReturn(Optional.of(s));
+        when(solicitudRepository.findAllById(any())).thenReturn(List.of(s));
 
-        List<NotificacionDTO> resultado = service.listar(1L);
+        PaginaDTO<NotificacionDTO> resultado = service.listar(1L, null, false, 0, 20);
 
-        assertThat(resultado.get(0).getRolReferencia()).isEqualTo("CLIENTE");
-        assertThat(resultado.get(1).getRolReferencia()).isNull();
+        assertThat(resultado.getContenido().get(0).getRolReferencia()).isEqualTo("CLIENTE");
+        assertThat(resultado.getContenido().get(1).getRolReferencia()).isNull();
     }
 
     @Test
     void listar_sinReferenciaNoConsultaRepositorios() {
-        when(notificacionUsuarioRepository.listarPorUsuario(1L))
-            .thenReturn(List.of(destinatario(notificacion(1L, null, null), 3L)));
+        when(notificacionUsuarioRepository.listarPaginado(
+                eq(1L), eq(""), eq(false), any(Pageable.class)))
+            .thenReturn(pagina(destinatario(notificacion(1L, null, null), 3L)));
 
-        service.listar(1L);
+        service.listar(1L, null, false, 0, 20);
 
-        verify(pedidoRepository, never()).findById(any());
-        verify(solicitudRepository, never()).findById(any());
+        verify(pedidoRepository, never()).findAllById(any());
+        verify(solicitudRepository, never()).findAllById(any());
+        verify(conversacionRepository, never()).findAllById(any());
     }
 
     @Test
-    void contarNoLeidas_delegaEnElRepositorio() {
+    void listar_normalizaLaCategoriaYDelegaLosFiltros() {
+        when(notificacionUsuarioRepository.listarPaginado(
+                eq(1L), eq("PEDIDOS"), eq(true), any(Pageable.class)))
+            .thenReturn(pagina());
+
+        PaginaDTO<NotificacionDTO> resultado = service.listar(1L, " pedidos ", true, 0, 20);
+
+        assertThat(resultado.getContenido()).isEmpty();
+        assertThat(resultado.isHayMas()).isFalse();
+        verify(notificacionUsuarioRepository).listarPaginado(
+            1L, "PEDIDOS", true, PageRequest.of(0, 20));
+    }
+
+    @Test
+    void listar_acotaElTamanioDePagina() {
+        when(notificacionUsuarioRepository.listarPaginado(
+                eq(1L), eq(""), eq(false), any(Pageable.class)))
+            .thenReturn(pagina());
+
+        service.listar(1L, null, false, -3, 999);
+
+        verify(notificacionUsuarioRepository).listarPaginado(
+            1L, "", false, PageRequest.of(0, NotificacionService.TAMANIO_MAXIMO));
+    }
+
+    @Test
+    void recientes_usaElTopePorDefecto() {
+        when(notificacionUsuarioRepository.listarRecientes(
+                eq(1L), any(Pageable.class)))
+            .thenReturn(List.of());
+
+        service.recientes(1L, null);
+
+        verify(notificacionUsuarioRepository).listarRecientes(
+            1L, PageRequest.of(0, NotificacionService.LIMITE_RECIENTES));
+    }
+
+    @Test
+    void contador_devuelveTotalYPorCategoria() {
         when(notificacionUsuarioRepository.countByUsuarioIdUsuarioAndLeidaFalse(1L))
             .thenReturn(4L);
+        when(notificacionUsuarioRepository.contarNoLeidasPorCategoria(1L))
+            .thenReturn(List.of(
+                new Object[] {"PEDIDOS", 3L},
+                new Object[] {"MENSAJES", 1L}));
 
-        assertThat(service.contarNoLeidas(1L)).isEqualTo(4L);
+        ContadorNotificacionesDTO contador = service.contador(1L);
+
+        assertThat(contador.noLeidas()).isEqualTo(4L);
+        assertThat(contador.porCategoria())
+            .containsEntry("PEDIDOS", 3L)
+            .containsEntry("MENSAJES", 1L);
+    }
+
+    @Test
+    void marcarTodasLeidas_delegaEnElRepositorio() {
+        when(notificacionUsuarioRepository.marcarTodasLeidas(
+                eq(1L), any(LocalDateTime.class)))
+            .thenReturn(5);
+
+        assertThat(service.marcarTodasLeidas(1L)).isEqualTo(5);
     }
 
     @Test
@@ -218,6 +294,10 @@ class NotificacionServiceTest {
     // ---------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------
+
+    private Page<NotificacionUsuario> pagina(NotificacionUsuario... filas) {
+        return new PageImpl<>(List.of(filas), PageRequest.of(0, 20), filas.length);
+    }
 
     private Usuario usuario(Long id) {
         return Usuario.builder().idUsuario(id).nombreUsuario("u" + id).build();

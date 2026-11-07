@@ -382,8 +382,7 @@ public class ConversacionService {
             Long idUsuario,
             boolean archivada) {
         Conversacion conversacion = obtenerConversacion(idConversacion);
-        validarParticipante(conversacion, idUsuario,
-            "No podés archivar esta conversación.");
+        validarParticipante(conversacion, idUsuario);
         ConversacionParticipante participante =
             participanteRepository
                 .findByConversacionIdConversacionAndUsuarioIdUsuario(
@@ -397,8 +396,7 @@ public class ConversacionService {
     @Transactional(readOnly = true)
     public ConversacionDTO obtener(Long idConversacion, Long idUsuario) {
         Conversacion conversacion = obtenerConversacion(idConversacion);
-        validarParticipante(conversacion, idUsuario,
-            "No podés ver esta conversación.");
+        validarParticipante(conversacion, idUsuario);
         return aDTO(conversacion, idUsuario, configuracionService.obtener());
     }
 
@@ -497,12 +495,14 @@ public class ConversacionService {
             .buscarPorPar(idUsuario, otro.getIdUsuario());
         if (existente.isEmpty()) {
             String motivo = motivoCupoSolicitudes(idUsuario, config);
-            return relacion(EstadoRelacionMensaje.NINGUNA, null,
-                motivo == null, motivo, null);
+            return conContraparte(
+                relacion(EstadoRelacionMensaje.NINGUNA, null,
+                    motivo == null, motivo, null),
+                otro);
         }
 
         Conversacion conversacion = existente.get();
-        return switch (conversacion.getEstado()) {
+        return conContraparte(switch (conversacion.getEstado()) {
             case ACEPTADA -> relacion(
                 EstadoRelacionMensaje.ACEPTADA,
                 conversacion.getIdConversacion(),
@@ -560,7 +560,7 @@ public class ConversacionService {
                     motivo,
                     disponible);
             }
-        };
+        }, otro);
     }
 
     @Transactional(readOnly = true)
@@ -625,8 +625,7 @@ public class ConversacionService {
     @Transactional(readOnly = true)
     public void marcarEscribiendo(Long idConversacion, Long idUsuario) {
         Conversacion conversacion = obtenerConversacion(idConversacion);
-        validarParticipante(conversacion, idUsuario,
-            "No podés indicar escritura en esta conversación.");
+        validarParticipante(conversacion, idUsuario);
         if (conversacion.getEstado() != EstadoConversacion.ACEPTADA) {
             return;
         }
@@ -645,8 +644,7 @@ public class ConversacionService {
     @Transactional(readOnly = true)
     public EscribiendoDTO estadoEscritura(Long idConversacion, Long idUsuario) {
         Conversacion conversacion = obtenerConversacion(idConversacion);
-        validarParticipante(conversacion, idUsuario,
-            "No podés ver el estado de escritura de esta conversación.");
+        validarParticipante(conversacion, idUsuario);
         if (conversacion.getEstado() != EstadoConversacion.ACEPTADA) {
             return EscribiendoDTO.builder().escribiendo(false).build();
         }
@@ -864,6 +862,13 @@ public class ConversacionService {
             .build();
     }
 
+    private EstadoRelacionMensajeDTO conContraparte(
+            EstadoRelacionMensajeDTO dto,
+            Usuario contraparte) {
+        dto.setContraparte(UsuarioResumenDTO.desdeUsuario(contraparte));
+        return dto;
+    }
+
     private boolean participantesValidos(Usuario cliente, Usuario artista) {
         return cliente != null
             && artista != null
@@ -1035,10 +1040,9 @@ public class ConversacionService {
 
     private void validarParticipante(
             Conversacion conversacion,
-            Long idUsuario,
-            String mensaje) {
+            Long idUsuario) {
         if (!conversacion.involucra(idUsuario)) {
-            throw new AccesoDenegadoException(mensaje);
+            throw new NoSuchElementException("Conversación no encontrada.");
         }
     }
 

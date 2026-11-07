@@ -655,7 +655,7 @@ function accionMensaje() {
   if (estado.idConversacion) {
     router.push({
       name: 'conversacion',
-      params: { idConversacion: estado.idConversacion },
+      params: { nombreUsuario: `@${perfil.value.nombreUsuario}` },
     })
     return
   }
@@ -683,7 +683,7 @@ async function enviarSolicitud(datos) {
     if (res.data?.idConversacion) {
       router.push({
         name: 'conversacion',
-        params: { idConversacion: res.data.idConversacion },
+        params: { nombreUsuario: `@${perfil.value.nombreUsuario}` },
       })
     }
   } catch (e) {
