@@ -13,13 +13,15 @@ import { useNotificaciones } from '../composables/useNotificaciones'
 
 const route = useRoute()
 const router = useRouter()
-const { error: notificarError } = useNotificaciones()
+const { exito, error: notificarError } = useNotificaciones()
 
 const cargando = ref(true)
 const error = ref('')
 const sustitucion = ref(null)
 const origen = ref(null)
 const eligiendo = ref(null)
+const favoritos = ref(new Set())
+const actualizandoFavorito = ref(new Set())
 
 const idServicio = computed(() => Number(route.params.id))
 const opciones = computed(() => sustitucion.value?.opciones || [])
@@ -124,7 +126,56 @@ async function solicitarEnCola() {
   }
 }
 
-onMounted(cargar)
+async function cargarFavoritos() {
+  if (!localStorage.getItem('token')) return
+  try {
+    const res = await api.get('/favoritos/servicios/ids')
+    favoritos.value = new Set(res.data || [])
+  } catch {
+    favoritos.value = new Set()
+  }
+}
+
+async function alternarFavorito(servicio) {
+  if (!localStorage.getItem('token')) {
+    router.push({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
+  const id = servicio.idServicio
+  if (actualizandoFavorito.value.has(id)) return
+
+  actualizandoFavorito.value = new Set(actualizandoFavorito.value).add(id)
+  try {
+    if (favoritos.value.has(id)) {
+      await api.delete(`/favoritos/servicios/${id}`)
+      const siguientes = new Set(favoritos.value)
+      siguientes.delete(id)
+      favoritos.value = siguientes
+      exito(`Quitaste "${servicio.nombre}" de tus favoritos.`)
+    } else {
+      await api.post(`/favoritos/servicios/${id}`)
+      favoritos.value = new Set(favoritos.value).add(id)
+      exito(`Agregaste "${servicio.nombre}" a tus favoritos.`)
+    }
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login', query: { redirect: route.fullPath } })
+      return
+    }
+    notificarError(
+      e.response?.data?.message || 'No se pudieron actualizar tus favoritos.',
+    )
+  } finally {
+    const siguientes = new Set(actualizandoFavorito.value)
+    siguientes.delete(id)
+    actualizandoFavorito.value = siguientes
+  }
+}
+
+onMounted(async () => {
+  void cargarFavoritos()
+  await cargar()
+})
 </script>
 
 <template>
@@ -246,7 +297,10 @@ onMounted(cargar)
             :key="opcion.idServicio"
             :opcion="opcion"
             :eligiendo="eligiendo === opcion.idServicio"
+            :es-favorito="favoritos.has(opcion.idServicio)"
+            :actualizando-favorito="actualizandoFavorito.has(opcion.idServicio)"
             @solicitar="solicitar"
+            @alternar-favorito="alternarFavorito"
           />
         </div>
 

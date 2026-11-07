@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import api from '../servicios/api'
 import TarjetaServicioAlternativa from '../components/TarjetaServicioAlternativa.vue'
 import {
   detalleCierrePedido,
@@ -13,13 +14,15 @@ import { useAccesoEnlace } from '../composables/useAccesoEnlace'
 
 const route = useRoute()
 const router = useRouter()
-const { error: notificarError } = useNotificaciones()
+const { exito, error: notificarError } = useNotificaciones()
 const { consumirSiCorresponde, avisoAcceso, errorAcceso } = useAccesoEnlace()
 
 const cargando = ref(true)
 const error = ref('')
 const detalle = ref(null)
 const eligiendo = ref(null)
+const favoritos = ref(new Set())
+const actualizandoFavorito = ref(new Set())
 const accesoNombre = ref(avisoAcceso())
 const mensajeAcceso = ref(errorAcceso())
 const requiereLogin = ref(false)
@@ -128,6 +131,52 @@ async function solicitar(opcion) {
   }
 }
 
+async function cargarFavoritos() {
+  if (!localStorage.getItem('token')) return
+  try {
+    const res = await api.get('/favoritos/servicios/ids')
+    favoritos.value = new Set(res.data || [])
+  } catch {
+    favoritos.value = new Set()
+  }
+}
+
+async function alternarFavorito(servicio) {
+  if (!localStorage.getItem('token')) {
+    irALogin()
+    return
+  }
+  const id = servicio.idServicio
+  if (actualizandoFavorito.value.has(id)) return
+
+  actualizandoFavorito.value = new Set(actualizandoFavorito.value).add(id)
+  try {
+    if (favoritos.value.has(id)) {
+      await api.delete(`/favoritos/servicios/${id}`)
+      const siguientes = new Set(favoritos.value)
+      siguientes.delete(id)
+      favoritos.value = siguientes
+      exito(`Quitaste "${servicio.nombre}" de tus favoritos.`)
+    } else {
+      await api.post(`/favoritos/servicios/${id}`)
+      favoritos.value = new Set(favoritos.value).add(id)
+      exito(`Agregaste "${servicio.nombre}" a tus favoritos.`)
+    }
+  } catch (e) {
+    if (e.response?.status === 401) {
+      irALogin()
+      return
+    }
+    notificarError(
+      e.response?.data?.message || 'No se pudieron actualizar tus favoritos.',
+    )
+  } finally {
+    const siguientes = new Set(actualizandoFavorito.value)
+    siguientes.delete(id)
+    actualizandoFavorito.value = siguientes
+  }
+}
+
 function cerrarSesionAcceso() {
   localStorage.removeItem('token')
   localStorage.removeItem('rol')
@@ -142,6 +191,7 @@ onMounted(async () => {
   if (acceso.habiaEnlace) {
     return
   }
+  void cargarFavoritos()
   await cargar()
 })
 </script>
@@ -281,7 +331,10 @@ onMounted(async () => {
             :key="opcion.idServicio"
             :opcion="opcion"
             :eligiendo="eligiendo === opcion.idServicio"
+            :es-favorito="favoritos.has(opcion.idServicio)"
+            :actualizando-favorito="actualizandoFavorito.has(opcion.idServicio)"
             @solicitar="solicitar"
+            @alternar-favorito="alternarFavorito"
           />
         </div>
       </section>

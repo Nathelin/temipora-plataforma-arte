@@ -4,15 +4,21 @@ import TarjetaServicio from './TarjetaServicio.vue'
 defineProps({
   opcion: { type: Object, required: true },
   eligiendo: { type: Boolean, default: false },
+  esFavorito: { type: Boolean, default: false },
+  actualizandoFavorito: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['solicitar'])
+const emit = defineEmits(['solicitar', 'alternar-favorito'])
 </script>
 
 <template>
   <TarjetaServicio
     :servicio="opcion.servicio"
     :motivo="opcion.motivo"
+    mostrar-favorito
+    :es-favorito="esFavorito"
+    :actualizando-favorito="actualizandoFavorito"
+    @alternar-favorito="emit('alternar-favorito', $event)"
   >
     <template #acciones>
       <button
