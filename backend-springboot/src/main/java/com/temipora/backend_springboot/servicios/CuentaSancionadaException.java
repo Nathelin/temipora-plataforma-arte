@@ -5,8 +5,9 @@ import java.time.LocalDateTime;
 import org.springframework.security.authentication.DisabledException;
 
 /**
- * Se lanza al autenticar una cuenta con una sanción vigente. Extiende
- * DisabledException para que Spring la trate como fallo de autenticación.
+ * Se lanza al abrir una sesión con una sanción vigente. Se usa en la
+ * autorización por token y en el WebSocket, nunca en el login con contraseña
+ * (allí la sanción se informa recién después de validar la contraseña).
  */
 public class CuentaSancionadaException extends DisabledException {
 

@@ -3,6 +3,7 @@
 package com.temipora.backend_springboot.config.filters;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -15,6 +16,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.temipora.backend_springboot.config.AccesoUsuarioService;
 import com.temipora.backend_springboot.config.ContactoPlataforma;
 import com.temipora.backend_springboot.config.JwtUtils;
 import com.temipora.backend_springboot.servicios.CuentaSancionadaException;
@@ -56,7 +58,9 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
                 if (nombreUsuario != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails;
                     try {
-                        userDetails = userDetailsService.loadUserByUsername(nombreUsuario);
+                        userDetails = userDetailsService instanceof AccesoUsuarioService acceso
+                            ? acceso.loadUserForSession(nombreUsuario)
+                            : userDetailsService.loadUserByUsername(nombreUsuario);
                     } catch (CuentaSancionadaException sancionada) {
                         escribir403(response, "CUENTA_SANCIONADA",
                             sancionada.getMotivo(), sancionada.getContacto(),
@@ -88,7 +92,7 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
             String codigo,
             String motivo,
             String contactoPlataforma,
-            java.time.LocalDateTime fechaFin) throws IOException {
+            LocalDateTime fechaFin) throws IOException {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");

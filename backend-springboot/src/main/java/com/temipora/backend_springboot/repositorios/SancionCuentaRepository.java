@@ -39,5 +39,17 @@ public interface SancionCuentaRepository
             @Param("estado") EstadoSancion estado,
             @Param("ahora") LocalDateTime ahora);
 
+    @Query("""
+        SELECT s FROM SancionCuenta s
+        WHERE lower(s.usuario.nombreUsuario) = lower(:nombreUsuario)
+          AND s.estado = :estado
+          AND (s.fechaFin IS NULL OR s.fechaFin > :ahora)
+        ORDER BY s.fechaInicio DESC
+        """)
+    List<SancionCuenta> findVigentesByNombreUsuario(
+            @Param("nombreUsuario") String nombreUsuario,
+            @Param("estado") EstadoSancion estado,
+            @Param("ahora") LocalDateTime ahora);
+
     List<SancionCuenta> findByUsuarioIdUsuarioOrderByFechaInicioDesc(Long idUsuario);
 }

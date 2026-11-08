@@ -11,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDateTime;
+import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -32,6 +35,7 @@ import com.temipora.backend_springboot.config.SecurityConfig;
 import com.temipora.backend_springboot.controladores.AuthController;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.Rol;
+import com.temipora.backend_springboot.modelo.SancionCuenta;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.servicios.LimpiezaArchivosService;
 import com.temipora.backend_springboot.servicios.StorageService;
@@ -151,6 +155,56 @@ class JwtAuthenticationFilterTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error", containsString("Credenciales")));
 
+        verify(usuarioService, never()).actualizarUltimaConexion(any());
+    }
+
+    @Test
+    void login_sancionadoConCredencialesValidas_devuelve403ConMotivoYContacto() throws Exception {
+        when(userDetailsService.loadUserByUsername("sancionado"))
+                .thenReturn(User.withUsername("sancionado")
+                        .password(passwordEncoder.encode("secreta123"))
+                        .authorities("ROLE_CLIENTE")
+                        .build());
+        when(usuarioService.getByNombreUsuario("sancionado"))
+                .thenReturn(Usuario.builder()
+                        .idUsuario(8L)
+                        .nombreUsuario("sancionado")
+                        .rol(Rol.builder().nombre(ERol.CLIENTE).build())
+                        .build());
+        when(usuarioService.sancionVigente(8L))
+                .thenReturn(Optional.of(SancionCuenta.builder()
+                        .idSancion(1L)
+                        .motivo("Spam reiterado")
+                        .fechaFin(LocalDateTime.of(2026, 12, 1, 10, 0))
+                        .build()));
+
+        mockMvc.perform(post(URL_LOGIN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nombreUsuario\":\"sancionado\",\"contrasenia\":\"secreta123\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.codigo").value("CUENTA_SANCIONADA"))
+                .andExpect(jsonPath("$.motivo").value("Spam reiterado"))
+                .andExpect(jsonPath("$.contacto").value("temiporasupport@gmail.com"))
+                .andExpect(jsonPath("$.token").doesNotExist());
+
+        verify(usuarioService, never()).actualizarUltimaConexion(any());
+    }
+
+    @Test
+    void login_sancionadoConContraseniaIncorrecta_devuelve401SinRevelarLaSancion() throws Exception {
+        when(userDetailsService.loadUserByUsername("sancionado"))
+                .thenReturn(User.withUsername("sancionado")
+                        .password(passwordEncoder.encode("secreta123"))
+                        .authorities("ROLE_CLIENTE")
+                        .build());
+
+        mockMvc.perform(post(URL_LOGIN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nombreUsuario\":\"sancionado\",\"contrasenia\":\"otraClave\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error", containsString("Credenciales")));
+
+        verify(usuarioService, never()).sancionVigente(any());
         verify(usuarioService, never()).actualizarUltimaConexion(any());
     }
 }

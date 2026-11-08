@@ -15,8 +15,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import com.temipora.backend_springboot.config.ContactoPlataforma;
 import com.temipora.backend_springboot.config.JwtUtils;
 import com.temipora.backend_springboot.modelo.LoginRequest;
+import com.temipora.backend_springboot.modelo.SancionCuenta;
 import com.temipora.backend_springboot.modelo.Usuario;
-import com.temipora.backend_springboot.servicios.CuentaSancionadaException;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
 import jakarta.servlet.FilterChain;
@@ -27,9 +27,9 @@ import tools.jackson.databind.ObjectMapper;
 
 public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilter {
 
-    private JwtUtils jwtUtils;
-    private UsuarioService usuarioService;
-    private ContactoPlataforma contacto;
+    private final JwtUtils jwtUtils;
+    private final UsuarioService usuarioService;
+    private final ContactoPlataforma contacto;
 
     public JwtAuthenticationFilter(
             JwtUtils jwtUtils,
@@ -70,6 +70,13 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         User usuario = (User) result.getPrincipal();
         Usuario entidad = usuarioService.getByNombreUsuario(usuario.getUsername());
 
+        // La contraseña ya fue validada: recién ahora es seguro revelar la sanción.
+        var sancionVigente = usuarioService.sancionVigente(entidad.getIdUsuario());
+        if (sancionVigente.isPresent()) {
+            escribirSancion(response, sancionVigente.get());
+            return;
+        }
+
         // El rol del token es el rol real del usuario, no la primera autoridad
         // (que puede ser un rol heredado por la jerarquía).
         String rol = entidad.getRol() != null && entidad.getRol().getNombre() != null
@@ -101,21 +108,6 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
 
-        if (failed instanceof CuentaSancionadaException sancionada) {
-            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            Map<String, Object> body = new HashMap<>();
-            body.put("codigo", "CUENTA_SANCIONADA");
-            body.put("motivo", sancionada.getMotivo());
-            body.put("contacto", sancionada.getContacto());
-            if (sancionada.getFechaFin() != null) {
-                body.put("fechaFin", sancionada.getFechaFin().toString());
-            }
-            body.put("message", "Tu cuenta se encuentra inhabilitada.");
-            response.getWriter().write(new ObjectMapper().writeValueAsString(body));
-            response.getWriter().flush();
-            return;
-        }
-
         if (failed instanceof DisabledException) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             Map<String, Object> body = new HashMap<>();
@@ -130,6 +122,25 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         Map<String, String> body = new HashMap<>();
         body.put("error", "Credenciales inválidas");
+
+        response.getWriter().write(new ObjectMapper().writeValueAsString(body));
+        response.getWriter().flush();
+    }
+
+    private void escribirSancion(HttpServletResponse response, SancionCuenta sancion)
+            throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("codigo", "CUENTA_SANCIONADA");
+        body.put("motivo", sancion.getMotivo());
+        body.put("contacto", contacto.getEmail());
+        if (sancion.getFechaFin() != null) {
+            body.put("fechaFin", sancion.getFechaFin().toString());
+        }
+        body.put("message", "Tu cuenta se encuentra inhabilitada.");
 
         response.getWriter().write(new ObjectMapper().writeValueAsString(body));
         response.getWriter().flush();

@@ -94,7 +94,7 @@ const grupos = [
     nombre: 'Comercio',
     items: [
       {
-        nombre: 'Presupuestos y hitos',
+        nombre: 'Presupuestos e hitos',
         to: '/admin/ajustes/presupuestos',
         rutas: ['/admin/ajustes/presupuestos', '/admin/ajustes/pedidos'],
         icono: Receipt,

@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -221,6 +222,14 @@ public class UsuarioService {
             }
             return dto;
         });
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<SancionCuenta> sancionVigente(Long idUsuario) {
+        return sancionCuentaRepository.findVigentesByUsuarioId(
+                idUsuario, EstadoSancion.ACTIVA, LocalDateTime.now())
+                .stream()
+                .findFirst();
     }
 
     public String nombreUsuario(Long idUsuario) {

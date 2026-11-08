@@ -84,7 +84,9 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
         UserDetails userDetails;
         try {
-            userDetails = userDetailsService.loadUserByUsername(nombreUsuario);
+            userDetails = userDetailsService instanceof AccesoUsuarioService acceso
+                ? acceso.loadUserForSession(nombreUsuario)
+                : userDetailsService.loadUserByUsername(nombreUsuario);
         } catch (CuentaSancionadaException e) {
             throw new MessagingException("La cuenta está inhabilitada.");
         } catch (RuntimeException e) {

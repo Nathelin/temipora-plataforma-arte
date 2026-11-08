@@ -25,7 +25,7 @@ import com.temipora.backend_springboot.servicios.CuentaSancionadaException;
 
 //interfaz que actua como colaborador entre el framework y la info del usuario para autenticar y autorizar
 @Service
-public class DetallesUsuarioService implements UserDetailsService{
+public class DetallesUsuarioService implements UserDetailsService, AccesoUsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final SancionCuentaRepository sancionCuentaRepository;
@@ -40,9 +40,25 @@ public class DetallesUsuarioService implements UserDetailsService{
         this.contacto = contacto;
     }
 
+    /**
+     * Autenticación por contraseña. No evalúa sanciones: el login debe verificar
+     * la contraseña antes de revelar el motivo (lo hace JwtAuthenticationFilter).
+     */
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String nombreUsuario) throws UsernameNotFoundException {
+        Usuario usuario = usuarioRepository.findByNombreUsuarioIgnoreCase(nombreUsuario)
+                                     .orElseThrow(()-> new UsernameNotFoundException("No se encontró al usuario."));
+        return construirDetalles(usuario);
+    }
+
+    /**
+     * Autorización de una sesión ya emitida (token JWT o WebSocket). Acá sí se
+     * bloquea una cuenta desactivada o con sanción vigente.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public UserDetails loadUserForSession(String nombreUsuario) throws UsernameNotFoundException {
         Usuario usuario = usuarioRepository.findByNombreUsuarioIgnoreCase(nombreUsuario)
                                      .orElseThrow(()-> new UsernameNotFoundException("No se encontró al usuario."));
 
@@ -53,12 +69,15 @@ public class DetallesUsuarioService implements UserDetailsService{
         List<SancionCuenta> sancionesVigentes = sancionCuentaRepository
             .findVigentesByUsuarioId(usuario.getIdUsuario(), EstadoSancion.ACTIVA, LocalDateTime.now());
         if (!sancionesVigentes.isEmpty()) {
+            SancionCuenta sancion = sancionesVigentes.get(0);
             throw new CuentaSancionadaException(
-                sancionesVigentes.get(0).getMotivo(),
-                contacto.getEmail(),
-                sancionesVigentes.get(0).getFechaFin());
+                sancion.getMotivo(), contacto.getEmail(), sancion.getFechaFin());
         }
 
+        return construirDetalles(usuario);
+    }
+
+    private UserDetails construirDetalles(Usuario usuario) {
         // El usuario tiene un solo rol, pero hereda las autoridades de sus ancestros:
         // CLIENTE <- ARTISTA <- ADMIN. Se devuelve el rol principal primero.
         Set<GrantedAuthority> autoridades = new LinkedHashSet<>();
@@ -74,8 +93,5 @@ public class DetallesUsuarioService implements UserDetailsService{
 
         return new User(usuario.getNombreUsuario(), usuario.getContrasenia(),
             usuario.isEstadoCuenta(), true, true, true, autoridades);
-
-        // el return tiene cuatro booleans, entre ellos para definir permisos y si hay bloqueos o expiración de sesión.
-        // TODO: investigar mejor
     }
 }
