@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../servicios/api'
+import { formatearFechaHora } from '../servicios/fechas'
 import AdminPageHeader from './admin/AdminPageHeader.vue'
 
 const route = useRoute()
@@ -42,12 +43,7 @@ const nombresEstado = {
 
 function formatearFecha(valor) {
   if (!valor) return '—'
-  const fecha = new Date(valor)
-  if (Number.isNaN(fecha.getTime())) return String(valor)
-  return new Intl.DateTimeFormat('es-AR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(fecha)
+  return formatearFechaHora(valor) || '—'
 }
 
 function nombreTipo(valor) {

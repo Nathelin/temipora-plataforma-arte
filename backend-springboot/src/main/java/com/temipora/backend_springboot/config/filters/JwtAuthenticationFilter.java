@@ -108,7 +108,7 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
             body.put("motivo", sancionada.getMotivo());
             body.put("contacto", sancionada.getContacto());
             if (sancionada.getFechaFin() != null) {
-                body.put("fechaFin", sancionada.getFechaFin());
+                body.put("fechaFin", sancionada.getFechaFin().toString());
             }
             body.put("message", "Tu cuenta se encuentra inhabilitada.");
             response.getWriter().write(new ObjectMapper().writeValueAsString(body));

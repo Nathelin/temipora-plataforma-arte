@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { useSesion } from '../composables/useSesion'
 import { obtenerContacto } from '../servicios/contacto'
+import { formatearFechaHora } from '../servicios/fechas'
 import fondo from '../assets/fondos/prueba.png'
 import welcomeLogo from '../assets/welcome logo.png'
 
@@ -33,13 +34,7 @@ function cargarInhabilitada() {
 }
 
 function formatearFechaFin(valor) {
-  if (!valor) return ''
-  const fecha = new Date(valor)
-  if (Number.isNaN(fecha.getTime())) return ''
-  return new Intl.DateTimeFormat('es-AR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(fecha)
+  return formatearFechaHora(valor)
 }
 
 function alInhabilitar() {

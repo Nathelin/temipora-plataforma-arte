@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import api from '../servicios/api'
 import { obtenerContacto } from '../servicios/contacto'
+import { formatearFechaHora, parsearFechaHora } from '../servicios/fechas'
 
 const props = defineProps({
   abierto: { type: Boolean, default: false },
@@ -19,15 +20,11 @@ const contacto = ref('')
 
 const esTemporal = computed(() => tipo.value === 'SUSPENSION')
 
-const fechaFinTexto = computed(() => {
-  if (!fechaFin.value) return ''
-  const fecha = new Date(fechaFin.value)
-  if (Number.isNaN(fecha.getTime())) return ''
-  return new Intl.DateTimeFormat('es-AR', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-  }).format(fecha)
-})
+const fechaFinISO = computed(() => parsearFechaHora(fechaFin.value))
+const fechaFinTexto = computed(() => formatearFechaHora(fechaFinISO.value))
+const fechaFinInvalida = computed(
+  () => Boolean(fechaFin.value.trim()) && !fechaFinISO.value,
+)
 
 watch(
   () => props.abierto,
@@ -53,8 +50,12 @@ async function enviar() {
     error.value = 'El motivo es obligatorio.'
     return
   }
-  if (esTemporal.value && !fechaFin.value) {
-    error.value = 'Indicá la fecha y hora de fin de la suspensión.'
+  if (esTemporal.value && !fechaFin.value.trim()) {
+    error.value = 'Indicá la fecha y hora de fin con el formato dd/mm/aaaa HH:mm.'
+    return
+  }
+  if (esTemporal.value && !fechaFinISO.value) {
+    error.value = 'La fecha de fin no es válida. Usá el formato dd/mm/aaaa HH:mm.'
     return
   }
 
@@ -64,7 +65,7 @@ async function enviar() {
       idUsuario: props.usuario.idUsuario,
       tipo: tipo.value,
       motivo: motivo.value.trim(),
-      fechaFin: esTemporal.value ? fechaFin.value : null,
+      fechaFin: esTemporal.value ? fechaFinISO.value : null,
     })
     emit('aplicada')
     emit('cerrar')
@@ -134,9 +135,15 @@ async function enviar() {
             <input
               id="fecha-fin-sancion"
               v-model="fechaFin"
-              type="datetime-local"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="dd/mm/aaaa HH:mm"
               class="mt-1 block w-full rounded-lg border-0 px-3 py-2.5 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
             />
+            <p v-if="fechaFinInvalida" class="mt-1 text-sm text-rojizo">
+              Usá el formato dd/mm/aaaa HH:mm.
+            </p>
           </div>
 
           <div>

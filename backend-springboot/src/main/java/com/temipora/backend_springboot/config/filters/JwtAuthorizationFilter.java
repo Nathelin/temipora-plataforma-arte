@@ -102,7 +102,7 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
             body.put("contacto", contactoPlataforma);
         }
         if (fechaFin != null) {
-            body.put("fechaFin", fechaFin);
+            body.put("fechaFin", fechaFin.toString());
         }
         body.put("message", "CUENTA_SANCIONADA".equals(codigo)
             ? "Tu cuenta se encuentra inhabilitada."

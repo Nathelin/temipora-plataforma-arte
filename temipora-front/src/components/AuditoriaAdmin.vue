@@ -14,6 +14,7 @@ import {
   X,
 } from '@lucide/vue'
 import api from '../servicios/api'
+import { formatearFechaHora, isoLocal, parsearFechaHora } from '../servicios/fechas'
 import { useAdminMenu } from '../composables/useAdminMenu'
 import AuditoriaDetalle from './admin/AuditoriaDetalle.vue'
 import {
@@ -81,15 +82,19 @@ const hasta = ref('')
 const desdeCustom = ref('')
 const hastaCustom = ref('')
 
+const rangoInvalido = computed(() => {
+  if (rango.value !== 'custom') return false
+  const desdeTexto = desdeCustom.value.trim()
+  const hastaTexto = hastaCustom.value.trim()
+  return Boolean(
+    (desdeTexto && !parsearFechaHora(desdeTexto))
+      || (hastaTexto && !parsearFechaHora(hastaTexto, { finDelDia: true })),
+  )
+})
+
 let debounceTimer
 let cargaProgramada
 let inicializado = false
-
-function isoLocal(fecha) {
-  const dos = (valor) => String(valor).padStart(2, '0')
-  return `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())}`
-    + `T${dos(fecha.getHours())}:${dos(fecha.getMinutes())}:${dos(fecha.getSeconds())}`
-}
 
 function aplicarRango() {
   if (rango.value === 'todo') {
@@ -98,8 +103,8 @@ function aplicarRango() {
     return
   }
   if (rango.value === 'custom') {
-    desde.value = desdeCustom.value ? `${desdeCustom.value}:00` : ''
-    hasta.value = hastaCustom.value ? `${hastaCustom.value}:59` : ''
+    desde.value = parsearFechaHora(desdeCustom.value)
+    hasta.value = parsearFechaHora(hastaCustom.value, { finDelDia: true })
     return
   }
   const ahora = new Date()
@@ -212,7 +217,7 @@ watch([desdeCustom, hastaCustom], () => {
   if (!inicializado) return
   if (rango.value === 'custom') {
     aplicarRango()
-    programarCarga()
+    if (!rangoInvalido.value) programarCarga()
   }
 })
 
@@ -402,7 +407,7 @@ watch(
 )
 
 function aInputFechaHora(valor) {
-  return valor ? String(valor).slice(0, 16) : ''
+  return formatearFechaHora(valor)
 }
 
 function inicializarDesdeUrl() {
@@ -518,13 +523,31 @@ onBeforeUnmount(() => {
         <div v-if="rango === 'custom'" class="grid w-full gap-3 sm:grid-cols-2">
           <label class="block">
             <span :class="claseEtiqueta">Desde</span>
-            <input v-model="desdeCustom" type="datetime-local" :class="claseCampo" />
+            <input
+              v-model="desdeCustom"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="dd/mm/aaaa HH:mm"
+              :class="claseCampo"
+            />
           </label>
           <label class="block">
             <span :class="claseEtiqueta">Hasta</span>
-            <input v-model="hastaCustom" type="datetime-local" :class="claseCampo" />
+            <input
+              v-model="hastaCustom"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="dd/mm/aaaa HH:mm"
+              :class="claseCampo"
+            />
           </label>
         </div>
+
+        <p v-if="rangoInvalido" class="w-full text-sm text-rojizo">
+          Usá el formato dd/mm/aaaa HH:mm para el rango personalizado.
+        </p>
       </div>
 
       <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

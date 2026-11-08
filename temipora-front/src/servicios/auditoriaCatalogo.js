@@ -1,3 +1,5 @@
+import { formatearFechaHora } from './fechas'
+
 export const ETIQUETAS_ACCION = {
   ETIQUETA_CREAR: 'Creó una etiqueta',
   ETIQUETA_MODIFICAR: 'Modificó una etiqueta',
@@ -151,11 +153,6 @@ export const ETIQUETAS_ORIGEN = {
   SISTEMA: 'Sistema',
 }
 
-const fechaAbsoluta = new Intl.DateTimeFormat('es', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-})
-
 const fechaRelativa = new Intl.RelativeTimeFormat('es', {
   numeric: 'auto',
 })
@@ -180,10 +177,7 @@ export function nombreOrigen(codigo) {
 }
 
 export function formatearFecha(valor) {
-  if (!valor) return '—'
-  const fecha = new Date(valor)
-  if (Number.isNaN(fecha.getTime())) return '—'
-  return fechaAbsoluta.format(fecha)
+  return formatearFechaHora(valor) || '—'
 }
 
 export function formatearFechaRelativa(valor) {
