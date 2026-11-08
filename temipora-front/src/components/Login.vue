@@ -1,8 +1,9 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { useSesion } from '../composables/useSesion'
+import { obtenerContacto } from '../servicios/contacto'
 import fondo from '../assets/fondos/prueba.png'
 import welcomeLogo from '../assets/welcome logo.png'
 
@@ -14,6 +15,36 @@ const contrasenia = ref('')
 const error = ref('')
 const cargando = ref(false)
 const verContrasenia = ref(false)
+const inhabilitada = ref(null)
+const contactoRespaldo = ref('')
+
+const contactoVisible = computed(
+  () => inhabilitada.value?.contacto || contactoRespaldo.value || 'temiporasupport@gmail.com',
+)
+
+function cargarInhabilitada() {
+  try {
+    const raw = sessionStorage.getItem('cuentaInhabilitada')
+    if (!raw) return
+    inhabilitada.value = JSON.parse(raw)
+  } catch {
+    inhabilitada.value = null
+  }
+}
+
+function formatearFechaFin(valor) {
+  if (!valor) return ''
+  const fecha = new Date(valor)
+  if (Number.isNaN(fecha.getTime())) return ''
+  return new Intl.DateTimeFormat('es-AR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(fecha)
+}
+
+function alInhabilitar() {
+  cargarInhabilitada()
+}
 
 async function iniciarSesion() {
   error.value = ''
@@ -26,6 +57,8 @@ async function iniciarSesion() {
 
     const rol = res.data.rol
     guardarSesion(res.data)
+    sessionStorage.removeItem('cuentaInhabilitada')
+    inhabilitada.value = null
 
     const redirect = route.query.redirect
     if (redirect) {
@@ -36,11 +69,33 @@ async function iniciarSesion() {
       router.push({ name: 'servicios' })
     }
   } catch (e) {
-    error.value = 'Nombre de usuario o contraseña incorrecta.'
+    const data = e.response?.data
+    if (e.response?.status === 403
+        && (data?.codigo === 'CUENTA_SANCIONADA' || data?.codigo === 'CUENTA_INACTIVA')) {
+      inhabilitada.value = {
+        codigo: data.codigo,
+        motivo: data.motivo || '',
+        contacto: data.contacto || '',
+        fechaFin: data.fechaFin || null,
+        message: data.message || '',
+      }
+    } else {
+      error.value = 'Nombre de usuario o contraseña incorrecta.'
+    }
   } finally {
     cargando.value = false
   }
 }
+
+onMounted(async () => {
+  cargarInhabilitada()
+  window.addEventListener('cuenta-inhabilitada', alInhabilitar)
+  contactoRespaldo.value = await obtenerContacto()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('cuenta-inhabilitada', alInhabilitar)
+})
 </script>
 
 <template>
@@ -97,6 +152,28 @@ async function iniciarSesion() {
               {{ verContrasenia ? 'Ocultar' : 'Ver' }}
             </button>
           </div>
+        </div>
+
+        <div
+          v-if="inhabilitada"
+          class="rounded-xl border border-rojizo/30 bg-rosa/40 px-4 py-3 text-sm text-granate"
+          role="alert"
+        >
+          <p class="font-semibold text-rojizo">
+            {{ inhabilitada.message || 'Tu cuenta está inhabilitada.' }}
+          </p>
+          <p v-if="inhabilitada.motivo" class="mt-1">
+            <span class="font-semibold">Motivo:</span> {{ inhabilitada.motivo }}
+          </p>
+          <p v-if="inhabilitada.fechaFin" class="mt-1">
+            La sanción finaliza el {{ formatearFechaFin(inhabilitada.fechaFin) }}.
+          </p>
+          <p class="mt-1">
+            Si creés que es un error, escribinos a
+            <a :href="`mailto:${contactoVisible}`" class="underline">
+              {{ contactoVisible }}
+            </a>.
+          </p>
         </div>
 
         <p v-if="error" class="rounded-md bg-rosa/40 px-3 py-2 text-sm text-rojizo">

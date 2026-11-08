@@ -2,6 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../servicios/api'
+import SancionCuentaModal from './SancionCuentaModal.vue'
 
 const router = useRouter()
 const usernameSearch = ref('')
@@ -17,6 +18,7 @@ const pageSize = ref(10)
 const totalElements = ref(0)
 const totalPages = ref(0)
 const usuarios = ref([]) // content of current page
+const usuarioSancionar = ref(null)
 let debounceTimer
 let requestId = 0
 
@@ -95,6 +97,18 @@ function siguientePagina() {
 
 function alternarDetalle(id) {
   abierto.value = abierto.value === id ? null : id
+}
+
+function abrirSancion(usuario) {
+  usuarioSancionar.value = usuario
+}
+
+function verSancion(usuario) {
+  router.push({ name: 'admin-sanciones', query: { texto: usuario.nombreUsuario } })
+}
+
+function alAplicarSancion() {
+  fetchUsers()
 }
 
 function cerrarSesion() {
@@ -194,7 +208,15 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
               <template v-for="u in usuarios" :key="u.idUsuario">
                 <tr class="border-t border-rosa/50 hover:bg-rosa/20 transition">
                   <td class="px-5 py-3 text-cafe/50 font-mono">{{ u.idUsuario }}</td>
-                  <td class="px-5 py-3 text-granate font-normal">{{ u.nombreUsuario }}</td>
+                  <td class="px-5 py-3 text-granate font-normal">
+                    {{ u.nombreUsuario }}
+                    <span
+                      v-if="u.sancionado"
+                      class="ml-2 rounded-full bg-rojizo/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rojizo"
+                    >
+                      Inhabilitada
+                    </span>
+                  </td>
                   <td class="px-5 py-3">
                     <span
                       class="px-2.5 py-0.5 rounded-full text-xs font-normal tracking-wide"
@@ -209,12 +231,28 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
                   </td>
                   <td class="px-5 py-3 text-granate">{{ u.correo }}</td>
                   <td class="px-5 py-3 text-right">
-                    <button
-                      class="text-rojizo hover:text-coral transition"
-                      @click="alternarDetalle(u.idUsuario)"
-                    >
-                      {{ abierto === u.idUsuario ? 'Cerrar' : 'Detalles' }}
-                    </button>
+                    <div class="flex items-center justify-end gap-3">
+                      <button
+                        v-if="!u.sancionado"
+                        class="text-sm font-semibold text-rojizo hover:text-coral transition"
+                        @click.stop="abrirSancion(u)"
+                      >
+                        Inhabilitar
+                      </button>
+                      <button
+                        v-else
+                        class="text-sm font-semibold text-granate hover:text-coral transition"
+                        @click.stop="verSancion(u)"
+                      >
+                        Ver sanción
+                      </button>
+                      <button
+                        class="text-rojizo hover:text-coral transition"
+                        @click="alternarDetalle(u.idUsuario)"
+                      >
+                        {{ abierto === u.idUsuario ? 'Cerrar' : 'Detalles' }}
+                      </button>
+                    </div>
                   </td>
                 </tr>
                 <tr v-if="abierto === u.idUsuario" class="border-t border-rosa/50 bg-rosa/10">
@@ -292,5 +330,12 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
         </div>
       </div>
     </main>
+
+    <SancionCuentaModal
+      :abierto="Boolean(usuarioSancionar)"
+      :usuario="usuarioSancionar"
+      @cerrar="usuarioSancionar = null"
+      @aplicada="alAplicarSancion"
+    />
   </div>
 </template>

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../components/Login.vue'
 import Usuarios from '../components/Usuarios.vue'
+import SancionesAdmin from '../components/SancionesAdmin.vue'
 import TiposAdmin from '../components/TiposAdmin.vue'
 import EtiquetasAdmin from '../components/EtiquetasAdmin.vue'
 import CategoriasEtiquetaAdmin from '../components/CategoriasEtiquetaAdmin.vue'
@@ -298,6 +299,12 @@ const routes = [
         name: 'usuarios',
         component: Usuarios,
         meta: { title: 'Usuarios registrados' },
+      },
+      {
+        path: 'sanciones',
+        name: 'admin-sanciones',
+        component: SancionesAdmin,
+        meta: { title: 'Sanciones de cuentas' },
       },
       {
         path: 'tipos/producto',

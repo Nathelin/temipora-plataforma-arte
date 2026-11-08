@@ -5,15 +5,18 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import com.temipora.backend_springboot.config.ContactoPlataforma;
 import com.temipora.backend_springboot.config.JwtUtils;
 import com.temipora.backend_springboot.modelo.LoginRequest;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.servicios.CuentaSancionadaException;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
 import jakarta.servlet.FilterChain;
@@ -26,10 +29,15 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
 
     private JwtUtils jwtUtils;
     private UsuarioService usuarioService;
+    private ContactoPlataforma contacto;
 
-    public JwtAuthenticationFilter(JwtUtils jwtUtils, UsuarioService usuarioService) {
+    public JwtAuthenticationFilter(
+            JwtUtils jwtUtils,
+            UsuarioService usuarioService,
+            ContactoPlataforma contacto) {
         this.jwtUtils = jwtUtils;
         this.usuarioService = usuarioService;
+        this.contacto = contacto;
     }
 
     @Override
@@ -90,9 +98,36 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     protected void unsuccessfulAuthentication(HttpServletRequest request,
                                               HttpServletResponse response,
                                               AuthenticationException failed) throws IOException, ServletException {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
 
+        if (failed instanceof CuentaSancionadaException sancionada) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            Map<String, Object> body = new HashMap<>();
+            body.put("codigo", "CUENTA_SANCIONADA");
+            body.put("motivo", sancionada.getMotivo());
+            body.put("contacto", sancionada.getContacto());
+            if (sancionada.getFechaFin() != null) {
+                body.put("fechaFin", sancionada.getFechaFin());
+            }
+            body.put("message", "Tu cuenta se encuentra inhabilitada.");
+            response.getWriter().write(new ObjectMapper().writeValueAsString(body));
+            response.getWriter().flush();
+            return;
+        }
+
+        if (failed instanceof DisabledException) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            Map<String, Object> body = new HashMap<>();
+            body.put("codigo", "CUENTA_INACTIVA");
+            body.put("contacto", contacto.getEmail());
+            body.put("message", "Tu cuenta se encuentra desactivada.");
+            response.getWriter().write(new ObjectMapper().writeValueAsString(body));
+            response.getWriter().flush();
+            return;
+        }
+
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         Map<String, String> body = new HashMap<>();
         body.put("error", "Credenciales inválidas");
 

@@ -7,10 +7,14 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.config.ContactoPlataforma;
 import com.temipora.backend_springboot.config.JwtUtils;
+import com.temipora.backend_springboot.modelo.EstadoSancion;
 import com.temipora.backend_springboot.modelo.PropositoToken;
+import com.temipora.backend_springboot.modelo.SancionCuenta;
 import com.temipora.backend_springboot.modelo.TokenAcceso;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.SancionCuentaRepository;
 import com.temipora.backend_springboot.repositorios.TokenAccesoRepository;
 
 /**
@@ -25,16 +29,22 @@ public class AccesoEnlaceService {
     private final UsuarioService usuarioService;
     private final JwtUtils jwtUtils;
     private final AuditoriaService auditoria;
+    private final SancionCuentaRepository sancionCuentaRepository;
+    private final ContactoPlataforma contacto;
 
     public AccesoEnlaceService(
             TokenAccesoRepository tokenRepository,
             UsuarioService usuarioService,
             JwtUtils jwtUtils,
-            AuditoriaService auditoria) {
+            AuditoriaService auditoria,
+            SancionCuentaRepository sancionCuentaRepository,
+            ContactoPlataforma contacto) {
         this.tokenRepository = tokenRepository;
         this.usuarioService = usuarioService;
         this.jwtUtils = jwtUtils;
         this.auditoria = auditoria;
+        this.sancionCuentaRepository = sancionCuentaRepository;
+        this.contacto = contacto;
     }
 
     @Transactional
@@ -96,6 +106,18 @@ public class AccesoEnlaceService {
         if (usuario == null || !usuario.isEstadoCuenta()) {
             auditarFallo(nombreUsuario, proposito, "Cuenta inactiva");
             throw new AccesoEnlaceInvalidoException("La cuenta no está activa.");
+        }
+
+        if (usuario != null) {
+            var sancionesVigentes = sancionCuentaRepository.findVigentesByUsuarioId(
+                usuario.getIdUsuario(), EstadoSancion.ACTIVA, ahora);
+            if (!sancionesVigentes.isEmpty()) {
+                SancionCuenta sancion = sancionesVigentes.get(0);
+                auditarFallo(nombreUsuario, proposito, "Cuenta inhabilitada");
+                throw new AccesoEnlaceInvalidoException(
+                    "Tu cuenta se encuentra inhabilitada. Motivo: " + sancion.getMotivo()
+                        + ". Contacto: " + contacto.getEmail());
+            }
         }
 
         token.setUsadoEn(ahora);

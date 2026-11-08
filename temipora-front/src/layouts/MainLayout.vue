@@ -8,6 +8,7 @@ import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
 import { useMensajes } from '../composables/useMensajes'
 import { useMensajeriaSocket } from '../composables/useMensajeriaSocket'
 import { useNotificacionesSistema } from '../composables/useNotificacionesSistema'
+import { obtenerContacto } from '../servicios/contacto'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,6 +17,12 @@ const token = ref(localStorage.getItem('token') || '')
 const rol = ref(localStorage.getItem('rol') || '')
 const nombreUsuario = ref(localStorage.getItem('nombreUsuario') || '')
 const urlFotoPerfil = ref(localStorage.getItem('urlFotoPerfil') || '')
+
+const contactoEmail = ref('temiporasupport@gmail.com')
+
+onMounted(async () => {
+  contactoEmail.value = await obtenerContacto()
+})
 
 const menuAbierto = ref(false)
 const menuMovilAbierto = ref(false)
@@ -444,8 +451,8 @@ function irAPerfil() {
           </p>
           <p class="text-xs leading-5 text-inverso-suave/80 mt-1">
             Contacto:
-            <a href="mailto:temiporasupport@gmail.com" class="hover:underline text-inverso-contraste">
-              temiporasupport@gmail.com
+            <a :href="`mailto:${contactoEmail}`" class="hover:underline text-inverso-contraste">
+              {{ contactoEmail }}
             </a>
           </p>
         </div>

@@ -14,6 +14,8 @@ import java.util.NoSuchElementException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.EstadoSancion;
+import com.temipora.backend_springboot.modelo.SancionCuenta;
 import com.temipora.backend_springboot.modelo.ActualizarContraseniaDTO;
 import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
@@ -26,6 +28,7 @@ import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
 import com.temipora.backend_springboot.repositorios.PaisRepository;
 import com.temipora.backend_springboot.repositorios.RolRepository;
+import com.temipora.backend_springboot.repositorios.SancionCuentaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 @Service
@@ -38,6 +41,7 @@ public class UsuarioService {
         CampoAuditado.de("telefono", "Teléfono"));
 
     private final UsuarioRepository usuarioRepository;
+    private final SancionCuentaRepository sancionCuentaRepository;
     private final PasswordEncoder passwordEncoder;
     private final RolRepository rolRepository;
     private final PaisRepository paisRepository;
@@ -48,6 +52,7 @@ public class UsuarioService {
 
     public UsuarioService(
             UsuarioRepository usuarioRepository,
+            SancionCuentaRepository sancionCuentaRepository,
             PasswordEncoder passwordEncoder,
             RolRepository rolRepository,
             PaisRepository paisRepository,
@@ -57,6 +62,7 @@ public class UsuarioService {
             TerminosPlataformaService terminosPlataformaService) {
 
         this.usuarioRepository = usuarioRepository;
+        this.sancionCuentaRepository = sancionCuentaRepository;
         this.passwordEncoder = passwordEncoder;
         this.rolRepository = rolRepository;
         this.paisRepository = paisRepository;
@@ -186,14 +192,35 @@ public class UsuarioService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public Page<UsuarioDTO> obtenerUsuariosPaginados(String nombreUsuario, String correo, Boolean estadoCuenta, ERol rol, Pageable pageable) {
-        return usuarioRepository.findByFilters(
+        Page<Usuario> page = usuarioRepository.findByFilters(
                 aPatronBusqueda(nombreUsuario),
                 aPatronBusqueda(correo),
                 estadoCuenta,
                 rol,
-                pageable)
-                .map(UsuarioDTO::desdeUsuario);
+                pageable);
+
+        List<Long> ids = page.getContent().stream()
+                .map(Usuario::getIdUsuario)
+                .toList();
+        java.util.Map<Long, SancionCuenta> vigentes = new java.util.HashMap<>();
+        if (!ids.isEmpty()) {
+            for (SancionCuenta sancion : sancionCuentaRepository.findVigentesByUsuarioIds(
+                    ids, EstadoSancion.ACTIVA, LocalDateTime.now())) {
+                vigentes.put(sancion.getUsuario().getIdUsuario(), sancion);
+            }
+        }
+
+        return page.map(usuario -> {
+            UsuarioDTO dto = UsuarioDTO.desdeUsuario(usuario);
+            SancionCuenta sancion = vigentes.get(usuario.getIdUsuario());
+            if (sancion != null) {
+                dto.setSancionado(true);
+                dto.setSancionTipo(sancion.getTipo().name());
+            }
+            return dto;
+        });
     }
 
     public String nombreUsuario(Long idUsuario) {

@@ -18,6 +18,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.SancionCuentaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -25,6 +26,12 @@ class DetallesUsuarioServiceTest {
 
     @Mock
     private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private SancionCuentaRepository sancionCuentaRepository;
+
+    @Mock
+    private ContactoPlataforma contacto;
 
     @InjectMocks
     private DetallesUsuarioService detallesUsuarioService;

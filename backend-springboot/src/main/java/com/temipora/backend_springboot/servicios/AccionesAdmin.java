@@ -69,6 +69,8 @@ public final class AccionesAdmin {
     public static final String RESENIA_DESCARTAR_REPORTES = "RESENIA_DESCARTAR_REPORTES";
     public static final String TERMINOS_PUBLICAR = "TERMINOS_PUBLICAR";
     public static final String TERMINOS_ACEPTAR = "TERMINOS_ACEPTAR";
+    public static final String CUENTA_SANCIONAR = "CUENTA_SANCIONAR";
+    public static final String CUENTA_REVERTIR_SANCION = "CUENTA_REVERTIR_SANCION";
     public static final String USUARIO_CAMBIAR_CORREO = "USUARIO_CAMBIAR_CORREO";
     public static final String USUARIO_CAMBIAR_CONTRASENIA = "USUARIO_CAMBIAR_CONTRASENIA";
     public static final String USUARIO_CAMBIAR_TELEFONO = "USUARIO_CAMBIAR_TELEFONO";

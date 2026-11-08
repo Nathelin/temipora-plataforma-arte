@@ -3,6 +3,7 @@ package com.temipora.backend_springboot.modelo;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.temipora.backend_springboot.servicios.TelefonoService;
 
 import lombok.AllArgsConstructor;
@@ -32,6 +33,10 @@ public class UsuarioDTO {
     private String nombrePais;
     private LocalDate fechaNacimiento;
     private boolean estadoCuenta;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Boolean sancionado;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String sancionTipo;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaUltimaConexion;
     private String urlFotoPerfil;

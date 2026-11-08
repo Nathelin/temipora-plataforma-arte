@@ -64,7 +64,7 @@ const grupos = [
         icono: ShieldAlert,
         badge: 'reportes',
       },
-      { nombre: 'Sanciones', icono: Ban, disponible: false },
+      { nombre: 'Sanciones', to: '/admin/sanciones', icono: Ban },
     ],
   },
   {

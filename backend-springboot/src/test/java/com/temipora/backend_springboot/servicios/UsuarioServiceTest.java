@@ -41,6 +41,7 @@ import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
 import com.temipora.backend_springboot.repositorios.PaisRepository;
 import com.temipora.backend_springboot.repositorios.RolRepository;
+import com.temipora.backend_springboot.repositorios.SancionCuentaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +49,9 @@ class UsuarioServiceTest {
 
     @Mock
     private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private SancionCuentaRepository sancionCuentaRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;

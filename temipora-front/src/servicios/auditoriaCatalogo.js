@@ -60,6 +60,8 @@ export const ETIQUETAS_ACCION = {
   USUARIO_CAMBIAR_CONTRASENIA: 'Cambió su contraseña',
   USUARIO_CAMBIAR_TELEFONO: 'Cambió su teléfono',
   USUARIO_QUITAR_TELEFONO: 'Quitó su teléfono',
+  CUENTA_SANCIONAR: 'Inhabilitó una cuenta',
+  CUENTA_REVERTIR_SANCION: 'Revirtió una sanción de cuenta',
   LOGIN_FALLIDO: 'Intento de inicio de sesión fallido',
   SERVICIO_CREAR: 'Creó un servicio',
   SERVICIO_MODIFICAR: 'Modificó un servicio',
@@ -128,6 +130,7 @@ export const ETIQUETAS_ENTIDAD = {
   HitoPedido: 'Hito del pedido',
   ReporteResenia: 'Reporte de reseña',
   Usuario: 'Usuario',
+  SancionCuenta: 'Sanción de cuenta',
 }
 
 export const ETIQUETAS_CATEGORIA = {

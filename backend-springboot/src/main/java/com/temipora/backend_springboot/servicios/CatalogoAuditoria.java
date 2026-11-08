@@ -43,6 +43,8 @@ public final class CatalogoAuditoria {
             AccionesAdmin.SOLICITUD_RETIRAR_PRESUPUESTO);
 
         registrar(CategoriaAuditoria.USUARIOS,
+            AccionesAdmin.CUENTA_SANCIONAR,
+            AccionesAdmin.CUENTA_REVERTIR_SANCION,
             AccionesAdmin.USUARIO_CAMBIAR_CORREO,
             AccionesAdmin.USUARIO_CAMBIAR_CONTRASENIA,
             AccionesAdmin.USUARIO_CAMBIAR_TELEFONO,
@@ -159,6 +161,8 @@ public final class CatalogoAuditoria {
             AccionesAdmin.SOLICITUD_RETIRAR_PRESUPUESTO,
             AccionesAdmin.TERMINOS_PUBLICAR,
             AccionesAdmin.TERMINOS_ACEPTAR,
+            AccionesAdmin.CUENTA_SANCIONAR,
+            AccionesAdmin.CUENTA_REVERTIR_SANCION,
             AccionesAdmin.USUARIO_CAMBIAR_CORREO,
             AccionesAdmin.USUARIO_CAMBIAR_CONTRASENIA,
             AccionesAdmin.USUARIO_CAMBIAR_TELEFONO,
