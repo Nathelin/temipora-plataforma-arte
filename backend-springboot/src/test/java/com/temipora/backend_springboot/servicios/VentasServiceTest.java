@@ -207,8 +207,6 @@ class VentasServiceTest {
 
         HitoPedido hito = new HitoPedido();
         hito.setOrden(0);
-        hito.setNombre("Seña");
-        hito.setTipo(TipoHito.SENA);
         hito.setHitoPresupuesto(hitoPresupuesto);
         hito.setPedido(pedido);
 

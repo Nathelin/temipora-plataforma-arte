@@ -219,8 +219,6 @@ class ProveedorPagoMercadoPagoTest {
         HitoPedido hito = new HitoPedido();
         hito.setIdHitoPedido(20L);
         hito.setOrden(0);
-        hito.setNombre("Seña");
-        hito.setComisionMontoCobro(new BigDecimal("5.00"));
         hito.setHitoPresupuesto(hitoPresupuesto);
         pedido.agregarHito(hito);
 

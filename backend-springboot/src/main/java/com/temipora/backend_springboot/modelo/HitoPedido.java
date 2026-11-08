@@ -1,6 +1,5 @@
 package com.temipora.backend_springboot.modelo;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
@@ -40,40 +39,6 @@ public class HitoPedido {
     @Column(nullable = false)
     private Integer orden;
 
-    @Column(name = "nombre_legacy", length = 60)
-    private String nombre;
-
-    @Column(name = "descripcion_legacy", length = 250)
-    private String descripcion;
-
-    @Column(name = "porcentaje_legacy", precision = 5, scale = 2)
-    private BigDecimal porcentaje;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "tipo_legacy", length = 10)
-    private TipoHito tipo;
-
-    @Column(name = "requiere_entrega_legacy", nullable = false)
-    private boolean requiereEntrega;
-
-    @Column(name = "monto_legacy", precision = 12, scale = 2)
-    private BigDecimal monto;
-
-    @Column(name = "monto_cobro_legacy", precision = 12, scale = 2)
-    private BigDecimal montoCobro;
-
-    @Column(name = "comision_monto_legacy", precision = 12, scale = 2)
-    private BigDecimal comisionMonto;
-
-    @Column(name = "comision_monto_cobro_legacy", precision = 12, scale = 2)
-    private BigDecimal comisionMontoCobro;
-
-    @Column(name = "monto_neto_legacy", precision = 12, scale = 2)
-    private BigDecimal montoNeto;
-
-    @Column(name = "monto_neto_cobro_legacy", precision = 12, scale = 2)
-    private BigDecimal montoNetoCobro;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "estado_pago", nullable = false, length = 20)
     private EstadoPagoHito estadoPago = EstadoPagoHito.PENDIENTE;
@@ -87,9 +52,6 @@ public class HitoPedido {
 
     @Column(name = "fecha_pago")
     private LocalDateTime fechaPago;
-
-    @Column(name = "id_pago_aprobado_legacy")
-    private Long idPagoAprobado;
 
     @Column(name = "fecha_entrega")
     private LocalDateTime fechaEntrega;

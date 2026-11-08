@@ -194,29 +194,12 @@ class PedidoServiceTest {
         pedido.setArtista(artista);
         pedido.setServicio(servicio);
         pedido.setEstado(EstadoPedido.PENDIENTE_PAGO);
-        pedido.setPrecioFinal(new BigDecimal("100.00"));
-        pedido.setPrecioFinalCobro(new BigDecimal("100.00"));
-        pedido.setMoneda(moneda);
-        pedido.setMonedaCobro(moneda);
-        pedido.setCotizacionCobro(BigDecimal.ONE);
-        pedido.setComisionPorcentaje(new BigDecimal("10.00"));
 
         hito = new HitoPedido();
         hito.setIdHitoPedido(HITO);
         hito.setPedido(pedido);
         hito.setHitoPresupuesto(hitoPresupuesto);
         hito.setOrden(0);
-        hito.setNombre("Pago único");
-        hito.setDescripcion("Bocetos");
-        hito.setPorcentaje(new BigDecimal("100.00"));
-        hito.setTipo(TipoHito.SENA);
-        hito.setRequiereEntrega(true);
-        hito.setMonto(new BigDecimal("100.00"));
-        hito.setMontoCobro(new BigDecimal("100.00"));
-        hito.setComisionMonto(new BigDecimal("10.00"));
-        hito.setComisionMontoCobro(new BigDecimal("10.00"));
-        hito.setMontoNeto(new BigDecimal("90.00"));
-        hito.setMontoNetoCobro(new BigDecimal("90.00"));
         hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
         hito.setEstadoEntrega(EstadoEntregaHito.NO_INICIADO);
         pedido.agregarHito(hito);
@@ -397,7 +380,9 @@ class PedidoServiceTest {
         HitoPedido siguiente = new HitoPedido();
         siguiente.setIdHitoPedido(21L);
         siguiente.setOrden(1);
-        siguiente.setTipo(TipoHito.ENTREGA);
+        HitoPresupuesto presupuestoSiguiente = new HitoPresupuesto();
+        presupuestoSiguiente.setTipo(TipoHito.ENTREGA);
+        siguiente.setHitoPresupuesto(presupuestoSiguiente);
         when(hitoFlujoService.habilitarSiguiente(any(), any(), any()))
             .thenReturn(siguiente);
 
@@ -492,7 +477,7 @@ class PedidoServiceTest {
 
     @Test
     void aprobarAutomaticamente_ignoraEntregasFinales() {
-        hito.setTipo(TipoHito.ENTREGA);
+        hito.getHitoPresupuesto().setTipo(TipoHito.ENTREGA);
         hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
         hito.setFechaLimiteAprobacion(LocalDateTime.now().minusDays(1));
         when(hitoPedidoRepository
