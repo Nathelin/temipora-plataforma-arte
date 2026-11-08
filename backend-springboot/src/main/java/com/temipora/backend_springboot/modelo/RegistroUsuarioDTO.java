@@ -35,6 +35,12 @@ public class RegistroUsuarioDTO {
     @AssertTrue(message = "Debes aceptar los términos y condiciones")
     private boolean acceptaTOS;
 
+    /**
+     * Versión de los TOS de plataforma que el usuario vio al registrarse.
+     * Si no se envía, el backend usa la versión vigente al momento del registro.
+     */
+    private Integer versionTerminos;
+
     @Size(min = 2, max = 25, message = "El nombre debe tener entre 2 y 25 caracteres")
     private String nombre;
 

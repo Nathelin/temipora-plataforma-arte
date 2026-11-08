@@ -20,6 +20,10 @@ api.interceptors.response.use(
       localStorage.removeItem('nombreUsuario')
       localStorage.removeItem('rol')
     }
+    if (error.response?.status === 403
+        && error.response?.data?.codigo === 'TOS_NO_ACEPTADOS') {
+      window.dispatchEvent(new CustomEvent('tos-no-aceptados'))
+    }
     return Promise.reject(error)
   },
 )

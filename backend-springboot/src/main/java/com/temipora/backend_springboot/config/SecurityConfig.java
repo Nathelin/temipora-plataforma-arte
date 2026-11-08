@@ -23,6 +23,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import com.temipora.backend_springboot.config.filters.JwtAuthenticationFilter;
 import com.temipora.backend_springboot.config.filters.JwtAuthorizationFilter;
+import com.temipora.backend_springboot.config.filters.TerminosAceptadosFilter;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
 import java.util.List;
@@ -34,10 +35,15 @@ public class SecurityConfig {
 
     private final JwtUtils jwtUtils;
     private final UserDetailsService userDetailsService;
+    private final TerminosAceptadosFilter terminosAceptadosFilter;
 
-    public SecurityConfig(JwtUtils jwtUtils, UserDetailsService userDetailsService) {
+    public SecurityConfig(
+            JwtUtils jwtUtils,
+            UserDetailsService userDetailsService,
+            TerminosAceptadosFilter terminosAceptadosFilter) {
         this.jwtUtils = jwtUtils;
         this.userDetailsService = userDetailsService;
+        this.terminosAceptadosFilter = terminosAceptadosFilter;
     }
 
     @Bean
@@ -99,6 +105,8 @@ public class SecurityConfig {
             )
             .addFilter(jwtAuthenticationFilter)
             .addFilterBefore(new JwtAuthorizationFilter(jwtUtils, userDetailsService),
+                    UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(terminosAceptadosFilter,
                     UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

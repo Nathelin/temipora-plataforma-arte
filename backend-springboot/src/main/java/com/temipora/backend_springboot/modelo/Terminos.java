@@ -37,11 +37,20 @@ public class Terminos {
     @Column(name = "id_producto")
     private Long idProducto;
 
-    @Column(name = "id_servicio")
-    private Long idServicio;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_servicio")
+    private Servicio servicio;
 
     @Column(nullable = false)
     private Integer version = 1;
+
+    /**
+     * Sólo la última versión de cada alcance (global o servicio) queda vigente.
+     * Las versiones anteriores se conservan para respetar lo aceptado por los
+     * usuarios y para auditoría.
+     */
+    @Column(nullable = false)
+    private boolean vigente = true;
 
     @Column(name = "informacion_general", columnDefinition = "TEXT")
     private String informacionGeneral;

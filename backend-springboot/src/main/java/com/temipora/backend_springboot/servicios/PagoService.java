@@ -130,7 +130,7 @@ public class PagoService {
         Pago guardado = pagoRepository.save(pago);
         auditoria.registrar(
             AccionesAdmin.PAGO_INICIAR, ENTIDAD_PAGO, guardado.getIdPago(),
-            "Inició el pago del hito '" + hito.getNombre()
+            "Inició el pago del hito '" + hito.getHitoPresupuesto().getNombre()
                 + "' del pedido #" + pedido.getIdPedido(),
             null, guardado, CAMPOS_PAGO);
         return guardado;
@@ -140,13 +140,15 @@ public class PagoService {
         Pago pago = new Pago();
         pago.setHitoPedido(hito);
         pago.setUsuarioPagador(pedido.getCliente());
-        pago.setMonto(hito.getMonto());
-        pago.setMoneda(pedido.getMoneda());
-        pago.setMontoCobro(hito.getMontoCobro());
-        pago.setMonedaCobro(pedido.getMonedaCobro());
-        pago.setCotizacionCobro(pedido.getCotizacionCobro());
-        pago.setComisionMontoCobro(hito.getComisionMontoCobro());
-        pago.setMontoNetoCobro(hito.getMontoNetoCobro());
+        pago.setMonto(hito.getHitoPresupuesto().getMonto());
+        pago.setMoneda(pedido.getPresupuesto().getMoneda());
+        pago.setMontoCobro(hito.getHitoPresupuesto().getMontoCobro());
+        pago.setMonedaCobro(pedido.getPresupuesto().getMonedaCobro());
+        pago.setCotizacionCobro(pedido.getPresupuesto().getCotizacionCobro());
+        pago.setComisionMontoCobro(
+            hito.getHitoPresupuesto().getComisionMontoCobro());
+        pago.setMontoNetoCobro(
+            hito.getHitoPresupuesto().getMontoNetoCobro());
         pago.setEstado(EstadoPago.PENDIENTE);
         pago.setProveedor(proveedorPago.nombre());
         pago.setClaveIdempotencia(
@@ -182,7 +184,7 @@ public class PagoService {
         Pedido pedido = aplicarAprobacion(pago, payload);
         auditoria.registrar(
             AccionesAdmin.PAGO_CONFIRMAR, ENTIDAD_PAGO, pago.getIdPago(),
-            "Confirmó el pago del hito '" + pago.getHitoPedido().getNombre() + "'",
+            "Confirmó el pago del hito '" + pago.getHitoPedido().getHitoPresupuesto().getNombre() + "'",
             antes, pago, CAMPOS_PAGO);
         return pedido;
     }
@@ -339,7 +341,7 @@ public class PagoService {
         }
 
         LocalDateTime ahora = LocalDateTime.now();
-        if (hito.getTipo() == TipoHito.ENTREGA
+        if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA
                 && hito.getEstadoEntrega() != EstadoEntregaHito.ENTREGADO) {
             throw new ConflictoException(
                 "La entrega final todavía no está disponible para pagar.");
@@ -353,7 +355,6 @@ public class PagoService {
 
         hito.setEstadoPago(EstadoPagoHito.PAGADO);
         hito.setFechaPago(ahora);
-        hito.setIdPagoAprobado(pago.getIdPago());
 
         boolean primerPago = pedido.getEstado() == EstadoPedido.PENDIENTE_PAGO;
         if (primerPago) {
@@ -361,10 +362,10 @@ public class PagoService {
         }
 
         HitoPedido siguiente = null;
-        if (hito.getTipo() == TipoHito.ENTREGA) {
+        if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
             hito.setEstadoEntrega(EstadoEntregaHito.APROBADO);
             hito.setFechaAprobacion(ahora);
-        } else if (!hito.isRequiereEntrega()) {
+        } else if (!hito.getHitoPresupuesto().isRequiereEntrega()) {
             hito.setEstadoEntrega(EstadoEntregaHito.APROBADO);
             hito.setFechaAprobacion(ahora);
             siguiente = hitoFlujoService.habilitarSiguiente(
@@ -377,8 +378,8 @@ public class PagoService {
 
         notificarPagoRecibido(pedido, hito);
 
-        if (hito.getTipo() == TipoHito.ENTREGA
-                || (!hito.isRequiereEntrega() && siguiente == null)) {
+        if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA
+                || (!hito.getHitoPresupuesto().isRequiereEntrega() && siguiente == null)) {
             pedidoCierreService.finalizar(pedido, ahora);
             auditoria.registrar(
                 AccionesAdmin.PEDIDO_FINALIZAR, ENTIDAD_PEDIDO, pedido.getIdPedido(),
@@ -450,7 +451,7 @@ public class PagoService {
             pago.getUsuarioPagador().getIdUsuario(),
             NOTIFICACION_PAGO_RECHAZADO,
             "Pago rechazado",
-            "El pago de '" + pago.getHitoPedido().getNombre()
+            "El pago de '" + pago.getHitoPedido().getHitoPresupuesto().getNombre()
                 + "' del pedido de '" + nombreServicio(pedido)
                 + "' fue rechazado." + (motivo != null && !motivo.isBlank()
                     ? " Motivo: " + motivo.trim()
@@ -464,7 +465,7 @@ public class PagoService {
             pedido.getArtista().getIdUsuario(),
             NOTIFICACION_PAGO_RECIBIDO,
             "Pago recibido",
-            "El cliente pagó '" + hito.getNombre()
+            "El cliente pagó '" + hito.getHitoPresupuesto().getNombre()
                 + "' del pedido de '" + nombreServicio(pedido) + "'.",
             pedido.getIdPedido(),
             TIPO_REFERENCIA_PEDIDO);

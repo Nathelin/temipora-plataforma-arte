@@ -11,4 +11,7 @@ public interface AceptacionTerminosPlataformaRepository
 
     Optional<AceptacionTerminosPlataforma> findByUsuarioIdUsuarioAndVersion(
         Long idUsuario, Integer version);
+
+    boolean existsByUsuarioNombreUsuarioIgnoreCaseAndVersion(
+        String nombreUsuario, Integer version);
 }

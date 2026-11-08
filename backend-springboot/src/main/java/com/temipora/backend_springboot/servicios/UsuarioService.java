@@ -44,6 +44,7 @@ public class UsuarioService {
     private final TelefonoService telefonoService;
     private final MonedaService monedaService;
     private final AuditoriaService auditoria;
+    private final TerminosPlataformaService terminosPlataformaService;
 
     public UsuarioService(
             UsuarioRepository usuarioRepository,
@@ -52,7 +53,8 @@ public class UsuarioService {
             PaisRepository paisRepository,
             TelefonoService telefonoService,
             MonedaService monedaService,
-            AuditoriaService auditoria) {
+            AuditoriaService auditoria,
+            TerminosPlataformaService terminosPlataformaService) {
 
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
@@ -61,8 +63,10 @@ public class UsuarioService {
         this.telefonoService = telefonoService;
         this.monedaService = monedaService;
         this.auditoria = auditoria;
+        this.terminosPlataformaService = terminosPlataformaService;
     }
 
+    @Transactional
     public Usuario registrarUsuario(RegistroUsuarioDTO dto) {
 
         if (dto.getRol() == ERol.ADMIN) {
@@ -75,6 +79,11 @@ public class UsuarioService {
                     + " años para crear una cuenta en Temipora.");
         }
 
+        String correo = dto.getCorreo().trim();
+        if (usuarioRepository.existsByCorreoIgnoreCase(correo)) {
+            throw new IllegalArgumentException("Ya existe una cuenta con ese correo.");
+        }
+
         Rol rol = rolRepository
                 .findByNombre(dto.getRol())
                 .orElseThrow(() -> new IllegalStateException("El rol " + dto.getRol() + " no existe"));
@@ -83,7 +92,7 @@ public class UsuarioService {
                 .nombreUsuario(dto.getNombreUsuario())
                 .nombre(dto.getNombre())
                 .apellido(dto.getApellido())
-                .correo(dto.getCorreo())
+                .correo(correo)
                 .contrasenia(passwordEncoder.encode(dto.getContrasenia()))
                 .fechaNacimiento(dto.getFechaNacimiento())
                 .biografia(dto.getBiografia())
@@ -94,7 +103,15 @@ public class UsuarioService {
                 .rol(rol)
                 .build();
 
-        return usuarioRepository.save(usuario);
+        Usuario guardado = usuarioRepository.save(usuario);
+
+        Integer versionTerminos = dto.getVersionTerminos();
+        if (versionTerminos == null) {
+            versionTerminos = terminosPlataformaService.obtenerEntidadVigente().getVersion();
+        }
+        terminosPlataformaService.aceptar(guardado.getIdUsuario(), versionTerminos);
+
+        return guardado;
     }
 
     public boolean existeNombreUsuario(String nombreUsuario) {
@@ -196,7 +213,7 @@ public class UsuarioService {
 
         String nuevoCorreo = dto.getCorreo().trim();
 
-        usuarioRepository.findByCorreo(nuevoCorreo)
+        usuarioRepository.findByCorreoIgnoreCase(nuevoCorreo)
                 .filter(otro -> !otro.getIdUsuario().equals(idUsuario))
                 .ifPresent(otro -> {
                     throw new IllegalArgumentException("Ya existe una cuenta con ese correo.");

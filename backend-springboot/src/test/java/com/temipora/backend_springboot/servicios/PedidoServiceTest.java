@@ -29,6 +29,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.temipora.backend_springboot.modelo.AceptacionTerminosPlataforma;
 import com.temipora.backend_springboot.modelo.ContadoresPedidosDTO;
 import com.temipora.backend_springboot.modelo.ArancelEstimadoDTO;
 import com.temipora.backend_springboot.modelo.Conversacion;
@@ -271,6 +272,23 @@ class PedidoServiceTest {
     }
 
     @Test
+    void crearDesdePresupuesto_sinAceptacionTerminos_lanzaConflicto() {
+        when(solicitudRepository.findByIdSolicitudForUpdate(
+            solicitud.getIdSolicitud())).thenReturn(Optional.of(solicitud));
+        when(pedidoRepository.findBySolicitudIdSolicitud(
+            solicitud.getIdSolicitud())).thenReturn(Optional.empty());
+        when(terminosPlataformaService.obtenerAceptacionVigente(anyLong()))
+            .thenThrow(new ConflictoException(
+                "Tenés que aceptar los términos de la plataforma vigentes."));
+
+        assertThatThrownBy(() -> pedidoService.crearDesdePresupuesto(
+            solicitud.getIdSolicitud(), CLIENTE))
+            .isInstanceOf(ConflictoException.class);
+
+        verify(pedidoRepository, never()).save(any(Pedido.class));
+    }
+
+    @Test
     void crearDesdePresupuesto_pedidoExistenteSena_iniciaElPago() {
         pedido.setEstado(EstadoPedido.PENDIENTE_PAGO);
         when(solicitudRepository.findByIdSolicitudForUpdate(
@@ -289,8 +307,8 @@ class PedidoServiceTest {
 
     @Test
     void crearDesdePresupuesto_pedidoExistenteEntrega_iniciaSinPago() {
-        hito.setTipo(TipoHito.ENTREGA);
-        hito.setNombre("Entrega final");
+        hito.getHitoPresupuesto().setTipo(TipoHito.ENTREGA);
+        hito.getHitoPresupuesto().setNombre("Entrega final");
         when(solicitudRepository.findByIdSolicitudForUpdate(
             solicitud.getIdSolicitud())).thenReturn(Optional.of(solicitud));
         when(pedidoRepository.findBySolicitudIdSolicitud(
@@ -339,7 +357,7 @@ class PedidoServiceTest {
     @Test
     void entregar_entregaUnica_permiteSinEtapaAnterior() {
         pedido.setEstado(EstadoPedido.EN_CURSO);
-        hito.setTipo(TipoHito.ENTREGA);
+        hito.getHitoPresupuesto().setTipo(TipoHito.ENTREGA);
         hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
         bloquearPedidoYHito();
 
@@ -818,6 +836,13 @@ class PedidoServiceTest {
             solicitud.getIdSolicitud())).thenReturn(Optional.of(solicitud));
         when(pedidoRepository.findBySolicitudIdSolicitud(
             solicitud.getIdSolicitud())).thenReturn(Optional.empty());
+
+        AceptacionTerminosPlataforma aceptacion = new AceptacionTerminosPlataforma();
+        aceptacion.setIdAceptacion(1L);
+        aceptacion.setVersion(4);
+        aceptacion.setFechaAceptacion(LocalDateTime.now());
+        when(terminosPlataformaService.obtenerAceptacionVigente(anyLong()))
+            .thenReturn(aceptacion);
     }
 
     private void bloquearPedidoYHito() {

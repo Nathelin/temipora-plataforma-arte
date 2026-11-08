@@ -28,6 +28,7 @@ import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.HitoPedido;
+import com.temipora.backend_springboot.modelo.HitoPresupuesto;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Pago;
 import com.temipora.backend_springboot.modelo.Pedido;
@@ -102,6 +103,12 @@ class PagoServiceTest {
         presupuesto.setTiempoEntregaValor(2);
         presupuesto.setTiempoEntregaUnidad(ETiempoEntregaUnidad.SEMANAS);
         presupuesto.setTiempoEntregaDias(14);
+        presupuesto.setMoneda(ars);
+        presupuesto.setMonedaCobro(ars);
+        presupuesto.setCotizacionCobro(BigDecimal.ONE);
+        presupuesto.setPrecioFinal(new BigDecimal("100.00"));
+        presupuesto.setPrecioFinalCobro(new BigDecimal("100.00"));
+        presupuesto.setComisionPorcentaje(new BigDecimal("10.00"));
 
         solicitud = new Solicitud();
         solicitud.setIdSolicitud(9L);
@@ -119,28 +126,25 @@ class PagoServiceTest {
         pedido.setArtista(artista);
         pedido.setServicio(servicio);
         pedido.setEstado(EstadoPedido.PENDIENTE_PAGO);
-        pedido.setPrecioFinal(new BigDecimal("100.00"));
-        pedido.setPrecioFinalCobro(new BigDecimal("100.00"));
-        pedido.setMoneda(ars);
-        pedido.setMonedaCobro(ars);
-        pedido.setCotizacionCobro(BigDecimal.ONE);
-        pedido.setComisionPorcentaje(new BigDecimal("10.00"));
-        pedido.setTerminosPlataformaVersion(1);
-        pedido.setTerminosPlataformaSnapshot("TOS");
+
+        HitoPresupuesto hitoPresupuesto = new HitoPresupuesto();
+        hitoPresupuesto.setIdHitoPresupuesto(8L);
+        hitoPresupuesto.setOrden(0);
+        hitoPresupuesto.setNombre("Seña");
+        hitoPresupuesto.setTipo(TipoHito.SENA);
+        hitoPresupuesto.setMonto(new BigDecimal("50.00"));
+        hitoPresupuesto.setMontoCobro(new BigDecimal("50.00"));
+        hitoPresupuesto.setComisionMonto(new BigDecimal("5.00"));
+        hitoPresupuesto.setComisionMontoCobro(new BigDecimal("5.00"));
+        hitoPresupuesto.setMontoNeto(new BigDecimal("45.00"));
+        hitoPresupuesto.setMontoNetoCobro(new BigDecimal("45.00"));
+        hitoPresupuesto.setRequiereEntrega(false);
 
         hito = new HitoPedido();
         hito.setIdHitoPedido(HITO);
+        hito.setHitoPresupuesto(hitoPresupuesto);
         hito.setOrden(0);
-        hito.setNombre("Seña");
-        hito.setTipo(TipoHito.SENA);
-        hito.setRequiereEntrega(false);
         hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
-        hito.setMonto(new BigDecimal("50.00"));
-        hito.setMontoCobro(new BigDecimal("50.00"));
-        hito.setComisionMonto(new BigDecimal("5.00"));
-        hito.setComisionMontoCobro(new BigDecimal("5.00"));
-        hito.setMontoNeto(new BigDecimal("45.00"));
-        hito.setMontoNetoCobro(new BigDecimal("45.00"));
         pedido.agregarHito(hito);
 
         pago = new Pago();
@@ -187,8 +191,8 @@ class PagoServiceTest {
 
     @Test
     void confirmarEntregaFinal_delegaElCierreDelPedido() {
-        hito.setTipo(TipoHito.ENTREGA);
-        hito.setRequiereEntrega(true);
+        hito.getHitoPresupuesto().setTipo(TipoHito.ENTREGA);
+        hito.getHitoPresupuesto().setRequiereEntrega(true);
         hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
         hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
         pedido.setEstado(EstadoPedido.EN_CURSO);
@@ -213,8 +217,8 @@ class PagoServiceTest {
 
     @Test
     void confirmarEntregaSinEntregar_lanzaConflicto() {
-        hito.setTipo(TipoHito.ENTREGA);
-        hito.setRequiereEntrega(true);
+        hito.getHitoPresupuesto().setTipo(TipoHito.ENTREGA);
+        hito.getHitoPresupuesto().setRequiereEntrega(true);
         hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
         hito.setEstadoEntrega(EstadoEntregaHito.NO_INICIADO);
         pedido.setEstado(EstadoPedido.EN_CURSO);

@@ -40,38 +40,38 @@ public class HitoPedido {
     @Column(nullable = false)
     private Integer orden;
 
-    @Column(nullable = false, length = 60)
+    @Column(name = "nombre_legacy", length = 60)
     private String nombre;
 
-    @Column(length = 250)
+    @Column(name = "descripcion_legacy", length = 250)
     private String descripcion;
 
-    @Column(precision = 5, scale = 2)
+    @Column(name = "porcentaje_legacy", precision = 5, scale = 2)
     private BigDecimal porcentaje;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
+    @Column(name = "tipo_legacy", length = 10)
     private TipoHito tipo;
 
-    @Column(name = "requiere_entrega", nullable = false)
+    @Column(name = "requiere_entrega_legacy", nullable = false)
     private boolean requiereEntrega;
 
-    @Column(nullable = false, precision = 12, scale = 2)
+    @Column(name = "monto_legacy", precision = 12, scale = 2)
     private BigDecimal monto;
 
-    @Column(name = "monto_cobro", nullable = false, precision = 12, scale = 2)
+    @Column(name = "monto_cobro_legacy", precision = 12, scale = 2)
     private BigDecimal montoCobro;
 
-    @Column(name = "comision_monto", nullable = false, precision = 12, scale = 2)
+    @Column(name = "comision_monto_legacy", precision = 12, scale = 2)
     private BigDecimal comisionMonto;
 
-    @Column(name = "comision_monto_cobro", nullable = false, precision = 12, scale = 2)
+    @Column(name = "comision_monto_cobro_legacy", precision = 12, scale = 2)
     private BigDecimal comisionMontoCobro;
 
-    @Column(name = "monto_neto", nullable = false, precision = 12, scale = 2)
+    @Column(name = "monto_neto_legacy", precision = 12, scale = 2)
     private BigDecimal montoNeto;
 
-    @Column(name = "monto_neto_cobro", nullable = false, precision = 12, scale = 2)
+    @Column(name = "monto_neto_cobro_legacy", precision = 12, scale = 2)
     private BigDecimal montoNetoCobro;
 
     @Enumerated(EnumType.STRING)
@@ -88,7 +88,7 @@ public class HitoPedido {
     @Column(name = "fecha_pago")
     private LocalDateTime fechaPago;
 
-    @Column(name = "id_pago_aprobado")
+    @Column(name = "id_pago_aprobado_legacy")
     private Long idPagoAprobado;
 
     @Column(name = "fecha_entrega")

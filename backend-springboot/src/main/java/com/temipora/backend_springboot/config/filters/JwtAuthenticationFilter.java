@@ -60,14 +60,15 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
                                             Authentication result) throws IOException, ServletException {
 
         User usuario = (User) result.getPrincipal();
-        String rol = usuario.getAuthorities().stream()
-            .findFirst()
-            .map(a -> a.getAuthority().replace("ROLE_", ""))
-            .orElse("");
+        Usuario entidad = usuarioService.getByNombreUsuario(usuario.getUsername());
+
+        // El rol del token es el rol real del usuario, no la primera autoridad
+        // (que puede ser un rol heredado por la jerarquía).
+        String rol = entidad.getRol() != null && entidad.getRol().getNombre() != null
+            ? entidad.getRol().getNombre().name()
+            : "";
 
         usuarioService.actualizarUltimaConexion(usuario.getUsername());
-
-        Usuario entidad = usuarioService.getByNombreUsuario(usuario.getUsername());
 
         String token = jwtUtils.generarTokenAcceso(usuario.getUsername(), rol);
 

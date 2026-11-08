@@ -25,10 +25,12 @@ import org.springframework.data.jpa.domain.Specification;
 
 import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.HitoPedido;
+import com.temipora.backend_springboot.modelo.HitoPresupuesto;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Pago;
 import com.temipora.backend_springboot.modelo.Pedido;
+import com.temipora.backend_springboot.modelo.Presupuesto;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.TipoHito;
 import com.temipora.backend_springboot.modelo.Usuario;
@@ -128,10 +130,10 @@ class VentasServiceTest {
     @Test
     void descuento_loFinanciaTemiporaYSeProrrateaPorPago() {
         Pago pago = pago(30L, "cliente1", "Ilustración");
-        Pedido pedido = pago.getHitoPedido().getPedido();
-        pedido.setDescuentoPorcentaje(new BigDecimal("5.00"));
-        pedido.setDescuentoMontoCobro(new BigDecimal("125.00"));
-        pedido.setPrecioFinalClienteCobro(new BigDecimal("2375.00"));
+        Presupuesto presupuesto = pago.getHitoPedido().getPedido().getPresupuesto();
+        presupuesto.setDescuentoPorcentaje(new BigDecimal("5.00"));
+        presupuesto.setDescuentoMontoCobro(new BigDecimal("125.00"));
+        presupuesto.setPrecioFinalClienteCobro(new BigDecimal("2375.00"));
         when(pagoRepository.findAll(
             ArgumentMatchers.<Specification<Pago>>any(),
             any(Pageable.class)))
@@ -188,15 +190,26 @@ class VentasServiceTest {
         Usuario cliente = new Usuario();
         cliente.setNombreUsuario(usuarioCliente);
 
+        Presupuesto presupuesto = new Presupuesto();
+        presupuesto.setDescuentoPorcentaje(BigDecimal.ZERO);
+        presupuesto.setDescuentoMontoCobro(BigDecimal.ZERO);
+        presupuesto.setPrecioFinalClienteCobro(BigDecimal.ONE);
+
         Pedido pedido = new Pedido();
         pedido.setIdPedido(10L);
         pedido.setCliente(cliente);
         pedido.setServicio(entidadServicio);
+        pedido.setPresupuesto(presupuesto);
+
+        HitoPresupuesto hitoPresupuesto = new HitoPresupuesto();
+        hitoPresupuesto.setNombre("Seña");
+        hitoPresupuesto.setTipo(TipoHito.SENA);
 
         HitoPedido hito = new HitoPedido();
         hito.setOrden(0);
         hito.setNombre("Seña");
         hito.setTipo(TipoHito.SENA);
+        hito.setHitoPresupuesto(hitoPresupuesto);
         hito.setPedido(pedido);
 
         Pago pago = new Pago();

@@ -130,13 +130,13 @@ public class VentasService {
         // El descuento lo financia Temipora: se prorratea por el monto de este
         // pago sobre el total que paga el cliente.
         BigDecimal descuentoCobro = BigDecimal.ZERO;
-        if (pedido.getDescuentoMontoCobro() != null
-                && pedido.getPrecioFinalClienteCobro() != null
-                && pedido.getPrecioFinalClienteCobro().signum() > 0
+        if (pedido.getPresupuesto().getDescuentoMontoCobro() != null
+                && pedido.getPresupuesto().getPrecioFinalClienteCobro() != null
+                && pedido.getPresupuesto().getPrecioFinalClienteCobro().signum() > 0
                 && pago.getMontoCobro() != null) {
-            descuentoCobro = pedido.getDescuentoMontoCobro()
+            descuentoCobro = pedido.getPresupuesto().getDescuentoMontoCobro()
                 .multiply(pago.getMontoCobro())
-                .divide(pedido.getPrecioFinalClienteCobro(),
+                .divide(pedido.getPresupuesto().getPrecioFinalClienteCobro(),
                     2, RoundingMode.HALF_UP);
         }
 
@@ -151,9 +151,11 @@ public class VentasService {
             .nombreUsuarioCliente(pedido.getCliente() != null
                 ? pedido.getCliente().getNombreUsuario()
                 : null)
-            .nombreHito(hito.getNombre())
+            .nombreHito(hito.getHitoPresupuesto().getNombre())
             .ordenHito(hito.getOrden())
-            .tipoHito(hito.getTipo() != null ? hito.getTipo().name() : null)
+            .tipoHito(hito.getHitoPresupuesto().getTipo() != null
+                ? hito.getHitoPresupuesto().getTipo().name()
+                : null)
             .estado(pago.getEstado() != null ? pago.getEstado().name() : null)
             .monto(pago.getMonto())
             .moneda(pago.getMoneda() != null
@@ -166,7 +168,7 @@ public class VentasService {
             .comisionMontoCobro(pago.getComisionMontoCobro())
             .montoNetoCobro(pago.getMontoNetoCobro())
             .netoMostrado(netoMostrado)
-            .descuentoPorcentaje(pedido.getDescuentoPorcentaje())
+            .descuentoPorcentaje(pedido.getPresupuesto().getDescuentoPorcentaje())
             .descuentoMontoCobro(descuentoCobro)
             .descuentoMostrado(convertir(
                 descuentoCobro, mostrada, pago.getFechaCreacion()))

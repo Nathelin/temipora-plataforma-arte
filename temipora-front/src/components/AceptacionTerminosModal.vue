@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import api from '../servicios/api'
 
 const visible = ref(false)
@@ -10,7 +10,6 @@ const error = ref('')
 
 async function verificar() {
   if (!localStorage.getItem('token')) return
-  if (localStorage.getItem('rol') === 'ADMIN') return
   try {
     const res = await api.get('/terminos-plataforma/estado')
     if (res.data?.version && !res.data.aceptada) {
@@ -39,7 +38,18 @@ async function aceptar() {
   }
 }
 
-onMounted(verificar)
+function manejarTosNoAceptados() {
+  verificar()
+}
+
+onMounted(() => {
+  verificar()
+  window.addEventListener('tos-no-aceptados', manejarTosNoAceptados)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('tos-no-aceptados', manejarTosNoAceptados)
+})
 </script>
 
 <template>

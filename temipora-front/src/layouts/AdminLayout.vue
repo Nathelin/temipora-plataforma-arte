@@ -5,6 +5,7 @@ import BrandLogo from '../components/BrandLogo.vue'
 import { useAdminMenu } from '../composables/useAdminMenu'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
+import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
 import api from '../servicios/api'
 import {
   Archive,
@@ -522,5 +523,6 @@ function cerrarSesion() {
         <router-view :key="JSON.stringify(route.params)" />
       </main>
     </div>
+    <AceptacionTerminosModal />
   </div>
 </template>

@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.config;
 
-import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -9,7 +10,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -24,14 +27,26 @@ public class DetallesUsuarioService implements UserDetailsService{
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String nombreUsuario) throws UsernameNotFoundException {
         Usuario usuario = usuarioRepository.findByNombreUsuarioIgnoreCase(nombreUsuario)
                                      .orElseThrow(()-> new UsernameNotFoundException("No se encontró al usuario."));
 
-        Collection<? extends GrantedAuthority> permisos = java.util.Collections.singleton(
-            new SimpleGrantedAuthority("ROLE_".concat(usuario.getRol().getNombre().name())));
-         
-        return new User(usuario.getNombreUsuario(), usuario.getContrasenia(), true, true, true, true, permisos);
+        // El usuario tiene un solo rol, pero hereda las autoridades de sus ancestros:
+        // CLIENTE <- ARTISTA <- ADMIN. Se devuelve el rol principal primero.
+        Set<GrantedAuthority> autoridades = new LinkedHashSet<>();
+        Set<Long> visitados = new LinkedHashSet<>();
+        Rol rol = usuario.getRol();
+        while (rol != null && visitados.add(rol.getIdRol())) {
+            if (rol.getNombre() != null) {
+                autoridades.add(new SimpleGrantedAuthority(
+                    "ROLE_".concat(rol.getNombre().name())));
+            }
+            rol = rol.getRolPadre();
+        }
+
+        return new User(usuario.getNombreUsuario(), usuario.getContrasenia(),
+            true, true, true, true, autoridades);
 
         // el return tiene cuatro booleans, entre ellos para definir permisos y si hay bloqueos o expiración de sesión.
         // TODO: investigar mejor

@@ -67,6 +67,9 @@ class UsuarioServiceTest {
     @Mock
     private AuditoriaService auditoria;
 
+    @Mock
+    private TerminosPlataformaService terminosPlataformaService;
+
     @InjectMocks
     private UsuarioService usuarioService;
 
@@ -135,7 +138,11 @@ class UsuarioServiceTest {
         when(rolRepository.findByNombre(ERol.CLIENTE)).thenReturn(Optional.of(rolCliente));
         when(passwordEncoder.encode("secreta123")).thenReturn("$2a$10$hasheado");
         when(monedaService.predeterminada()).thenReturn(Moneda.builder().idMoneda(1L).codigo("ARS").build());
-        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> {
+            Usuario guardado = inv.getArgument(0);
+            guardado.setIdUsuario(1L);
+            return guardado;
+        });
 
         Usuario guardado = usuarioService.registrarUsuario(dto);
 
@@ -148,6 +155,22 @@ class UsuarioServiceTest {
         assertThat(guardado.getNombre()).isEqualTo("Cosmo");
         assertThat(guardado.getBiografia()).isEqualTo("Artista emergente");
         verify(passwordEncoder).encode("secreta123");
+        verify(terminosPlataformaService).aceptar(1L, 4);
+    }
+
+    @Test
+    void registrarUsuario_correoDuplicado_lanzaExcepcionYNoGuarda() {
+        RegistroUsuarioDTO dto = registroConRol(ERol.CLIENTE);
+        when(usuarioRepository.existsByCorreoIgnoreCase(dto.getCorreo().trim()))
+            .thenReturn(true);
+
+        assertThatThrownBy(() -> usuarioService.registrarUsuario(dto))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Ya existe una cuenta con ese correo.");
+
+        verify(usuarioRepository, never()).save(any(Usuario.class));
+        verify(rolRepository, never()).findByNombre(any(ERol.class));
+        verify(terminosPlataformaService, never()).aceptar(any(), any());
     }
 
     // ---------------------------------------------------------------
@@ -391,7 +414,7 @@ class UsuarioServiceTest {
 
         when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
         when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
-        when(usuarioRepository.findByCorreo("nuevo@mail.com")).thenReturn(Optional.empty());
+        when(usuarioRepository.findByCorreoIgnoreCase("nuevo@mail.com")).thenReturn(Optional.empty());
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UsuarioDTO resultado = usuarioService.cambiarCorreo(1L, dto);
@@ -430,7 +453,7 @@ class UsuarioServiceTest {
 
         when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
         when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
-        when(usuarioRepository.findByCorreo("ocupado@mail.com")).thenReturn(Optional.of(otro));
+        when(usuarioRepository.findByCorreoIgnoreCase("ocupado@mail.com")).thenReturn(Optional.of(otro));
 
         assertThatThrownBy(() -> usuarioService.cambiarCorreo(1L, dto))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -448,7 +471,7 @@ class UsuarioServiceTest {
 
         when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
         when(passwordEncoder.matches("secreta123", "$2a$10$hasheado")).thenReturn(true);
-        when(usuarioRepository.findByCorreo("cosmiq@mail.com")).thenReturn(Optional.of(usuario));
+        when(usuarioRepository.findByCorreoIgnoreCase("cosmiq@mail.com")).thenReturn(Optional.of(usuario));
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UsuarioDTO resultado = usuarioService.cambiarCorreo(1L, dto);
@@ -826,6 +849,7 @@ class UsuarioServiceTest {
         dto.setContrasenia("secreta123");
         dto.setConfirmarContrasenia("secreta123");
         dto.setAcceptaTOS(true);
+        dto.setVersionTerminos(4);
         dto.setFechaNacimiento(LocalDate.of(2000, 1, 1));
         dto.setRol(rol);
         return dto;

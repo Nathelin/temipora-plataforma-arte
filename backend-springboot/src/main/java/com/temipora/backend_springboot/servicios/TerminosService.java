@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import com.temipora.backend_springboot.modelo.DerechoTermino;
+import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.TerminoDerecho;
 import com.temipora.backend_springboot.modelo.TerminoDerechoRequest;
 import com.temipora.backend_springboot.modelo.Terminos;
@@ -20,6 +21,7 @@ import com.temipora.backend_springboot.modelo.TerminosDTO;
 import com.temipora.backend_springboot.modelo.TerminosRequest;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
+import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.TerminosRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -32,20 +34,24 @@ public class TerminosService {
     private final TerminosRepository terminosRepository;
     private final DerechoTerminoRepository derechoTerminoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final ServicioRepository servicioRepository;
 
     public TerminosService(
             TerminosRepository terminosRepository,
             DerechoTerminoRepository derechoTerminoRepository,
-            UsuarioRepository usuarioRepository) {
+            UsuarioRepository usuarioRepository,
+            ServicioRepository servicioRepository) {
         this.terminosRepository = terminosRepository;
         this.derechoTerminoRepository = derechoTerminoRepository;
         this.usuarioRepository = usuarioRepository;
+        this.servicioRepository = servicioRepository;
     }
 
     @Transactional(readOnly = true)
     public TerminosDTO obtenerGlobal(Long idArtista) {
         return terminosRepository
-            .findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(idArtista)
+            .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(
+                idArtista)
             .map(TerminosDTO::desdeTerminos)
             .orElseGet(TerminosDTO::vacio);
     }
@@ -53,15 +59,18 @@ public class TerminosService {
     @Transactional
     public TerminosDTO guardarGlobal(Long idArtista, TerminosRequest request) {
         validarContenido(request);
-        Terminos terminos = terminosRepository
-            .findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(idArtista)
-            .orElseGet(() -> nuevoTerminos(idArtista, null));
-        return guardar(terminos, request);
+        Terminos actual = terminosRepository
+            .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullOrderByVersionDesc(
+                idArtista)
+            .orElse(null);
+        return guardar(actual, idArtista, null, request);
     }
 
     @Transactional(readOnly = true)
     public TerminosDTO obtenerServicio(Long idServicio, Long idArtista) {
-        return terminosRepository.findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
+        return terminosRepository
+            .findFirstByArtistaIdUsuarioAndServicioIdServicioAndVigenteTrueOrderByVersionDesc(
+                idArtista, idServicio)
             .map(terminos -> TerminosDTO.desdeTerminos(terminos, true))
             .orElseGet(() -> obtenerGlobal(idArtista));
     }
@@ -69,10 +78,11 @@ public class TerminosService {
     @Transactional
     public TerminosDTO guardarServicio(Long idServicio, Long idArtista, TerminosRequest request) {
         validarContenido(request);
-        Terminos terminos = terminosRepository
-            .findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
-            .orElseGet(() -> nuevoTerminos(idArtista, idServicio));
-        return guardar(terminos, request);
+        Terminos actual = terminosRepository
+            .findFirstByArtistaIdUsuarioAndServicioIdServicioOrderByVersionDesc(
+                idArtista, idServicio)
+            .orElse(null);
+        return guardar(actual, idArtista, idServicio, request);
     }
 
     @Transactional
@@ -81,34 +91,60 @@ public class TerminosService {
             throw new IllegalArgumentException(
                 "Antes de quitar los términos propios, completá tus términos globales.");
         }
-        terminosRepository.findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
-            .ifPresent(terminosRepository::delete);
+        terminosRepository
+            .findFirstByArtistaIdUsuarioAndServicioIdServicioAndVigenteTrueOrderByVersionDesc(
+                idArtista, idServicio)
+            .ifPresent(terminos -> {
+                terminos.setVigente(false);
+                terminosRepository.save(terminos);
+            });
     }
 
     @Transactional(readOnly = true)
     public boolean tieneGlobalValido(Long idArtista) {
         return terminosRepository
-            .findByArtistaIdUsuarioAndIdProductoIsNullAndIdServicioIsNull(idArtista)
+            .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(
+                idArtista)
             .map(this::tieneContenido)
             .orElse(false);
     }
 
     @Transactional(readOnly = true)
     public boolean tieneTerminosValidos(Long idServicio, Long idArtista) {
-        return terminosRepository.findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
+        return terminosRepository
+            .findFirstByArtistaIdUsuarioAndServicioIdServicioAndVigenteTrueOrderByVersionDesc(
+                idArtista, idServicio)
             .map(this::tieneContenido)
             .orElseGet(() -> tieneGlobalValido(idArtista));
     }
 
-    private TerminosDTO guardar(Terminos terminos, TerminosRequest request) {
-        if (terminos.getIdTerminos() != null) {
-            terminos.setVersion(terminos.getVersion() + 1);
-            // Borra los hijos existentes ANTES de insertar los nuevos: si no, Hibernate
-            // inserta primero y choca con el UNIQUE (id_terminos, id_derecho_termino).
-            terminos.getTerminoDerechos().clear();
+    /**
+     * Cada guardado crea una versión nueva e inmutable. La versión anterior se
+     * conserva marcada como no vigente para que las solicitudes que ya la
+     * aceptaron sigan apuntando a su contenido original.
+     */
+    private TerminosDTO guardar(
+            Terminos actual, Long idArtista, Long idServicio, TerminosRequest request) {
+        Terminos nueva;
+        if (actual == null) {
+            nueva = nuevoTerminos(idArtista, idServicio);
+        } else {
+            actual.setVigente(false);
+            terminosRepository.save(actual);
+            // Hibernate ordena los INSERT antes de los UPDATE. Sin este flush, la
+            // versión nueva se insertaría con vigente=true mientras la anterior
+            // todavía lo está, violando uk_terminos_*_vigente.
             terminosRepository.flush();
+            nueva = nuevoTerminos(idArtista, idServicio);
+            nueva.setVersion(actual.getVersion() + 1);
+            nueva.setVigente(true);
         }
+        aplicar(nueva, request);
+        Terminos guardados = terminosRepository.save(nueva);
+        return TerminosDTO.desdeTerminos(guardados, idServicio != null);
+    }
 
+    private void aplicar(Terminos terminos, TerminosRequest request) {
         terminos.setInformacionGeneral(limpiar(request.getInformacionGeneral()));
         terminos.setPoliticaRevisiones(limpiar(request.getPoliticaRevisiones()));
         terminos.setPoliticaCancelaciones(limpiar(request.getPoliticaCancelaciones()));
@@ -119,9 +155,6 @@ public class TerminosService {
         terminos.setQueNoDibuja(limpiar(request.getQueNoDibuja()));
         terminos.reemplazarDerechos(construirDerechos(request.getDerechos()));
         terminos.setFechaActualizacion(LocalDateTime.now());
-
-        Terminos guardados = terminosRepository.save(terminos);
-        return TerminosDTO.desdeTerminos(guardados, guardados.getIdServicio() != null);
     }
 
     private Terminos nuevoTerminos(Long idArtista, Long idServicio) {
@@ -129,8 +162,14 @@ public class TerminosService {
             .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idArtista));
         Terminos nuevo = new Terminos();
         nuevo.setArtista(artista);
-        nuevo.setIdServicio(idServicio);
+        if (idServicio != null) {
+            Servicio servicio = servicioRepository.findByIdServicio(idServicio)
+                .orElseThrow(() -> new NoSuchElementException(
+                    "Servicio no encontrado: " + idServicio));
+            nuevo.setServicio(servicio);
+        }
         nuevo.setVersion(1);
+        nuevo.setVigente(true);
         return nuevo;
     }
 

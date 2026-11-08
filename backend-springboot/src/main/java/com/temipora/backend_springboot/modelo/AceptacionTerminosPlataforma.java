@@ -42,8 +42,4 @@ public class AceptacionTerminosPlataforma {
 
     @Column(name = "fecha_aceptacion", nullable = false, updatable = false)
     private LocalDateTime fechaAceptacion = LocalDateTime.now();
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_pedido")
-    private Pedido pedido;
 }

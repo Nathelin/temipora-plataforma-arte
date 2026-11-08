@@ -339,16 +339,15 @@ public class AuditoriaService {
             return;
         }
         evento.setActorNombre(recortar(auth.getName(), 60));
-        String rol = auth.getAuthorities().stream()
-            .map(a -> a.getAuthority())
-            .filter(a -> a.startsWith("ROLE_"))
-            .map(a -> a.substring("ROLE_".length()))
-            .findFirst()
+        var usuario = usuarioRepository.findByNombreUsuarioIgnoreCase(auth.getName());
+        String rol = usuario
+            .map(u -> u.getRol() != null && u.getRol().getNombre() != null
+                ? u.getRol().getNombre().name()
+                : null)
             .orElse(null);
         evento.setActorRol(rol);
         evento.setOrigen(rol != null ? rol : "USUARIO");
-        usuarioRepository.findByNombreUsuarioIgnoreCase(auth.getName())
-            .ifPresent(usuario -> evento.setActorId(usuario.getIdUsuario()));
+        usuario.ifPresent(u -> evento.setActorId(u.getIdUsuario()));
     }
 
     private void completarRequest(EventoAuditoria evento) {

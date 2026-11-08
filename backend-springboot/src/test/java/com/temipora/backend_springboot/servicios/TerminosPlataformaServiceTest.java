@@ -76,6 +76,39 @@ class TerminosPlataformaServiceTest {
     }
 
     @Test
+    void obtenerAceptacionVigente_existente_laDevuelve() {
+        when(terminosRepository.findFirstByVigenteTrueOrderByVersionDesc())
+            .thenReturn(Optional.of(terminos(4, true)));
+        AceptacionTerminosPlataforma aceptacion = new AceptacionTerminosPlataforma();
+        aceptacion.setIdAceptacion(10L);
+        aceptacion.setVersion(4);
+        when(aceptacionRepository.findByUsuarioIdUsuarioAndVersion(5L, 4))
+            .thenReturn(Optional.of(aceptacion));
+
+        assertThat(service.obtenerAceptacionVigente(5L)).isSameAs(aceptacion);
+    }
+
+    @Test
+    void obtenerAceptacionVigente_sinAceptacion_lanzaConflicto() {
+        when(terminosRepository.findFirstByVigenteTrueOrderByVersionDesc())
+            .thenReturn(Optional.of(terminos(4, true)));
+        when(aceptacionRepository.findByUsuarioIdUsuarioAndVersion(5L, 4))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.obtenerAceptacionVigente(5L))
+            .isInstanceOf(ConflictoException.class);
+    }
+
+    @Test
+    void obtenerAceptacionVigente_sinTerminos_lanzaConflicto() {
+        when(terminosRepository.findFirstByVigenteTrueOrderByVersionDesc())
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.obtenerAceptacionVigente(5L))
+            .isInstanceOf(ConflictoException.class);
+    }
+
+    @Test
     void listarVersiones_mapeaTodas() {
         when(terminosRepository.findAllByOrderByVersionDesc())
             .thenReturn(List.of(terminos(2, true), terminos(1, false)));
