@@ -30,6 +30,8 @@ import com.jayway.jsonpath.JsonPath;
 import com.temipora.backend_springboot.config.JwtUtils;
 import com.temipora.backend_springboot.config.SecurityConfig;
 import com.temipora.backend_springboot.controladores.AuthController;
+import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.servicios.LimpiezaArchivosService;
 import com.temipora.backend_springboot.servicios.StorageService;
@@ -81,6 +83,7 @@ class JwtAuthenticationFilterTest {
                 .thenReturn(Usuario.builder()
                         .idUsuario(7L)
                         .nombreUsuario("artista777")
+                        .rol(Rol.builder().nombre(ERol.ARTISTA).build())
                         .urlFotoPerfil("uploads/pfp.png")
                         .build());
 

@@ -23,11 +23,13 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EventoAuditoria;
 import com.temipora.backend_springboot.modelo.EventoAuditoriaDTO;
 import com.temipora.backend_springboot.modelo.FiltroAuditoria;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
+import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.EventoAuditoriaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
@@ -102,7 +104,11 @@ class AuditoriaServiceTest {
             new UsernamePasswordAuthenticationToken(
                 "admin", null, List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
         when(usuarioRepository.findByNombreUsuarioIgnoreCase("admin"))
-            .thenReturn(Optional.of(Usuario.builder().idUsuario(1L).nombreUsuario("admin").build()));
+            .thenReturn(Optional.of(Usuario.builder()
+                .idUsuario(1L)
+                .nombreUsuario("admin")
+                .rol(Rol.builder().nombre(ERol.ADMIN).build())
+                .build()));
 
         auditoriaService.registrar("ACCION", "Entidad", 1L, "Resumen", null);
 

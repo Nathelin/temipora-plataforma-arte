@@ -21,6 +21,7 @@ const {
   refrescarContador,
   marcarLeida,
   marcarTodasLeidas,
+  sincronizarSesion,
   iniciarPolling,
   detenerPolling,
 } = useNotificacionesSistema()
@@ -106,6 +107,7 @@ function formatearFecha(valor) {
 }
 
 onMounted(() => {
+  sincronizarSesion()
   void refrescarContador()
   iniciarPolling()
   document.addEventListener('click', manejarClickExterior)

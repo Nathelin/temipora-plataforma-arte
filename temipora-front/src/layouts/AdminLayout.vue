@@ -6,6 +6,7 @@ import { useAdminMenu } from '../composables/useAdminMenu'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
+import { useNotificacionesSistema } from '../composables/useNotificacionesSistema'
 import api from '../servicios/api'
 import {
   Archive,
@@ -32,6 +33,11 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+
+const {
+  limpiar: limpiarNotificaciones,
+  detenerPolling: detenerPollingNotificaciones,
+} = useNotificacionesSistema()
 
 const nombreUsuario = ref(localStorage.getItem('nombreUsuario') || '')
 const urlFotoPerfil = ref(localStorage.getItem('urlFotoPerfil') || '')
@@ -226,6 +232,8 @@ function cerrarSesion() {
   localStorage.removeItem('nombreUsuario')
   localStorage.removeItem('idUsuario')
   localStorage.removeItem('urlFotoPerfil')
+  limpiarNotificaciones()
+  detenerPollingNotificaciones()
   router.push({ name: 'login' })
 }
 </script>

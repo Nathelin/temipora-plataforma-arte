@@ -30,6 +30,7 @@ const {
   cambiarCategoria,
   alternarSoloNoLeidas,
   establecerFiltros,
+  sincronizarSesion,
   refrescarContador,
 } = useNotificacionesSistema()
 
@@ -167,6 +168,7 @@ watch(
 )
 
 onMounted(() => {
+  sincronizarSesion()
   establecerFiltros(filtrosDeUrl())
   void refrescarContador()
   cargar({ reset: true })

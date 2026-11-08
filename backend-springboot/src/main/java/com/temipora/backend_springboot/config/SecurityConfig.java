@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.config;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -35,15 +36,15 @@ public class SecurityConfig {
 
     private final JwtUtils jwtUtils;
     private final UserDetailsService userDetailsService;
-    private final TerminosAceptadosFilter terminosAceptadosFilter;
+    private final ObjectProvider<TerminosAceptadosFilter> terminosAceptadosFilterProvider;
 
     public SecurityConfig(
             JwtUtils jwtUtils,
             UserDetailsService userDetailsService,
-            TerminosAceptadosFilter terminosAceptadosFilter) {
+            ObjectProvider<TerminosAceptadosFilter> terminosAceptadosFilterProvider) {
         this.jwtUtils = jwtUtils;
         this.userDetailsService = userDetailsService;
-        this.terminosAceptadosFilter = terminosAceptadosFilter;
+        this.terminosAceptadosFilterProvider = terminosAceptadosFilterProvider;
     }
 
     @Bean
@@ -105,9 +106,14 @@ public class SecurityConfig {
             )
             .addFilter(jwtAuthenticationFilter)
             .addFilterBefore(new JwtAuthorizationFilter(jwtUtils, userDetailsService),
-                    UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(terminosAceptadosFilter,
                     UsernamePasswordAuthenticationFilter.class);
+
+        TerminosAceptadosFilter terminosAceptadosFilter =
+            terminosAceptadosFilterProvider.getIfAvailable();
+        if (terminosAceptadosFilter != null) {
+            http.addFilterAfter(terminosAceptadosFilter,
+                UsernamePasswordAuthenticationFilter.class);
+        }
 
         return http.build();
     }

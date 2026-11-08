@@ -5,7 +5,6 @@ import java.io.IOException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import com.temipora.backend_springboot.modelo.TerminosPlataforma;
@@ -22,7 +21,6 @@ import jakarta.servlet.http.HttpServletResponse;
  * vigente de los TOS de plataforma. Los endpoints de TOS, login, registro y
  * recursos públicos quedan exentos.
  */
-@Component
 public class TerminosAceptadosFilter extends OncePerRequestFilter {
 
     private final AceptacionTerminosPlataformaRepository aceptacionRepository;

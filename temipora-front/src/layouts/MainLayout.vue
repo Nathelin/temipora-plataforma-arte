@@ -7,6 +7,7 @@ import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
 import { useMensajes } from '../composables/useMensajes'
 import { useMensajeriaSocket } from '../composables/useMensajeriaSocket'
+import { useNotificacionesSistema } from '../composables/useNotificacionesSistema'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,6 +38,11 @@ const {
   cargarContador: cargarContadorMensajes,
   limpiar: limpiarMensajes,
 } = useMensajes()
+
+const {
+  limpiar: limpiarNotificaciones,
+  detenerPolling: detenerPollingNotificaciones,
+} = useNotificacionesSistema()
 
 const {
   conectar: conectarSocket,
@@ -120,6 +126,8 @@ function cerrarSesion() {
   localStorage.removeItem('nombreUsuario')
   localStorage.removeItem('idUsuario')
   localStorage.removeItem('urlFotoPerfil')
+  limpiarNotificaciones()
+  detenerPollingNotificaciones()
   limpiarMensajes()
   desconectarSocket()
   router.push({ name: 'login' })
