@@ -15,6 +15,7 @@ const idEditando = ref(null)
 const nombre = ref('')
 const descripcion = ref('')
 const observaciones = ref('')
+const tipoEntrega = ref('DIGITAL')
 const errorForm = ref('')
 
 const modalConfirmacion = ref(null)
@@ -38,6 +39,7 @@ function abrirAlta() {
   nombre.value = ''
   descripcion.value = ''
   observaciones.value = ''
+  tipoEntrega.value = 'DIGITAL'
   errorForm.value = ''
   modalAbierto.value = true
 }
@@ -48,6 +50,7 @@ function abrirEdicion(m) {
   nombre.value = m.nombre
   descripcion.value = m.descripcion || ''
   observaciones.value = m.observaciones || ''
+  tipoEntrega.value = m.tipoEntrega || 'DIGITAL'
   errorForm.value = ''
   modalAbierto.value = true
 }
@@ -63,6 +66,7 @@ async function guardar() {
     nombre: nombre.value.trim(),
     descripcion: descripcion.value.trim() || null,
     observaciones: observaciones.value.trim() || null,
+    tipoEntrega: tipoEntrega.value,
   }
   try {
     if (editando.value) {
@@ -162,6 +166,7 @@ onMounted(cargar)
             <thead class="bg-rosa/40 text-granate">
               <tr>
                 <th class="px-5 py-3 font-normal text-sm">Nombre</th>
+                <th class="px-5 py-3 font-normal text-sm">Entrega</th>
                 <th class="px-5 py-3 font-normal text-sm">Observaciones</th>
                 <th class="px-5 py-3 font-normal text-sm">Estado</th>
                 <th class="px-5 py-3"></th>
@@ -173,6 +178,16 @@ onMounted(cargar)
                   {{ m.nombre }}
                   <span class="block text-xs text-cafe/50 font-normal truncate max-w-64" :title="m.descripcion">
                     {{ m.descripcion }}
+                  </span>
+                </td>
+                <td class="px-5 py-3 text-cafe/60">
+                  <span
+                    class="px-2.5 py-0.5 rounded-full text-xs font-normal"
+                    :class="m.tipoEntrega === 'FISICA'
+                      ? 'bg-coral/10 text-granate'
+                      : 'bg-rosa/40 text-cafe/70'"
+                  >
+                    {{ m.tipoEntrega === 'FISICA' ? 'Física' : 'Digital' }}
                   </span>
                 </td>
                 <td class="px-5 py-3 text-cafe/60">{{ m.observaciones || '—' }}</td>
@@ -237,6 +252,20 @@ onMounted(cargar)
               class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"
             ></textarea>
             <p class="text-right text-xs text-cafe/50 mt-1">{{ descripcion.length }}/250</p>
+          </div>
+
+          <div>
+            <label class="block text-sm text-cafe mb-2">Tipo de entrega <span class="text-rojizo">*</span></label>
+            <select
+              v-model="tipoEntrega"
+              class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+            >
+              <option value="DIGITAL">Digital</option>
+              <option value="FISICA">Física — requiere coordinación de envío</option>
+            </select>
+            <p class="text-xs text-cafe/50 mt-1">
+              Si es física, el formulario mostrará que Temipora no gestiona envíos.
+            </p>
           </div>
 
           <div>

@@ -362,6 +362,27 @@ class ProductoServiceTest {
             .count()).isEqualTo(1);
     }
 
+    @Test
+    void modificar_varianteUsaImagenDeGaleriaSinReSubir() {
+        Producto producto = productoConVariante(10L, 5L, 20L, SHA_VARIANTE);
+        prepararModificacion(producto);
+        when(eventoLedgerRepository.existsByVarianteIdVariante(20L)).thenReturn(false);
+
+        ProductoRequest request = request();
+        request.setTitulo("Plancha nueva");
+        ProductoVarianteRequest variante = request.getVariantes().get(0);
+        variante.setIdVariante(20L);
+        variante.setUrlImagen("img.webp");
+        variante.setSha256(SHA_IMAGEN);
+        variante.setClaveArchivoOriginal(null);
+
+        ProductoDTO dto = productoService.modificar(10L, 5L, request);
+
+        assertThat(dto.getVariantes().get(0).getSha256()).isEqualTo(SHA_IMAGEN);
+        assertThat(producto.getVariantes().get(0).getClaveArchivoOriginal())
+            .isEqualTo("productos/img.webp");
+    }
+
     // ---------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------
@@ -497,6 +518,7 @@ class ProductoServiceTest {
         imagen.setUrl("img.webp");
         imagen.setOrden(0);
         imagen.setSha256(SHA_IMAGEN);
+        imagen.setClaveArchivoOriginal("productos/img.webp");
         producto.getImagenes().add(imagen);
 
         LicenciaProducto licencia = new LicenciaProducto();

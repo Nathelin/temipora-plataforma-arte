@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.modelo;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -18,4 +19,7 @@ public class MedioRequest {
 
     @Size(max = 500, message = "Las observaciones no pueden superar los 500 caracteres")
     private String observaciones;
+
+    @NotNull(message = "El tipo de entrega es obligatorio.")
+    private TipoEntrega tipoEntrega;
 }

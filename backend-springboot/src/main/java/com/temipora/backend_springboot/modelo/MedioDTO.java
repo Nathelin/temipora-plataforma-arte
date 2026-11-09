@@ -17,6 +17,7 @@ public class MedioDTO {
     private String nombre;
     private String descripcion;
     private String observaciones;
+    private TipoEntrega tipoEntrega;
     private boolean activo;
 
     public static MedioDTO desdeMedio(Medio medio) {
@@ -25,6 +26,7 @@ public class MedioDTO {
             .nombre(medio.getNombre())
             .descripcion(medio.getDescripcion())
             .observaciones(medio.getObservaciones())
+            .tipoEntrega(medio.getTipoEntrega())
             .activo(medio.isActivo())
             .build();
     }

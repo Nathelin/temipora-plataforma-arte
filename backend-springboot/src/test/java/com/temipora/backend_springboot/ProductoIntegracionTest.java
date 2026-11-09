@@ -27,6 +27,7 @@ import com.temipora.backend_springboot.modelo.ProductoImagenRequest;
 import com.temipora.backend_springboot.modelo.ProductoRequest;
 import com.temipora.backend_springboot.modelo.ProductoVarianteRequest;
 import com.temipora.backend_springboot.modelo.TipoEventoLedger;
+import com.temipora.backend_springboot.modelo.TipoEntrega;
 import com.temipora.backend_springboot.modelo.TipoProducto;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
@@ -118,6 +119,7 @@ class ProductoIntegracionTest {
         assertThat(dto.getVariantes()).hasSize(1);
         assertThat(dto.getVariantes().get(0).isTieneLedger()).isTrue();
         assertThat(dto.getPrecioDesde()).isEqualByComparingTo("150.00");
+        assertThat(dto.getTipoEntregaMedio()).isEqualTo(TipoEntrega.DIGITAL);
 
         assertThat(dto.getLicencia()).isNotNull();
         assertThat(dto.getLicencia().getDerechos()).hasSize(1);

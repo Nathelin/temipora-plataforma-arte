@@ -56,6 +56,7 @@ const guardando = ref(false)
 const errorGuardado = ref('')
 const errores = ref([])
 const subiendoImagen = ref(false)
+const progresoImagen = ref('')
 const errorImagen = ref('')
 const visorAbierto = ref(false)
 const visorIndice = ref(0)
@@ -103,6 +104,15 @@ const nombreTipo = computed(
 )
 const nombreMedio = computed(
   () => medios.value.find((m) => String(m.idMedio) === form.value.idMedio)?.nombre || '',
+)
+const tipoSeleccionado = computed(
+  () => tipos.value.find((t) => String(t.idTipoProducto) === form.value.idTipoProducto) || null,
+)
+const medioSeleccionado = computed(
+  () => medios.value.find((m) => String(m.idMedio) === form.value.idMedio) || null,
+)
+const esEntregaFisica = computed(
+  () => medioSeleccionado.value?.tipoEntrega === 'FISICA',
 )
 const esAdoptable = computed(() => esTipoUnico(nombreTipo.value) && nombreTipo.value.toLowerCase().includes('adoptable'))
 const hayVarianteUnica = computed(
@@ -274,35 +284,56 @@ watch(() => form.value.idTipoProducto, (nuevo, anterior) => {
 })
 
 async function subirImagen(event) {
-  const archivo = event.target.files?.[0] || null
+  const archivos = Array.from(event.target.files || [])
   event.target.value = ''
-  if (!archivo) return
+  if (!archivos.length) return
 
-  const problema = validarImagen(archivo)
-  if (problema) {
-    errorImagen.value = problema
-    return
+  const validos = []
+  const problemas = []
+  for (const archivo of archivos) {
+    const problema = validarImagen(archivo)
+    if (problema) {
+      problemas.push(`${archivo.name}: ${problema}`)
+    } else {
+      validos.push(archivo)
+    }
   }
+  errorImagen.value = problemas.join(' · ')
+  if (!validos.length) return
 
   subiendoImagen.value = true
-  errorImagen.value = ''
   try {
-    const data = await subirImagenProducto(archivo)
-    form.value.imagenes.push({
-      url: data.url,
-      sha256: data.sha256,
-      claveArchivoOriginal: data.claveOriginal,
-    })
+    for (let i = 0; i < validos.length; i++) {
+      progresoImagen.value = `Subiendo ${i + 1} de ${validos.length}...`
+      const data = await subirImagenProducto(validos[i])
+      form.value.imagenes.push({
+        url: data.url,
+        sha256: data.sha256,
+        claveArchivoOriginal: data.claveOriginal,
+      })
+    }
   } catch (e) {
     errorImagen.value = e.response?.data?.message
-      || 'No se pudo subir la imagen del producto.'
+      || 'No se pudieron subir todas las imágenes.'
   } finally {
     subiendoImagen.value = false
+    progresoImagen.value = ''
   }
 }
 
 function quitarImagen(indice) {
   form.value.imagenes.splice(indice, 1)
+}
+
+function agregarImagenDesdeVariante(imagen) {
+  if (!imagen?.url) return
+  if (!form.value.imagenes.some((item) => item.url === imagen.url)) {
+    form.value.imagenes.push({
+      url: imagen.url,
+      sha256: imagen.sha256,
+      claveArchivoOriginal: imagen.claveArchivoOriginal || '',
+    })
+  }
 }
 
 function moverImagen(indice, pasoDireccion) {
@@ -712,6 +743,15 @@ onBeforeUnmount(() => {
                       {{ tipo.nombre }}
                     </option>
                   </select>
+                  <div
+                    v-if="tipoSeleccionado?.descripcion"
+                    class="mt-2 rounded-lg bg-crema/60 px-3 py-2 text-xs leading-relaxed text-cafe/65"
+                  >
+                    <p>{{ tipoSeleccionado.descripcion }}</p>
+                    <p v-if="tipoSeleccionado.observaciones" class="mt-1 text-cafe/50">
+                      {{ tipoSeleccionado.observaciones }}
+                    </p>
+                  </div>
                 </div>
 
                 <div>
@@ -731,6 +771,24 @@ onBeforeUnmount(() => {
                       {{ medio.nombre }}
                     </option>
                   </select>
+                  <div
+                    v-if="medioSeleccionado?.descripcion"
+                    class="mt-2 rounded-lg bg-crema/60 px-3 py-2 text-xs leading-relaxed text-cafe/65"
+                  >
+                    <p>{{ medioSeleccionado.descripcion }}</p>
+                    <p v-if="medioSeleccionado.observaciones" class="mt-1 text-cafe/50">
+                      {{ medioSeleccionado.observaciones }}
+                    </p>
+                  </div>
+                  <div
+                    v-if="esEntregaFisica"
+                    class="mt-2 rounded-xl border border-coral/30 bg-rosa/15 px-3 py-2 text-xs leading-relaxed text-granate"
+                  >
+                    <p class="font-semibold">Temipora no gestiona envíos.</p>
+                    <p class="mt-1">
+                      El envío y la entrega se coordinan directamente entre artista y comprador.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -777,9 +835,10 @@ onBeforeUnmount(() => {
             </div>
 
             <div>
-              <h3 class="font-display text-lg font-bold text-granate">Imágenes</h3>
+              <h3 class="font-display text-lg font-bold text-granate">Portada y galería</h3>
               <p class="mt-1 text-sm text-cafe/60">
-                La primera imagen será la portada de la publicación.
+                La primera imagen será la portada. La galería se reutiliza para
+                asignar imágenes a las variantes sin volver a subirlas.
               </p>
 
               <div class="mt-4 rounded-2xl border border-dashed border-rosa/70 bg-crema/40 p-6 text-center">
@@ -788,15 +847,17 @@ onBeforeUnmount(() => {
                 </p>
                 <p class="mt-1 text-xs text-cafe/55">
                   Se guarda el original privado y una preview pública optimizada.
+                  Podés seleccionar varias imágenes a la vez.
                 </p>
                 <label
                   class="mt-4 inline-flex cursor-pointer items-center justify-center rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-rojizo"
                   :class="subiendoImagen ? 'pointer-events-none opacity-50' : ''"
                 >
-                  {{ subiendoImagen ? 'Subiendo...' : 'Elegir imagen' }}
+                  {{ subiendoImagen ? (progresoImagen || 'Subiendo...') : 'Elegir imágenes' }}
                   <input
                     type="file"
                     class="sr-only"
+                    multiple
                     :accept="acceptImagenes"
                     @change="subirImagen"
                   />
@@ -826,7 +887,7 @@ onBeforeUnmount(() => {
                   </button>
                   <div class="flex items-center justify-between gap-2 px-3 py-2">
                     <span class="text-[11px] font-semibold text-cafe/55">
-                      {{ indice === 0 ? 'Portada' : `Imagen ${indice + 1}` }}
+                      {{ indice === 0 ? 'Portada' : `Galería ${indice}` }}
                     </span>
                     <div class="flex items-center gap-1">
                       <button
@@ -909,6 +970,8 @@ onBeforeUnmount(() => {
               :moneda="monedaCodigo"
               :es-adoptable="esAdoptable"
               :imagen-portada="form.imagenes[0]?.url || ''"
+              :imagenes-galeria="form.imagenes"
+              @agregar-imagen="agregarImagenDesdeVariante"
             />
           </section>
 
@@ -1067,6 +1130,16 @@ onBeforeUnmount(() => {
               </h3>
               <p class="mt-1 text-xs text-cafe/55">
                 {{ nombreTipo || 'Sin tipo' }} · {{ nombreMedio || 'Sin medio' }} · {{ monedaCodigo }}
+              </p>
+              <p
+                v-if="esEntregaFisica"
+                class="mt-2 rounded-lg border border-coral/20 bg-rosa/20 px-3 py-2 text-xs leading-relaxed text-granate"
+              >
+                Entrega física: Temipora no gestiona envíos. El envío y la entrega
+                se coordinan directamente entre artista y comprador.
+              </p>
+              <p v-else class="mt-2 text-xs text-cafe/45">
+                Entrega digital.
               </p>
               <p class="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-cafe/75">
                 {{ form.descripcion }}

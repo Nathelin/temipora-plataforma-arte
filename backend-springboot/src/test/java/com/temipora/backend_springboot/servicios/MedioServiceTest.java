@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.MedioDTO;
 import com.temipora.backend_springboot.modelo.MedioRequest;
+import com.temipora.backend_springboot.modelo.TipoEntrega;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +51,7 @@ class MedioServiceTest {
         assertThat(resultado).extracting(MedioDTO::getNombre)
                 .containsExactly("Digital", "Tradicional");
         assertThat(resultado.get(1).isActivo()).isFalse();
+        assertThat(resultado.get(1).getTipoEntrega()).isEqualTo(TipoEntrega.DIGITAL);
     }
 
     @Test
@@ -70,6 +72,7 @@ class MedioServiceTest {
     @Test
     void crear_nombreNoRepetido_guardaActivoYConCamposLimpios() {
         MedioRequest request = request("  Pintura  ", "  Al óleo  ", null);
+        request.setTipoEntrega(TipoEntrega.FISICA);
         when(medioRepository.existsByNombreIgnoreCase("Pintura")).thenReturn(false);
         when(medioRepository.save(any(Medio.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -81,8 +84,10 @@ class MedioServiceTest {
         assertThat(guardado.getNombre()).isEqualTo("Pintura");
         assertThat(guardado.getDescripcion()).isEqualTo("Al óleo");
         assertThat(guardado.getObservaciones()).isNull();
+        assertThat(guardado.getTipoEntrega()).isEqualTo(TipoEntrega.FISICA);
         assertThat(guardado.isActivo()).isTrue();
         assertThat(resultado.getNombre()).isEqualTo("Pintura");
+        assertThat(resultado.getTipoEntrega()).isEqualTo(TipoEntrega.FISICA);
     }
 
     @Test
@@ -114,6 +119,7 @@ class MedioServiceTest {
         assertThat(resultado.getNombre()).isEqualTo("Digital 2");
         assertThat(resultado.getDescripcion()).isEqualTo("Nueva desc");
         assertThat(resultado.getObservaciones()).isEqualTo("obs");
+        assertThat(resultado.getTipoEntrega()).isEqualTo(TipoEntrega.DIGITAL);
     }
 
     @Test
@@ -179,6 +185,7 @@ class MedioServiceTest {
                 .nombre(nombre)
                 .descripcion("descripcion")
                 .observaciones(null)
+                .tipoEntrega(TipoEntrega.DIGITAL)
                 .activo(activo)
                 .build();
     }
@@ -188,6 +195,7 @@ class MedioServiceTest {
         request.setNombre(nombre);
         request.setDescripcion(descripcion);
         request.setObservaciones(observaciones);
+        request.setTipoEntrega(TipoEntrega.DIGITAL);
         return request;
     }
 }

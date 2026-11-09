@@ -376,6 +376,8 @@ public class ProductoService {
                 ? producto.getMedio().getIdMedio() : null)
             .nombreMedio(producto.getMedio() != null
                 ? producto.getMedio().getNombre() : null)
+            .tipoEntregaMedio(producto.getMedio() != null
+                ? producto.getMedio().getTipoEntrega() : null)
             .titulo(producto.getTitulo())
             .descripcion(producto.getDescripcion())
             .idMoneda(producto.getMoneda() != null
@@ -587,11 +589,21 @@ public class ProductoService {
             }
             String clave = limpiar(request.getClaveArchivoOriginal());
             if (clave == null) {
-                if (oldSha == null || !sha.equalsIgnoreCase(oldSha)) {
+                String claveGaleria = producto.getImagenes().stream()
+                    .filter(imagen -> imagen.getSha256() != null
+                        && imagen.getSha256().equalsIgnoreCase(sha))
+                    .map(ProductoImagen::getClaveArchivoOriginal)
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+                if (claveGaleria != null) {
+                    clave = claveGaleria;
+                } else if (oldSha == null || !sha.equalsIgnoreCase(oldSha)) {
                     throw new IllegalArgumentException(
                         "Volvé a subir la imagen de la variante.");
+                } else {
+                    clave = variante.getClaveArchivoOriginal();
                 }
-                clave = variante.getClaveArchivoOriginal();
             }
             variante.setImagenUrl(request.getUrlImagen().trim());
             variante.setSha256(sha);

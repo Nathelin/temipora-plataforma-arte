@@ -21,6 +21,7 @@ public class MedioService {
         CampoAuditado.de("nombre", "Nombre"),
         CampoAuditado.de("descripcion", "Descripción"),
         CampoAuditado.de("observaciones", "Observaciones"),
+        CampoAuditado.de("tipoEntrega", "Tipo de entrega"),
         CampoAuditado.de("activo", "Activo"));
 
     private final MedioRepository medioRepository;
@@ -53,6 +54,7 @@ public class MedioService {
             .nombre(request.getNombre().trim())
             .descripcion(request.getDescripcion() != null ? request.getDescripcion().trim() : null)
             .observaciones(request.getObservaciones() != null ? request.getObservaciones().trim() : null)
+            .tipoEntrega(request.getTipoEntrega())
             .activo(true)
             .build();
 
@@ -72,6 +74,7 @@ public class MedioService {
         medio.setNombre(request.getNombre().trim());
         medio.setDescripcion(request.getDescripcion() != null ? request.getDescripcion().trim() : null);
         medio.setObservaciones(request.getObservaciones() != null ? request.getObservaciones().trim() : null);
+        medio.setTipoEntrega(request.getTipoEntrega());
 
         Medio guardado = medioRepository.save(medio);
         auditoria.registrar(

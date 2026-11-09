@@ -25,6 +25,7 @@ public class ProductoDTO {
     private String nombreTipoProducto;
     private Long idMedio;
     private String nombreMedio;
+    private TipoEntrega tipoEntregaMedio;
     private String titulo;
     private String descripcion;
     private Long idMoneda;

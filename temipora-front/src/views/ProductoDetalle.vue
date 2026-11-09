@@ -41,6 +41,9 @@ const licencia = computed(() => producto.value?.licencia || null)
 const resumenDerechos = computed(
   () => (licencia.value?.derechos || []).map((derecho) => derecho.nombre).join(' · '),
 )
+const esEntregaFisica = computed(
+  () => producto.value?.tipoEntregaMedio === 'FISICA',
+)
 const ledgerVariantes = computed(() => ledger.value?.variantes || [])
 const tieneAlgunLedger = computed(
   () => ledgerVariantes.value.some((variante) => variante.tieneLedger),
@@ -289,6 +292,20 @@ onMounted(cargar)
           </section>
 
           <section
+            v-if="esEntregaFisica"
+            class="rounded-[22px] border border-coral/30 bg-rosa/15 p-6 shadow-sm"
+          >
+            <h2 class="font-display text-lg font-bold text-granate">Entrega</h2>
+            <p class="mt-2 text-sm font-semibold text-granate">
+              Temipora no gestiona envíos.
+            </p>
+            <p class="mt-1 text-sm leading-relaxed text-cafe/75">
+              El envío y la entrega de esta pieza tradicional se coordinan
+              directamente entre artista y comprador.
+            </p>
+          </section>
+
+          <section
             v-if="(producto.etiquetas || []).length"
             class="rounded-[22px] border border-borde/60 bg-superficie p-6 shadow-sm"
           >
@@ -357,6 +374,16 @@ onMounted(cargar)
                 {{ producto.cantidadVariantes }} variante(s) ·
                 {{ producto.cantidadVariantesDisponibles }} disponible(s)
               </p>
+
+              <div
+                v-if="esEntregaFisica"
+                class="mt-3 rounded-xl border border-coral/20 bg-rosa/20 px-3 py-2 text-xs leading-relaxed text-granate"
+              >
+                <p class="font-semibold">Temipora no gestiona envíos.</p>
+                <p class="mt-1">
+                  La entrega se coordina directamente entre artista y comprador.
+                </p>
+              </div>
 
               <div
                 v-if="licencia"
