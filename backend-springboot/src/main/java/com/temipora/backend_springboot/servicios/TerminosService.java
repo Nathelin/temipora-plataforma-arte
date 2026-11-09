@@ -1,11 +1,7 @@
 package com.temipora.backend_springboot.servicios;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -54,7 +50,7 @@ public class TerminosService {
     @Transactional(readOnly = true)
     public TerminosDTO obtenerGlobal(Long idArtista) {
         return terminosRepository
-            .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(
+            .findFirstByArtistaIdUsuarioAndServicioIsNullAndVigenteTrueOrderByVersionDesc(
                 idArtista)
             .map(TerminosDTO::desdeTerminos)
             .orElseGet(TerminosDTO::vacio);
@@ -64,7 +60,7 @@ public class TerminosService {
     public TerminosDTO guardarGlobal(Long idArtista, TerminosRequest request) {
         validarContenido(request);
         Terminos actual = terminosRepository
-            .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullOrderByVersionDesc(
+            .findFirstByArtistaIdUsuarioAndServicioIsNullOrderByVersionDesc(
                 idArtista)
             .orElse(null);
         return guardar(actual, idArtista, null, request);
@@ -89,25 +85,6 @@ public class TerminosService {
         return guardar(actual, idArtista, idServicio, request);
     }
 
-    @Transactional(readOnly = true)
-    public TerminosDTO obtenerProducto(Long idProducto, Long idArtista) {
-        return terminosRepository
-            .findFirstByArtistaIdUsuarioAndIdProductoAndVigenteTrueOrderByVersionDesc(
-                idArtista, idProducto)
-            .map(terminos -> TerminosDTO.desdeTerminos(terminos, false))
-            .orElseGet(() -> obtenerGlobal(idArtista));
-    }
-
-    @Transactional
-    public TerminosDTO guardarProducto(Long idProducto, Long idArtista, TerminosRequest request) {
-        validarContenido(request);
-        Terminos actual = terminosRepository
-            .findFirstByArtistaIdUsuarioAndIdProductoOrderByVersionDesc(
-                idArtista, idProducto)
-            .orElse(null);
-        return guardar(actual, idArtista, null, idProducto, request);
-    }
-
     @Transactional
     public void eliminarServicio(Long idServicio, Long idArtista) {
         if (!tieneGlobalValido(idArtista)) {
@@ -123,25 +100,10 @@ public class TerminosService {
             });
     }
 
-    @Transactional
-    public void eliminarProducto(Long idProducto, Long idArtista) {
-        if (!tieneGlobalValido(idArtista)) {
-            throw new IllegalArgumentException(
-                "Antes de quitar los términos propios, completá tus términos globales.");
-        }
-        terminosRepository
-            .findFirstByArtistaIdUsuarioAndIdProductoAndVigenteTrueOrderByVersionDesc(
-                idArtista, idProducto)
-            .ifPresent(terminos -> {
-                terminos.setVigente(false);
-                terminosRepository.save(terminos);
-            });
-    }
-
     @Transactional(readOnly = true)
     public boolean tieneGlobalValido(Long idArtista) {
         return terminosRepository
-            .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(
+            .findFirstByArtistaIdUsuarioAndServicioIsNullAndVigenteTrueOrderByVersionDesc(
                 idArtista)
             .map(this::tieneContenido)
             .orElse(false);
@@ -156,52 +118,6 @@ public class TerminosService {
             .orElseGet(() -> tieneGlobalValido(idArtista));
     }
 
-    @Transactional(readOnly = true)
-    public boolean tieneProductoValido(Long idProducto, Long idArtista) {
-        return terminosRepository
-            .findFirstByArtistaIdUsuarioAndIdProductoAndVigenteTrueOrderByVersionDesc(
-                idArtista, idProducto)
-            .map(this::tieneContenido)
-            .orElseGet(() -> tieneGlobalValido(idArtista));
-    }
-
-    /**
-     * Huella del contenido vigente de los términos aplicables al producto
-     * (propios del producto o globales del artista). Se usa para dejar
-     * registrado qué condiciones regían al momento del génesis.
-     */
-    @Transactional(readOnly = true)
-    public String hashVigenteProducto(Long idProducto, Long idArtista) {
-        Terminos terminos = terminosRepository
-            .findFirstByArtistaIdUsuarioAndIdProductoAndVigenteTrueOrderByVersionDesc(
-                idArtista, idProducto)
-            .orElseGet(() -> terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(
-                    idArtista)
-                .orElse(null));
-        if (terminos == null) {
-            return null;
-        }
-        String contenido = String.join("|",
-            String.valueOf(terminos.getIdTerminos()),
-            String.valueOf(terminos.getVersion()),
-            nvl(terminos.getInformacionGeneral()),
-            nvl(terminos.getPoliticaRevisiones()),
-            nvl(terminos.getPoliticaCancelaciones()),
-            nvl(terminos.getUsoArtista()),
-            nvl(terminos.getUsoCliente()),
-            nvl(terminos.getPagoExtra()),
-            nvl(terminos.getQueDibuja()),
-            nvl(terminos.getQueNoDibuja()));
-        try {
-            return HexFormat.of().formatHex(
-                MessageDigest.getInstance("SHA-256")
-                    .digest(contenido.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 no disponible.", e);
-        }
-    }
-
     /**
      * Cada guardado crea una versión nueva e inmutable. La versión anterior se
      * conserva marcada como no vigente para que las solicitudes que ya la
@@ -209,15 +125,9 @@ public class TerminosService {
      */
     private TerminosDTO guardar(
             Terminos actual, Long idArtista, Long idServicio, TerminosRequest request) {
-        return guardar(actual, idArtista, idServicio, null, request);
-    }
-
-    private TerminosDTO guardar(
-            Terminos actual, Long idArtista, Long idServicio, Long idProducto,
-            TerminosRequest request) {
         Terminos nueva;
         if (actual == null) {
-            nueva = nuevoTerminos(idArtista, idServicio, idProducto);
+            nueva = nuevoTerminos(idArtista, idServicio);
         } else {
             actual.setVigente(false);
             terminosRepository.save(actual);
@@ -225,7 +135,7 @@ public class TerminosService {
             // versión nueva se insertaría con vigente=true mientras la anterior
             // todavía lo está, violando uk_terminos_*_vigente.
             terminosRepository.flush();
-            nueva = nuevoTerminos(idArtista, idServicio, idProducto);
+            nueva = nuevoTerminos(idArtista, idServicio);
             nueva.setVersion(actual.getVersion() + 1);
             nueva.setVigente(true);
         }
@@ -248,10 +158,6 @@ public class TerminosService {
     }
 
     private Terminos nuevoTerminos(Long idArtista, Long idServicio) {
-        return nuevoTerminos(idArtista, idServicio, null);
-    }
-
-    private Terminos nuevoTerminos(Long idArtista, Long idServicio, Long idProducto) {
         Usuario artista = usuarioRepository.findByIdUsuario(idArtista)
             .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idArtista));
         Terminos nuevo = new Terminos();
@@ -261,9 +167,6 @@ public class TerminosService {
                 .orElseThrow(() -> new NoSuchElementException(
                     "Servicio no encontrado: " + idServicio));
             nuevo.setServicio(servicio);
-        }
-        if (idProducto != null) {
-            nuevo.setIdProducto(idProducto);
         }
         nuevo.setVersion(1);
         nuevo.setVigente(true);
@@ -328,9 +231,5 @@ public class TerminosService {
 
     private String limpiar(String valor) {
         return valor != null && !valor.isBlank() ? valor.trim() : null;
-    }
-
-    private String nvl(String valor) {
-        return valor != null ? valor : "";
     }
 }

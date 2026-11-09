@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -24,8 +25,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
+import com.temipora.backend_springboot.modelo.LicenciaProducto;
+import com.temipora.backend_springboot.modelo.LicenciaProductoRequest;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Producto;
@@ -37,6 +41,7 @@ import com.temipora.backend_springboot.modelo.ProductoVariante;
 import com.temipora.backend_springboot.modelo.ProductoVarianteRequest;
 import com.temipora.backend_springboot.modelo.TipoProducto;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
 import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
@@ -61,7 +66,7 @@ class ProductoServiceTest {
     @Mock private MedioRepository medioRepository;
     @Mock private EtiquetaRepository etiquetaRepository;
     @Mock private MonedaService monedaService;
-    @Mock private TerminosService terminosService;
+    @Mock private DerechoTerminoRepository derechoTerminoRepository;
     @Mock private LedgerService ledgerService;
     @Mock private AuditoriaService auditoriaService;
 
@@ -79,7 +84,12 @@ class ProductoServiceTest {
         assertThat(dto.getVariantes().get(0).isTieneLedger()).isTrue();
         assertThat(dto.getPrecioDesde()).isEqualByComparingTo("100.00");
         assertThat(dto.getContenidosSensibles()).isEmpty();
-        verify(ledgerService).registrarGenesis(any(ProductoVariante.class), eq("hashTerminos"));
+        assertThat(dto.getLicencia()).isNotNull();
+        assertThat(dto.getLicencia().getDerechos()).hasSize(1);
+        assertThat(dto.getLicencia().getDerechos().get(0).getCodigo())
+            .isEqualTo("CONTENIDO");
+        verify(ledgerService).registrarGenesis(
+            any(ProductoVariante.class), anyString());
         verify(auditoriaService).registrar(
             eq(AccionesAdmin.PRODUCTO_CREAR), eq("Producto"), eq(10L),
             anyString(), isNull(), any(Producto.class), anyList());
@@ -100,16 +110,17 @@ class ProductoServiceTest {
     }
 
     @Test
-    void crear_sinTerminosGlobales_lanzaError() {
+    void crear_sinDerechos_lanzaError() {
         when(productoRepository
             .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
                 5L, 1L, "Plancha de otoño", EstadoProducto.ARCHIVADO))
             .thenReturn(false);
-        when(terminosService.tieneGlobalValido(5L)).thenReturn(false);
+        ProductoRequest request = request();
+        request.getLicencia().setIdsDerechos(Set.of());
 
-        assertThatThrownBy(() -> productoService.crear(5L, request()))
+        assertThatThrownBy(() -> productoService.crear(5L, request))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Completá tus términos de uso antes de publicar el producto.");
+            .hasMessage("Elegí al menos un uso permitido para la licencia.");
     }
 
     @Test
@@ -118,7 +129,8 @@ class ProductoServiceTest {
             .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
                 5L, 1L, "Plancha de otoño", EstadoProducto.ARCHIVADO))
             .thenReturn(false);
-        when(terminosService.tieneGlobalValido(5L)).thenReturn(true);
+        when(derechoTerminoRepository.findAllById(any()))
+            .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
         when(varianteRepository
             .existsBySha256AndEstadoNotAndProductoIdProductoNot(
                 anyString(), eq(EstadoVariante.ARCHIVADO), eq(-1L)))
@@ -135,21 +147,16 @@ class ProductoServiceTest {
             .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
                 5L, 1L, "Plancha de otoño", EstadoProducto.ARCHIVADO))
             .thenReturn(false);
-        when(terminosService.tieneGlobalValido(5L)).thenReturn(true);
-        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
-        when(tipoProductoRepository.findByIdTipoProducto(1L))
-            .thenReturn(Optional.of(tipo(1L, "Adoptable")));
-        when(medioRepository.findByIdMedio(2L))
-            .thenReturn(Optional.of(medio(2L, "Digital")));
-        when(monedaService.obtener(3L)).thenReturn(moneda(3L, "ARS"));
+        when(derechoTerminoRepository.findAllById(any()))
+            .thenReturn(List.of(derecho(1L, "REVENTA", true)));
 
         ProductoRequest request = request();
-        request.setPermiteReventa(true);
+        request.getLicencia().setIdsDerechos(Set.of(1L));
         request.getVariantes().get(0).setStockDisponible(2);
 
         assertThatThrownBy(() -> productoService.crear(5L, request))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("La reventa solo se habilita si hay al menos una variante con stock 1.");
+            .hasMessageContaining("El derecho de reventa solo se habilita");
     }
 
     @Test
@@ -158,7 +165,8 @@ class ProductoServiceTest {
             .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
                 5L, 1L, "Plancha de otoño", EstadoProducto.ARCHIVADO))
             .thenReturn(false);
-        when(terminosService.tieneGlobalValido(5L)).thenReturn(true);
+        when(derechoTerminoRepository.findAllById(any()))
+            .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
 
         ProductoRequest request = request();
         request.setVariantes(new ArrayList<>());
@@ -195,7 +203,8 @@ class ProductoServiceTest {
             .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNot(
                 5L, 1L, "Plancha nueva", 10L, EstadoProducto.ARCHIVADO))
             .thenReturn(false);
-        when(terminosService.tieneProductoValido(10L, 5L)).thenReturn(true);
+        when(derechoTerminoRepository.findAllById(any()))
+            .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
         when(tipoProductoRepository.findByIdTipoProducto(1L))
             .thenReturn(Optional.of(tipo(1L, "Adoptable")));
         when(medioRepository.findByIdMedio(2L))
@@ -248,16 +257,16 @@ class ProductoServiceTest {
     }
 
     @Test
-    void reactivar_sinTerminos_lanzaError() {
+    void reactivar_sinLicencia_lanzaError() {
         Producto producto = productoConVariante(10L, 5L, 20L, SHA_VARIANTE);
+        producto.getLicencias().clear();
         producto.setEstado(EstadoProducto.PAUSADO);
         when(productoRepository.findByIdProductoForUpdate(10L))
             .thenReturn(Optional.of(producto));
-        when(terminosService.tieneProductoValido(10L, 5L)).thenReturn(false);
 
         assertThatThrownBy(() -> productoService.reactivar(10L, 5L))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Completá tus términos de uso antes de publicar el producto.");
+            .hasMessage("El producto no tiene una licencia configurada.");
     }
 
     @Test
@@ -266,7 +275,6 @@ class ProductoServiceTest {
         producto.setEstado(EstadoProducto.PAUSADO);
         when(productoRepository.findByIdProductoForUpdate(10L))
             .thenReturn(Optional.of(producto));
-        when(terminosService.tieneProductoValido(10L, 5L)).thenReturn(true);
         when(productoRepository.save(any(Producto.class)))
             .thenAnswer(inv -> inv.getArgument(0));
         when(productoRepository.findByIdProducto(10L))
@@ -293,6 +301,7 @@ class ProductoServiceTest {
 
         assertThat(dtos).hasSize(1);
         assertThat(dtos.get(0).getVariantes().get(0).isTieneLedger()).isTrue();
+        assertThat(dtos.get(0).getLicencia()).isNotNull();
     }
 
     @Test
@@ -306,6 +315,53 @@ class ProductoServiceTest {
             .hasMessage("No podés modificar un producto que no es tuyo.");
     }
 
+    @Test
+    void crear_reventaConVarianteUnica_guardaRegalia() {
+        prepararCreacion();
+        when(derechoTerminoRepository.findAllById(any()))
+            .thenReturn(List.of(derecho(1L, "REVENTA", true)));
+
+        ProductoRequest request = request();
+        request.getLicencia().setIdsDerechos(Set.of(1L));
+        request.getLicencia().setPorcentajeRegalia(new BigDecimal("5.00"));
+
+        ProductoDTO dto = productoService.crear(5L, request);
+
+        assertThat(dto.getLicencia().isPermiteReventa()).isTrue();
+        assertThat(dto.getLicencia().getPorcentajeRegalia())
+            .isEqualByComparingTo("5.00");
+        assertThat(dto.getPorcentajeRegalia()).isEqualByComparingTo("5.00");
+        assertThat(dto.getLicencia().getDerechos().get(0).getCodigo())
+            .isEqualTo("REVENTA");
+    }
+
+    @Test
+    void modificar_cambiaLicencia_creaVersionNuevaYConservaLaAnterior() {
+        Producto producto = productoConVariante(10L, 5L, 20L, SHA_VARIANTE);
+        prepararModificacion(producto);
+        when(derechoTerminoRepository.findAllById(any()))
+            .thenReturn(List.of(derecho(1L, "REVENTA", true)));
+
+        ProductoRequest request = request();
+        request.setTitulo("Plancha nueva");
+        request.getLicencia().setIdsDerechos(Set.of(1L));
+        request.getLicencia().setPorcentajeRegalia(new BigDecimal("5.00"));
+        request.getVariantes().get(0).setIdVariante(20L);
+        request.getVariantes().get(0).setSha256(SHA_VARIANTE);
+        request.getVariantes().get(0).setClaveArchivoOriginal(null);
+
+        ProductoDTO dto = productoService.modificar(10L, 5L, request);
+
+        assertThat(producto.getLicencias()).hasSize(2);
+        assertThat(dto.getLicencia().getVersion()).isEqualTo(2);
+        assertThat(dto.getLicencia().isPermiteReventa()).isTrue();
+        assertThat(dto.getLicencia().getPorcentajeRegalia())
+            .isEqualByComparingTo("5.00");
+        assertThat(producto.getLicencias().stream()
+            .filter(licencia -> !licencia.isVigente())
+            .count()).isEqualTo(1);
+    }
+
     // ---------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------
@@ -315,7 +371,8 @@ class ProductoServiceTest {
             .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
                 5L, 1L, "Plancha de otoño", EstadoProducto.ARCHIVADO))
             .thenReturn(false);
-        when(terminosService.tieneGlobalValido(5L)).thenReturn(true);
+        when(derechoTerminoRepository.findAllById(any()))
+            .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(tipoProductoRepository.findByIdTipoProducto(1L))
             .thenReturn(Optional.of(tipo(1L, "Adoptable")));
@@ -330,9 +387,12 @@ class ProductoServiceTest {
                 for (ProductoVariante variante : producto.getVariantes()) {
                     variante.setIdVariante(id++);
                 }
+                long idLicencia = 30L;
+                for (LicenciaProducto licencia : producto.getLicencias()) {
+                    licencia.setIdLicenciaProducto(idLicencia++);
+                }
                 return producto;
             });
-        when(terminosService.hashVigenteProducto(10L, 5L)).thenReturn("hashTerminos");
         when(eventoLedgerRepository.findVariantesConLedger(List.of(10L)))
             .thenReturn(Set.of(20L));
     }
@@ -344,7 +404,8 @@ class ProductoServiceTest {
             .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNot(
                 5L, 1L, "Plancha nueva", 10L, EstadoProducto.ARCHIVADO))
             .thenReturn(false);
-        when(terminosService.tieneProductoValido(10L, 5L)).thenReturn(true);
+        when(derechoTerminoRepository.findAllById(any()))
+            .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
         when(tipoProductoRepository.findByIdTipoProducto(1L))
             .thenReturn(Optional.of(tipo(1L, "Adoptable")));
         when(medioRepository.findByIdMedio(2L))
@@ -352,7 +413,6 @@ class ProductoServiceTest {
         when(monedaService.obtener(3L)).thenReturn(moneda(3L, "ARS"));
         when(productoRepository.saveAndFlush(any(Producto.class)))
             .thenAnswer(inv -> inv.getArgument(0));
-        when(terminosService.hashVigenteProducto(10L, 5L)).thenReturn("hashTerminos");
         when(eventoLedgerRepository.existsByVarianteIdVariante(20L)).thenReturn(true);
         when(eventoLedgerRepository.findVariantesConLedger(List.of(10L)))
             .thenReturn(Set.of(20L));
@@ -366,11 +426,18 @@ class ProductoServiceTest {
         request.setTitulo("Plancha de otoño");
         request.setDescripcion("desc");
         request.setContenidosSensibles(Set.of());
-        request.setPorcentajeRegalia(new BigDecimal("5"));
         request.setImagenes(new ArrayList<>(List.of(imagenRequest())));
         request.setVariantes(new ArrayList<>(List.of(varianteRequest(null))));
         request.setIdsEtiquetas(Set.of());
+        request.setLicencia(licenciaRequest());
         return request;
+    }
+
+    private LicenciaProductoRequest licenciaRequest() {
+        LicenciaProductoRequest licencia = new LicenciaProductoRequest();
+        licencia.setIdsDerechos(new LinkedHashSet<>(Set.of(2L)));
+        licencia.setPorcentajeRegalia(BigDecimal.ZERO);
+        return licencia;
     }
 
     private ProductoImagenRequest imagenRequest() {
@@ -432,7 +499,27 @@ class ProductoServiceTest {
         imagen.setSha256(SHA_IMAGEN);
         producto.getImagenes().add(imagen);
 
+        LicenciaProducto licencia = new LicenciaProducto();
+        licencia.setIdLicenciaProducto(30L);
+        licencia.setProducto(producto);
+        licencia.setVersion(1);
+        licencia.setVigente(true);
+        licencia.setPorcentajeRegalia(BigDecimal.ZERO);
+        licencia.reemplazarDerechos(Set.of(derecho(2L, "CONTENIDO", false)));
+        producto.getLicencias().add(licencia);
+
         return producto;
+    }
+
+    private DerechoTermino derecho(Long id, String codigo, boolean requierePiezaUnica) {
+        DerechoTermino derecho = new DerechoTermino();
+        derecho.setIdDerechoTermino(id);
+        derecho.setCodigo(codigo);
+        derecho.setNombre(codigo);
+        derecho.setOrden(0);
+        derecho.setActivo(true);
+        derecho.setRequierePiezaUnica(requierePiezaUnica);
+        return derecho;
     }
 
     private Moneda moneda(Long id, String codigo) {

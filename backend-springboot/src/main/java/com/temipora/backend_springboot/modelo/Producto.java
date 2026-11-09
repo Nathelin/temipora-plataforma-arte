@@ -1,6 +1,5 @@
 package com.temipora.backend_springboot.modelo;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -78,12 +77,6 @@ public class Producto {
     @Column(name = "contenido", nullable = false, length = 20)
     private Set<ContenidoSensible> contenidosSensibles = new HashSet<>();
 
-    @Column(name = "permite_reventa", nullable = false)
-    private boolean permiteReventa = false;
-
-    @Column(name = "porcentaje_regalia", nullable = false, precision = 5, scale = 2)
-    private BigDecimal porcentajeRegalia = BigDecimal.ZERO;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private EstadoProducto estado = EstadoProducto.DISPONIBLE;
@@ -117,6 +110,10 @@ public class Producto {
 
     @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<ProductoEtiqueta> etiquetas = new LinkedHashSet<>();
+
+    @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("version ASC")
+    private Set<LicenciaProducto> licencias = new LinkedHashSet<>();
 
     public void agregarVariante(ProductoVariante variante) {
         variante.setProducto(this);
@@ -162,5 +159,17 @@ public class Producto {
         if (nuevos != null) {
             this.contenidosSensibles.addAll(nuevos);
         }
+    }
+
+    public void agregarLicencia(LicenciaProducto licencia) {
+        licencia.setProducto(this);
+        this.licencias.add(licencia);
+    }
+
+    public LicenciaProducto licenciaVigente() {
+        return licencias.stream()
+            .filter(LicenciaProducto::isVigente)
+            .findFirst()
+            .orElse(null);
     }
 }

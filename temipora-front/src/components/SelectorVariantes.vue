@@ -2,27 +2,38 @@
 import { computed, ref } from 'vue'
 import { acceptImagenes, validarImagen } from '../servicios/archivos'
 import { formatearPrecio } from '../servicios/moneda'
-import {
-  esIlimitada,
-  esPiezaUnica,
-  etiquetaStock,
-  estadoVarianteDe,
-  subirImagenProducto,
-} from '../servicios/productos'
+import { subirImagenProducto } from '../servicios/productos'
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
   moneda: { type: String, default: 'ARS' },
-  permiteReventa: { type: Boolean, default: false },
+  esAdoptable: { type: Boolean, default: false },
+  imagenPortada: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:modelValue'])
 
-const cantidadPlancha = ref(3)
+const MODOS_STOCK = [
+  { valor: 'ILIMITADO', texto: 'Ilimitado' },
+  { valor: 'LIMITADA', texto: 'Cantidad limitada' },
+  { valor: 'UNICA', texto: 'Pieza única' },
+]
+
+const cantidadAdoptables = ref(3)
 const subiendo = ref(null)
 const error = ref('')
 
 const variantes = computed(() => props.modelValue)
+const esPresentacionUnica = computed(() => variantes.value.length === 1)
+
+function esIlimitada(variante) {
+  return variante?.stockDisponible === null || variante?.stockDisponible === undefined
+}
+
+function modoStock(variante) {
+  if (esIlimitada(variante)) return 'ILIMITADO'
+  return Number(variante.stockDisponible) === 1 ? 'UNICA' : 'LIMITADA'
+}
 
 function actualizar(indice, campo, valor) {
   const copia = props.modelValue.map((variante, i) =>
@@ -36,7 +47,7 @@ function nuevaVariante(overrides = {}) {
     nombre: 'Variante',
     descripcion: '',
     precio: '',
-    stockDisponible: 1,
+    stockDisponible: props.esAdoptable ? 1 : null,
     estado: 'DISPONIBLE',
     urlImagen: '',
     sha256: '',
@@ -47,27 +58,41 @@ function nuevaVariante(overrides = {}) {
 
 function agregarVariante() {
   const total = props.modelValue.length
+  const iniciales = props.modelValue.map((variante, i) =>
+    i === 0 && variante.nombre === 'Única'
+      ? { ...variante, nombre: props.esAdoptable ? 'Adoptable 1' : 'Variante 1' }
+      : variante,
+  )
   emit('update:modelValue', [
-    ...props.modelValue,
+    ...iniciales,
     nuevaVariante({
-      nombre: total === 0 ? 'Única' : `Variante ${total + 1}`,
+      nombre: props.esAdoptable ? `Adoptable ${total + 1}` : `Variante ${total + 1}`,
     }),
   ])
 }
 
-function generarPlancha() {
-  const cantidad = Math.max(1, Math.min(50, Number(cantidadPlancha.value) || 1))
-  const base = props.modelValue.length
-  const nuevas = Array.from({ length: cantidad }, (_, i) =>
+function crearVariosAdoptables() {
+  const cantidad = Math.max(1, Math.min(50, Number(cantidadAdoptables.value) || 1))
+  const soloPresentacionUnica =
+    props.modelValue.length === 1 && props.modelValue[0].nombre === 'Única'
+  const iniciales = soloPresentacionUnica
+    ? [{ ...props.modelValue[0], nombre: 'Adoptable 1', stockDisponible: 1 }]
+    : [...props.modelValue]
+  const cantidadNuevas = soloPresentacionUnica
+    ? Math.max(0, cantidad - 1)
+    : cantidad
+  const base = iniciales.length
+  const nuevas = Array.from({ length: cantidadNuevas }, (_, i) =>
     nuevaVariante({
       nombre: `Adoptable ${base + i + 1}`,
       stockDisponible: 1,
     }),
   )
-  emit('update:modelValue', [...props.modelValue, ...nuevas])
+  emit('update:modelValue', [...iniciales, ...nuevas])
 }
 
 function quitarVariante(indice) {
+  if (props.modelValue.length <= 1) return
   emit('update:modelValue', props.modelValue.filter((_, i) => i !== indice))
 }
 
@@ -80,21 +105,31 @@ function moverVariante(indice, paso) {
   emit('update:modelValue', copia)
 }
 
-function alternarIlimitado(indice) {
+function cambiarModoStock(indice, modo) {
   const variante = props.modelValue[indice]
-  actualizar(indice, 'stockDisponible', esIlimitada(variante) ? 1 : null)
+  if (modo === 'ILIMITADO') {
+    actualizar(indice, 'stockDisponible', null)
+    return
+  }
+  if (modo === 'UNICA') {
+    actualizar(indice, 'stockDisponible', 1)
+    return
+  }
+  const actual = Number(variante.stockDisponible)
+  if (!esIlimitada(variante) && actual !== 1) return
+  actualizar(indice, 'stockDisponible', 2)
 }
 
 function onStockInput(indice, event) {
-  const valor = event.target.value
-  actualizar(indice, 'stockDisponible', valor === '' ? 1 : Number(valor))
+  const valor = Number(event.target.value)
+  actualizar(indice, 'stockDisponible', Number.isFinite(valor) && valor >= 0 ? valor : 0)
 }
 
 function precioVisible(variante) {
   const numero = Number(variante.precio)
   return Number.isFinite(numero) && numero > 0
     ? formatearPrecio(numero, props.moneda)
-    : 'Sin precio'
+    : ''
 }
 
 async function subirImagen(event, indice) {
@@ -134,14 +169,44 @@ async function subirImagen(event, indice) {
 
 <template>
   <div class="space-y-4">
-    <div class="flex flex-col gap-3 rounded-2xl border border-rosa/60 bg-crema/50 p-4 sm:flex-row sm:items-end sm:justify-between">
-      <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end">
-        <div class="w-full sm:w-40">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h3 class="font-display text-lg font-bold text-granate">
+          {{ esPresentacionUnica ? 'Precio y stock' : 'Variantes' }}
+        </h3>
+        <p class="mt-1 text-sm text-cafe/60">
+          {{ esPresentacionUnica
+            ? 'Esta publicación tiene una sola presentación.'
+            : 'Cada variante se vende por separado y puede tener su propio precio, stock e imagen.' }}
+        </p>
+      </div>
+      <button
+        type="button"
+        class="shrink-0 rounded-lg border border-coral/40 bg-blanco px-4 py-2 text-sm font-medium text-granate transition hover:bg-rosa/20"
+        @click="agregarVariante"
+      >
+        {{ esPresentacionUnica ? 'Agregar otra presentación' : 'Agregar variante' }}
+      </button>
+    </div>
+
+    <div
+      v-if="esAdoptable"
+      class="flex flex-col gap-3 rounded-2xl border border-rosa/60 bg-crema/50 p-4 sm:flex-row sm:items-end sm:justify-between"
+    >
+      <div>
+        <p class="text-sm font-semibold text-granate">¿Es una plancha de adoptables?</p>
+        <p class="mt-1 text-xs leading-relaxed text-cafe/55">
+          Crea varias piezas únicas de una vez. Cada adoptable queda con stock 1
+          y podés renombrarlo o subirle su imagen después.
+        </p>
+      </div>
+      <div class="flex items-end gap-2">
+        <div class="w-28">
           <label class="mb-1.5 block text-xs font-medium text-cafe/70">
-            Plancha de adoptables
+            Cantidad
           </label>
           <input
-            v-model.number="cantidadPlancha"
+            v-model.number="cantidadAdoptables"
             type="number"
             min="1"
             max="50"
@@ -150,76 +215,120 @@ async function subirImagen(event, indice) {
         </div>
         <button
           type="button"
-          class="rounded-lg border border-coral/40 bg-blanco px-4 py-2 text-sm font-medium text-granate transition hover:bg-rosa/20"
-          @click="generarPlancha"
-        >
-          Generar plancha
-        </button>
-        <button
-          type="button"
           class="rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-rojizo"
-          @click="agregarVariante"
+          @click="crearVariosAdoptables"
         >
-          Agregar variante
+          Crear varios adoptables
         </button>
       </div>
-      <p class="max-w-sm text-xs leading-relaxed text-cafe/55">
-        Cada producto tiene una o más variantes. Una plancha genera una variante
-        con stock 1 por cada adoptable.
-      </p>
     </div>
-
-    <p
-      v-if="permiteReventa"
-      class="rounded-xl border border-coral/20 bg-rosa/20 px-4 py-3 text-xs leading-relaxed text-granate"
-    >
-      La reventa se habilita solo para variantes con stock 1. Las variantes
-      ilimitadas o con stock mayor a 1 se venden como licencia y no se revenden.
-    </p>
 
     <p v-if="error" class="rounded-xl border border-rojizo/30 bg-rojizo/5 px-4 py-3 text-sm text-rojizo">
       {{ error }}
     </p>
 
-    <div
-      v-if="!variantes.length"
-      class="rounded-2xl border border-dashed border-rosa/70 px-4 py-10 text-center"
-    >
-      <p class="text-sm font-medium text-granate">Todavía no hay variantes.</p>
-      <p class="mt-1 text-sm text-cafe/50">
-        Agregá una variante única o generá una plancha de adoptables.
-      </p>
-    </div>
-
+    <!-- Presentación única -->
     <article
-      v-for="(variante, indice) in variantes"
+      v-if="esPresentacionUnica"
+      class="rounded-2xl border border-rosa/60 bg-blanco p-5 shadow-sm"
+    >
+      <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_14rem]">
+        <div class="space-y-5">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label class="mb-1.5 block text-xs font-medium text-cafe/70">
+                Precio <span class="text-rojizo">*</span>
+              </label>
+              <div class="relative">
+                <input
+                  :value="variantes[0].precio"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0"
+                  class="w-full rounded-lg border border-rosa/60 bg-blanco px-3 py-2 pr-14 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
+                  @input="actualizar(0, 'precio', $event.target.value)"
+                />
+                <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-cafe/45">
+                  {{ moneda }}
+                </span>
+              </div>
+              <p class="mt-1 text-[11px] text-cafe/45">{{ precioVisible(variantes[0]) }}</p>
+            </div>
+
+            <div>
+              <p class="mb-1.5 text-xs font-medium text-cafe/70">Stock</p>
+              <div class="inline-flex w-full rounded-lg border border-rosa/60 bg-crema/40 p-0.5">
+                <button
+                  v-for="modo in MODOS_STOCK"
+                  :key="modo.valor"
+                  type="button"
+                  class="flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition"
+                  :class="modoStock(variantes[0]) === modo.valor
+                    ? 'bg-coral text-white shadow-sm'
+                    : 'text-cafe/60 hover:bg-rosa/20 hover:text-granate'"
+                  :aria-pressed="modoStock(variantes[0]) === modo.valor"
+                  @click="cambiarModoStock(0, modo.valor)"
+                >
+                  {{ modo.texto }}
+                </button>
+              </div>
+              <div v-if="modoStock(variantes[0]) === 'LIMITADA'" class="mt-2">
+                <input
+                  :value="variantes[0].stockDisponible"
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="w-28 rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
+                  @input="onStockInput(0, $event)"
+                />
+              </div>
+              <p
+                v-if="modoStock(variantes[0]) === 'UNICA'"
+                class="mt-2 text-[11px] leading-relaxed text-cafe/50"
+              >
+                Se vende una sola unidad. Si habilitás la reventa, puede transferirse.
+              </p>
+            </div>
+          </div>
+
+          <p class="rounded-xl bg-crema/60 px-3 py-2 text-xs leading-relaxed text-cafe/60">
+            La imagen de la presentación será la portada de la publicación.
+            Si querés una imagen distinta, agregá una segunda presentación.
+          </p>
+        </div>
+
+        <div>
+          <p class="mb-2 text-xs font-medium text-cafe/70">Imagen de portada</p>
+          <div class="overflow-hidden rounded-xl border border-rosa/60 bg-rosa/10">
+            <img
+              v-if="imagenPortada"
+              :src="imagenPortada"
+              alt="Portada de la publicación"
+              class="aspect-square w-full object-cover"
+            />
+            <div
+              v-else
+              class="flex aspect-square flex-col items-center justify-center gap-2 px-4 text-center text-xs text-cafe/45"
+            >
+              <span class="text-2xl" aria-hidden="true">＋</span>
+              Subí la portada en el paso de imágenes
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- Variantes múltiples -->
+    <article
+      v-for="(variante, indice) in (esPresentacionUnica ? [] : variantes)"
       :key="variante.idVariante || `nueva-${indice}`"
       class="rounded-2xl border border-rosa/60 bg-blanco p-5 shadow-sm"
     >
       <header class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex flex-wrap items-center gap-2">
-          <h3 class="font-display text-base font-bold text-granate">
-            Variante {{ indice + 1 }}
-          </h3>
-          <span
-            class="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
-            :class="estadoVarianteDe(variante.estado).clase"
-          >
-            {{ estadoVarianteDe(variante.estado).texto }}
-          </span>
-          <span
-            class="rounded-full bg-crema px-2.5 py-0.5 text-[11px] font-semibold text-cafe/65"
-          >
-            {{ etiquetaStock(variante) }}
-          </span>
-          <span
-            v-if="esPiezaUnica(variante)"
-            class="rounded-full bg-mantequilla/60 px-2.5 py-0.5 text-[11px] font-bold text-granate"
-          >
-            Pieza única
-          </span>
-        </div>
-
+        <h3 class="font-display text-base font-bold text-granate">
+          Variante {{ indice + 1 }}
+        </h3>
         <div class="flex items-center gap-1">
           <button
             type="button"
@@ -260,23 +369,29 @@ async function subirImagen(event, indice) {
                 :value="variante.nombre"
                 type="text"
                 maxlength="100"
-                placeholder="Ej. Adoptable 1"
+                :placeholder="esAdoptable ? 'Ej. Adoptable 1' : 'Ej. Tamaño A4'"
                 class="w-full rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
                 @input="actualizar(indice, 'nombre', $event.target.value)"
               />
             </div>
             <div>
               <label class="mb-1.5 block text-xs font-medium text-cafe/70">
-                Precio ({{ moneda }})
+                Precio <span class="text-rojizo">*</span>
               </label>
-              <input
-                :value="variante.precio"
-                type="number"
-                min="0"
-                step="0.01"
-                class="w-full rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
-                @input="actualizar(indice, 'precio', $event.target.value)"
-              />
+              <div class="relative">
+                <input
+                  :value="variante.precio"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0"
+                  class="w-full rounded-lg border border-rosa/60 bg-blanco px-3 py-2 pr-14 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
+                  @input="actualizar(indice, 'precio', $event.target.value)"
+                />
+                <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-cafe/45">
+                  {{ moneda }}
+                </span>
+              </div>
               <p class="mt-1 text-[11px] text-cafe/45">{{ precioVisible(variante) }}</p>
             </div>
           </div>
@@ -294,46 +409,32 @@ async function subirImagen(event, indice) {
             ></textarea>
           </div>
 
-          <div class="flex flex-wrap items-end gap-5">
-            <label class="inline-flex items-center gap-2 text-sm text-cafe">
-              <input
-                type="checkbox"
-                :checked="esIlimitada(variante)"
-                class="h-4 w-4 rounded border-rosa text-coral focus:ring-coral"
-                @change="alternarIlimitado(indice)"
-              />
-              Stock ilimitado
-            </label>
-
-            <div v-if="!esIlimitada(variante)" class="w-32">
-              <label class="mb-1.5 block text-xs font-medium text-cafe/70">
-                Stock disponible
-              </label>
-              <input
-                :value="variante.stockDisponible"
-                type="number"
-                min="0"
-                step="1"
-                class="w-full rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
-                @input="onStockInput(indice, $event)"
-              />
-            </div>
-
-            <div class="w-40">
-              <label class="mb-1.5 block text-xs font-medium text-cafe/70">
-                Estado
-              </label>
-              <select
-                :value="variante.estado"
-                class="w-full rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
-                @change="actualizar(indice, 'estado', $event.target.value)"
+          <div>
+            <p class="mb-1.5 text-xs font-medium text-cafe/70">Stock</p>
+            <div class="inline-flex w-full max-w-md rounded-lg border border-rosa/60 bg-crema/40 p-0.5">
+              <button
+                v-for="modo in MODOS_STOCK"
+                :key="modo.valor"
+                type="button"
+                class="flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition"
+                :class="modoStock(variante) === modo.valor
+                  ? 'bg-coral text-white shadow-sm'
+                  : 'text-cafe/60 hover:bg-rosa/20 hover:text-granate'"
+                :aria-pressed="modoStock(variante) === modo.valor"
+                @click="cambiarModoStock(indice, modo.valor)"
               >
-                <option value="DISPONIBLE">Disponible</option>
-                <option value="PAUSADO">Pausado</option>
-                <option value="AGOTADO">Agotado</option>
-                <option value="ARCHIVADO">Archivado</option>
-              </select>
+                {{ modo.texto }}
+              </button>
             </div>
+            <input
+              v-if="modoStock(variante) === 'LIMITADA'"
+              :value="variante.stockDisponible"
+              type="number"
+              min="0"
+              step="1"
+              class="mt-2 w-28 rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
+              @input="onStockInput(indice, $event)"
+            />
           </div>
         </div>
 
@@ -368,9 +469,6 @@ async function subirImagen(event, indice) {
               @change="subirImagen($event, indice)"
             />
           </label>
-          <p v-if="variante.sha256" class="mt-2 break-all text-[10px] leading-relaxed text-cafe/35">
-            SHA-256: {{ variante.sha256 }}
-          </p>
         </div>
       </div>
     </article>

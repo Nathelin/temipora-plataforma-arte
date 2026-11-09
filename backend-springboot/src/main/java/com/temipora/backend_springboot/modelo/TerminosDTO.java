@@ -18,7 +18,6 @@ public class TerminosDTO {
 
     private Long idTerminos;
     private Long idServicio;
-    private Long idProducto;
     private boolean propio;
     private Integer version;
     private String informacionGeneral;
@@ -46,7 +45,6 @@ public class TerminosDTO {
             .idServicio(terminos.getServicio() != null
                 ? terminos.getServicio().getIdServicio()
                 : null)
-            .idProducto(terminos.getIdProducto())
             .propio(propio)
             .version(terminos.getVersion())
             .informacionGeneral(terminos.getInformacionGeneral())

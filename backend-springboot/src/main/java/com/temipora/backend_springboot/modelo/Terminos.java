@@ -34,9 +34,6 @@ public class Terminos {
     @JoinColumn(name = "id_artista")
     private Usuario artista;
 
-    @Column(name = "id_producto")
-    private Long idProducto;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_servicio")
     private Servicio servicio;

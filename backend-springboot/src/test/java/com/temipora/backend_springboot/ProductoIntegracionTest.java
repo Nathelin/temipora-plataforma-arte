@@ -13,9 +13,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
 import com.temipora.backend_springboot.modelo.EventoLedger;
+import com.temipora.backend_springboot.modelo.LicenciaProducto;
+import com.temipora.backend_springboot.modelo.LicenciaProductoRequest;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Producto;
@@ -26,6 +29,7 @@ import com.temipora.backend_springboot.modelo.ProductoVarianteRequest;
 import com.temipora.backend_springboot.modelo.TipoEventoLedger;
 import com.temipora.backend_springboot.modelo.TipoProducto;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
@@ -34,7 +38,6 @@ import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 import com.temipora.backend_springboot.servicios.LedgerService;
 import com.temipora.backend_springboot.servicios.MonedaService;
 import com.temipora.backend_springboot.servicios.ProductoService;
-import com.temipora.backend_springboot.servicios.TerminosService;
 
 @SpringBootTest
 @Transactional
@@ -42,16 +45,16 @@ class ProductoIntegracionTest {
 
     @Autowired private ProductoService productoService;
     @Autowired private LedgerService ledgerService;
-    @Autowired private TerminosService terminosService;
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private TipoProductoRepository tipoProductoRepository;
     @Autowired private MedioRepository medioRepository;
     @Autowired private MonedaService monedaService;
     @Autowired private ProductoRepository productoRepository;
     @Autowired private EventoLedgerRepository eventoLedgerRepository;
+    @Autowired private DerechoTerminoRepository derechoTerminoRepository;
 
     @Test
-    void crearProductoUnico_persisteVariantesTerminosYGenesis() {
+    void crearProductoUnico_persisteVariantesLicenciaYGenesis() {
         Usuario artista = usuarioRepository.findAll().stream()
             .filter(usuario -> usuario.getRol() != null
                 && usuario.getRol().getNombre() == ERol.ARTISTA)
@@ -93,10 +96,20 @@ class ProductoIntegracionTest {
         request.setVariantes(new ArrayList<>(List.of(variante)));
         request.setIdsEtiquetas(Set.of());
         request.setContenidosSensibles(Set.of());
-        com.temipora.backend_springboot.modelo.TerminosRequest terminos =
-            new com.temipora.backend_springboot.modelo.TerminosRequest();
-        terminos.setUsoCliente("Uso personal de la pieza.");
-        request.setTerminos(terminos);
+
+        DerechoTermino personal = derechoTerminoRepository
+            .findByActivoTrueOrderByOrdenAsc().stream()
+            .filter(derecho -> "PERSONAL".equals(derecho.getCodigo()))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException(
+                "No existe el derecho PERSONAL en el catálogo."));
+        LicenciaProductoRequest licencia = new LicenciaProductoRequest();
+        licencia.setIdsDerechos(Set.of(personal.getIdDerechoTermino()));
+        licencia.setPermiteModificaciones(false);
+        licencia.setRequiereCredito(true);
+        licencia.setPorcentajeRegalia(BigDecimal.ZERO);
+        licencia.setTextoAdicional("Uso personal de la pieza.");
+        request.setLicencia(licencia);
 
         ProductoDTO dto = productoService.crear(artista.getIdUsuario(), request);
 
@@ -106,10 +119,20 @@ class ProductoIntegracionTest {
         assertThat(dto.getVariantes().get(0).isTieneLedger()).isTrue();
         assertThat(dto.getPrecioDesde()).isEqualByComparingTo("150.00");
 
+        assertThat(dto.getLicencia()).isNotNull();
+        assertThat(dto.getLicencia().getDerechos()).hasSize(1);
+        assertThat(dto.getLicencia().getDerechos().get(0).getCodigo())
+            .isEqualTo("PERSONAL");
+
         Producto producto = productoRepository.findByIdProducto(dto.getIdProducto())
             .orElseThrow();
         assertThat(producto.getVariantes()).hasSize(1);
         assertThat(producto.getImagenes()).hasSize(1);
+        assertThat(producto.getLicencias()).hasSize(1);
+        LicenciaProducto licenciaGuardada = producto.licenciaVigente();
+        assertThat(licenciaGuardada).isNotNull();
+        assertThat(licenciaGuardada.getDerechos()).hasSize(1);
+        assertThat(licenciaGuardada.isRequiereCredito()).isTrue();
         Long idVariante = producto.getVariantes().get(0).getIdVariante();
 
         List<EventoLedger> eventos = eventoLedgerRepository
@@ -120,10 +143,6 @@ class ProductoIntegracionTest {
         assertThat(eventos.get(0).getHashImagen()).isEqualTo(shaVariante);
 
         assertThat(ledgerService.verificarProducto(producto).isIntegridad()).isTrue();
-        assertThat(terminosService
-            .obtenerProducto(dto.getIdProducto(), artista.getIdUsuario())
-            .getIdProducto())
-            .isEqualTo(dto.getIdProducto());
     }
 
     private String shaAleatorio() {

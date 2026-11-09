@@ -10,21 +10,15 @@ public interface TerminosRepository extends JpaRepository<Terminos, Long> {
 
     Optional<Terminos> findByIdTerminos(Long idTerminos);
 
-    Optional<Terminos> findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(
+    Optional<Terminos> findFirstByArtistaIdUsuarioAndServicioIsNullAndVigenteTrueOrderByVersionDesc(
         Long idUsuario);
 
     Optional<Terminos> findFirstByArtistaIdUsuarioAndServicioIdServicioAndVigenteTrueOrderByVersionDesc(
         Long idUsuario, Long idServicio);
 
-    Optional<Terminos> findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullOrderByVersionDesc(
+    Optional<Terminos> findFirstByArtistaIdUsuarioAndServicioIsNullOrderByVersionDesc(
         Long idUsuario);
 
     Optional<Terminos> findFirstByArtistaIdUsuarioAndServicioIdServicioOrderByVersionDesc(
         Long idUsuario, Long idServicio);
-
-    Optional<Terminos> findFirstByArtistaIdUsuarioAndIdProductoAndVigenteTrueOrderByVersionDesc(
-        Long idUsuario, Long idProducto);
-
-    Optional<Terminos> findFirstByArtistaIdUsuarioAndIdProductoOrderByVersionDesc(
-        Long idUsuario, Long idProducto);
 }

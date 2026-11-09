@@ -1,11 +1,15 @@
 package com.temipora.backend_springboot.servicios;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -13,16 +17,23 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import com.temipora.backend_springboot.modelo.DerechoTermino;
+import com.temipora.backend_springboot.modelo.DerechoTerminoDTO;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
 import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaDTO;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
+import com.temipora.backend_springboot.modelo.LicenciaProducto;
+import com.temipora.backend_springboot.modelo.LicenciaProductoDTO;
+import com.temipora.backend_springboot.modelo.LicenciaProductoDerecho;
+import com.temipora.backend_springboot.modelo.LicenciaProductoRequest;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Producto;
@@ -37,6 +48,7 @@ import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
 import com.temipora.backend_springboot.modelo.ProductoVarianteRequest;
 import com.temipora.backend_springboot.modelo.TipoProducto;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
 import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
@@ -59,8 +71,6 @@ public class ProductoService {
         CampoAuditado.de("medio", "Medio"),
         CampoAuditado.de("moneda", "Moneda"),
         CampoAuditado.de("contenidoSensible", "Contenido sensible"),
-        CampoAuditado.de("permiteReventa", "Permite reventa"),
-        CampoAuditado.de("porcentajeRegalia", "Porcentaje de regalía"),
         CampoAuditado.de("estado", "Estado"),
         CampoAuditado.de("imagenPortada", "Imagen de portada"));
 
@@ -73,7 +83,7 @@ public class ProductoService {
     private final MedioRepository medioRepository;
     private final EtiquetaRepository etiquetaRepository;
     private final MonedaService monedaService;
-    private final TerminosService terminosService;
+    private final DerechoTerminoRepository derechoTerminoRepository;
     private final LedgerService ledgerService;
     private final AuditoriaService auditoria;
 
@@ -87,7 +97,7 @@ public class ProductoService {
             MedioRepository medioRepository,
             EtiquetaRepository etiquetaRepository,
             MonedaService monedaService,
-            TerminosService terminosService,
+            DerechoTerminoRepository derechoTerminoRepository,
             LedgerService ledgerService,
             AuditoriaService auditoria) {
         this.productoRepository = productoRepository;
@@ -99,7 +109,7 @@ public class ProductoService {
         this.medioRepository = medioRepository;
         this.etiquetaRepository = etiquetaRepository;
         this.monedaService = monedaService;
-        this.terminosService = terminosService;
+        this.derechoTerminoRepository = derechoTerminoRepository;
         this.ledgerService = ledgerService;
         this.auditoria = auditoria;
     }
@@ -139,7 +149,8 @@ public class ProductoService {
     @Transactional
     public ProductoDTO crear(Long idArtista, ProductoRequest request) {
         validarUnico(idArtista, request.getIdTipoProducto(), request.getTitulo(), null);
-        validarTerminos(idArtista, null, request);
+        LicenciaContenido licenciaContenido = validarLicencia(
+            request.getLicencia(), request.getVariantes());
         validarDuplicados(request, null);
         validarVariantesBasicas(request.getVariantes());
 
@@ -164,18 +175,15 @@ public class ProductoService {
             construirImagenes(producto, request.getImagenes(), null));
         producto.reemplazarEtiquetas(
             cargarEtiquetas(artista, request.getIdsEtiquetas()));
+        producto.agregarLicencia(construirLicencia(
+            producto, request.getLicencia(), licenciaContenido, 1, true));
 
         Producto guardado = productoRepository.saveAndFlush(producto);
 
-        if (request.getTerminos() != null) {
-            terminosService.guardarProducto(
-                guardado.getIdProducto(), idArtista, request.getTerminos());
-        }
-        String hashTerminos = terminosService.hashVigenteProducto(
-            guardado.getIdProducto(), idArtista);
+        String hashLicencia = hashLicencia(guardado.licenciaVigente());
         for (ProductoVariante variante : guardado.getVariantes()) {
             if (variante.esUnica()) {
-                ledgerService.registrarGenesis(variante, hashTerminos);
+                ledgerService.registrarGenesis(variante, hashLicencia);
             }
         }
         productoRepository.flush();
@@ -183,7 +191,8 @@ public class ProductoService {
         auditoria.registrar(
             AccionesAdmin.PRODUCTO_CREAR, ENTIDAD, guardado.getIdProducto(),
             "Creó el producto “" + guardado.getTitulo() + "” con "
-                + guardado.getVariantes().size() + " variante(s)",
+                + guardado.getVariantes().size() + " variante(s) y licencia v"
+                + versionLicencia(guardado),
             null, guardado, CAMPOS);
         return aDTO(guardado);
     }
@@ -201,7 +210,8 @@ public class ProductoService {
 
         Snapshot antes = Snapshot.de(producto, CAMPOS);
         validarUnico(idArtista, request.getIdTipoProducto(), request.getTitulo(), idProducto);
-        validarTerminos(idArtista, idProducto, request);
+        LicenciaContenido licenciaContenido = validarLicencia(
+            request.getLicencia(), request.getVariantes());
         validarDuplicados(request, idProducto);
         validarVariantesBasicas(request.getVariantes());
 
@@ -211,27 +221,25 @@ public class ProductoService {
             construirImagenes(producto, request.getImagenes(), producto.getImagenes()));
         producto.reemplazarEtiquetas(
             cargarEtiquetas(producto.getArtista(), request.getIdsEtiquetas()));
+        actualizarLicencia(producto, request.getLicencia(), licenciaContenido);
         producto.setFechaActualizacion(LocalDateTime.now());
 
         Producto guardado = productoRepository.saveAndFlush(producto);
 
-        if (request.getTerminos() != null) {
-            terminosService.guardarProducto(
-                idProducto, idArtista, request.getTerminos());
-        }
-        String hashTerminos = terminosService.hashVigenteProducto(idProducto, idArtista);
+        String hashLicencia = hashLicencia(guardado.licenciaVigente());
         for (ProductoVariante variante : guardado.getVariantes()) {
             if (variante.esUnica()
                     && !eventoLedgerRepository.existsByVarianteIdVariante(
                         variante.getIdVariante())) {
-                ledgerService.registrarGenesis(variante, hashTerminos);
+                ledgerService.registrarGenesis(variante, hashLicencia);
             }
         }
         productoRepository.flush();
 
         auditoria.registrar(
             AccionesAdmin.PRODUCTO_MODIFICAR, ENTIDAD, guardado.getIdProducto(),
-            "Modificó el producto “" + guardado.getTitulo() + "”",
+            "Modificó el producto “" + guardado.getTitulo() + "” (licencia v"
+                + versionLicencia(guardado) + ")",
             antes, guardado, CAMPOS);
         return aDTO(guardado);
     }
@@ -267,9 +275,9 @@ public class ProductoService {
         if (producto.getEstado() == EstadoProducto.DISPONIBLE) {
             return obtenerPropio(idProducto, idArtista);
         }
-        if (!terminosService.tieneProductoValido(idProducto, idArtista)) {
+        if (producto.licenciaVigente() == null) {
             throw new IllegalArgumentException(
-                "Completá tus términos de uso antes de publicar el producto.");
+                "El producto no tiene una licencia configurada.");
         }
         Snapshot antes = Snapshot.de(producto, CAMPOS);
         producto.setEstado(EstadoProducto.DISPONIBLE);
@@ -344,6 +352,13 @@ public class ProductoService {
                 .orElse(null));
 
         Usuario artista = producto.getArtista();
+        LicenciaProducto licencia = producto.licenciaVigente();
+        LicenciaProductoDTO licenciaDTO = licenciaDTO(licencia);
+        boolean permiteReventa = licencia != null && licencia.permiteReventa();
+        BigDecimal porcentajeRegalia = licencia != null
+            && licencia.getPorcentajeRegalia() != null
+                ? licencia.getPorcentajeRegalia()
+                : BigDecimal.ZERO;
         return ProductoDTO.builder()
             .idProducto(producto.getIdProducto())
             .idArtista(artista != null ? artista.getIdUsuario() : null)
@@ -371,8 +386,9 @@ public class ProductoService {
             .contenidosSensibles(producto.getContenidosSensibles().stream()
                 .map(Enum::name)
                 .toList())
-            .permiteReventa(producto.isPermiteReventa())
-            .porcentajeRegalia(producto.getPorcentajeRegalia())
+            .permiteReventa(permiteReventa)
+            .porcentajeRegalia(porcentajeRegalia)
+            .licencia(licenciaDTO)
             .estado(producto.getEstado())
             .imagenPortada(producto.getImagenPortada())
             .imagenes(producto.getImagenes().stream()
@@ -436,23 +452,6 @@ public class ProductoService {
                 ? new HashSet<>(request.getContenidosSensibles())
                 : Set.of());
 
-        boolean hayUnica = request.getVariantes().stream()
-            .anyMatch(v -> v.getStockDisponible() != null
-                && v.getStockDisponible() == 1);
-        if (request.isPermiteReventa() && !hayUnica) {
-            throw new IllegalArgumentException(
-                "La reventa solo se habilita si hay al menos una variante con stock 1.");
-        }
-        producto.setPermiteReventa(request.isPermiteReventa());
-        BigDecimal regalia = request.getPorcentajeRegalia() != null
-            ? request.getPorcentajeRegalia()
-            : BigDecimal.ZERO;
-        if (regalia.compareTo(BigDecimal.ZERO) < 0
-                || regalia.compareTo(REGALIA_MAXIMA) > 0) {
-            throw new IllegalArgumentException(
-                "El porcentaje de regalía debe estar entre 0 y 10.");
-        }
-        producto.setPorcentajeRegalia(regalia);
         producto.setImagenPortada(
             request.getImagenes().isEmpty()
                 ? null
@@ -726,18 +725,188 @@ public class ProductoService {
         }
     }
 
-    private void validarTerminos(
-            Long idArtista, Long idProducto, ProductoRequest request) {
-        if (request.getTerminos() != null) {
+    private LicenciaContenido validarLicencia(
+            LicenciaProductoRequest request,
+            List<ProductoVarianteRequest> variantes) {
+        if (request == null) {
+            throw new IllegalArgumentException(
+                "La licencia del producto es obligatoria.");
+        }
+        Set<Long> ids = request.getIdsDerechos() == null
+            ? Set.of()
+            : request.getIdsDerechos().stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (ids.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Elegí al menos un uso permitido para la licencia.");
+        }
+        List<DerechoTermino> encontrados = derechoTerminoRepository.findAllById(ids);
+        if (encontrados.size() != ids.size()) {
+            throw new IllegalArgumentException(
+                "Algún derecho de la licencia no existe.");
+        }
+        Set<DerechoTermino> derechos = new LinkedHashSet<>(encontrados);
+        if (derechos.stream().anyMatch(derecho -> !derecho.isActivo())) {
+            throw new IllegalArgumentException(
+                "La licencia incluye un derecho dado de baja.");
+        }
+        boolean requierePiezaUnica = derechos.stream()
+            .anyMatch(DerechoTermino::isRequierePiezaUnica);
+        if (requierePiezaUnica) {
+            boolean hayUnica = variantes != null && variantes.stream()
+                .anyMatch(variante -> variante.getStockDisponible() != null
+                    && variante.getStockDisponible() == 1);
+            if (!hayUnica) {
+                throw new IllegalArgumentException(
+                    "El derecho de reventa solo se habilita si hay al menos "
+                        + "una variante con stock 1.");
+            }
+        }
+        BigDecimal regalia = request.getPorcentajeRegalia() != null
+            ? request.getPorcentajeRegalia()
+            : BigDecimal.ZERO;
+        if (requierePiezaUnica) {
+            if (regalia.compareTo(BigDecimal.ZERO) < 0
+                    || regalia.compareTo(REGALIA_MAXIMA) > 0) {
+                throw new IllegalArgumentException(
+                    "El porcentaje de regalía debe estar entre 0 y 10.");
+            }
+        } else {
+            regalia = BigDecimal.ZERO;
+        }
+        return new LicenciaContenido(derechos, regalia);
+    }
+
+    private LicenciaProducto construirLicencia(
+            Producto producto,
+            LicenciaProductoRequest request,
+            LicenciaContenido contenido,
+            int version,
+            boolean vigente) {
+        LicenciaProducto licencia = new LicenciaProducto();
+        licencia.setProducto(producto);
+        licencia.setPermiteModificaciones(request.isPermiteModificaciones());
+        licencia.setRequiereCredito(request.isRequiereCredito());
+        licencia.setPorcentajeRegalia(contenido.porcentajeRegalia());
+        licencia.setTextoAdicional(limpiar(request.getTextoAdicional()));
+        licencia.setVersion(version);
+        licencia.setVigente(vigente);
+        licencia.reemplazarDerechos(contenido.derechos());
+        return licencia;
+    }
+
+    private void actualizarLicencia(
+            Producto producto,
+            LicenciaProductoRequest request,
+            LicenciaContenido contenido) {
+        LicenciaProducto actual = producto.licenciaVigente();
+        if (actual != null && licenciaIgual(actual, request, contenido)) {
             return;
         }
-        boolean valido = idProducto == null
-            ? terminosService.tieneGlobalValido(idArtista)
-            : terminosService.tieneProductoValido(idProducto, idArtista);
-        if (!valido) {
-            throw new IllegalArgumentException(
-                "Completá tus términos de uso antes de publicar el producto.");
+        if (actual != null) {
+            actual.setVigente(false);
+            // Flush del UPDATE antes del INSERT de la versión nueva para no
+            // violar uk_licencia_producto_vigente.
+            productoRepository.saveAndFlush(producto);
         }
+        int version = actual != null ? actual.getVersion() + 1 : 1;
+        producto.agregarLicencia(construirLicencia(
+            producto, request, contenido, version, true));
+    }
+
+    private boolean licenciaIgual(
+            LicenciaProducto actual,
+            LicenciaProductoRequest request,
+            LicenciaContenido contenido) {
+        Set<Long> idsActuales = actual.getDerechos().stream()
+            .map(asignacion -> asignacion.getDerecho() != null
+                ? asignacion.getDerecho().getIdDerechoTermino() : null)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        Set<Long> idsNuevos = contenido.derechos().stream()
+            .map(DerechoTermino::getIdDerechoTermino)
+            .collect(Collectors.toSet());
+        return idsActuales.equals(idsNuevos)
+            && actual.isPermiteModificaciones() == request.isPermiteModificaciones()
+            && actual.isRequiereCredito() == request.isRequiereCredito()
+            && normalizarRegalia(actual.getPorcentajeRegalia())
+                .compareTo(contenido.porcentajeRegalia()) == 0
+            && Objects.equals(
+                limpiar(actual.getTextoAdicional()),
+                limpiar(request.getTextoAdicional()));
+    }
+
+    private BigDecimal normalizarRegalia(BigDecimal valor) {
+        return valor != null ? valor : BigDecimal.ZERO;
+    }
+
+    private String hashLicencia(LicenciaProducto licencia) {
+        if (licencia == null) {
+            return null;
+        }
+        String derechos = licencia.getDerechos().stream()
+            .map(LicenciaProductoDerecho::getDerecho)
+            .filter(Objects::nonNull)
+            .map(derecho -> derecho.getCodigo() != null
+                ? derecho.getCodigo()
+                : String.valueOf(derecho.getIdDerechoTermino()))
+            .sorted()
+            .collect(Collectors.joining(","));
+        String canonico = String.join("|",
+            String.valueOf(licencia.getVersion()),
+            derechos,
+            String.valueOf(licencia.isPermiteModificaciones()),
+            String.valueOf(licencia.isRequiereCredito()),
+            licencia.getPorcentajeRegalia() != null
+                ? licencia.getPorcentajeRegalia().stripTrailingZeros().toPlainString()
+                : "",
+            licencia.getTextoAdicional() != null ? licencia.getTextoAdicional() : "");
+        return sha256Hex(canonico);
+    }
+
+    private String sha256Hex(String valor) {
+        try {
+            return HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256")
+                    .digest(valor.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 no disponible.", e);
+        }
+    }
+
+    private String versionLicencia(Producto producto) {
+        LicenciaProducto licencia = producto.licenciaVigente();
+        return licencia != null ? String.valueOf(licencia.getVersion()) : "?";
+    }
+
+    private LicenciaProductoDTO licenciaDTO(LicenciaProducto licencia) {
+        if (licencia == null) {
+            return null;
+        }
+        List<DerechoTerminoDTO> derechos = licencia.getDerechos().stream()
+            .map(LicenciaProductoDerecho::getDerecho)
+            .filter(Objects::nonNull)
+            .sorted(Comparator.comparing(DerechoTermino::getOrden,
+                Comparator.nullsLast(Integer::compareTo)))
+            .map(DerechoTerminoDTO::desdeDerecho)
+            .toList();
+        return LicenciaProductoDTO.builder()
+            .idLicenciaProducto(licencia.getIdLicenciaProducto())
+            .version(licencia.getVersion())
+            .vigente(licencia.isVigente())
+            .derechos(derechos)
+            .permiteModificaciones(licencia.isPermiteModificaciones())
+            .requiereCredito(licencia.isRequiereCredito())
+            .porcentajeRegalia(licencia.getPorcentajeRegalia())
+            .textoAdicional(licencia.getTextoAdicional())
+            .permiteReventa(licencia.permiteReventa())
+            .build();
+    }
+
+    private record LicenciaContenido(
+            Set<DerechoTermino> derechos,
+            BigDecimal porcentajeRegalia) {
     }
 
     private void validarUnico(

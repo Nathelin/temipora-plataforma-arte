@@ -26,6 +26,9 @@ public interface ProductoRepository
         "variantes",
         "variantes.propietarioActual",
         "imagenes",
+        "licencias",
+        "licencias.derechos",
+        "licencias.derechos.derecho",
         "etiquetas",
         "etiquetas.etiqueta",
         "etiquetas.etiqueta.categoria"
@@ -44,6 +47,9 @@ public interface ProductoRepository
         "variantes",
         "variantes.propietarioActual",
         "imagenes",
+        "licencias",
+        "licencias.derechos",
+        "licencias.derechos.derecho",
         "etiquetas",
         "etiquetas.etiqueta",
         "etiquetas.etiqueta.categoria"

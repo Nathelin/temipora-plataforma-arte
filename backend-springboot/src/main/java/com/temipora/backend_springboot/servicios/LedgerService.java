@@ -42,7 +42,7 @@ public class LedgerService {
      * transacción del alta para que un fallo revierta todo el producto.
      */
     @Transactional
-    public EventoLedger registrarGenesis(ProductoVariante variante, String hashTerminos) {
+    public EventoLedger registrarGenesis(ProductoVariante variante, String hashLicencia) {
         if (variante == null || variante.getIdVariante() == null) {
             throw new IllegalArgumentException(
                 "No se puede registrar el génesis de una variante sin guardar.");
@@ -79,7 +79,7 @@ public class LedgerService {
         evento.setOcurridoEn(ocurrido);
         evento.setHashPrevio(hashPrevio);
         evento.setHashImagen(hashImagen);
-        evento.setDatos(datosGenesis(producto, variante, artista, hashTerminos, hashImagen));
+        evento.setDatos(datosGenesis(producto, variante, artista, hashLicencia, hashImagen));
         evento.setHashEvento(calcularHash(
             variante.getIdVariante(),
             1L,
@@ -219,13 +219,13 @@ public class LedgerService {
             Producto producto,
             ProductoVariante variante,
             Usuario artista,
-            String hashTerminos,
+            String hashLicencia,
             String hashImagen) {
         return "{\"titulo\":" + json(producto != null ? producto.getTitulo() : null)
             + ",\"variante\":" + json(variante.getNombre())
             + ",\"artista\":" + json(artista != null ? artista.getNombreUsuario() : null)
             + ",\"sha256\":" + json(hashImagen)
-            + ",\"terminos\":" + json(hashTerminos)
+            + ",\"licencia\":" + json(hashLicencia)
             + "}";
     }
 

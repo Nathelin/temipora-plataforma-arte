@@ -33,6 +33,7 @@ public class ProductoDTO {
     private List<String> contenidosSensibles;
     private boolean permiteReventa;
     private BigDecimal porcentajeRegalia;
+    private LicenciaProductoDTO licencia;
     private EstadoProducto estado;
     private String imagenPortada;
     private List<ProductoImagenDTO> imagenes;

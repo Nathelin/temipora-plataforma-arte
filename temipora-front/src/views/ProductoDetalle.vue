@@ -16,7 +16,6 @@ const idProducto = computed(() => Number(route.params.id))
 
 const producto = ref(null)
 const ledger = ref(null)
-const terminos = ref(null)
 const cargando = ref(true)
 const error = ref('')
 const visorAbierto = ref(false)
@@ -38,10 +37,10 @@ const precioDesde = computed(() => {
   if (!producto.value) return '—'
   return formatearPrecio(producto.value.precioDesde, producto.value.moneda || 'ARS')
 })
-const terminosTexto = computed(() => {
-  const t = terminos.value
-  return t?.usoCliente || t?.informacionGeneral || t?.usoArtista || ''
-})
+const licencia = computed(() => producto.value?.licencia || null)
+const resumenDerechos = computed(
+  () => (licencia.value?.derechos || []).map((derecho) => derecho.nombre).join(' · '),
+)
 const ledgerVariantes = computed(() => ledger.value?.variantes || [])
 const tieneAlgunLedger = computed(
   () => ledgerVariantes.value.some((variante) => variante.tieneLedger),
@@ -68,14 +67,12 @@ async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    const [productoRes, ledgerRes, terminosRes] = await Promise.all([
+    const [productoRes, ledgerRes] = await Promise.all([
       api.get(`/mis-productos/${idProducto.value}`),
       api.get(`/mis-productos/${idProducto.value}/ledger`),
-      api.get(`/mis-productos/${idProducto.value}/terminos`),
     ])
     producto.value = productoRes.data
     ledger.value = ledgerRes.data
-    terminos.value = terminosRes.data
   } catch (e) {
     error.value = e.response?.data?.message
       || 'No se pudo cargar la vista previa del producto.'
@@ -182,7 +179,8 @@ onMounted(cargar)
           <section class="rounded-[22px] border border-borde/60 bg-superficie p-6 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <h2 class="font-display text-lg font-bold text-granate">
-                Variantes ({{ variantes.length }})
+                {{ variantes.length === 1 ? 'Presentación' : 'Variantes' }}
+                ({{ variantes.length }})
               </h2>
               <span class="text-xs text-cafe/45">
                 Cada variante es un ítem vendible.
@@ -245,14 +243,48 @@ onMounted(cargar)
           </section>
 
           <section
-            v-if="terminosTexto"
+            v-if="licencia"
             class="rounded-[22px] border border-borde/60 bg-superficie p-6 shadow-sm"
           >
             <h2 class="font-display text-lg font-bold text-granate">
-              Términos de uso
+              Licencia de uso
             </h2>
-            <p class="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-cafe/75">
-              {{ terminosTexto }}
+            <p class="mt-1 text-[11px] text-cafe/45">
+              Versión {{ licencia.version }}
+            </p>
+            <p class="mt-3 text-sm leading-relaxed text-cafe/75">
+              <span class="font-semibold text-granate">Usos permitidos:</span>
+              {{ resumenDerechos || 'Sin usos definidos' }}
+            </p>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+              <p class="rounded-xl bg-crema/60 px-3 py-2 text-xs text-cafe/70">
+                Modificaciones:
+                <span class="font-semibold text-granate">
+                  {{ licencia.permiteModificaciones ? 'permitidas' : 'no permitidas' }}
+                </span>
+              </p>
+              <p class="rounded-xl bg-crema/60 px-3 py-2 text-xs text-cafe/70">
+                Crédito:
+                <span class="font-semibold text-granate">
+                  {{ licencia.requiereCredito ? 'requerido' : 'no requerido' }}
+                </span>
+              </p>
+            </div>
+            <p
+              v-if="licencia.permiteReventa"
+              class="mt-3 rounded-xl border border-coral/20 bg-rosa/20 px-3 py-2 text-xs leading-relaxed text-granate"
+            >
+              Reventa permitida para piezas únicas
+              <span v-if="Number(licencia.porcentajeRegalia) > 0">
+                con regalía del {{ licencia.porcentajeRegalia }}%.
+              </span>
+              <span v-else>sin regalía.</span>
+            </p>
+            <p
+              v-if="licencia.textoAdicional"
+              class="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-cafe/75"
+            >
+              {{ licencia.textoAdicional }}
             </p>
           </section>
 
@@ -327,11 +359,18 @@ onMounted(cargar)
               </p>
 
               <div
-                v-if="producto.permiteReventa"
+                v-if="licencia"
                 class="mt-4 rounded-xl border border-coral/20 bg-rosa/20 px-3 py-2 text-xs leading-relaxed text-granate"
               >
-                Reventa habilitada para piezas únicas con regalía del
-                {{ producto.porcentajeRegalia }}%.
+                <p class="font-semibold">Licencia</p>
+                <p class="mt-1">{{ resumenDerechos || 'Sin usos definidos' }}</p>
+                <p v-if="licencia.permiteReventa" class="mt-1">
+                  Reventa de piezas únicas
+                  <span v-if="Number(licencia.porcentajeRegalia) > 0">
+                    con regalía del {{ licencia.porcentajeRegalia }}%.
+                  </span>
+                  <span v-else>sin regalía.</span>
+                </p>
               </div>
 
               <router-link

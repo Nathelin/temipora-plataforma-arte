@@ -58,7 +58,7 @@ class TerminosServiceTest {
     @Test
     void obtenerGlobal_sinTerminos_devuelveVacio() {
         when(terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
+                .findFirstByArtistaIdUsuarioAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
             .thenReturn(Optional.empty());
 
         TerminosDTO dto = terminosService.obtenerGlobal(5L);
@@ -73,7 +73,7 @@ class TerminosServiceTest {
     void obtenerGlobal_existente_devuelveElDelArtista() {
         Terminos terminos = terminos(1L, 2, "Hola");
         when(terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
+                .findFirstByArtistaIdUsuarioAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
             .thenReturn(Optional.of(terminos));
 
         TerminosDTO dto = terminosService.obtenerGlobal(5L);
@@ -108,7 +108,7 @@ class TerminosServiceTest {
                 .findFirstByArtistaIdUsuarioAndServicioIdServicioAndVigenteTrueOrderByVersionDesc(5L, 7L))
             .thenReturn(Optional.empty());
         when(terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
+                .findFirstByArtistaIdUsuarioAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
             .thenReturn(Optional.of(globales));
 
         TerminosDTO dto = terminosService.obtenerServicio(7L, 5L);
@@ -145,7 +145,7 @@ class TerminosServiceTest {
                 .findFirstByArtistaIdUsuarioAndServicioIdServicioAndVigenteTrueOrderByVersionDesc(5L, 7L))
             .thenReturn(Optional.of(propios));
         when(terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
+                .findFirstByArtistaIdUsuarioAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
             .thenReturn(Optional.of(globales));
 
         terminosService.eliminarServicio(7L, 5L);
@@ -158,7 +158,7 @@ class TerminosServiceTest {
     @Test
     void eliminarServicio_sinGlobalesValidos_lanzaError() {
         when(terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
+                .findFirstByArtistaIdUsuarioAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
             .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> terminosService.eliminarServicio(7L, 5L))
@@ -172,7 +172,7 @@ class TerminosServiceTest {
     void tieneGlobalValido_conTexto_devuelveTrue() {
         Terminos globales = terminos(1L, 1, "Global");
         when(terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
+                .findFirstByArtistaIdUsuarioAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
             .thenReturn(Optional.of(globales));
 
         assertThat(terminosService.tieneGlobalValido(5L)).isTrue();
@@ -186,7 +186,7 @@ class TerminosServiceTest {
         comercial.setDerecho(derecho(1L, "CONTENIDO", "Uso comercial", 2));
         globales.getTerminoDerechos().add(comercial);
         when(terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
+                .findFirstByArtistaIdUsuarioAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
             .thenReturn(Optional.of(globales));
 
         assertThat(terminosService.tieneGlobalValido(5L)).isFalse();
@@ -210,7 +210,7 @@ class TerminosServiceTest {
                 .findFirstByArtistaIdUsuarioAndServicioIdServicioAndVigenteTrueOrderByVersionDesc(5L, 7L))
             .thenReturn(Optional.empty());
         when(terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
+                .findFirstByArtistaIdUsuarioAndServicioIsNullAndVigenteTrueOrderByVersionDesc(5L))
             .thenReturn(Optional.of(globales));
 
         assertThat(terminosService.tieneTerminosValidos(7L, 5L)).isTrue();
@@ -225,7 +225,7 @@ class TerminosServiceTest {
         when(derechoTerminoRepository.findByIdDerechoTermino(1L))
             .thenReturn(Optional.of(derecho(1L, "CONTENIDO", "Uso comercial en producción de contenido", 2)));
         when(terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullOrderByVersionDesc(5L))
+                .findFirstByArtistaIdUsuarioAndServicioIsNullOrderByVersionDesc(5L))
             .thenReturn(Optional.empty());
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(terminosRepository.save(any(Terminos.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -250,7 +250,7 @@ class TerminosServiceTest {
     @Test
     void guardarGlobal_soloConQueNoDibuja_esContenidoValido() {
         when(terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullOrderByVersionDesc(5L))
+                .findFirstByArtistaIdUsuarioAndServicioIsNullOrderByVersionDesc(5L))
             .thenReturn(Optional.empty());
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(terminosRepository.save(any(Terminos.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -269,7 +269,7 @@ class TerminosServiceTest {
         when(derechoTerminoRepository.findByIdDerechoTermino(2L))
             .thenReturn(Optional.of(derecho(2L, "PERSONAL", "Uso personal", 1)));
         when(terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullOrderByVersionDesc(5L))
+                .findFirstByArtistaIdUsuarioAndServicioIsNullOrderByVersionDesc(5L))
             .thenReturn(Optional.empty());
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(terminosRepository.save(any(Terminos.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -288,7 +288,7 @@ class TerminosServiceTest {
     void guardarGlobal_existente_creaVersionNuevaYDesmarcaLaAnterior() {
         Terminos existente = terminos(1L, 3, "Viejo");
         when(terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullOrderByVersionDesc(5L))
+                .findFirstByArtistaIdUsuarioAndServicioIsNullOrderByVersionDesc(5L))
             .thenReturn(Optional.of(existente));
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(terminosRepository.save(any(Terminos.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -343,7 +343,7 @@ class TerminosServiceTest {
     @Test
     void guardarGlobal_artistaInexistente_lanzaNoSuchElement() {
         when(terminosRepository
-                .findFirstByArtistaIdUsuarioAndIdProductoIsNullAndServicioIsNullOrderByVersionDesc(5L))
+                .findFirstByArtistaIdUsuarioAndServicioIsNullOrderByVersionDesc(5L))
             .thenReturn(Optional.empty());
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.empty());
 

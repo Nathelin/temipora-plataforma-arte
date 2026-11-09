@@ -1,12 +1,9 @@
 package com.temipora.backend_springboot.modelo;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -38,12 +35,6 @@ public class ProductoRequest {
 
     private Set<@NotNull ContenidoSensible> contenidosSensibles;
 
-    private boolean permiteReventa;
-
-    @DecimalMin(value = "0", message = "El porcentaje de regalía no puede ser negativo")
-    @DecimalMax(value = "10", message = "El porcentaje de regalía no puede superar el 10%")
-    private BigDecimal porcentajeRegalia;
-
     @NotEmpty(message = "Debés agregar al menos una imagen del producto.")
     private List<@Valid ProductoImagenRequest> imagenes;
 
@@ -53,6 +44,7 @@ public class ProductoRequest {
     @Size(max = 5, message = "Un producto puede tener como máximo 5 etiquetas.")
     private Set<@NotNull(message = "El id de la etiqueta no puede ser nulo.") Long> idsEtiquetas;
 
+    @NotNull(message = "La licencia del producto es obligatoria.")
     @Valid
-    private TerminosRequest terminos;
+    private LicenciaProductoRequest licencia;
 }

@@ -67,10 +67,6 @@ export function etiquetaStock(variante) {
   return `${stock} disponibles`
 }
 
-export function esPiezaUnica(variante) {
-  return !esIlimitada(variante) && Number(variante.stockDisponible) === 1
-}
-
 export function tieneLedger(producto) {
   return (producto?.variantes || []).some((variante) => variante.tieneLedger)
 }
@@ -87,31 +83,4 @@ export async function subirImagenProducto(archivo) {
   fd.append('archivo', archivo)
   const res = await api.post('/mis-productos/imagenes', fd)
   return res.data
-}
-
-export function terminosComoForm(terminos) {
-  return {
-    form: {
-      informacionGeneral: terminos?.informacionGeneral || '',
-      politicaRevisiones: terminos?.politicaRevisiones || '',
-      politicaCancelaciones: terminos?.politicaCancelaciones || '',
-      usoArtista: terminos?.usoArtista || '',
-      usoCliente: terminos?.usoCliente || '',
-      queDibuja: terminos?.queDibuja || '',
-      queNoDibuja: terminos?.queNoDibuja || '',
-    },
-  }
-}
-
-export function hayTerminos(terminos) {
-  const claves = [
-    'informacionGeneral',
-    'politicaRevisiones',
-    'politicaCancelaciones',
-    'usoArtista',
-    'usoCliente',
-    'queDibuja',
-    'queNoDibuja',
-  ]
-  return claves.some((clave) => String(terminos?.[clave] || '').trim())
 }

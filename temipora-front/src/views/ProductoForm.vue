@@ -5,9 +5,8 @@ import api from '../servicios/api'
 import { acceptImagenes, validarImagen } from '../servicios/archivos'
 import { formatearPrecio } from '../servicios/moneda'
 import {
-  estadoVarianteDe,
+  esIlimitada,
   etiquetaStock,
-  hayTerminos,
   subirImagenProducto,
 } from '../servicios/productos'
 import { useMonedas } from '../composables/useMonedas'
@@ -18,7 +17,6 @@ import VisorImagenes from '../components/VisorImagenes.vue'
 
 const route = useRoute()
 const router = useRouter()
-const nombreUsuario = localStorage.getItem('nombreUsuario') || ''
 
 const idProducto = computed(() => (route.params.id ? Number(route.params.id) : null))
 const esEdicion = computed(() => idProducto.value !== null)
@@ -26,30 +24,24 @@ const esEdicion = computed(() => idProducto.value !== null)
 const PASOS = [
   {
     n: 1,
-    label: 'Datos',
-    titulo: 'Datos del producto',
-    descripcion: 'Título, clasificación, precio base y condiciones de reventa.',
+    label: 'Publicación',
+    titulo: 'Publicación',
+    descripcion: 'Título, descripción, tipo, medio, imágenes y etiquetas.',
   },
   {
     n: 2,
-    label: 'Variantes',
-    titulo: 'Variantes y stock',
-    descripcion: 'Cada adoptable, tamaño o presentación es una variante vendible.',
+    label: 'Precio y stock',
+    titulo: 'Precio y stock',
+    descripcion: 'Moneda de la publicación, presentaciones y disponibilidad.',
   },
   {
     n: 3,
-    label: 'Imágenes',
-    titulo: 'Imágenes del producto',
-    descripcion: 'La primera imagen será la portada de la publicación.',
+    label: 'Licencia',
+    titulo: 'Licencia y reventa',
+    descripcion: 'Definí qué puede hacer el comprador con la obra.',
   },
   {
     n: 4,
-    label: 'Etiquetas',
-    titulo: 'Etiquetas y términos',
-    descripcion: 'Clasificá la publicación y definí las condiciones de uso.',
-  },
-  {
-    n: 5,
     label: 'Revisión',
     titulo: 'Revisión y publicación',
     descripcion: 'Revisá todo antes de publicar el producto.',
@@ -70,9 +62,7 @@ const visorIndice = ref(0)
 
 const tipos = ref([])
 const medios = ref([])
-const idUsuario = ref(null)
-const globalTerminos = ref(null)
-const terminosInicialPropio = ref(false)
+const derechos = ref([])
 const { monedas, cargar: cargarMonedas, predeterminada } = useMonedas()
 
 const SENSIBLES = [
@@ -89,15 +79,18 @@ const form = ref({
   idMoneda: '',
   contenidoSensible: false,
   contenidosSensibles: [],
-  permiteReventa: false,
-  porcentajeRegalia: 0,
   imagenes: [],
 })
 
 const variantes = ref([])
 const etiquetas = ref([])
-const terminosPropios = ref(false)
-const terminosTexto = ref('')
+const licencia = ref({
+  idsDerechos: [],
+  permiteModificaciones: false,
+  requiereCredito: false,
+  porcentajeRegalia: 0,
+  textoAdicional: '',
+})
 const estadoGuardado = ref(null)
 
 const pasoActual = computed(() => PASOS.find((p) => p.n === paso.value) || PASOS[0])
@@ -105,32 +98,52 @@ const monedaSeleccionada = computed(
   () => monedas.value.find((m) => String(m.idMoneda) === form.value.idMoneda) || null,
 )
 const monedaCodigo = computed(() => monedaSeleccionada.value?.codigo || 'ARS')
-const hayTerminosGlobales = computed(() => hayTerminos(globalTerminos.value))
-const hayVarianteUnica = computed(
-  () => variantes.value.some((v) => !esIlimitada(v) && Number(v.stockDisponible) === 1),
-)
-const precioDesde = computed(() => {
-  const precios = variantes.value
-    .map((v) => Number(v.precio))
-    .filter((precio) => Number.isFinite(precio) && precio > 0)
-  return precios.length ? Math.min(...precios) : null
-})
-const imagenesUrl = computed(() => form.value.imagenes.map((imagen) => imagen.url))
-const tituloPagina = computed(() => (esEdicion.value ? 'Editar producto' : 'Crear producto'))
 const nombreTipo = computed(
   () => tipos.value.find((t) => String(t.idTipoProducto) === form.value.idTipoProducto)?.nombre || '',
 )
 const nombreMedio = computed(
   () => medios.value.find((m) => String(m.idMedio) === form.value.idMedio)?.nombre || '',
 )
-const resumenTerminosGlobal = computed(() => {
-  const t = globalTerminos.value
-  return t?.informacionGeneral || t?.usoCliente || t?.usoArtista
-    || 'Tus términos globales están configurados.'
+const esAdoptable = computed(() => esTipoUnico(nombreTipo.value) && nombreTipo.value.toLowerCase().includes('adoptable'))
+const hayVarianteUnica = computed(
+  () => variantes.value.some(
+    (variante) => !esIlimitada(variante) && Number(variante.stockDisponible) === 1,
+  ),
+)
+const derechosSeleccionados = computed(() => derechos.value.filter((derecho) =>
+  licencia.value.idsDerechos.some(
+    (id) => String(id) === String(derecho.idDerechoTermino),
+  ),
+))
+const derechoReventa = computed(
+  () => derechosSeleccionados.value.some((derecho) => derecho.requierePiezaUnica),
+)
+const resumenUsos = computed(
+  () => derechosSeleccionados.value.map((derecho) => derecho.nombre).join(' · ')
+    || 'Sin usos definidos',
+)
+const resumenReventa = computed(() => {
+  if (!derechoReventa.value) return 'No permitida'
+  const regalia = Number(licencia.value.porcentajeRegalia || 0)
+  return regalia > 0
+    ? `Permitida con regalía del ${regalia}%`
+    : 'Permitida sin regalía'
 })
+const precioDesde = computed(() => {
+  const precios = variantes.value
+    .map((variante) => Number(variante.precio))
+    .filter((precio) => Number.isFinite(precio) && precio > 0)
+  return precios.length ? Math.min(...precios) : null
+})
+const imagenesUrl = computed(() => form.value.imagenes.map((imagen) => imagen.url))
+const tituloPagina = computed(() => (esEdicion.value ? 'Editar producto' : 'Crear producto'))
 
-function esIlimitada(variante) {
-  return variante?.stockDisponible === null || variante?.stockDisponible === undefined
+function esTipoUnico(nombre) {
+  const texto = String(nombre || '').toLowerCase()
+  return texto.includes('adoptable')
+    || texto.includes('tradicional')
+    || texto.includes('pieza única')
+    || texto.includes('pieza unica')
 }
 
 function instantanea() {
@@ -138,8 +151,7 @@ function instantanea() {
     form: form.value,
     variantes: variantes.value,
     etiquetas: etiquetas.value,
-    terminosPropios: terminosPropios.value,
-    terminosTexto: terminosTexto.value,
+    licencia: licencia.value,
   })
 }
 
@@ -147,41 +159,50 @@ const hayCambios = computed(
   () => estadoGuardado.value !== null && estadoGuardado.value !== instantanea(),
 )
 
+function nuevaPresentacion(overrides = {}) {
+  return {
+    nombre: 'Única',
+    descripcion: '',
+    precio: '',
+    stockDisponible: null,
+    estado: 'DISPONIBLE',
+    urlImagen: '',
+    sha256: '',
+    claveArchivoOriginal: '',
+    numeroEdicion: null,
+    ...overrides,
+  }
+}
+
+function seleccionarDerechoPorCodigo(codigo) {
+  const derecho = derechos.value.find((item) => item.codigo === codigo)
+  if (derecho) {
+    licencia.value.idsDerechos = [derecho.idDerechoTermino]
+  }
+}
+
 async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    const [tiposRes, mediosRes, perfilRes] = await Promise.all([
+    const [tiposRes, mediosRes, derechosRes] = await Promise.all([
       api.get('/tipos-producto'),
       api.get('/medios'),
-      api.get(`/perfil/${nombreUsuario}`),
+      api.get('/derechos-termino'),
       cargarMonedas(),
     ])
     tipos.value = tiposRes.data
     medios.value = mediosRes.data
-    idUsuario.value = perfilRes.data.idUsuario
-
-    const terminosRes = await api.get(`/usuarios/${idUsuario.value}/terminos`)
-    globalTerminos.value = terminosRes.data
+    derechos.value = derechosRes.data
 
     if (esEdicion.value) {
-      const [productoRes, terminosProductoRes] = await Promise.all([
-        api.get(`/mis-productos/${idProducto.value}`),
-        api.get(`/mis-productos/${idProducto.value}/terminos`),
-      ])
+      const productoRes = await api.get(`/mis-productos/${idProducto.value}`)
       mapearProducto(productoRes.data)
-      const terminosProducto = terminosProductoRes.data
-      terminosInicialPropio.value = !!terminosProducto?.idProducto
-      terminosPropios.value = terminosInicialPropio.value || !hayTerminosGlobales.value
-      if (terminosInicialPropio.value) {
-        terminosTexto.value = terminosProducto.usoCliente
-          || terminosProducto.informacionGeneral
-          || ''
-      }
     } else {
       const pred = predeterminada()
       form.value.idMoneda = pred ? String(pred.idMoneda) : ''
-      terminosPropios.value = !hayTerminosGlobales.value
+      variantes.value = [nuevaPresentacion()]
+      seleccionarDerechoPorCodigo('PERSONAL')
     }
     estadoGuardado.value = instantanea()
   } catch (e) {
@@ -202,17 +223,16 @@ function mapearProducto(d) {
     contenidosSensibles: Array.isArray(d.contenidosSensibles)
       ? [...d.contenidosSensibles]
       : [],
-    permiteReventa: !!d.permiteReventa,
-    porcentajeRegalia: Number(d.porcentajeRegalia || 0),
     imagenes: (d.imagenes || []).map((imagen) => ({
       url: imagen.url,
       sha256: imagen.sha256,
       claveArchivoOriginal: '',
     })),
   }
+
   variantes.value = (d.variantes || []).map((variante) => ({
     idVariante: variante.idVariante,
-    nombre: variante.nombre || '',
+    nombre: variante.nombre || 'Única',
     descripcion: variante.descripcion || '',
     precio: Number(variante.precio) || '',
     stockDisponible: variante.stockDisponible === null
@@ -225,8 +245,33 @@ function mapearProducto(d) {
     claveArchivoOriginal: '',
     numeroEdicion: variante.numeroEdicion || null,
   }))
+  if (!variantes.value.length) {
+    variantes.value = [nuevaPresentacion()]
+  }
+
   etiquetas.value = Array.isArray(d.etiquetas) ? [...d.etiquetas] : []
+
+  const lic = d.licencia || {}
+  licencia.value = {
+    idsDerechos: (lic.derechos || []).map((derecho) => derecho.idDerechoTermino),
+    permiteModificaciones: !!lic.permiteModificaciones,
+    requiereCredito: !!lic.requiereCredito,
+    porcentajeRegalia: Number(lic.porcentajeRegalia || 0),
+    textoAdicional: lic.textoAdicional || '',
+  }
+  if (!licencia.value.idsDerechos.length) {
+    seleccionarDerechoPorCodigo('PERSONAL')
+  }
 }
+
+watch(() => form.value.idTipoProducto, (nuevo, anterior) => {
+  if (!nuevo || nuevo === anterior) return
+  if (!esTipoUnico(nombreTipo.value) || variantes.value.length !== 1) return
+  const unica = variantes.value[0]
+  if (!unica.precio && esIlimitada(unica)) {
+    variantes.value = [{ ...unica, stockDisponible: 1 }]
+  }
+})
 
 async function subirImagen(event) {
   const archivo = event.target.files?.[0] || null
@@ -280,51 +325,9 @@ function validarDatos() {
   if (!form.value.idTipoProducto) errs.push('Elegí un tipo de producto.')
   if (!form.value.idMedio) errs.push('Elegí un medio.')
   if (!form.value.descripcion.trim()) errs.push('La descripción es obligatoria.')
-  if (!form.value.idMoneda) errs.push('Elegí una moneda.')
   if (form.value.contenidoSensible && !form.value.contenidosSensibles.length) {
     errs.push('Elegí qué tipo de contenido sensible puede aparecer.')
   }
-  const regalia = Number(form.value.porcentajeRegalia || 0)
-  if (regalia < 0 || regalia > 10) {
-    errs.push('La regalía debe estar entre 0 y 10%.')
-  }
-  return errs
-}
-
-function validarReventa() {
-  if (form.value.permiteReventa && !hayVarianteUnica.value) {
-    return ['Para habilitar la reventa necesitás al menos una variante con stock 1.']
-  }
-  return []
-}
-
-function validarVariantes() {
-  const errs = []
-  if (!variantes.value.length) {
-    errs.push('Agregá al menos una variante.')
-    return errs
-  }
-  const nombres = new Set()
-  variantes.value.forEach((variante, indice) => {
-    const nombre = String(variante.nombre || '').trim()
-    if (!nombre) {
-      errs.push(`La variante ${indice + 1} necesita un nombre.`)
-    } else if (nombres.has(nombre.toLowerCase())) {
-      errs.push(`El nombre “${nombre}” está repetido.`)
-    } else {
-      nombres.add(nombre.toLowerCase())
-    }
-    if (!variante.precio || Number(variante.precio) <= 0) {
-      errs.push(`El precio de la variante ${indice + 1} debe ser mayor a cero.`)
-    }
-    if (variante.stockDisponible !== null
-        && Number(variante.stockDisponible) < 0) {
-      errs.push(`El stock de la variante ${indice + 1} no puede ser negativo.`)
-    }
-    if (!variante.urlImagen || !variante.sha256) {
-      errs.push(`Subí la imagen de la variante ${indice + 1}.`)
-    }
-  })
   return errs
 }
 
@@ -334,27 +337,98 @@ function validarImagenes() {
     : ['Agregá al menos una imagen del producto.']
 }
 
-function validarTerminos() {
-  if (terminosPropios.value) {
-    return terminosTexto.value.trim()
-      ? []
-      : ['Escribí los términos de uso del producto.']
+function validarMoneda() {
+  return form.value.idMoneda ? [] : ['Elegí la moneda de la publicación.']
+}
+
+function validarVariantes() {
+  const errs = []
+  if (!variantes.value.length) {
+    return ['Agregá al menos una presentación.']
   }
-  return hayTerminosGlobales.value
-    ? []
-    : ['Tus términos globales están vacíos. Completalos o definí términos propios para este producto.']
+  const presentacionUnica = variantes.value.length === 1
+  const nombres = new Set()
+  variantes.value.forEach((variante, indice) => {
+    if (!presentacionUnica) {
+      const nombre = String(variante.nombre || '').trim()
+      if (!nombre) {
+        errs.push(`La variante ${indice + 1} necesita un nombre.`)
+      } else if (nombres.has(nombre.toLowerCase())) {
+        errs.push(`El nombre “${nombre}” está repetido.`)
+      } else {
+        nombres.add(nombre.toLowerCase())
+      }
+    }
+    if (!variante.precio || Number(variante.precio) <= 0) {
+      errs.push(presentacionUnica
+        ? 'El precio debe ser mayor a cero.'
+        : `El precio de la variante ${indice + 1} debe ser mayor a cero.`)
+    }
+    if (variante.stockDisponible !== null
+        && variante.stockDisponible !== undefined
+        && Number(variante.stockDisponible) < 0) {
+      errs.push(`El stock de la variante ${indice + 1} no puede ser negativo.`)
+    }
+    const tieneImagen = variante.urlImagen && variante.sha256
+    const usaPortada = presentacionUnica && form.value.imagenes[0]?.url
+    if (!tieneImagen && !usaPortada) {
+      errs.push(presentacionUnica
+        ? 'Subí una imagen de portada para la presentación.'
+        : `Subí la imagen de la variante ${indice + 1}.`)
+    }
+  })
+  return errs
+}
+
+function validarLicencia() {
+  const errs = []
+  if (!licencia.value.idsDerechos.length) {
+    errs.push('Elegí al menos un uso permitido para la licencia.')
+  }
+  if (derechoReventa.value && !hayVarianteUnica.value) {
+    errs.push('Para habilitar la reventa necesitás al menos una presentación con stock 1.')
+  }
+  if (derechoReventa.value) {
+    const regalia = Number(licencia.value.porcentajeRegalia || 0)
+    if (regalia < 0 || regalia > 10) {
+      errs.push('La regalía debe estar entre 0 y 10%.')
+    }
+  }
+  return errs
 }
 
 function validarPasoActual() {
   let problemas = []
-  if (paso.value === 1) problemas = validarDatos()
-  else if (paso.value === 2) problemas = validarVariantes()
-  else if (paso.value === 3) problemas = validarImagenes()
-  else if (paso.value === 4) problemas = validarTerminos()
-  else if (paso.value === 5) problemas = validarReventa()
+  if (paso.value === 1) problemas = [...validarDatos(), ...validarImagenes()]
+  else if (paso.value === 2) problemas = [...validarMoneda(), ...validarVariantes()]
+  else if (paso.value === 3) problemas = validarLicencia()
+  else if (paso.value === 4) problemas = validarTodo()
 
   errores.value = problemas
   return problemas.length === 0
+}
+
+function validarTodo() {
+  const datos = [...validarDatos(), ...validarImagenes()]
+  if (datos.length) {
+    errores.value = datos
+    paso.value = 1
+    return false
+  }
+  const precio = [...validarMoneda(), ...validarVariantes()]
+  if (precio.length) {
+    errores.value = precio
+    paso.value = 2
+    return false
+  }
+  const lic = validarLicencia()
+  if (lic.length) {
+    errores.value = lic
+    paso.value = 3
+    return false
+  }
+  errores.value = []
+  return true
 }
 
 function irAlPrincipio() {
@@ -392,16 +466,10 @@ function irAEditar(n) {
   irAlPrincipio()
 }
 
-function validarTodo() {
-  for (const p of PASOS) {
-    paso.value = p.n
-    if (!validarPasoActual()) return false
-  }
-  return true
-}
-
 function construirPayload() {
-  const payload = {
+  const portada = form.value.imagenes[0]
+  const presentacionUnica = variantes.value.length === 1
+  return {
     idTipoProducto: Number(form.value.idTipoProducto),
     idMedio: Number(form.value.idMedio),
     titulo: form.value.titulo.trim(),
@@ -411,39 +479,44 @@ function construirPayload() {
     contenidosSensibles: form.value.contenidoSensible
       ? form.value.contenidosSensibles
       : [],
-    permiteReventa: form.value.permiteReventa,
-    porcentajeRegalia: form.value.permiteReventa
-      ? Number(form.value.porcentajeRegalia || 0)
-      : 0,
     imagenes: form.value.imagenes.map((imagen, indice) => ({
       url: imagen.url,
       sha256: imagen.sha256,
       claveArchivoOriginal: imagen.claveArchivoOriginal || undefined,
       orden: indice,
     })),
-    variantes: variantes.value.map((variante, indice) => ({
-      idVariante: variante.idVariante || undefined,
-      nombre: variante.nombre.trim(),
-      descripcion: variante.descripcion?.trim() || null,
-      precio: Number(variante.precio),
-      stockDisponible: variante.stockDisponible === null
-        ? null
-        : Number(variante.stockDisponible),
-      orden: indice,
-      estado: variante.estado,
-      urlImagen: variante.urlImagen,
-      sha256: variante.sha256,
-      claveArchivoOriginal: variante.claveArchivoOriginal || undefined,
-      numeroEdicion: variante.numeroEdicion || null,
-    })),
+    variantes: variantes.value.map((variante, indice) => {
+      const usarPortada = presentacionUnica && !variante.urlImagen && portada
+      return {
+        idVariante: variante.idVariante || undefined,
+        nombre: String(variante.nombre || 'Única').trim(),
+        descripcion: variante.descripcion?.trim() || null,
+        precio: Number(variante.precio),
+        stockDisponible: variante.stockDisponible === null
+          || variante.stockDisponible === undefined
+          ? null
+          : Number(variante.stockDisponible),
+        orden: indice,
+        estado: variante.estado || 'DISPONIBLE',
+        urlImagen: usarPortada ? portada.url : variante.urlImagen,
+        sha256: usarPortada ? portada.sha256 : variante.sha256,
+        claveArchivoOriginal: usarPortada
+          ? (portada.claveArchivoOriginal || undefined)
+          : (variante.claveArchivoOriginal || undefined),
+        numeroEdicion: variante.numeroEdicion || null,
+      }
+    }),
     idsEtiquetas: etiquetas.value.map((etiqueta) => etiqueta.idEtiqueta),
+    licencia: {
+      idsDerechos: licencia.value.idsDerechos,
+      permiteModificaciones: licencia.value.permiteModificaciones,
+      requiereCredito: licencia.value.requiereCredito,
+      porcentajeRegalia: derechoReventa.value
+        ? Number(licencia.value.porcentajeRegalia || 0)
+        : 0,
+      textoAdicional: licencia.value.textoAdicional?.trim() || null,
+    },
   }
-  if (terminosPropios.value) {
-    payload.terminos = {
-      usoCliente: terminosTexto.value.trim(),
-    }
-  }
-  return payload
 }
 
 async function guardar() {
@@ -456,20 +529,11 @@ async function guardar() {
   guardando.value = true
   try {
     const payload = construirPayload()
-    let idFinal = idProducto.value
     if (esEdicion.value) {
       await api.put(`/mis-productos/${idProducto.value}`, payload)
     } else {
-      const res = await api.post('/mis-productos', payload)
-      idFinal = res.data.idProducto
+      await api.post('/mis-productos', payload)
     }
-
-    if (esEdicion.value
-        && terminosInicialPropio.value
-        && !terminosPropios.value) {
-      await api.delete(`/mis-productos/${idFinal}/terminos`)
-    }
-
     estadoGuardado.value = instantanea()
     router.push('/panel/productos')
   } catch (e) {
@@ -482,6 +546,18 @@ async function guardar() {
 
 function irAlListado() {
   router.push('/panel/productos')
+}
+
+function imagenVariante(variante) {
+  if (variante.urlImagen) return variante.urlImagen
+  if (variantes.value.length === 1 && form.value.imagenes[0]) {
+    return form.value.imagenes[0].url
+  }
+  return ''
+}
+
+function nombrePresentacion(variante) {
+  return variantes.value.length === 1 ? 'Presentación' : variante.nombre
 }
 
 const { actualizar: marcarCambios, limpiar: limpiarCambios } = useCambiosSinGuardar()
@@ -524,7 +600,7 @@ onBeforeUnmount(() => {
     <div class="mx-auto mt-4 text-center">
       <h1 class="text-2xl text-granate sm:text-3xl">{{ tituloPagina }}</h1>
       <p class="mt-2 text-sm text-cafe/60">
-        Completá la publicación y sus variantes paso a paso.
+        Completá la publicación y sus condiciones paso a paso.
       </p>
     </div>
 
@@ -602,83 +678,213 @@ onBeforeUnmount(() => {
             <li v-for="problema in errores" :key="problema">• {{ problema }}</li>
           </ul>
 
-          <!-- Paso 1 -->
-          <section v-if="paso === 1" class="space-y-6">
-            <div>
-              <label class="mb-2 block text-sm text-cafe">
-                Título <span class="text-rojizo">*</span>
-              </label>
-              <input
-                v-model="form.titulo"
-                type="text"
-                maxlength="100"
-                placeholder="Ej. Plancha de adoptables de otoño"
-                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-              />
-            </div>
-
-            <div class="grid gap-6 sm:grid-cols-2">
+          <!-- Paso 1: publicación -->
+          <section v-if="paso === 1" class="space-y-8">
+            <div class="space-y-6">
               <div>
                 <label class="mb-2 block text-sm text-cafe">
-                  Tipo de producto <span class="text-rojizo">*</span>
+                  Título <span class="text-rojizo">*</span>
                 </label>
-                <select
-                  v-model="form.idTipoProducto"
-                  class="block w-full rounded-lg border-0 px-3 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-                >
-                  <option value="" disabled>Elegí un tipo</option>
-                  <option
-                    v-for="tipo in tipos"
-                    :key="tipo.idTipoProducto"
-                    :value="String(tipo.idTipoProducto)"
+                <input
+                  v-model="form.titulo"
+                  type="text"
+                  maxlength="100"
+                  placeholder="Ej. Plancha de adoptables de otoño"
+                  class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                />
+              </div>
+
+              <div class="grid gap-6 sm:grid-cols-2">
+                <div>
+                  <label class="mb-2 block text-sm text-cafe">
+                    Tipo de producto <span class="text-rojizo">*</span>
+                  </label>
+                  <select
+                    v-model="form.idTipoProducto"
+                    class="block w-full rounded-lg border-0 px-3 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
                   >
-                    {{ tipo.nombre }}
-                  </option>
-                </select>
+                    <option value="" disabled>Elegí un tipo</option>
+                    <option
+                      v-for="tipo in tipos"
+                      :key="tipo.idTipoProducto"
+                      :value="String(tipo.idTipoProducto)"
+                    >
+                      {{ tipo.nombre }}
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="mb-2 block text-sm text-cafe">
+                    Medio <span class="text-rojizo">*</span>
+                  </label>
+                  <select
+                    v-model="form.idMedio"
+                    class="block w-full rounded-lg border-0 px-3 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                  >
+                    <option value="" disabled>Elegí un medio</option>
+                    <option
+                      v-for="medio in medios"
+                      :key="medio.idMedio"
+                      :value="String(medio.idMedio)"
+                    >
+                      {{ medio.nombre }}
+                    </option>
+                  </select>
+                </div>
               </div>
 
               <div>
                 <label class="mb-2 block text-sm text-cafe">
-                  Medio <span class="text-rojizo">*</span>
+                  Descripción <span class="text-rojizo">*</span>
                 </label>
-                <select
-                  v-model="form.idMedio"
-                  class="block w-full rounded-lg border-0 px-3 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-                >
-                  <option value="" disabled>Elegí un medio</option>
-                  <option
-                    v-for="medio in medios"
-                    :key="medio.idMedio"
-                    :value="String(medio.idMedio)"
+                <textarea
+                  v-model="form.descripcion"
+                  rows="4"
+                  maxlength="500"
+                  class="block w-full resize-none rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                ></textarea>
+                <p class="mt-1 text-right text-xs text-cafe/50">
+                  {{ form.descripcion.length }}/500
+                </p>
+              </div>
+
+              <div class="rounded-2xl border border-rosa/60 bg-crema/50 p-5">
+                <label class="inline-flex items-center gap-2 text-sm font-medium text-granate">
+                  <input
+                    v-model="form.contenidoSensible"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-rosa text-coral focus:ring-coral"
+                  />
+                  La publicación presenta contenido sensible
+                </label>
+                <div v-if="form.contenidoSensible" class="mt-4 grid gap-2 sm:grid-cols-3">
+                  <label
+                    v-for="tipo in SENSIBLES"
+                    :key="tipo.valor"
+                    class="inline-flex items-center gap-2 rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe"
                   >
-                    {{ medio.nombre }}
-                  </option>
-                </select>
+                    <input
+                      v-model="form.contenidosSensibles"
+                      type="checkbox"
+                      :value="tipo.valor"
+                      class="h-4 w-4 rounded border-rosa text-coral focus:ring-coral"
+                    />
+                    {{ tipo.texto }}
+                  </label>
+                </div>
               </div>
             </div>
 
             <div>
-              <label class="mb-2 block text-sm text-cafe">
-                Descripción <span class="text-rojizo">*</span>
-              </label>
-              <textarea
-                v-model="form.descripcion"
-                rows="4"
-                maxlength="500"
-                class="block w-full resize-none rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-              ></textarea>
-              <p class="mt-1 text-right text-xs text-cafe/50">
-                {{ form.descripcion.length }}/500
+              <h3 class="font-display text-lg font-bold text-granate">Imágenes</h3>
+              <p class="mt-1 text-sm text-cafe/60">
+                La primera imagen será la portada de la publicación.
+              </p>
+
+              <div class="mt-4 rounded-2xl border border-dashed border-rosa/70 bg-crema/40 p-6 text-center">
+                <p class="text-sm font-medium text-granate">
+                  Subí las imágenes de la publicación
+                </p>
+                <p class="mt-1 text-xs text-cafe/55">
+                  Se guarda el original privado y una preview pública optimizada.
+                </p>
+                <label
+                  class="mt-4 inline-flex cursor-pointer items-center justify-center rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-rojizo"
+                  :class="subiendoImagen ? 'pointer-events-none opacity-50' : ''"
+                >
+                  {{ subiendoImagen ? 'Subiendo...' : 'Elegir imagen' }}
+                  <input
+                    type="file"
+                    class="sr-only"
+                    :accept="acceptImagenes"
+                    @change="subirImagen"
+                  />
+                </label>
+                <p v-if="errorImagen" class="mt-2 text-sm text-rojizo">{{ errorImagen }}</p>
+              </div>
+
+              <div
+                v-if="form.imagenes.length"
+                class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3"
+              >
+                <article
+                  v-for="(imagen, indice) in form.imagenes"
+                  :key="`${imagen.url}-${indice}`"
+                  class="overflow-hidden rounded-2xl border border-rosa/60 bg-blanco shadow-sm"
+                >
+                  <button
+                    type="button"
+                    class="block w-full"
+                    @click="abrirVisor(indice)"
+                  >
+                    <img
+                      :src="imagen.url"
+                      :alt="`Imagen ${indice + 1} del producto`"
+                      class="aspect-square w-full object-cover"
+                    />
+                  </button>
+                  <div class="flex items-center justify-between gap-2 px-3 py-2">
+                    <span class="text-[11px] font-semibold text-cafe/55">
+                      {{ indice === 0 ? 'Portada' : `Imagen ${indice + 1}` }}
+                    </span>
+                    <div class="flex items-center gap-1">
+                      <button
+                        type="button"
+                        class="rounded px-1.5 py-0.5 text-xs text-cafe/60 transition hover:bg-rosa/20 disabled:opacity-30"
+                        :disabled="indice === 0"
+                        aria-label="Mover imagen a la izquierda"
+                        @click="moverImagen(indice, -1)"
+                      >
+                        ←
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded px-1.5 py-0.5 text-xs text-cafe/60 transition hover:bg-rosa/20 disabled:opacity-30"
+                        :disabled="indice === form.imagenes.length - 1"
+                        aria-label="Mover imagen a la derecha"
+                        @click="moverImagen(indice, 1)"
+                      >
+                        →
+                      </button>
+                      <button
+                        type="button"
+                        class="rounded px-1.5 py-0.5 text-xs text-rojizo/80 transition hover:bg-rojizo/5 hover:text-rojizo"
+                        @click="quitarImagen(indice)"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              </div>
+
+              <p v-else class="mt-3 text-center text-sm text-cafe/50">
+                Todavía no subiste imágenes.
               </p>
             </div>
 
             <div>
-              <label class="mb-2 block text-sm text-cafe">
-                Moneda <span class="text-rojizo">*</span>
+              <h3 class="font-display text-lg font-bold text-granate">Etiquetas</h3>
+              <p class="mt-1 text-sm text-cafe/60">
+                Hasta 5 etiquetas para que encuentren tu publicación.
+              </p>
+              <div class="mt-4">
+                <SelectorEtiquetas v-model="etiquetas" />
+              </div>
+            </div>
+          </section>
+
+          <!-- Paso 2: precio y stock -->
+          <section v-else-if="paso === 2" class="space-y-6">
+            <div class="rounded-2xl border border-rosa/60 bg-crema/50 p-5">
+              <label class="mb-2 block text-sm font-medium text-granate">
+                Moneda de la publicación <span class="text-rojizo">*</span>
               </label>
               <select
                 v-model="form.idMoneda"
-                class="block w-full rounded-lg border-0 px-3 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                :disabled="esEdicion"
+                class="block w-full max-w-sm rounded-lg border-0 px-3 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral disabled:bg-cafe/5 disabled:text-cafe/50"
               >
                 <option value="" disabled>Elegí una moneda</option>
                 <option
@@ -689,277 +895,208 @@ onBeforeUnmount(() => {
                   {{ moneda.nombre }} ({{ moneda.codigo }})
                 </option>
               </select>
-            </div>
-
-            <div class="rounded-2xl border border-rosa/60 bg-crema/50 p-5">
-              <label class="inline-flex items-center gap-2 text-sm font-medium text-granate">
-                <input
-                  v-model="form.contenidoSensible"
-                  type="checkbox"
-                  class="h-4 w-4 rounded border-rosa text-coral focus:ring-coral"
-                />
-                La publicación presenta contenido sensible
-              </label>
-              <div v-if="form.contenidoSensible" class="mt-4 grid gap-2 sm:grid-cols-3">
-                <label
-                  v-for="tipo in SENSIBLES"
-                  :key="tipo.valor"
-                  class="inline-flex items-center gap-2 rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe"
-                >
-                  <input
-                    v-model="form.contenidosSensibles"
-                    type="checkbox"
-                    :value="tipo.valor"
-                    class="h-4 w-4 rounded border-rosa text-coral focus:ring-coral"
-                  />
-                  {{ tipo.texto }}
-                </label>
-              </div>
-            </div>
-
-            <div class="rounded-2xl border border-rosa/60 bg-crema/50 p-5">
-              <label class="inline-flex items-center gap-2 text-sm font-medium text-granate">
-                <input
-                  v-model="form.permiteReventa"
-                  type="checkbox"
-                  class="h-4 w-4 rounded border-rosa text-coral focus:ring-coral"
-                />
-                Permitir la reventa de piezas únicas
-              </label>
               <p class="mt-2 text-xs leading-relaxed text-cafe/55">
-                Solo se aplica a variantes con stock 1. El comprador podrá
-                revender la pieza y vos vas a recibir una regalía.
+                Todos los precios de esta publicación se expresan en esta moneda.
+                <template v-if="esEdicion">
+                  La moneda no se puede cambiar después de publicar; si necesitás
+                  otra, archivá esta publicación y creá una nueva.
+                </template>
               </p>
-              <div v-if="form.permiteReventa" class="mt-4 flex flex-wrap items-end gap-4">
-                <div class="w-40">
-                  <label class="mb-1.5 block text-xs font-medium text-cafe/70">
-                    Regalía (%)
-                  </label>
-                  <input
-                    v-model.number="form.porcentajeRegalia"
-                    type="number"
-                    min="0"
-                    max="10"
-                    step="0.01"
-                    class="w-full rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
-                  />
-                </div>
-                <p
-                  class="rounded-lg px-3 py-2 text-xs"
-                  :class="hayVarianteUnica
-                    ? 'bg-green-500/10 text-green-700'
-                    : 'bg-mantequilla/50 text-granate'"
-                >
-                  {{ hayVarianteUnica
-                    ? 'Hay al menos una variante única para revender.'
-                    : 'Todavía no hay ninguna variante con stock 1.' }}
-                </p>
-              </div>
             </div>
-          </section>
 
-          <!-- Paso 2 -->
-          <section v-else-if="paso === 2">
             <SelectorVariantes
               v-model="variantes"
               :moneda="monedaCodigo"
-              :permite-reventa="form.permiteReventa"
+              :es-adoptable="esAdoptable"
+              :imagen-portada="form.imagenes[0]?.url || ''"
             />
           </section>
 
-          <!-- Paso 3 -->
-          <section v-else-if="paso === 3" class="space-y-5">
-            <div class="rounded-2xl border border-dashed border-rosa/70 bg-crema/40 p-6 text-center">
-              <p class="text-sm font-medium text-granate">
-                Subí las imágenes de la publicación
-              </p>
-              <p class="mt-1 text-xs text-cafe/55">
-                La primera imagen será la portada. Se guarda el original privado
-                y una preview pública optimizada.
-              </p>
-              <label
-                class="mt-4 inline-flex cursor-pointer items-center justify-center rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-rojizo"
-                :class="subiendoImagen ? 'pointer-events-none opacity-50' : ''"
-              >
-                {{ subiendoImagen ? 'Subiendo...' : 'Elegir imagen' }}
-                <input
-                  type="file"
-                  class="sr-only"
-                  :accept="acceptImagenes"
-                  @change="subirImagen"
-                />
-              </label>
-              <p v-if="errorImagen" class="mt-2 text-sm text-rojizo">{{ errorImagen }}</p>
-            </div>
-
-            <div
-              v-if="form.imagenes.length"
-              class="grid grid-cols-2 gap-4 sm:grid-cols-3"
-            >
-              <article
-                v-for="(imagen, indice) in form.imagenes"
-                :key="`${imagen.url}-${indice}`"
-                class="overflow-hidden rounded-2xl border border-rosa/60 bg-blanco shadow-sm"
-              >
-                <button
-                  type="button"
-                  class="block w-full"
-                  @click="abrirVisor(indice)"
-                >
-                  <img
-                    :src="imagen.url"
-                    :alt="`Imagen ${indice + 1} del producto`"
-                    class="aspect-square w-full object-cover"
-                  />
-                </button>
-                <div class="flex items-center justify-between gap-2 px-3 py-2">
-                  <span class="text-[11px] font-semibold text-cafe/55">
-                    {{ indice === 0 ? 'Portada' : `Imagen ${indice + 1}` }}
-                  </span>
-                  <div class="flex items-center gap-1">
-                    <button
-                      type="button"
-                      class="rounded px-1.5 py-0.5 text-xs text-cafe/60 transition hover:bg-rosa/20 disabled:opacity-30"
-                      :disabled="indice === 0"
-                      aria-label="Mover imagen a la izquierda"
-                      @click="moverImagen(indice, -1)"
-                    >
-                      ←
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded px-1.5 py-0.5 text-xs text-cafe/60 transition hover:bg-rosa/20 disabled:opacity-30"
-                      :disabled="indice === form.imagenes.length - 1"
-                      aria-label="Mover imagen a la derecha"
-                      @click="moverImagen(indice, 1)"
-                    >
-                      →
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded px-1.5 py-0.5 text-xs text-rojizo/80 transition hover:bg-rojizo/5 hover:text-rojizo"
-                      @click="quitarImagen(indice)"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
-              </article>
-            </div>
-
-            <p v-else class="text-center text-sm text-cafe/50">
-              Todavía no subiste imágenes.
-            </p>
-          </section>
-
-          <!-- Paso 4 -->
-          <section v-else-if="paso === 4" class="space-y-6">
-            <SelectorEtiquetas v-model="etiquetas" />
-
+          <!-- Paso 3: licencia -->
+          <section v-else-if="paso === 3" class="space-y-6">
             <div class="rounded-2xl border border-rosa/60 bg-crema/50 p-5">
-              <h3 class="text-sm font-semibold text-granate">Términos de uso</h3>
-
-              <div v-if="hayTerminosGlobales" class="mt-3 rounded-xl border border-rosa/50 bg-blanco p-4">
-                <p class="text-xs font-semibold uppercase tracking-[0.12em] text-cafe/45">
-                  Tus términos globales
-                </p>
-                <p class="mt-2 line-clamp-3 text-sm leading-relaxed text-cafe/70">
-                  {{ resumenTerminosGlobal }}
-                </p>
-                <router-link
-                  to="/panel/terminos"
-                  class="mt-2 inline-block text-xs font-medium text-coral transition hover:text-rojizo"
-                >
-                  Editar términos globales →
-                </router-link>
-              </div>
-
-              <p
-                v-else
-                class="mt-3 rounded-xl border border-mantequilla/70 bg-mantequilla/30 px-4 py-3 text-sm text-granate"
-              >
-                No tenés términos globales configurados. Definí términos propios
-                para este producto o completá tus
-                <router-link to="/panel/terminos" class="font-semibold underline">
-                  términos globales
-                </router-link>.
+              <h3 class="font-display text-lg font-bold text-granate">Usos permitidos</h3>
+              <p class="mt-1 text-sm text-cafe/60">
+                Elegí qué puede hacer el comprador con la obra. Podés combinar más de uno.
               </p>
 
-              <label
-                v-if="hayTerminosGlobales"
-                class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-granate"
-              >
+              <div class="mt-4 grid gap-3">
+                <label
+                  v-for="derecho in derechos"
+                  :key="derecho.idDerechoTermino"
+                  class="flex cursor-pointer items-start gap-3 rounded-xl border border-rosa/60 bg-blanco p-4 transition hover:border-coral/40"
+                  :class="(derecho.requierePiezaUnica && !hayVarianteUnica
+                    && !licencia.idsDerechos.includes(derecho.idDerechoTermino))
+                    ? 'cursor-not-allowed opacity-60'
+                    : ''"
+                >
+                  <input
+                    v-model="licencia.idsDerechos"
+                    type="checkbox"
+                    :value="derecho.idDerechoTermino"
+                    :disabled="derecho.requierePiezaUnica && !hayVarianteUnica
+                      && !licencia.idsDerechos.includes(derecho.idDerechoTermino)"
+                    class="mt-0.5 h-4 w-4 rounded border-rosa text-coral focus:ring-coral"
+                  />
+                  <span class="min-w-0">
+                    <span class="flex flex-wrap items-center gap-2">
+                      <span class="text-sm font-semibold text-granate">{{ derecho.nombre }}</span>
+                      <span
+                        v-if="derecho.requierePiezaUnica"
+                        class="rounded-full bg-mantequilla/60 px-2 py-0.5 text-[10px] font-bold text-granate"
+                      >
+                        Solo piezas únicas
+                      </span>
+                    </span>
+                    <span class="mt-1 block text-xs leading-relaxed text-cafe/60">
+                      {{ derecho.descripcion }}
+                    </span>
+                    <span
+                      v-if="derecho.requierePiezaUnica && !hayVarianteUnica"
+                      class="mt-2 block text-[11px] font-medium text-granate"
+                    >
+                      Para habilitarlo, volvé al paso 2 y poné una presentación como “Pieza única”.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-rosa/60 bg-blanco p-5">
                 <input
-                  v-model="terminosPropios"
+                  v-model="licencia.permiteModificaciones"
                   type="checkbox"
-                  class="h-4 w-4 rounded border-rosa text-coral focus:ring-coral"
+                  class="mt-0.5 h-4 w-4 rounded border-rosa text-coral focus:ring-coral"
                 />
-                Definir términos propios para este producto
+                <span>
+                  <span class="block text-sm font-semibold text-granate">Permitir modificaciones</span>
+                  <span class="mt-1 block text-xs leading-relaxed text-cafe/55">
+                    El comprador puede editar, recortar o intervenir la obra.
+                  </span>
+                </span>
               </label>
 
-              <div v-if="terminosPropios || !hayTerminosGlobales" class="mt-4">
-                <label class="mb-2 block text-xs font-medium text-cafe/70">
-                  Términos de uso del producto
-                </label>
-                <textarea
-                  v-model="terminosTexto"
-                  rows="5"
-                  maxlength="4000"
-                  placeholder="Ej. La compra habilita el uso personal de la pieza. No permite reventa salvo que se indique."
-                  class="block w-full resize-none rounded-lg border border-rosa/60 bg-blanco px-4 py-2.5 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
-                ></textarea>
-              </div>
+              <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-rosa/60 bg-blanco p-5">
+                <input
+                  v-model="licencia.requiereCredito"
+                  type="checkbox"
+                  class="mt-0.5 h-4 w-4 rounded border-rosa text-coral focus:ring-coral"
+                />
+                <span>
+                  <span class="block text-sm font-semibold text-granate">Requerir crédito</span>
+                  <span class="mt-1 block text-xs leading-relaxed text-cafe/55">
+                    El comprador debe mencionarte cuando use o comparta la obra.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            <div v-if="derechoReventa" class="rounded-2xl border border-coral/30 bg-rosa/15 p-5">
+              <label class="mb-2 block text-sm font-medium text-granate">
+                Regalía por reventa (%)
+              </label>
+              <input
+                v-model.number="licencia.porcentajeRegalia"
+                type="number"
+                min="0"
+                max="10"
+                step="0.01"
+                class="w-40 rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/55">
+                Porcentaje que recibís cada vez que se revende la pieza única.
+                0% significa reventa sin regalía. Máximo 10%.
+              </p>
+            </div>
+
+            <div class="rounded-2xl border border-rosa/60 bg-blanco p-5">
+              <label class="mb-2 block text-sm font-medium text-granate">
+                Condiciones adicionales (opcional)
+              </label>
+              <textarea
+                v-model="licencia.textoAdicional"
+                rows="4"
+                maxlength="2000"
+                placeholder="Ej. La compra habilita el uso personal de la pieza. No permite redistribución digital."
+                class="block w-full resize-none rounded-lg border border-rosa/60 bg-blanco px-4 py-2.5 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
+              ></textarea>
+            </div>
+
+            <div class="rounded-2xl border border-rosa/60 bg-crema/40 p-5">
+              <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                Resumen de la licencia
+              </p>
+              <p class="mt-2 text-sm text-cafe/75">
+                <span class="font-semibold text-granate">Usos:</span> {{ resumenUsos }}
+              </p>
+              <p class="mt-1 text-sm text-cafe/75">
+                <span class="font-semibold text-granate">Modificaciones:</span>
+                {{ licencia.permiteModificaciones ? 'Permitidas' : 'No permitidas' }}
+              </p>
+              <p class="mt-1 text-sm text-cafe/75">
+                <span class="font-semibold text-granate">Crédito:</span>
+                {{ licencia.requiereCredito ? 'Requerido' : 'No requerido' }}
+              </p>
+              <p class="mt-1 text-sm text-cafe/75">
+                <span class="font-semibold text-granate">Reventa:</span> {{ resumenReventa }}
+              </p>
+              <p v-if="licencia.textoAdicional.trim()" class="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-cafe/60">
+                {{ licencia.textoAdicional }}
+              </p>
             </div>
           </section>
 
-          <!-- Paso 5 -->
-          <section v-else-if="paso === 5" class="space-y-6">
-            <div class="grid gap-4 sm:grid-cols-2">
-              <article class="rounded-2xl border border-rosa/60 bg-crema/40 p-5">
+          <!-- Paso 4: revisión -->
+          <section v-else-if="paso === 4" class="space-y-5">
+            <article class="rounded-2xl border border-rosa/60 bg-crema/40 p-5">
+              <div class="flex items-start justify-between gap-3">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
                   Publicación
                 </p>
-                <h3 class="mt-2 font-display text-lg font-bold text-granate">
-                  {{ form.titulo }}
-                </h3>
-                <p class="mt-1 text-xs text-cafe/55">
-                  {{ nombreTipo }} · {{ nombreMedio }} · {{ monedaCodigo }}
-                </p>
-                <p class="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-cafe/75">
-                  {{ form.descripcion }}
-                </p>
-                <p class="mt-3 text-sm font-semibold text-coral">
-                  {{ precioDesde !== null ? formatearPrecio(precioDesde, monedaCodigo) : 'Sin precio' }}
-                  <span class="text-[11px] font-normal text-cafe/45">desde</span>
-                </p>
-                <p v-if="form.contenidoSensible" class="mt-2 text-xs font-medium text-granate">
-                  Contenido sensible: {{ form.contenidosSensibles.join(' · ') }}
-                </p>
-              </article>
-
-              <article class="rounded-2xl border border-rosa/60 bg-crema/40 p-5">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
-                  Reventa
-                </p>
-                <p class="mt-2 text-sm text-cafe/75">
-                  {{ form.permiteReventa
-                    ? `Habilitada para piezas únicas con regalía del ${form.porcentajeRegalia}%.`
-                    : 'No habilitada para este producto.' }}
-                </p>
-                <p class="mt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
-                  Términos
-                </p>
-                <p class="mt-2 text-sm text-cafe/75">
-                  {{ terminosPropios
-                    ? 'Términos propios del producto.'
-                    : 'Términos globales de la cuenta.' }}
-                </p>
-              </article>
-            </div>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-coral transition hover:text-rojizo"
+                  @click="irAEditar(1)"
+                >
+                  Editar
+                </button>
+              </div>
+              <h3 class="mt-2 font-display text-lg font-bold text-granate">
+                {{ form.titulo || 'Sin título' }}
+              </h3>
+              <p class="mt-1 text-xs text-cafe/55">
+                {{ nombreTipo || 'Sin tipo' }} · {{ nombreMedio || 'Sin medio' }} · {{ monedaCodigo }}
+              </p>
+              <p class="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-cafe/75">
+                {{ form.descripcion }}
+              </p>
+              <p v-if="form.contenidoSensible" class="mt-2 text-xs font-medium text-granate">
+                Contenido sensible: {{ form.contenidosSensibles.join(' · ') }}
+              </p>
+            </article>
 
             <article class="rounded-2xl border border-rosa/60 bg-blanco p-5">
-              <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
-                Variantes ({{ variantes.length }})
+              <div class="flex items-start justify-between gap-3">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                  Precio y stock
+                </p>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-coral transition hover:text-rojizo"
+                  @click="irAEditar(2)"
+                >
+                  Editar
+                </button>
+              </div>
+              <p class="mt-2 text-sm text-cafe/65">
+                {{ variantes.length === 1
+                  ? '1 presentación'
+                  : `${variantes.length} variantes` }}
+                · desde
+                <span class="font-semibold text-granate">
+                  {{ precioDesde !== null ? formatearPrecio(precioDesde, monedaCodigo) : 'sin precio' }}
+                </span>
               </p>
               <div class="mt-3 divide-y divide-rosa/40">
                 <div
@@ -968,26 +1105,20 @@ onBeforeUnmount(() => {
                   class="flex items-center gap-3 py-3"
                 >
                   <img
-                    v-if="variante.urlImagen"
-                    :src="variante.urlImagen"
-                    :alt="variante.nombre"
+                    v-if="imagenVariante(variante)"
+                    :src="imagenVariante(variante)"
+                    :alt="nombrePresentacion(variante)"
                     class="h-12 w-12 shrink-0 rounded-lg object-cover ring-1 ring-rosa/50"
                   />
                   <div class="min-w-0 flex-1">
                     <p class="truncate text-sm font-semibold text-granate">
-                      {{ variante.nombre }}
+                      {{ nombrePresentacion(variante) }}
                     </p>
                     <p class="text-xs text-cafe/55">
                       {{ formatearPrecio(Number(variante.precio), monedaCodigo) }}
                       · {{ etiquetaStock(variante) }}
                     </p>
                   </div>
-                  <span
-                    class="shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
-                    :class="estadoVarianteDe(variante.estado).clase"
-                  >
-                    {{ estadoVarianteDe(variante.estado).texto }}
-                  </span>
                   <span
                     v-if="!esIlimitada(variante) && Number(variante.stockDisponible) === 1"
                     class="shrink-0 rounded-full bg-mantequilla/60 px-2.5 py-0.5 text-[11px] font-bold text-granate"
@@ -1000,9 +1131,50 @@ onBeforeUnmount(() => {
             </article>
 
             <article class="rounded-2xl border border-rosa/60 bg-blanco p-5">
-              <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
-                Imágenes ({{ form.imagenes.length }})
+              <div class="flex items-start justify-between gap-3">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                  Licencia
+                </p>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-coral transition hover:text-rojizo"
+                  @click="irAEditar(3)"
+                >
+                  Editar
+                </button>
+              </div>
+              <p class="mt-2 text-sm text-cafe/75">
+                <span class="font-semibold text-granate">Usos:</span> {{ resumenUsos }}
               </p>
+              <p class="mt-1 text-sm text-cafe/75">
+                <span class="font-semibold text-granate">Modificaciones:</span>
+                {{ licencia.permiteModificaciones ? 'Permitidas' : 'No permitidas' }}
+              </p>
+              <p class="mt-1 text-sm text-cafe/75">
+                <span class="font-semibold text-granate">Crédito:</span>
+                {{ licencia.requiereCredito ? 'Requerido' : 'No requerido' }}
+              </p>
+              <p class="mt-1 text-sm text-cafe/75">
+                <span class="font-semibold text-granate">Reventa:</span> {{ resumenReventa }}
+              </p>
+              <p v-if="licencia.textoAdicional.trim()" class="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-cafe/60">
+                {{ licencia.textoAdicional }}
+              </p>
+            </article>
+
+            <article class="rounded-2xl border border-rosa/60 bg-blanco p-5">
+              <div class="flex items-start justify-between gap-3">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                  Imágenes y etiquetas
+                </p>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-coral transition hover:text-rojizo"
+                  @click="irAEditar(1)"
+                >
+                  Editar
+                </button>
+              </div>
               <div class="mt-3 flex flex-wrap gap-3">
                 <img
                   v-for="(imagen, indice) in form.imagenes"
@@ -1012,13 +1184,7 @@ onBeforeUnmount(() => {
                   class="h-20 w-20 rounded-xl object-cover ring-1 ring-rosa/50"
                 />
               </div>
-            </article>
-
-            <article class="rounded-2xl border border-rosa/60 bg-blanco p-5">
-              <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
-                Etiquetas
-              </p>
-              <div class="mt-3 flex flex-wrap gap-2">
+              <div class="mt-4 flex flex-wrap gap-2">
                 <span
                   v-for="etiqueta in etiquetas"
                   :key="etiqueta.idEtiqueta"
@@ -1073,38 +1239,6 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </footer>
-        </div>
-
-        <div class="mt-6 rounded-2xl border border-rosa/50 bg-crema/60 p-5">
-          <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
-            Revisión rápida
-          </p>
-          <div class="mt-3 grid gap-3 sm:grid-cols-3">
-            <button
-              type="button"
-              class="rounded-xl border border-rosa/50 bg-blanco px-4 py-3 text-left transition hover:border-coral/40"
-              @click="irAEditar(1)"
-            >
-              <p class="text-xs text-cafe/50">Datos</p>
-              <p class="mt-1 truncate text-sm font-medium text-granate">{{ form.titulo || 'Sin título' }}</p>
-            </button>
-            <button
-              type="button"
-              class="rounded-xl border border-rosa/50 bg-blanco px-4 py-3 text-left transition hover:border-coral/40"
-              @click="irAEditar(2)"
-            >
-              <p class="text-xs text-cafe/50">Variantes</p>
-              <p class="mt-1 text-sm font-medium text-granate">{{ variantes.length }} variante(s)</p>
-            </button>
-            <button
-              type="button"
-              class="rounded-xl border border-rosa/50 bg-blanco px-4 py-3 text-left transition hover:border-coral/40"
-              @click="irAEditar(3)"
-            >
-              <p class="text-xs text-cafe/50">Imágenes</p>
-              <p class="mt-1 text-sm font-medium text-granate">{{ form.imagenes.length }} imagen(es)</p>
-            </button>
-          </div>
         </div>
       </div>
     </template>

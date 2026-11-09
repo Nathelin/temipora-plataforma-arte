@@ -7,7 +7,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -22,13 +21,11 @@ import com.temipora.backend_springboot.modelo.ProductoDTO;
 import com.temipora.backend_springboot.modelo.ProductoLedgerDTO;
 import com.temipora.backend_springboot.modelo.ProductoRequest;
 import com.temipora.backend_springboot.modelo.ProductoResumenEstadoDTO;
-import com.temipora.backend_springboot.modelo.TerminosDTO;
 import com.temipora.backend_springboot.servicios.AlmacenPrivadoService;
 import com.temipora.backend_springboot.servicios.LedgerService;
 import com.temipora.backend_springboot.servicios.ProductoBajaService;
 import com.temipora.backend_springboot.servicios.ProductoService;
 import com.temipora.backend_springboot.servicios.StorageService;
-import com.temipora.backend_springboot.servicios.TerminosService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
 import jakarta.validation.Valid;
@@ -43,7 +40,6 @@ public class ProductoController {
     private final UsuarioService usuarioService;
     private final StorageService storageService;
     private final AlmacenPrivadoService almacenPrivadoService;
-    private final TerminosService terminosService;
 
     public ProductoController(
             ProductoService productoService,
@@ -51,15 +47,13 @@ public class ProductoController {
             LedgerService ledgerService,
             UsuarioService usuarioService,
             StorageService storageService,
-            AlmacenPrivadoService almacenPrivadoService,
-            TerminosService terminosService) {
+            AlmacenPrivadoService almacenPrivadoService) {
         this.productoService = productoService;
         this.productoBajaService = productoBajaService;
         this.ledgerService = ledgerService;
         this.usuarioService = usuarioService;
         this.storageService = storageService;
         this.almacenPrivadoService = almacenPrivadoService;
-        this.terminosService = terminosService;
     }
 
     @GetMapping("/mis-productos")
@@ -137,27 +131,6 @@ public class ProductoController {
         return ledgerService.verificarProducto(
             productoService.obtenerEntidadPropia(
                 id, idAutenticado(authentication)));
-    }
-
-    @GetMapping("/mis-productos/{id}/terminos")
-    @PreAuthorize("hasRole('ARTISTA')")
-    public TerminosDTO terminos(
-            @PathVariable Long id,
-            Authentication authentication) {
-        Long idArtista = idAutenticado(authentication);
-        productoService.obtenerEntidadPropia(id, idArtista);
-        return terminosService.obtenerProducto(id, idArtista);
-    }
-
-    @DeleteMapping("/mis-productos/{id}/terminos")
-    @PreAuthorize("hasRole('ARTISTA')")
-    public ResponseEntity<Void> eliminarTerminos(
-            @PathVariable Long id,
-            Authentication authentication) {
-        Long idArtista = idAutenticado(authentication);
-        productoService.obtenerEntidadPropia(id, idArtista);
-        terminosService.eliminarProducto(id, idArtista);
-        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/mis-productos/imagenes")
