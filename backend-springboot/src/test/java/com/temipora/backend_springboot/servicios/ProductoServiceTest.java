@@ -379,7 +379,7 @@ class ProductoServiceTest {
         ProductoDTO dto = productoService.modificar(10L, 5L, request);
 
         assertThat(dto.getVariantes().get(0).getSha256()).isEqualTo(SHA_IMAGEN);
-        assertThat(producto.getVariantes().get(0).getClaveArchivoOriginal())
+        assertThat(producto.getVariantes().iterator().next().getClaveArchivoOriginal())
             .isEqualTo("productos/img.webp");
     }
 

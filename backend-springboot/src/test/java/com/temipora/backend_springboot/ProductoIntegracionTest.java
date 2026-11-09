@@ -68,7 +68,6 @@ class ProductoIntegracionTest {
         Moneda moneda = monedaService.predeterminada();
 
         String titulo = "Test productos " + UUID.randomUUID();
-        String shaImagen = shaAleatorio();
         String shaVariante = shaAleatorio();
 
         ProductoVarianteRequest variante = new ProductoVarianteRequest();
@@ -81,11 +80,15 @@ class ProductoIntegracionTest {
         variante.setSha256(shaVariante);
         variante.setClaveArchivoOriginal("productos/test-variante.webp");
 
-        ProductoImagenRequest imagen = new ProductoImagenRequest();
-        imagen.setUrl("/uploads/test-producto.webp");
-        imagen.setSha256(shaImagen);
-        imagen.setClaveArchivoOriginal("productos/test-producto.webp");
-        imagen.setOrden(0);
+        List<ProductoImagenRequest> imagenes = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            ProductoImagenRequest imagen = new ProductoImagenRequest();
+            imagen.setUrl("/uploads/test-producto-" + i + ".webp");
+            imagen.setSha256(shaAleatorio());
+            imagen.setClaveArchivoOriginal("productos/test-producto-" + i + ".webp");
+            imagen.setOrden(i);
+            imagenes.add(imagen);
+        }
 
         ProductoRequest request = new ProductoRequest();
         request.setIdTipoProducto(tipo.getIdTipoProducto());
@@ -93,19 +96,27 @@ class ProductoIntegracionTest {
         request.setIdMoneda(moneda.getIdMoneda());
         request.setTitulo(titulo);
         request.setDescripcion("Producto de prueba de integración.");
-        request.setImagenes(new ArrayList<>(List.of(imagen)));
+        request.setImagenes(imagenes);
         request.setVariantes(new ArrayList<>(List.of(variante)));
         request.setIdsEtiquetas(Set.of());
         request.setContenidosSensibles(Set.of());
 
-        DerechoTermino personal = derechoTerminoRepository
-            .findByActivoTrueOrderByOrdenAsc().stream()
+        List<DerechoTermino> derechosActivos = derechoTerminoRepository
+            .findByActivoTrueOrderByOrdenAsc();
+        DerechoTermino personal = derechosActivos.stream()
             .filter(derecho -> "PERSONAL".equals(derecho.getCodigo()))
             .findFirst()
             .orElseThrow(() -> new IllegalStateException(
                 "No existe el derecho PERSONAL en el catálogo."));
+        DerechoTermino contenido = derechosActivos.stream()
+            .filter(derecho -> "CONTENIDO".equals(derecho.getCodigo()))
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException(
+                "No existe el derecho CONTENIDO en el catálogo."));
         LicenciaProductoRequest licencia = new LicenciaProductoRequest();
-        licencia.setIdsDerechos(Set.of(personal.getIdDerechoTermino()));
+        licencia.setIdsDerechos(Set.of(
+            personal.getIdDerechoTermino(),
+            contenido.getIdDerechoTermino()));
         licencia.setPermiteModificaciones(false);
         licencia.setRequiereCredito(true);
         licencia.setPorcentajeRegalia(BigDecimal.ZERO);
@@ -118,24 +129,25 @@ class ProductoIntegracionTest {
         assertThat(dto.getTitulo()).isEqualTo(titulo);
         assertThat(dto.getVariantes()).hasSize(1);
         assertThat(dto.getVariantes().get(0).isTieneLedger()).isTrue();
+        assertThat(dto.getImagenes()).hasSize(4);
         assertThat(dto.getPrecioDesde()).isEqualByComparingTo("150.00");
         assertThat(dto.getTipoEntregaMedio()).isEqualTo(TipoEntrega.DIGITAL);
 
         assertThat(dto.getLicencia()).isNotNull();
-        assertThat(dto.getLicencia().getDerechos()).hasSize(1);
-        assertThat(dto.getLicencia().getDerechos().get(0).getCodigo())
-            .isEqualTo("PERSONAL");
+        assertThat(dto.getLicencia().getDerechos())
+            .extracting(derecho -> derecho.getCodigo())
+            .containsExactlyInAnyOrder("PERSONAL", "CONTENIDO");
 
         Producto producto = productoRepository.findByIdProducto(dto.getIdProducto())
             .orElseThrow();
         assertThat(producto.getVariantes()).hasSize(1);
-        assertThat(producto.getImagenes()).hasSize(1);
+        assertThat(producto.getImagenes()).hasSize(4);
         assertThat(producto.getLicencias()).hasSize(1);
         LicenciaProducto licenciaGuardada = producto.licenciaVigente();
         assertThat(licenciaGuardada).isNotNull();
-        assertThat(licenciaGuardada.getDerechos()).hasSize(1);
+        assertThat(licenciaGuardada.getDerechos()).hasSize(2);
         assertThat(licenciaGuardada.isRequiereCredito()).isTrue();
-        Long idVariante = producto.getVariantes().get(0).getIdVariante();
+        Long idVariante = producto.getVariantes().iterator().next().getIdVariante();
 
         List<EventoLedger> eventos = eventoLedgerRepository
             .findByVarianteIdVarianteOrderBySecuenciaAsc(idVariante);
