@@ -57,6 +57,7 @@ public class ReactivacionProcesador {
     private final EmailPlantillaService emailPlantillaService;
     private final MonedaService monedaService;
     private final AccesoEnlaceService accesoEnlaceService;
+    private final SancionService sancionService;
 
     @Value("${temipora.mail.base-url:http://localhost:5173}")
     private String baseUrl;
@@ -71,7 +72,8 @@ public class ReactivacionProcesador {
             EnvioEmailService envioEmailService,
             EmailPlantillaService emailPlantillaService,
             MonedaService monedaService,
-            AccesoEnlaceService accesoEnlaceService) {
+            AccesoEnlaceService accesoEnlaceService,
+            SancionService sancionService) {
         this.usuarioRepository = usuarioRepository;
         this.solicitudRepository = solicitudRepository;
         this.comisionService = comisionService;
@@ -82,6 +84,7 @@ public class ReactivacionProcesador {
         this.emailPlantillaService = emailPlantillaService;
         this.monedaService = monedaService;
         this.accesoEnlaceService = accesoEnlaceService;
+        this.sancionService = sancionService;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -93,6 +96,11 @@ public class ReactivacionProcesador {
         Usuario usuario = usuarioRepository.findByIdUsuario(idUsuario)
             .orElse(null);
         if (usuario == null || !usuario.isEstadoCuenta()) {
+            return 0;
+        }
+
+        // No generar promociones ni correos automáticos para cuentas sancionadas.
+        if (sancionService.obtenerVigente(idUsuario).isPresent()) {
             return 0;
         }
 

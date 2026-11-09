@@ -75,6 +75,23 @@ const fallidas = computed(() => lote.value.filter(i => i.estado === 'errorSubida
 const ultimaImagen = computed(() => indiceActual.value === lote.value.length - 1)
 const soloLectura = computed(() => !esEdicion.value && actual.value?.estado === 'guardada')
 
+const SIN_CONTENIDO_SENSIBLE = 'NINGUNO'
+
+const opcionesContenidoSensible = [
+  { valor: SIN_CONTENIDO_SENSIBLE, etiqueta: 'Sin contenido sensible' },
+  { valor: 'VIOLENCIA', etiqueta: 'Violencia' },
+  { valor: 'DESNUDOS', etiqueta: 'Desnudos' },
+  { valor: 'GENERAL', etiqueta: 'Contenido sensible general' },
+]
+
+function etiquetaContenidoSensible(valor) {
+  return opcionesContenidoSensible.find(o => o.valor === valor)?.etiqueta || 'Sin contenido sensible'
+}
+
+function contenidoSensibleParaApi(valor) {
+  return valor && valor !== SIN_CONTENIDO_SENSIBLE ? valor : null
+}
+
 function datosVacios(tituloPrefill = '') {
   return {
     titulo: tituloPrefill,
@@ -357,6 +374,7 @@ function validarDatos(datos) {
   if (!datos.titulo.trim()) return 'El título es obligatorio.'
   if (!datos.descripcion.trim()) return 'La descripción es obligatoria.'
   if (!datos.idTipoArte) return 'Selecciona el tipo de arte de la obra.'
+  if (!datos.contenidoSensible) return 'Indica si la obra contiene contenido sensible.'
   return ''
 }
 
@@ -367,7 +385,7 @@ function cuerpoDesde(item) {
     descripcion: d.descripcion,
     url: item.url,
     idTipoArte: Number(d.idTipoArte),
-    contenidoSensible: d.contenidoSensible || null,
+    contenidoSensible: contenidoSensibleParaApi(d.contenidoSensible),
     idsEtiqueta: d.etiquetas.map(e => e.idEtiqueta),
     idsMaterial: d.materiales.map(m => m.idMaterial),
   }
@@ -479,7 +497,7 @@ async function guardarVerificada() {
         titulo: item.datos.titulo,
         descripcion: item.datos.descripcion,
         idTipoArte: Number(item.datos.idTipoArte),
-        contenidoSensible: item.datos.contenidoSensible || null,
+        contenidoSensible: contenidoSensibleParaApi(item.datos.contenidoSensible),
         idsEtiqueta: item.datos.etiquetas.map(e => e.idEtiqueta),
         idsMaterial: item.datos.materiales.map(m => m.idMaterial),
         agregarComoEjemplo: agregarComoEjemplo.value,
@@ -615,7 +633,7 @@ onMounted(() => {
         titulo: img.titulo,
         descripcion: img.descripcion,
         idTipoArte: img.tipoArte?.idTipoArte || '',
-        contenidoSensible: img.contenidoSensible || '',
+        contenidoSensible: img.contenidoSensible || SIN_CONTENIDO_SENSIBLE,
         etiquetas: [...(img.etiquetas || [])],
         materiales: [...(img.materiales || [])],
       },
@@ -909,7 +927,7 @@ function urlsSinPublicar() {
                 </div>
                 <div>
                   <p class="text-xs text-cafe/60 pt-3">Contenido sensible</p>
-                  <p class="text-cafe">{{ actual.datos.contenidoSensible || 'No' }}</p>
+                  <p class="text-cafe">{{ etiquetaContenidoSensible(actual.datos.contenidoSensible) }}</p>
                 </div>
               </div>
               <div>
@@ -955,12 +973,12 @@ function urlsSinPublicar() {
               </div>
 
               <div>
-                <label class="block text-sm text-cafe mb-2 pt-3">Contenido sensible</label>
-                <select v-model="actual.datos.contenidoSensible" class="block w-full rounded-lg border-0 py-2.5 px-3 text-base text-cafe ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
-                  <option value="">Sin contenido sensible</option>
-                  <option value="VIOLENCIA">Violencia</option>
-                  <option value="DESNUDOS">Desnudos</option>
-                  <option value="GENERAL">Contenido sensible general</option>
+                <label class="block text-sm text-cafe mb-2 pt-3">Contenido sensible <span class="text-rojizo">*</span></label>
+                <select v-model="actual.datos.contenidoSensible" required class="block w-full rounded-lg border-0 py-2.5 px-3 text-base text-cafe ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none">
+                  <option value="" disabled>Selecciona una opción</option>
+                  <option v-for="opcion in opcionesContenidoSensible" :key="opcion.valor" :value="opcion.valor">
+                    {{ opcion.etiqueta }}
+                  </option>
                 </select>
               </div>
 

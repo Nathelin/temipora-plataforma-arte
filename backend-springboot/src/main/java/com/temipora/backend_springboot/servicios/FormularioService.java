@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
@@ -45,7 +46,7 @@ public class FormularioService {
     @Transactional(readOnly = true)
     public FormularioDTO obtenerGlobal(Long idArtista) {
         return formularioRepository
-            .findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalse(idArtista)
+            .findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalseAndVigenteTrue(idArtista)
             .map(FormularioDTO::desdeFormulario)
             .orElseGet(() -> FormularioDTO.desdeFormulario(formularioSistema()));
     }
@@ -53,15 +54,15 @@ public class FormularioService {
     @Transactional
     public FormularioDTO guardarGlobal(Long idArtista, FormularioRequest request) {
         List<Pregunta> preguntas = validarPreguntas(request);
-        Formulario formulario = formularioRepository
-            .findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalse(idArtista)
-            .orElseGet(() -> nuevoFormulario(idArtista, null));
-        return guardar(formulario, preguntas);
+        desactivarVigente(formularioRepository
+            .findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalseAndVigenteTrue(idArtista));
+        return guardar(nuevoFormulario(idArtista, null), preguntas);
     }
 
     @Transactional(readOnly = true)
     public FormularioDTO obtenerServicio(Long idServicio, Long idArtista) {
-        return formularioRepository.findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
+        return formularioRepository
+            .findByArtistaIdUsuarioAndIdServicioAndVigenteTrue(idArtista, idServicio)
             .map(formulario -> FormularioDTO.desdeFormulario(formulario, true))
             .orElseGet(() -> obtenerGlobal(idArtista));
     }
@@ -69,16 +70,28 @@ public class FormularioService {
     @Transactional
     public FormularioDTO guardarServicio(Long idServicio, Long idArtista, FormularioRequest request) {
         List<Pregunta> preguntas = validarPreguntas(request);
-        Formulario formulario = formularioRepository
-            .findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
-            .orElseGet(() -> nuevoFormulario(idArtista, idServicio));
-        return guardar(formulario, preguntas);
+        desactivarVigente(formularioRepository
+            .findByArtistaIdUsuarioAndIdServicioAndVigenteTrue(idArtista, idServicio));
+        return guardar(nuevoFormulario(idArtista, idServicio), preguntas);
     }
 
     @Transactional
     public void eliminarServicio(Long idServicio, Long idArtista) {
-        formularioRepository.findByArtistaIdUsuarioAndIdServicio(idArtista, idServicio)
-            .ifPresent(formularioRepository::delete);
+        desactivarVigente(formularioRepository
+            .findByArtistaIdUsuarioAndIdServicioAndVigenteTrue(idArtista, idServicio));
+    }
+
+    /**
+     * El formulario anterior no se borra: puede estar referenciado por
+     * solicitudes ya creadas. Se marca inactivo para que las próximas usen
+     * una versión nueva (o el global, si se está desactivando el propio).
+     */
+    private void desactivarVigente(Optional<Formulario> actual) {
+        actual.ifPresent(formulario -> {
+            formulario.setVigente(false);
+            formularioRepository.save(formulario);
+            formularioRepository.flush();
+        });
     }
 
     private List<Pregunta> validarPreguntas(FormularioRequest request) {
