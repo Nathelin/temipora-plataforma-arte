@@ -87,6 +87,8 @@ public class SecurityConfig {
                     "/images/**",
                     "/error",
                     "/api/servicios/**",
+                    "/api/productos/**",
+                    "/api/tipos-producto",
                     "/api/sustituciones",
                     "/api/perfil/**",
                     "/api/portfolio/**",

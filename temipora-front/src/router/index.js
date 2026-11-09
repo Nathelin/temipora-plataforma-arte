@@ -65,6 +65,9 @@ import PortfolioSubir from '../views/PortfolioSubir.vue'
 import MisServicios from '../views/MisServicios.vue'
 import ServicioForm from '../views/ServicioForm.vue'
 import ServicioSolicitudes from '../views/ServicioSolicitudes.vue'
+import MisProductos from '../views/MisProductos.vue'
+import ProductoForm from '../views/ProductoForm.vue'
+import ProductoDetalle from '../views/ProductoDetalle.vue'
 import ServiciosArchivados from '../views/ServiciosArchivados.vue'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useConfirmacionSalida } from '../composables/useConfirmacionSalida'
@@ -239,6 +242,10 @@ const routes = [
           { path: 'servicios/crear', name: 'servicio-crear', component: ServicioForm, meta: { title: 'Crear servicio' } },
           { path: 'servicios/:id/editar', name: 'servicio-editar', component: ServicioForm, meta: { title: 'Editar servicio' } },
           { path: 'servicios/:id/solicitudes', name: 'servicio-solicitudes', component: ServicioSolicitudes, meta: { title: 'Solicitudes del servicio' } },
+          { path: 'productos', name: 'mis-productos', component: MisProductos, meta: { title: 'Mis productos' } },
+          { path: 'productos/crear', name: 'producto-crear', component: ProductoForm, meta: { title: 'Crear producto' } },
+          { path: 'productos/:id/editar', name: 'producto-editar', component: ProductoForm, meta: { title: 'Editar producto' } },
+          { path: 'productos/:id', name: 'producto-previa', component: ProductoDetalle, meta: { title: 'Vista previa del producto' } },
           { path: 'solicitudes', name: 'panel-solicitudes', component: Solicitudes, meta: { title: 'Solicitudes' } },
           { path: 'solicitudes/:idSolicitud', name: 'panel-solicitud-detalle', component: SolicitudDetalle, meta: { title: 'Solicitud' } },
           { path: 'solicitudes/:idSolicitud/presupuesto', name: 'presupuesto-crear', component: PresupuestoForm, meta: { title: 'Enviar presupuesto' } },

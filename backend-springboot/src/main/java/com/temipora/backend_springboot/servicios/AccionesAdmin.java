@@ -34,6 +34,14 @@ public final class AccionesAdmin {
     public static final String TIPO_PRODUCTO_BAJA = "TIPO_PRODUCTO_BAJA";
     public static final String TIPO_PRODUCTO_REACTIVAR = "TIPO_PRODUCTO_REACTIVAR";
 
+    public static final String PRODUCTO_CREAR = "PRODUCTO_CREAR";
+    public static final String PRODUCTO_MODIFICAR = "PRODUCTO_MODIFICAR";
+    public static final String PRODUCTO_PAUSAR = "PRODUCTO_PAUSAR";
+    public static final String PRODUCTO_REACTIVAR = "PRODUCTO_REACTIVAR";
+    public static final String PRODUCTO_ARCHIVAR = "PRODUCTO_ARCHIVAR";
+    public static final String PRODUCTO_RESTAURAR = "PRODUCTO_RESTAURAR";
+    public static final String LEDGER_GENESIS = "LEDGER_GENESIS";
+
     public static final String TIPO_SERVICIO_CREAR = "TIPO_SERVICIO_CREAR";
     public static final String TIPO_SERVICIO_MODIFICAR = "TIPO_SERVICIO_MODIFICAR";
     public static final String TIPO_SERVICIO_BAJA = "TIPO_SERVICIO_BAJA";

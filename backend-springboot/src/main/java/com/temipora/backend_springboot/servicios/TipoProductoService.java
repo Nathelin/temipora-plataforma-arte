@@ -39,6 +39,12 @@ public class TipoProductoService {
             .toList();
     }
 
+    public List<TipoProductoDTO> listarActivos() {
+        return tipoProductoRepository.findByActivoTrueOrderByNombreAsc().stream()
+            .map(TipoProductoDTO::desdeTipoProducto)
+            .toList();
+    }
+
     @Transactional
     public TipoProductoDTO crear(TipoProductoRequest request) {
         validarNombreUnico(request.getNombre(), null);

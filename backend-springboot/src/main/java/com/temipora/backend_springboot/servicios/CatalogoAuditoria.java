@@ -89,6 +89,12 @@ public final class CatalogoAuditoria {
             AccionesAdmin.TIPO_PRODUCTO_MODIFICAR,
             AccionesAdmin.TIPO_PRODUCTO_BAJA,
             AccionesAdmin.TIPO_PRODUCTO_REACTIVAR,
+            AccionesAdmin.PRODUCTO_CREAR,
+            AccionesAdmin.PRODUCTO_MODIFICAR,
+            AccionesAdmin.PRODUCTO_PAUSAR,
+            AccionesAdmin.PRODUCTO_REACTIVAR,
+            AccionesAdmin.PRODUCTO_ARCHIVAR,
+            AccionesAdmin.PRODUCTO_RESTAURAR,
             AccionesAdmin.TIPO_SERVICIO_CREAR,
             AccionesAdmin.TIPO_SERVICIO_MODIFICAR,
             AccionesAdmin.TIPO_SERVICIO_BAJA,
@@ -134,7 +140,8 @@ public final class CatalogoAuditoria {
             AccionesAdmin.TERMINOS_ACEPTAR);
 
         registrar(CategoriaAuditoria.SISTEMA,
-            AccionesAdmin.COTIZACION_REFRESCAR);
+            AccionesAdmin.COTIZACION_REFRESCAR,
+            AccionesAdmin.LEDGER_GENESIS);
 
         criticas(
             AccionesAdmin.PRESUPUESTO_CREAR,
