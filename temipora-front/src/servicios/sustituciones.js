@@ -9,7 +9,7 @@ export const MOTIVOS = {
   SOLO_ESPERA: {
     titulo: 'Solo lista de espera',
     detalle:
-      'El artista recibe solicitudes únicamente en lista de espera. Podés anotarte o buscar a alguien con cupo ahora.',
+      '',
   },
   CERRADA: {
     titulo: 'Recepción cerrada',

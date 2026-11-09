@@ -254,7 +254,7 @@ onMounted(async () => {
             :disabled="eligiendo === idServicio"
             @click="solicitarEnCola"
           >
-            {{ esSoloEspera ? 'Unirme a la lista de espera' : 'Lista de espera' }}
+            {{ esSoloEspera ? 'Lista de espera' : 'Lista de espera' }}
           </button>
           <router-link
             :to="{ name: 'servicio-detalle', params: { id: idServicio } }"
@@ -321,7 +321,7 @@ onMounted(async () => {
               class="inline-flex min-h-10 items-center rounded-full border-2 border-coral/50 px-5 text-sm font-bold text-granate transition hover:border-coral hover:bg-coral hover:text-white"
               @click="solicitarEnCola"
             >
-              {{ esSoloEspera ? 'Unirme a la lista de espera' : 'Lista de espera' }}
+              {{ esSoloEspera ? 'Lista de espera' : 'Lista de espera' }}
             </button>
           </div>
         </div>

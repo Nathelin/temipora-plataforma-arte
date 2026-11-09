@@ -906,7 +906,8 @@ onBeforeUnmount(() => {
         <button
           v-if="paso < 5"
           type="button"
-          class="rounded-md bg-coral px-5 py-2.5 text-sm text-white hover:bg-rojizo transition shadow-sm"
+          class="rounded-md bg-coral px-5 py-2.5 text-sm text-white hover:bg-rojizo transition shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          :disabled="paso === 1 && (!terminosValidos || !aceptaTerminos)"
           @click="continuar"
         >
           Continuar →

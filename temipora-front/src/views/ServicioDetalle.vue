@@ -228,7 +228,7 @@ const esSoloEspera = computed(
 )
 
 const etiquetaCola = computed(() =>
-  esSoloEspera.value ? 'Unirme a la lista de espera' : 'Lista de espera',
+  esSoloEspera.value ? 'Lista de espera' : 'Lista de espera',
 )
 
 const tituloCola = computed(() =>
