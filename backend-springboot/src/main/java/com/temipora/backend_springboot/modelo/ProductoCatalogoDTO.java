@@ -10,8 +10,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Producto tal como se muestra en el catálogo público. Es deliberadamente
- * liviano: no incluye variantes completas, entregables ni datos de gestión.
+ * Producto tal como se muestra en el catálogo público. En los listados es
+ * liviano: las variantes, imágenes, licencia y etiquetas quedan vacías. El
+ * detalle (GET /api/productos/{id}) sí las completa con un subconjunto seguro
+ * para que la vista pública coincida con la vista previa del artista.
  */
 @Getter
 @Setter
@@ -47,10 +49,20 @@ public class ProductoCatalogoDTO {
     private boolean esPiezaUnica;
     private boolean disponible;
     private int cantidadVariantes;
+    private int cantidadVariantesDisponibles;
 
     private boolean contenidoSensible;
     private List<String> contenidosSensibles;
 
     private BigDecimal calificacionPromedio;
     private int cantidadResenias;
+
+    /** Solo en el detalle: galería completa ordenada. */
+    private List<ProductoImagenDTO> imagenes;
+    /** Solo en el detalle: variantes públicas (sin hash ni archivo original). */
+    private List<ProductoVarianteDTO> variantes;
+    /** Solo en el detalle: licencia vigente. */
+    private LicenciaProductoDTO licencia;
+    /** Solo en el detalle: etiquetas válidas asignadas. */
+    private List<EtiquetaDTO> etiquetas;
 }

@@ -3,31 +3,40 @@ package com.temipora.backend_springboot.servicios;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.DerechoTermino;
+import com.temipora.backend_springboot.modelo.DerechoTerminoDTO;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
+import com.temipora.backend_springboot.modelo.Etiqueta;
+import com.temipora.backend_springboot.modelo.EtiquetaDTO;
+import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
 import com.temipora.backend_springboot.modelo.FiltroProductoRequest;
+import com.temipora.backend_springboot.modelo.LicenciaProducto;
+import com.temipora.backend_springboot.modelo.LicenciaProductoDTO;
+import com.temipora.backend_springboot.modelo.LicenciaProductoDerecho;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.OrdenProducto;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Producto;
 import com.temipora.backend_springboot.modelo.ProductoCatalogoDTO;
+import com.temipora.backend_springboot.modelo.ProductoEtiqueta;
 import com.temipora.backend_springboot.modelo.ProductoImagen;
+import com.temipora.backend_springboot.modelo.ProductoImagenDTO;
+import com.temipora.backend_springboot.modelo.ProductoLedgerDTO;
 import com.temipora.backend_springboot.modelo.ProductoVariante;
+import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -47,18 +56,24 @@ public class ProductoCatalogoService {
 
     private final ProductoRepository productoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final EventoLedgerRepository eventoLedgerRepository;
     private final MonedaService monedaService;
     private final ConversionMonedaService conversionMonedaService;
+    private final LedgerService ledgerService;
 
     public ProductoCatalogoService(
             ProductoRepository productoRepository,
             UsuarioRepository usuarioRepository,
+            EventoLedgerRepository eventoLedgerRepository,
             MonedaService monedaService,
-            ConversionMonedaService conversionMonedaService) {
+            ConversionMonedaService conversionMonedaService,
+            LedgerService ledgerService) {
         this.productoRepository = productoRepository;
         this.usuarioRepository = usuarioRepository;
+        this.eventoLedgerRepository = eventoLedgerRepository;
         this.monedaService = monedaService;
         this.conversionMonedaService = conversionMonedaService;
+        this.ledgerService = ledgerService;
     }
 
     @Transactional(readOnly = true)
@@ -129,13 +144,155 @@ public class ProductoCatalogoService {
      */
     @Transactional(readOnly = true)
     public ProductoCatalogoDTO obtener(Long idProducto, Long viewerId) {
+        Producto producto = obtenerEntidadPublica(idProducto);
+        Moneda moneda = monedaPreferidaDe(viewerId);
+        ProductoCatalogoDTO dto = aDTO(producto, moneda, viewerId);
+        return completarDetalle(dto, producto, moneda);
+    }
+
+    /**
+     * Variantes visibles de un producto público. No expone hash, archivo
+     * original ni identificadores internos de propietario.
+     */
+    @Transactional(readOnly = true)
+    public PaginaDTO<ProductoVarianteDTO> obtenerVariantes(
+            Long idProducto, Long viewerId, int pagina, int tamano) {
+        Producto producto = obtenerEntidadPublica(idProducto);
+        Moneda moneda = monedaPreferidaDe(viewerId);
+        int paginaSegura = Math.max(pagina, 1);
+        int tamanoSeguro = Math.min(Math.max(tamano, 1), TAMANIO_MAXIMO);
+        Set<Long> conLedger = eventoLedgerRepository.findVariantesConLedger(
+            List.of(producto.getIdProducto()));
+
+        List<ProductoVarianteDTO> visibles = producto.getVariantes().stream()
+            .filter(variante -> variante.getEstado() != EstadoVariante.ARCHIVADO)
+            .sorted(Comparator.comparing(ProductoVariante::getOrden,
+                Comparator.nullsLast(Integer::compareTo)))
+            .map(variante -> aVarianteDTOPublica(variante, conLedger, producto, moneda))
+            .toList();
+
+        int total = visibles.size();
+        int desde = Math.min((paginaSegura - 1) * tamanoSeguro, total);
+        int hasta = Math.min(desde + tamanoSeguro, total);
+        int totalPaginas = total == 0
+            ? 1
+            : (int) Math.ceil((double) total / tamanoSeguro);
+
+        return PaginaDTO.<ProductoVarianteDTO>builder()
+            .contenido(visibles.subList(desde, hasta))
+            .pagina(paginaSegura)
+            .tamanio(tamanoSeguro)
+            .totalElementos(total)
+            .totalPaginas(totalPaginas)
+            .hayMas(hasta < total)
+            .build();
+    }
+
+    /** Historial de autenticidad del producto público. */
+    @Transactional(readOnly = true)
+    public ProductoLedgerDTO obtenerLedger(
+            Long idProducto, int pagina, int tamano) {
+        Producto producto = obtenerEntidadPublica(idProducto);
+        return ledgerService.verificarProducto(producto, pagina, tamano);
+    }
+
+    private Producto obtenerEntidadPublica(Long idProducto) {
         Producto producto = productoRepository.findByIdProducto(idProducto)
             .orElseThrow(() -> new NoSuchElementException(
                 "Producto no encontrado: " + idProducto));
         if (producto.getEstado() != EstadoProducto.DISPONIBLE) {
             throw new NoSuchElementException("Producto no encontrado: " + idProducto);
         }
-        return aDTO(producto, monedaPreferidaDe(viewerId), viewerId);
+        return producto;
+    }
+
+    /**
+     * Completa el DTO de detalle con la galería, las variantes públicas, la
+     * licencia vigente y las etiquetas válidas. Lo que se agrega acá nunca
+     * incluye huellas SHA-256, claves de archivo ni datos de gestión.
+     */
+    private ProductoCatalogoDTO completarDetalle(
+            ProductoCatalogoDTO dto, Producto producto, Moneda monedaDestino) {
+        List<ProductoVariante> variantes = producto.getVariantes().stream()
+            .filter(variante -> variante.getEstado() != EstadoVariante.ARCHIVADO)
+            .sorted(Comparator.comparing(ProductoVariante::getOrden,
+                Comparator.nullsLast(Integer::compareTo)))
+            .toList();
+        Set<Long> conLedger = eventoLedgerRepository.findVariantesConLedger(
+            List.of(producto.getIdProducto()));
+
+        dto.setImagenes(producto.getImagenes().stream()
+            .sorted(Comparator.comparing(ProductoImagen::getOrden,
+                Comparator.nullsLast(Integer::compareTo)))
+            .map(imagen -> ProductoImagenDTO.builder()
+                .idProductoImagen(imagen.getIdProductoImagen())
+                .url(imagen.getUrl())
+                .orden(imagen.getOrden())
+                .build())
+            .toList());
+        dto.setVariantes(variantes.stream()
+            .map(variante -> aVarianteDTOPublica(
+                variante, conLedger, producto, monedaDestino))
+            .toList());
+        dto.setLicencia(licenciaDTO(producto.licenciaVigente()));
+        dto.setEtiquetas(producto.getEtiquetas().stream()
+            .map(ProductoEtiqueta::getEtiqueta)
+            .filter(etiqueta -> etiqueta.getEstado() == EtiquetaEstado.VALIDA)
+            .sorted(Comparator.comparing(Etiqueta::getNombre,
+                String.CASE_INSENSITIVE_ORDER))
+            .map(EtiquetaDTO::desdeEtiqueta)
+            .toList());
+        dto.setCantidadVariantesDisponibles((int) variantes.stream()
+            .filter(ProductoVariante::estaDisponible)
+            .count());
+        return dto;
+    }
+
+    private ProductoVarianteDTO aVarianteDTOPublica(
+            ProductoVariante variante,
+            Set<Long> variantesConLedger,
+            Producto producto,
+            Moneda monedaDestino) {
+        return ProductoVarianteDTO.builder()
+            .idVariante(variante.getIdVariante())
+            .nombre(variante.getNombre())
+            .descripcion(variante.getDescripcion())
+            .precio(convertir(variante.getPrecio(), producto, monedaDestino))
+            .stockDisponible(variante.getStockDisponible())
+            .orden(variante.getOrden())
+            .estado(variante.getEstado())
+            .imagenUrl(variante.getImagenUrl())
+            .numeroEdicion(variante.getNumeroEdicion())
+            .nombrePropietario(variante.getPropietarioActual() != null
+                ? variante.getPropietarioActual().getNombreUsuario() : null)
+            .esUnica(variante.esUnica())
+            .tieneLedger(variante.getIdVariante() != null
+                && variantesConLedger.contains(variante.getIdVariante()))
+            .build();
+    }
+
+    private LicenciaProductoDTO licenciaDTO(LicenciaProducto licencia) {
+        if (licencia == null) {
+            return null;
+        }
+        List<DerechoTerminoDTO> derechos = licencia.getDerechos().stream()
+            .map(LicenciaProductoDerecho::getDerecho)
+            .filter(Objects::nonNull)
+            .sorted(Comparator.comparing(DerechoTermino::getOrden,
+                Comparator.nullsLast(Integer::compareTo)))
+            .map(DerechoTerminoDTO::desdeDerecho)
+            .toList();
+        return LicenciaProductoDTO.builder()
+            .idLicenciaProducto(licencia.getIdLicenciaProducto())
+            .version(licencia.getVersion())
+            .vigente(licencia.isVigente())
+            .derechos(derechos)
+            .permiteModificaciones(licencia.isPermiteModificaciones())
+            .requiereCredito(licencia.isRequiereCredito())
+            .porcentajeRegalia(licencia.getPorcentajeRegalia())
+            .textoAdicional(licencia.getTextoAdicional())
+            .permiteReventa(licencia.permiteReventa())
+            .build();
     }
 
     // ------------------------------------------------------------------
@@ -302,6 +459,24 @@ public class ProductoCatalogoService {
             return artista.getUrlFotoPerfilMiniatura();
         }
         return artista.getUrlFotoPerfil();
+    }
+
+    private BigDecimal convertir(
+            BigDecimal monto, Producto producto, Moneda monedaDestino) {
+        if (monto == null) {
+            return null;
+        }
+        if (monedaDestino == null || producto.getMoneda() == null
+                || Objects.equals(producto.getMoneda().getIdMoneda(),
+                    monedaDestino.getIdMoneda())) {
+            return monto.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal factor = conversionMonedaService.factor(
+            producto.getMoneda(), monedaDestino, LocalDateTime.now());
+        if (factor == null) {
+            return monto.setScale(2, RoundingMode.HALF_UP);
+        }
+        return monto.multiply(factor).setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal precioDesde(Producto producto, Moneda monedaDestino) {

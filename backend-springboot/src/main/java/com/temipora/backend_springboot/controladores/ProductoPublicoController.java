@@ -13,6 +13,8 @@ import com.temipora.backend_springboot.modelo.FiltroProductoRequest;
 import com.temipora.backend_springboot.modelo.OrdenProducto;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.ProductoCatalogoDTO;
+import com.temipora.backend_springboot.modelo.ProductoLedgerDTO;
+import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
 import com.temipora.backend_springboot.servicios.ProductoCatalogoService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -76,6 +78,25 @@ public class ProductoPublicoController {
             Authentication authentication) {
         return productoCatalogoService.obtener(
             idProducto, idVisor(authentication));
+    }
+
+    @GetMapping("/{idProducto}/variantes")
+    public PaginaDTO<ProductoVarianteDTO> variantes(
+            @PathVariable Long idProducto,
+            @RequestParam(defaultValue = "1") int pagina,
+            @RequestParam(defaultValue = "4") int tamano,
+            Authentication authentication) {
+        return productoCatalogoService.obtenerVariantes(
+            idProducto, idVisor(authentication), pagina, tamano);
+    }
+
+    @GetMapping("/{idProducto}/ledger")
+    public ProductoLedgerDTO ledger(
+            @PathVariable Long idProducto,
+            @RequestParam(defaultValue = "1") int pagina,
+            @RequestParam(defaultValue = "4") int tamano) {
+        return productoCatalogoService.obtenerLedger(
+            idProducto, pagina, tamano);
     }
 
     private Long idVisor(Authentication authentication) {

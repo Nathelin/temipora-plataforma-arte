@@ -103,6 +103,16 @@ export async function cargarProductoPublico(idProducto) {
   return res.data
 }
 
+export async function cargarVariantesProductoPublico(idProducto, params = {}) {
+  const res = await api.get(`/productos/${idProducto}/variantes`, { params })
+  return res.data
+}
+
+export async function cargarLedgerProductoPublico(idProducto, params = {}) {
+  const res = await api.get(`/productos/${idProducto}/ledger`, { params })
+  return res.data
+}
+
 export async function cargarProductosDeArtista(nombreUsuario) {
   const res = await api.get(`/productos/artista/${nombreUsuario}`)
   return res.data
