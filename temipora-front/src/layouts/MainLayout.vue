@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BrandLogo from '../components/BrandLogo.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
+import MenuTemaMovil from '../components/MenuTemaMovil.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
 import { useMensajes } from '../composables/useMensajes'
@@ -26,6 +27,7 @@ onMounted(async () => {
 
 const menuAbierto = ref(false)
 const menuMovilAbierto = ref(false)
+const temaMovilAbierto = ref(false)
 const contenedorMenu = ref(null)
 const contenedorNav = ref(null)
 
@@ -36,6 +38,9 @@ const puedeVerMisCompras = computed(() => estaLogueado.value && !esAdmin.value)
 const enMisCompras = computed(() => route.path.startsWith('/pedidos')
   || route.path.startsWith('/solicitudes'))
 const enPanel = computed(() => route.path.startsWith('/panel'))
+const enMensajes = computed(() => route.path.startsWith('/mensajes')
+  || route.path.startsWith('/panel/mensajes'))
+const enFavoritos = computed(() => route.path.startsWith('/favoritos'))
 
 const {
   noLeidos: mensajesNoLeidos,
@@ -68,6 +73,13 @@ function alternarMenu() {
   menuAbierto.value = !menuAbierto.value
 }
 
+function alternarMenuMovil() {
+  menuMovilAbierto.value = !menuMovilAbierto.value
+  if (!menuMovilAbierto.value) {
+    temaMovilAbierto.value = false
+  }
+}
+
 function clickDentroDe(event, contenedor) {
   if (!contenedor) {
     return false
@@ -88,6 +100,7 @@ function manejarTecla(event) {
   if (event.key === 'Escape') {
     menuAbierto.value = false
     menuMovilAbierto.value = false
+    temaMovilAbierto.value = false
   }
 }
 
@@ -174,27 +187,6 @@ function irAPerfil() {
               Productos
             </router-link>
             <router-link
-              v-if="estaLogueado && !esAdmin"
-              to="/mensajes"
-              class="relative inline-flex items-center gap-1 text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
-            >
-              Mensajes
-              <span
-                v-if="totalMensajes"
-                class="inline-flex min-w-4 items-center justify-center rounded-full bg-coral px-1 py-0.5 text-[10px] font-bold leading-none text-white"
-                :aria-label="`${totalMensajes} mensajes pendientes`"
-              >
-                {{ badgeMensajes }}
-              </span>
-            </router-link>
-            <router-link
-              v-if="estaLogueado"
-              to="/favoritos"
-              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
-            >
-              Favoritos
-            </router-link>
-            <router-link
               v-if="puedeVerMisCompras"
               to="/mis-compras"
               class="relative inline-flex items-center gap-2 rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-sm font-semibold text-coral transition hover:bg-coral/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
@@ -229,7 +221,30 @@ function irAPerfil() {
             <span class="transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true">→</span>
           </router-link>
 
-          <ThemeToggle />
+          <ThemeToggle class="hidden sm:inline-flex" />
+
+          <router-link
+            v-if="estaLogueado && !esAdmin"
+            to="/mensajes"
+            class="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-rosa/60 bg-blanco/70 text-granate transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+            :class="enMensajes ? 'ring-2 ring-coral/40' : ''"
+            :aria-current="enMensajes ? 'page' : undefined"
+            :aria-label="totalMensajes
+              ? `Mensajes, ${totalMensajes} pendientes`
+              : 'Mensajes'"
+            title="Mensajes"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
+            </svg>
+            <span
+              v-if="totalMensajes"
+              class="absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-coral px-1 py-0.5 text-[10px] font-bold leading-none text-white ring-2 ring-crema"
+              aria-hidden="true"
+            >
+              {{ badgeMensajes }}
+            </span>
+          </router-link>
 
           <PanelNotificaciones v-if="estaLogueado" />
 
@@ -289,6 +304,15 @@ function irAPerfil() {
                 </button>
                 <button
                   class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  :class="enFavoritos ? 'bg-rosa/20 font-semibold text-granate' : ''"
+                  role="menuitem"
+                  :aria-current="enFavoritos ? 'page' : undefined"
+                  @click="menuAbierto = false; router.push({ name: 'favoritos' })"
+                >
+                  Favoritos
+                </button>
+                <button
+                  class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
                   role="menuitem"
                   @click="menuAbierto = false; router.push({ name: 'configuracion-perfil' })"
                 >
@@ -319,7 +343,7 @@ function irAPerfil() {
               class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rosa/60 bg-blanco/70 text-granate transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
               :aria-expanded="menuMovilAbierto"
               aria-label="Abrir menú de navegación"
-              @click="menuMovilAbierto = !menuMovilAbierto"
+              @click="alternarMenuMovil"
             >
               <svg v-if="!menuMovilAbierto" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
                 <path d="M4 7h16M4 12h16M4 17h16" />
@@ -363,28 +387,6 @@ function irAPerfil() {
                 Productos
               </router-link>
               <router-link
-                v-if="estaLogueado && !esAdmin"
-                to="/mensajes"
-                class="flex w-full items-center justify-between gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                @click="menuMovilAbierto = false"
-              >
-                <span>Mensajes</span>
-                <span
-                  v-if="totalMensajes"
-                  class="rounded-full bg-coral px-1.5 py-0.5 text-[10px] font-bold leading-none text-white"
-                >
-                  {{ badgeMensajes }}
-                </span>
-              </router-link>
-              <router-link
-                v-if="estaLogueado"
-                to="/favoritos"
-                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                @click="menuMovilAbierto = false"
-              >
-                Favoritos
-              </router-link>
-              <router-link
                 v-if="puedeVerMisCompras"
                 to="/mis-compras"
                 class="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/25 bg-coral/10 px-4 py-3 text-sm font-semibold text-coral transition hover:bg-coral/15"
@@ -404,6 +406,12 @@ function irAPerfil() {
               </router-link>
 
               <div v-if="!estaLogueado" class="mt-1 border-t border-rosa/40 pt-1">
+                <MenuTemaMovil
+                  id-panel="selector-tema-movil-invitado"
+                  :abierto="temaMovilAbierto"
+                  @alternar="temaMovilAbierto = !temaMovilAbierto"
+                  @seleccionar="temaMovilAbierto = false"
+                />
                 <router-link
                   to="/login"
                   class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
@@ -421,6 +429,21 @@ function irAPerfil() {
               </div>
 
               <div v-else class="mt-1 border-t border-rosa/40 pt-1">
+                <button
+                  type="button"
+                  class="flex w-full items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  :class="enFavoritos ? 'bg-rosa/20 font-semibold text-granate' : ''"
+                  :aria-current="enFavoritos ? 'page' : undefined"
+                  @click="menuMovilAbierto = false; router.push({ name: 'favoritos' })"
+                >
+                  Favoritos
+                </button>
+                <MenuTemaMovil
+                  id-panel="selector-tema-movil"
+                  :abierto="temaMovilAbierto"
+                  @alternar="temaMovilAbierto = !temaMovilAbierto"
+                  @seleccionar="temaMovilAbierto = false"
+                />
                 <button
                   type="button"
                   class="flex w-full items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold text-rojizo transition hover:bg-rosa/20"
