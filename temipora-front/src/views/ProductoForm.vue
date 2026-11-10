@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
-import { acceptImagenes, validarImagen } from '../servicios/archivos'
+import { acceptImagenes, TAMANO_MAXIMO_BYTES, validarImagen } from '../servicios/archivos'
 import { formatearPrecio } from '../servicios/moneda'
 import {
   esIlimitada,
@@ -55,9 +55,15 @@ const error = ref('')
 const guardando = ref(false)
 const errorGuardado = ref('')
 const errores = ref([])
+const erroresCampo = ref({})
+const erroresVariantes = ref({})
+const MAX_IMAGENES_PRODUCTO = 60
+const MAX_MB_IMAGEN = TAMANO_MAXIMO_BYTES / (1024 * 1024)
 const subiendoImagen = ref(false)
 const progresoImagen = ref('')
 const errorImagen = ref('')
+const arrastrandoArchivos = ref(false)
+const arrastrandoImagen = ref(null)
 const visorAbierto = ref(false)
 const visorIndice = ref(0)
 const modalReventaAbierto = ref(false)
@@ -255,6 +261,7 @@ function mapearProducto(d) {
     sha256: variante.sha256 || '',
     claveArchivoOriginal: '',
     numeroEdicion: variante.numeroEdicion || null,
+    tieneLedger: !!variante.tieneLedger,
   }))
   if (!variantes.value.length) {
     variantes.value = [nuevaPresentacion()]
@@ -284,20 +291,27 @@ watch(() => form.value.idTipoProducto, (nuevo, anterior) => {
   }
 })
 
-async function subirImagen(event) {
-  const archivos = Array.from(event.target.files || [])
-  event.target.value = ''
+async function subirArchivos(archivos) {
   if (!archivos.length) return
+  const restantes = MAX_IMAGENES_PRODUCTO - form.value.imagenes.length
+  if (restantes <= 0) {
+    errorImagen.value = `Máximo ${MAX_IMAGENES_PRODUCTO} imágenes por publicación.`
+    return
+  }
 
+  const lote = archivos.slice(0, restantes)
   const validos = []
   const problemas = []
-  for (const archivo of archivos) {
+  for (const archivo of lote) {
     const problema = validarImagen(archivo)
     if (problema) {
       problemas.push(`${archivo.name}: ${problema}`)
     } else {
       validos.push(archivo)
     }
+  }
+  if (archivos.length > restantes) {
+    problemas.push(`Solo se pueden agregar ${restantes} imágenes más.`)
   }
   errorImagen.value = problemas.join(' · ')
   if (!validos.length) return
@@ -320,6 +334,47 @@ async function subirImagen(event) {
     subiendoImagen.value = false
     progresoImagen.value = ''
   }
+}
+
+function subirImagen(event) {
+  const archivos = Array.from(event.target.files || [])
+  event.target.value = ''
+  subirArchivos(archivos)
+}
+
+function soltarArchivos(event) {
+  arrastrandoArchivos.value = false
+  const archivos = Array.from(event.dataTransfer?.files || [])
+  subirArchivos(archivos)
+}
+
+function usarComoPortada(indice) {
+  if (indice === 0) return
+  const copia = [...form.value.imagenes]
+  const [portada] = copia.splice(indice, 1)
+  copia.unshift(portada)
+  form.value.imagenes = copia
+}
+
+function iniciarArrastreImagen(indice, event) {
+  arrastrandoImagen.value = indice
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', String(indice))
+}
+
+function soltarImagen(destino, event) {
+  event.preventDefault()
+  const origen = arrastrandoImagen.value
+  arrastrandoImagen.value = null
+  if (origen === null || origen === destino) return
+  const copia = [...form.value.imagenes]
+  const [movida] = copia.splice(origen, 1)
+  copia.splice(destino, 0, movida)
+  form.value.imagenes = copia
+}
+
+function terminarArrastreImagen() {
+  arrastrandoImagen.value = null
 }
 
 function quitarImagen(indice) {
@@ -351,89 +406,153 @@ function abrirVisor(indice) {
   visorAbierto.value = true
 }
 
+function limpiarErroresCampos() {
+  erroresCampo.value = {}
+  erroresVariantes.value = {}
+}
+
 function validarDatos() {
   const errs = []
-  if (!form.value.titulo.trim()) errs.push('El título es obligatorio.')
-  if (!form.value.idTipoProducto) errs.push('Elegí un tipo de producto.')
-  if (!form.value.idMedio) errs.push('Elegí un medio.')
-  if (!form.value.descripcion.trim()) errs.push('La descripción es obligatoria.')
+  if (!form.value.titulo.trim()) {
+    const mensaje = 'El título es obligatorio.'
+    errs.push(mensaje)
+    erroresCampo.value.titulo = mensaje
+  }
+  if (!form.value.idTipoProducto) {
+    const mensaje = 'Elegí un tipo de producto.'
+    errs.push(mensaje)
+    erroresCampo.value.idTipoProducto = mensaje
+  }
+  if (!form.value.idMedio) {
+    const mensaje = 'Elegí un medio.'
+    errs.push(mensaje)
+    erroresCampo.value.idMedio = mensaje
+  }
+  if (!form.value.descripcion.trim()) {
+    const mensaje = 'La descripción es obligatoria.'
+    errs.push(mensaje)
+    erroresCampo.value.descripcion = mensaje
+  }
   if (form.value.contenidoSensible && !form.value.contenidosSensibles.length) {
-    errs.push('Elegí qué tipo de contenido sensible puede aparecer.')
+    const mensaje = 'Elegí qué tipo de contenido sensible puede aparecer.'
+    errs.push(mensaje)
+    erroresCampo.value.contenidosSensibles = mensaje
   }
   return errs
 }
 
 function validarImagenes() {
-  return form.value.imagenes.length
-    ? []
-    : ['Agregá al menos una imagen del producto.']
+  const errs = []
+  if (!form.value.imagenes.length) {
+    const mensaje = 'Agregá al menos una imagen del producto.'
+    errs.push(mensaje)
+    erroresCampo.value.imagenes = mensaje
+  } else if (form.value.imagenes.length > MAX_IMAGENES_PRODUCTO) {
+    const mensaje = `Máximo ${MAX_IMAGENES_PRODUCTO} imágenes por publicación.`
+    errs.push(mensaje)
+    erroresCampo.value.imagenes = mensaje
+  }
+  return errs
 }
 
 function validarMoneda() {
-  return form.value.idMoneda ? [] : ['Elegí la moneda de la publicación.']
+  if (!form.value.idMoneda) {
+    const mensaje = 'Elegí la moneda de la publicación.'
+    erroresCampo.value.idMoneda = mensaje
+    return [mensaje]
+  }
+  return []
 }
 
 function validarVariantes() {
   const errs = []
+  erroresVariantes.value = {}
+
   if (variantes.value.length > 50) {
-    errs.push('Un producto puede tener como máximo 50 variantes.')
+    const mensaje = 'Un producto puede tener como máximo 50 variantes.'
+    errs.push(mensaje)
+    erroresCampo.value.variantes = mensaje
     return errs
   }
   if (!variantes.value.length) {
-    return ['Agregá al menos una presentación.']
+    const mensaje = 'Agregá al menos una presentación.'
+    errs.push(mensaje)
+    erroresCampo.value.variantes = mensaje
+    return errs
   }
+
   const presentacionUnica = variantes.value.length === 1
   const nombres = new Set()
   variantes.value.forEach((variante, indice) => {
+    const campos = {}
     if (!presentacionUnica) {
       const nombre = String(variante.nombre || '').trim()
       if (!nombre) {
-        errs.push(`La variante ${indice + 1} necesita un nombre.`)
+        campos.nombre = `La variante ${indice + 1} necesita un nombre.`
+        errs.push(campos.nombre)
       } else if (nombres.has(nombre.toLowerCase())) {
-        errs.push(`El nombre “${nombre}” está repetido.`)
+        campos.nombre = `El nombre “${nombre}” está repetido.`
+        errs.push(campos.nombre)
       } else {
         nombres.add(nombre.toLowerCase())
       }
     }
     if (!variante.precio || Number(variante.precio) <= 0) {
-      errs.push(presentacionUnica
+      campos.precio = presentacionUnica
         ? 'El precio debe ser mayor a cero.'
-        : `El precio de la variante ${indice + 1} debe ser mayor a cero.`)
+        : `El precio de la variante ${indice + 1} debe ser mayor a cero.`
+      errs.push(campos.precio)
     }
     if (variante.stockDisponible !== null
         && variante.stockDisponible !== undefined
         && Number(variante.stockDisponible) < 0) {
-      errs.push(`El stock de la variante ${indice + 1} no puede ser negativo.`)
+      campos.stock = `El stock de la variante ${indice + 1} no puede ser negativo.`
+      errs.push(campos.stock)
     }
     const tieneImagen = variante.urlImagen && variante.sha256
     const usaPortada = presentacionUnica && form.value.imagenes[0]?.url
     if (!tieneImagen && !usaPortada) {
-      errs.push(presentacionUnica
+      campos.imagen = presentacionUnica
         ? 'Subí una imagen de portada para la presentación.'
-        : `Subí la imagen de la variante ${indice + 1}.`)
+        : `Subí la imagen de la variante ${indice + 1}.`
+      errs.push(campos.imagen)
+    }
+    if (Object.keys(campos).length) {
+      erroresVariantes.value[indice] = campos
     }
   })
+
+  if (errs.length) {
+    erroresCampo.value.variantes = 'Revisá las variantes marcadas.'
+  }
   return errs
 }
 
 function validarLicencia() {
   const errs = []
   if (!licencia.value.idsDerechos.length) {
-    errs.push('Elegí al menos un uso permitido para la licencia.')
+    const mensaje = 'Elegí al menos un uso permitido para la licencia.'
+    errs.push(mensaje)
+    erroresCampo.value.licencia = mensaje
   }
   if (derechoReventa.value && !hayVarianteUnica.value) {
-    errs.push('Para habilitar la reventa necesitás al menos una presentación con stock 1.')
+    const mensaje = 'Para habilitar la reventa necesitás al menos una presentación con stock 1.'
+    errs.push(mensaje)
+    erroresCampo.value.licencia = mensaje
   }
   if (derechoReventa.value) {
     const regalia = Number(licencia.value.porcentajeRegalia || 0)
     if (regalia < 0 || regalia > 10) {
-      errs.push('La regalía debe estar entre 0 y 10%.')
+      const mensaje = 'La regalía debe estar entre 0 y 10%.'
+      errs.push(mensaje)
+      erroresCampo.value.porcentajeRegalia = mensaje
     }
   }
   return errs
 }
 
 function validarPasoActual() {
+  limpiarErroresCampos()
   let problemas = []
   if (paso.value === 1) problemas = [...validarDatos(), ...validarImagenes()]
   else if (paso.value === 2) problemas = [...validarMoneda(), ...validarVariantes()]
@@ -445,6 +564,7 @@ function validarPasoActual() {
 }
 
 function validarTodo() {
+  limpiarErroresCampos()
   const datos = [...validarDatos(), ...validarImagenes()]
   if (datos.length) {
     errores.value = datos
@@ -481,6 +601,7 @@ function siguiente() {
 
 function anterior() {
   errores.value = []
+  limpiarErroresCampos()
   if (paso.value > 1) {
     paso.value--
     irAlPrincipio()
@@ -490,6 +611,7 @@ function anterior() {
 function irAPaso(n) {
   if (n < paso.value) {
     errores.value = []
+    limpiarErroresCampos()
     paso.value = n
     irAlPrincipio()
   }
@@ -497,6 +619,7 @@ function irAPaso(n) {
 
 function irAEditar(n) {
   errores.value = []
+  limpiarErroresCampos()
   errorGuardado.value = ''
   paso.value = n
   irAlPrincipio()
@@ -571,6 +694,7 @@ async function guardar() {
       await api.post('/mis-productos', payload)
     }
     estadoGuardado.value = instantanea()
+    limpiarCambios()
     router.push('/panel/productos')
   } catch (e) {
     errorGuardado.value = e.response?.data?.message
@@ -726,8 +850,12 @@ onBeforeUnmount(() => {
                   type="text"
                   maxlength="100"
                   placeholder="Ej. Plancha de adoptables de otoño"
+                  :aria-invalid="!!erroresCampo.titulo"
                   class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
                 />
+                <p v-if="erroresCampo.titulo" class="mt-1 text-xs font-medium text-rojizo">
+                  {{ erroresCampo.titulo }}
+                </p>
               </div>
 
               <div class="grid gap-6 sm:grid-cols-2">
@@ -748,6 +876,9 @@ onBeforeUnmount(() => {
                       {{ tipo.nombre }}
                     </option>
                   </select>
+                  <p v-if="erroresCampo.idTipoProducto" class="mt-1 text-xs font-medium text-rojizo">
+                    {{ erroresCampo.idTipoProducto }}
+                  </p>
                   <div
                     v-if="tipoSeleccionado?.descripcion"
                     class="mt-2 rounded-lg bg-crema/60 px-3 py-2 text-xs leading-relaxed text-cafe/65"
@@ -776,6 +907,9 @@ onBeforeUnmount(() => {
                       {{ medio.nombre }}
                     </option>
                   </select>
+                  <p v-if="erroresCampo.idMedio" class="mt-1 text-xs font-medium text-rojizo">
+                    {{ erroresCampo.idMedio }}
+                  </p>
                   <div
                     v-if="medioSeleccionado?.descripcion"
                     class="mt-2 rounded-lg bg-crema/60 px-3 py-2 text-xs leading-relaxed text-cafe/65"
@@ -810,6 +944,9 @@ onBeforeUnmount(() => {
                 <p class="mt-1 text-right text-xs text-cafe/50">
                   {{ form.descripcion.length }}/500
                 </p>
+                <p v-if="erroresCampo.descripcion" class="mt-1 text-xs font-medium text-rojizo">
+                  {{ erroresCampo.descripcion }}
+                </p>
               </div>
 
               <div class="rounded-2xl border border-rosa/60 bg-crema/50 p-5">
@@ -836,6 +973,9 @@ onBeforeUnmount(() => {
                     {{ tipo.texto }}
                   </label>
                 </div>
+                <p v-if="erroresCampo.contenidosSensibles" class="mt-2 text-xs font-medium text-rojizo">
+                  {{ erroresCampo.contenidosSensibles }}
+                </p>
               </div>
             </div>
 
@@ -852,21 +992,37 @@ onBeforeUnmount(() => {
                 </button>
               </div>
               <p class="mt-1 text-sm text-cafe/60">
-                La primera imagen será la portada. La galería se reutiliza para
-                asignar imágenes a las variantes sin volver a subirlas.
+                La primera imagen es la portada. Podés cambiarla con “Usar como
+                portada”. La galería se reutiliza para las variantes sin volver a
+                subirlas.
               </p>
 
-              <div class="mt-4 rounded-2xl border border-dashed border-rosa/70 bg-crema/40 p-6 text-center">
+              <div
+                class="mt-4 rounded-2xl border border-dashed p-6 text-center transition"
+                :class="arrastrandoArchivos
+                  ? 'border-coral bg-rosa/20'
+                  : 'border-rosa/70 bg-crema/40'"
+                @dragenter.prevent="arrastrandoArchivos = true"
+                @dragover.prevent="arrastrandoArchivos = true"
+                @dragleave.prevent="arrastrandoArchivos = false"
+                @drop.prevent="soltarArchivos"
+              >
                 <p class="text-sm font-medium text-granate">
-                  Subí las imágenes de la publicación
+                  Arrastrá y soltá imágenes acá
                 </p>
                 <p class="mt-1 text-xs text-cafe/55">
-                  Se guarda el original privado y una preview pública optimizada.
-                  Podés seleccionar varias imágenes a la vez.
+                  o elegí archivos desde tu dispositivo. Se guarda el original
+                  privado y una preview pública optimizada.
+                </p>
+                <p class="mt-2 text-[11px] text-cafe/45">
+                  JPG, PNG o WebP · hasta {{ MAX_MB_IMAGEN }} MB por imagen ·
+                  {{ form.imagenes.length }}/{{ MAX_IMAGENES_PRODUCTO }} imágenes
                 </p>
                 <label
                   class="mt-4 inline-flex cursor-pointer items-center justify-center rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-rojizo"
-                  :class="subiendoImagen ? 'pointer-events-none opacity-50' : ''"
+                  :class="subiendoImagen || form.imagenes.length >= MAX_IMAGENES_PRODUCTO
+                    ? 'pointer-events-none opacity-50'
+                    : ''"
                 >
                   {{ subiendoImagen ? (progresoImagen || 'Subiendo...') : 'Elegir imágenes' }}
                   <input
@@ -887,7 +1043,13 @@ onBeforeUnmount(() => {
                 <article
                   v-for="(imagen, indice) in form.imagenes"
                   :key="`${imagen.url}-${indice}`"
-                  class="overflow-hidden rounded-2xl border border-rosa/60 bg-blanco shadow-sm"
+                  draggable="true"
+                  class="cursor-move overflow-hidden rounded-2xl border border-rosa/60 bg-blanco shadow-sm transition"
+                  :class="arrastrandoImagen === indice ? 'opacity-50 ring-2 ring-coral/40' : ''"
+                  @dragstart="iniciarArrastreImagen(indice, $event)"
+                  @dragover.prevent
+                  @drop="soltarImagen(indice, $event)"
+                  @dragend="terminarArrastreImagen"
                 >
                   <button
                     type="button"
@@ -900,43 +1062,57 @@ onBeforeUnmount(() => {
                       class="aspect-square w-full object-cover"
                     />
                   </button>
-                  <div class="flex items-center justify-between gap-2 px-3 py-2">
-                    <span class="text-[11px] font-semibold text-cafe/55">
-                      {{ indice === 0 ? 'Portada' : `Galería ${indice}` }}
-                    </span>
-                    <div class="flex items-center gap-1">
-                      <button
-                        type="button"
-                        class="rounded px-1.5 py-0.5 text-xs text-cafe/60 transition hover:bg-rosa/20 disabled:opacity-30"
-                        :disabled="indice === 0"
-                        aria-label="Mover imagen a la izquierda"
-                        @click="moverImagen(indice, -1)"
-                      >
-                        ←
-                      </button>
-                      <button
-                        type="button"
-                        class="rounded px-1.5 py-0.5 text-xs text-cafe/60 transition hover:bg-rosa/20 disabled:opacity-30"
-                        :disabled="indice === form.imagenes.length - 1"
-                        aria-label="Mover imagen a la derecha"
-                        @click="moverImagen(indice, 1)"
-                      >
-                        →
-                      </button>
-                      <button
-                        type="button"
-                        class="rounded px-1.5 py-0.5 text-xs text-rojizo/80 transition hover:bg-rojizo/5 hover:text-rojizo"
-                        @click="quitarImagen(indice)"
-                      >
-                        ×
-                      </button>
+                  <div class="px-3 py-2">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-[11px] font-semibold text-cafe/55">
+                        {{ indice === 0 ? 'Portada' : `Galería ${indice}` }}
+                      </span>
+                      <div class="flex items-center gap-1">
+                        <button
+                          type="button"
+                          class="rounded px-1.5 py-0.5 text-xs text-cafe/60 transition hover:bg-rosa/20 disabled:opacity-30"
+                          :disabled="indice === 0"
+                          aria-label="Mover imagen a la izquierda"
+                          @click.stop="moverImagen(indice, -1)"
+                        >
+                          ←
+                        </button>
+                        <button
+                          type="button"
+                          class="rounded px-1.5 py-0.5 text-xs text-cafe/60 transition hover:bg-rosa/20 disabled:opacity-30"
+                          :disabled="indice === form.imagenes.length - 1"
+                          aria-label="Mover imagen a la derecha"
+                          @click.stop="moverImagen(indice, 1)"
+                        >
+                          →
+                        </button>
+                        <button
+                          type="button"
+                          class="rounded px-1.5 py-0.5 text-xs text-rojizo/80 transition hover:bg-rojizo/5 hover:text-rojizo"
+                          @click.stop="quitarImagen(indice)"
+                        >
+                          ×
+                        </button>
+                      </div>
                     </div>
+                    <button
+                      v-if="indice !== 0"
+                      type="button"
+                      class="mt-1 text-[11px] font-medium text-coral transition hover:text-rojizo"
+                      @click.stop="usarComoPortada(indice)"
+                    >
+                      Usar como portada
+                    </button>
                   </div>
                 </article>
               </div>
 
               <p v-else class="mt-3 text-center text-sm text-cafe/50">
                 Todavía no subiste imágenes.
+              </p>
+
+              <p v-if="erroresCampo.imagenes" class="mt-2 text-xs font-medium text-rojizo">
+                {{ erroresCampo.imagenes }}
               </p>
             </div>
 
@@ -978,7 +1154,14 @@ onBeforeUnmount(() => {
                   otra, archivá esta publicación y creá una nueva.
                 </template>
               </p>
+              <p v-if="erroresCampo.idMoneda" class="mt-1 text-xs font-medium text-rojizo">
+                {{ erroresCampo.idMoneda }}
+              </p>
             </div>
+
+            <p v-if="erroresCampo.variantes" class="text-xs font-medium text-rojizo">
+              {{ erroresCampo.variantes }}
+            </p>
 
             <SelectorVariantes
               v-model="variantes"
@@ -986,6 +1169,7 @@ onBeforeUnmount(() => {
               :es-adoptable="esAdoptable"
               :imagen-portada="form.imagenes[0]?.url || ''"
               :imagenes-galeria="form.imagenes"
+              :errores-variantes="erroresVariantes"
               @agregar-imagen="agregarImagenDesdeVariante"
             />
           </section>
@@ -1079,6 +1263,10 @@ onBeforeUnmount(() => {
               </label>
             </div>
 
+            <p v-if="erroresCampo.licencia" class="text-xs font-medium text-rojizo">
+              {{ erroresCampo.licencia }}
+            </p>
+
             <div v-if="derechoReventa" class="rounded-2xl border border-coral/30 bg-rosa/15 p-5">
               <label class="mb-2 block text-sm font-medium text-granate">
                 Regalía por reventa (%)
@@ -1094,6 +1282,9 @@ onBeforeUnmount(() => {
               <p class="mt-2 text-xs leading-relaxed text-cafe/55">
                 Porcentaje que recibís cada vez que se revende la pieza única.
                 0% significa reventa sin regalía. Máximo 10%.
+              </p>
+              <p v-if="erroresCampo.porcentajeRegalia" class="mt-1 text-xs font-medium text-rojizo">
+                {{ erroresCampo.porcentajeRegalia }}
               </p>
             </div>
 

@@ -777,6 +777,7 @@ async function guardar() {
     }
 
     estadoGuardado.value = instantanea()
+    limpiarCambios()
     irAlListado()
   } catch (e) {
     errorGuardado.value = e.response?.data?.message || 'No se pudo guardar el servicio.'

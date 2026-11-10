@@ -36,6 +36,7 @@ public class ProductoRequest {
     private Set<@NotNull ContenidoSensible> contenidosSensibles;
 
     @NotEmpty(message = "Debés agregar al menos una imagen del producto.")
+    @Size(max = 60, message = "Un producto puede tener como máximo 60 imágenes.")
     private List<@Valid ProductoImagenRequest> imagenes;
 
     @NotEmpty(message = "Debés agregar al menos una variante.")

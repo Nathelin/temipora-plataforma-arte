@@ -508,8 +508,7 @@ router.beforeEach(async (to, from) => {
 })
 
 router.beforeEach(async (to, from) => {
-  const saliendoDeConfig = from.path.startsWith('/configuracion') && to.path !== from.path
-  if (!saliendoDeConfig || !hayCambiosConfig.value) {
+  if (to.path === from.path || !hayCambiosConfig.value) {
     return true
   }
 

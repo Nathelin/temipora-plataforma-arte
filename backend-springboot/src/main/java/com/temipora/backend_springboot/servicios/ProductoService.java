@@ -70,6 +70,7 @@ public class ProductoService {
     private static final String ENTIDAD = "Producto";
     private static final BigDecimal REGALIA_MAXIMA = new BigDecimal("10.00");
     private static final int MAX_VARIANTES = 50;
+    private static final int MAX_IMAGENES = 60;
     private static final List<CampoAuditado> CAMPOS = List.of(
         CampoAuditado.de("titulo", "Título"),
         CampoAuditado.de("descripcion", "Descripción"),
@@ -470,6 +471,10 @@ public class ProductoService {
         if (request.getImagenes() == null || request.getImagenes().isEmpty()) {
             throw new IllegalArgumentException(
                 "Debés agregar al menos una imagen del producto.");
+        }
+        if (request.getImagenes().size() > MAX_IMAGENES) {
+            throw new IllegalArgumentException(
+                "Un producto puede tener como máximo " + MAX_IMAGENES + " imágenes.");
         }
         TipoProducto tipo = tipoProductoRepository
             .findByIdTipoProducto(request.getIdTipoProducto())

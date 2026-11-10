@@ -10,6 +10,7 @@ const props = defineProps({
   esAdoptable: { type: Boolean, default: false },
   imagenPortada: { type: String, default: '' },
   imagenesGaleria: { type: Array, default: () => [] },
+  erroresVariantes: { type: Object, default: () => ({}) },
 })
 
 const emit = defineEmits(['update:modelValue', 'agregar-imagen'])
@@ -32,6 +33,9 @@ const indiceGaleria = ref(null)
 const variantes = computed(() => props.modelValue)
 const esPresentacionUnica = computed(() => variantes.value.length === 1)
 const hayMasImagenes = computed(() => props.imagenesGaleria.length > 3)
+const imagenesAsignables = computed(
+  () => Math.max(0, props.imagenesGaleria.length - 1),
+)
 const textoBotonAdoptables = computed(() => {
   const total = Math.max(1, Math.min(50, Number(cantidadAdoptables.value) || 1))
   return `Ajustar a ${total} adoptable${total === 1 ? '' : 's'}`
@@ -100,6 +104,34 @@ function aplicarPrecioATodas() {
     ...variante,
     precio: precioMasivo.value,
   })))
+}
+
+function asignarImagenesEnOrden() {
+  const disponibles = props.imagenesGaleria.slice(1)
+  if (!disponibles.length) {
+    error.value = 'No hay imágenes de galería además de la portada.'
+    return
+  }
+  confirmacion.value = null
+  let conLedger = 0
+  const copia = props.modelValue.map((variante, indice) => {
+    if (variante.tieneLedger) {
+      conLedger++
+      return variante
+    }
+    const imagen = disponibles[indice]
+    if (!imagen) return variante
+    return {
+      ...variante,
+      urlImagen: imagen.url,
+      sha256: imagen.sha256,
+      claveArchivoOriginal: imagen.claveArchivoOriginal || '',
+    }
+  })
+  error.value = conLedger
+    ? 'Las piezas únicas ya registradas conservan su imagen.'
+    : ''
+  emit('update:modelValue', copia)
 }
 
 function tieneDatos(variante) {
@@ -255,6 +287,12 @@ function seleccionarDesdeGaleria(imagen) {
 function seleccionarImagen(indice, imagen) {
   confirmacion.value = null
   if (!imagen?.url || !imagen?.sha256) return
+  const varianteActual = props.modelValue[indice]
+  if (varianteActual?.tieneLedger
+      && varianteActual.sha256 !== imagen.sha256) {
+    error.value = 'La imagen de una pieza única ya registrada no se puede cambiar.'
+    return
+  }
   const copia = props.modelValue.map((variante, i) =>
     i === indice
       ? {
@@ -265,6 +303,7 @@ function seleccionarImagen(indice, imagen) {
         }
       : variante,
   )
+  error.value = ''
   emit('update:modelValue', copia)
 }
 
@@ -272,6 +311,10 @@ async function subirImagen(event, indice) {
   const archivo = event.target.files?.[0] || null
   event.target.value = ''
   if (!archivo) return
+  if (props.modelValue[indice]?.tieneLedger) {
+    error.value = 'La imagen de una pieza única ya registrada no se puede cambiar.'
+    return
+  }
 
   const problema = validarImagen(archivo)
   if (problema) {
@@ -440,6 +483,27 @@ async function subirImagen(event, indice) {
       </div>
     </div>
 
+    <div
+      v-if="!esPresentacionUnica"
+      class="flex flex-col gap-3 rounded-2xl border border-rosa/60 bg-crema/50 p-4 sm:flex-row sm:items-end sm:justify-between"
+    >
+      <div>
+        <p class="text-sm font-semibold text-granate">Imágenes de las variantes</p>
+        <p class="mt-1 text-xs leading-relaxed text-cafe/55">
+          Asigna en orden las {{ imagenesAsignables }} imágenes de la galería,
+          salteando la portada.
+        </p>
+      </div>
+      <button
+        type="button"
+        class="rounded-lg border border-coral/40 bg-blanco px-4 py-2 text-sm font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-40"
+        :disabled="imagenesAsignables === 0"
+        @click="asignarImagenesEnOrden"
+      >
+        Asignar en orden
+      </button>
+    </div>
+
     <!-- Presentación única -->
     <article
       v-if="esPresentacionUnica"
@@ -467,6 +531,9 @@ async function subirImagen(event, indice) {
                 </span>
               </div>
               <p class="mt-1 text-[11px] text-cafe/45">{{ precioVisible(variantes[0]) }}</p>
+              <p v-if="erroresVariantes[0]?.precio" class="mt-1 text-xs font-medium text-rojizo">
+                {{ erroresVariantes[0].precio }}
+              </p>
             </div>
 
             <div>
@@ -502,12 +569,18 @@ async function subirImagen(event, indice) {
               >
                 Se vende una sola unidad. Si habilitás la reventa, puede transferirse.
               </p>
+              <p v-if="erroresVariantes[0]?.stock" class="mt-1 text-xs font-medium text-rojizo">
+                {{ erroresVariantes[0].stock }}
+              </p>
             </div>
           </div>
 
           <p class="rounded-xl bg-crema/60 px-3 py-2 text-xs leading-relaxed text-cafe/60">
             La imagen de la presentación será la portada de la publicación.
             Si querés una imagen distinta, agregá una segunda presentación.
+          </p>
+          <p v-if="erroresVariantes[0]?.imagen" class="text-xs font-medium text-rojizo">
+            {{ erroresVariantes[0].imagen }}
           </p>
         </div>
 
@@ -586,6 +659,9 @@ async function subirImagen(event, indice) {
                 class="w-full rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
                 @input="actualizar(indice, 'nombre', $event.target.value)"
               />
+              <p v-if="erroresVariantes[indice]?.nombre" class="mt-1 text-xs font-medium text-rojizo">
+                {{ erroresVariantes[indice].nombre }}
+              </p>
             </div>
             <div>
               <label class="mb-1.5 block text-xs font-medium text-cafe/70">
@@ -606,6 +682,9 @@ async function subirImagen(event, indice) {
                 </span>
               </div>
               <p class="mt-1 text-[11px] text-cafe/45">{{ precioVisible(variante) }}</p>
+              <p v-if="erroresVariantes[indice]?.precio" class="mt-1 text-xs font-medium text-rojizo">
+                {{ erroresVariantes[indice].precio }}
+              </p>
             </div>
           </div>
 
@@ -648,6 +727,9 @@ async function subirImagen(event, indice) {
               class="mt-2 w-28 rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
               @input="onStockInput(indice, $event)"
             />
+            <p v-if="erroresVariantes[indice]?.stock" class="mt-1 text-xs font-medium text-rojizo">
+              {{ erroresVariantes[indice].stock }}
+            </p>
           </div>
         </div>
 
@@ -715,6 +797,9 @@ async function subirImagen(event, indice) {
               @change="subirImagen($event, indice)"
             />
           </label>
+          <p v-if="erroresVariantes[indice]?.imagen" class="mt-1 text-xs font-medium text-rojizo">
+            {{ erroresVariantes[indice].imagen }}
+          </p>
         </div>
       </div>
     </article>
