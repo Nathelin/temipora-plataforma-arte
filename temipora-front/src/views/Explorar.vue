@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { cargarCatalogoProductos } from '../servicios/productos'
@@ -40,6 +40,30 @@ const productosGrilla = computed(() => (
 ))
 
 const chips = computed(() => tiposProducto.value.slice(0, MAX_CHIPS))
+
+// Carrusel de servicios: una sola fila con flechas en desktop.
+// En mobile el scroll es táctil y las flechas se ocultan.
+const carruselServicios = ref(null)
+const puedeIzquierda = ref(false)
+const puedeDerecha = ref(false)
+
+function actualizarFlechas() {
+  const el = carruselServicios.value
+  if (!el) {
+    puedeIzquierda.value = false
+    puedeDerecha.value = false
+    return
+  }
+  puedeIzquierda.value = el.scrollLeft > 4
+  puedeDerecha.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 4
+}
+
+function desplazarServicios(direccion) {
+  const el = carruselServicios.value
+  if (!el) return
+  const paso = Math.max(el.clientWidth * 0.8, 240)
+  el.scrollBy({ left: paso * direccion, behavior: 'smooth' })
+}
 
 const ETIQUETAS_SENSIBLE = {
   VIOLENCIA: 'Violencia',
@@ -199,6 +223,11 @@ async function alternarFavorito(tipo, item) {
 onMounted(() => {
   cargarFavoritos()
   cargar()
+})
+
+watch(serviciosGrilla, async () => {
+  await nextTick()
+  actualizarFlechas()
 })
 </script>
 
@@ -379,93 +408,138 @@ onMounted(() => {
               Encargá una pieza hecha a tu medida.
             </p>
           </div>
-          <router-link
-            to="/servicios"
-            class="text-sm font-bold text-acento underline decoration-acento/40 underline-offset-4 transition hover:text-acento-hover"
-          >
-            Ver todos los servicios →
-          </router-link>
         </div>
 
-        <div class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-          <article
-            v-for="servicio in serviciosGrilla"
-            :key="servicio.idServicio"
-            class="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-borde/60 bg-superficie shadow-sm transition hover:-translate-y-1 hover:border-acento/40"
-            @click="irAServicio(servicio.idServicio)"
+        <div class="relative mt-5">
+          <button
+            v-if="puedeIzquierda"
+            type="button"
+            class="absolute -left-3 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-borde/60 bg-superficie text-granate shadow-md transition hover:bg-superficie-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acento/60 lg:flex"
+            aria-label="Ver servicios anteriores"
+            @click="desplazarServicios(-1)"
           >
-            <div class="relative aspect-[4/5] overflow-hidden bg-rosa/20">
-              <img
-                v-if="servicio.imagenPortada"
-                :src="servicio.imagenPortada"
-                :alt="servicio.nombre"
-                class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
-                :class="servicio.requiereAdvertencia ? 'scale-105 blur-[18px]' : ''"
-              />
-              <span
-                v-if="servicio.requiereAdvertencia"
-                class="pointer-events-none absolute inset-0 flex items-center justify-center bg-granate/35 px-3 text-center text-[11px] font-semibold text-inverso-contraste"
-                :title="descripcionAccesibleSensible(servicio)"
-              >
-                Contenido sensible
-              </span>
-              <button
-                type="button"
-                class="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border shadow-sm backdrop-blur-sm transition hover:scale-105"
-                :class="favoritosServicios.has(servicio.idServicio)
-                  ? 'border-acento bg-acento text-acento-contraste'
-                  : 'border-white/70 bg-superficie/95 text-acento hover:bg-acento hover:text-acento-contraste'"
-                :disabled="actualizando.has(clave('servicio', servicio.idServicio))"
-                :aria-pressed="favoritosServicios.has(servicio.idServicio)"
-                :aria-label="favoritosServicios.has(servicio.idServicio)
-                  ? `Quitar ${servicio.nombre} de tus favoritos`
-                  : `Agregar ${servicio.nombre} a tus favoritos`"
-                @click.stop="alternarFavorito('servicio', servicio)"
-              >
-                <svg
-                  class="h-4 w-4"
-                  viewBox="0 0 24 24"
-                  :fill="favoritosServicios.has(servicio.idServicio) ? 'currentColor' : 'none'"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  aria-hidden="true"
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
+
+          <div
+            ref="carruselServicios"
+            class="-mx-1 flex snap-x snap-mandatory gap-5 overflow-x-auto px-1 pb-3 lg:scroll-smooth lg:pb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            role="list"
+            aria-label="Servicios destacados"
+            @scroll.passive="actualizarFlechas"
+          >
+            <article
+              v-for="servicio in serviciosGrilla"
+              :key="servicio.idServicio"
+              role="listitem"
+              class="group w-[240px] shrink-0 snap-start cursor-pointer overflow-hidden rounded-2xl border border-borde/60 bg-superficie shadow-sm transition hover:-translate-y-1 hover:border-acento/40 sm:w-[260px]"
+              @click="irAServicio(servicio.idServicio)"
+            >
+              <div class="relative aspect-[4/5] overflow-hidden bg-rosa/20">
+                <img
+                  v-if="servicio.imagenPortada"
+                  :src="servicio.imagenPortada"
+                  :alt="servicio.nombre"
+                  class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+                  :class="servicio.requiereAdvertencia ? 'scale-105 blur-[18px]' : ''"
+                />
+                <span
+                  v-if="servicio.requiereAdvertencia"
+                  class="pointer-events-none absolute inset-0 flex items-center justify-center bg-granate/35 px-3 text-center text-[11px] font-semibold text-inverso-contraste"
+                  :title="descripcionAccesibleSensible(servicio)"
                 >
-                  <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z" />
-                </svg>
-              </button>
-              <span
-                v-if="servicio.descuentoOfertaPorcentaje > 0"
-                class="absolute bottom-3 left-3 rounded-full bg-coral px-2.5 py-1 text-[11px] font-extrabold text-white shadow-sm"
-              >
-                -{{ servicio.descuentoOfertaPorcentaje }}%
-              </span>
-            </div>
-
-            <div class="flex flex-1 flex-col p-4">
-              <h3 class="line-clamp-1 font-display text-base font-bold leading-snug text-granate">
-                {{ servicio.nombre }}
-              </h3>
-              <button
-                type="button"
-                class="mt-2 flex w-fit items-center gap-2 text-xs font-medium text-cafe/70 transition hover:text-acento"
-                @click.stop="irAPerfil(servicio.nombreArtista)"
-              >
-                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-rosa/40 text-[10px] font-bold text-granate">
-                  {{ (servicio.nombreArtista || '?').charAt(0).toUpperCase() }}
+                  Contenido sensible
                 </span>
-                @{{ servicio.nombreArtista }}
-              </button>
+                <button
+                  type="button"
+                  class="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border shadow-sm backdrop-blur-sm transition hover:scale-105"
+                  :class="favoritosServicios.has(servicio.idServicio)
+                    ? 'border-acento bg-acento text-acento-contraste'
+                    : 'border-white/70 bg-superficie/95 text-acento hover:bg-acento hover:text-acento-contraste'"
+                  :disabled="actualizando.has(clave('servicio', servicio.idServicio))"
+                  :aria-pressed="favoritosServicios.has(servicio.idServicio)"
+                  :aria-label="favoritosServicios.has(servicio.idServicio)
+                    ? `Quitar ${servicio.nombre} de tus favoritos`
+                    : `Agregar ${servicio.nombre} a tus favoritos`"
+                  @click.stop="alternarFavorito('servicio', servicio)"
+                >
+                  <svg
+                    class="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    :fill="favoritosServicios.has(servicio.idServicio) ? 'currentColor' : 'none'"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    aria-hidden="true"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z" />
+                  </svg>
+                </button>
+                <span
+                  v-if="servicio.descuentoOfertaPorcentaje > 0"
+                  class="absolute bottom-3 left-3 rounded-full bg-coral px-2.5 py-1 text-[11px] font-extrabold text-white shadow-sm"
+                >
+                  -{{ servicio.descuentoOfertaPorcentaje }}%
+                </span>
+              </div>
 
-              <div class="mt-auto flex items-baseline gap-2 pt-3">
-                <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-cafe/45">Desde</span>
-                <span class="font-display text-lg font-extrabold text-acento">{{ precioServicio(servicio) }}</span>
+              <div class="flex flex-col p-4">
+                <h3 class="line-clamp-1 font-display text-base font-bold leading-snug text-granate">
+                  {{ servicio.nombre }}
+                </h3>
+                <button
+                  type="button"
+                  class="mt-2 flex w-fit items-center gap-2 text-xs font-medium text-cafe/70 transition hover:text-acento"
+                  @click.stop="irAPerfil(servicio.nombreArtista)"
+                >
+                  <span class="flex h-6 w-6 items-center justify-center rounded-full bg-rosa/40 text-[10px] font-bold text-granate">
+                    {{ (servicio.nombreArtista || '?').charAt(0).toUpperCase() }}
+                  </span>
+                  @{{ servicio.nombreArtista }}
+                </button>
+
+                <div class="mt-3 flex items-baseline gap-2">
+                  <span class="text-[10px] font-semibold uppercase tracking-[0.12em] text-cafe/45">Desde</span>
+                  <span class="font-display text-lg font-extrabold text-acento">{{ precioServicio(servicio) }}</span>
+                </div>
+                <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-cafe/55">
+                  <span>{{ ratingServicio(servicio) }}</span>
+                  <span>· {{ textoEntrega(servicio) }}</span>
+                </div>
               </div>
-              <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-cafe/55">
-                <span>{{ ratingServicio(servicio) }}</span>
-                <span>· {{ textoEntrega(servicio) }}</span>
-              </div>
-            </div>
-          </article>
+            </article>
+
+            <router-link
+              to="/servicios"
+              role="listitem"
+              class="flex w-[200px] shrink-0 snap-start flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-borde bg-superficie/60 p-6 text-center transition hover:border-acento/50 hover:bg-superficie-alt sm:w-[220px]"
+            >
+              <span class="flex h-11 w-11 items-center justify-center rounded-full bg-rosa/30 text-acento">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+              </span>
+              <span class="font-display text-base font-bold text-granate">
+                Ver todos los servicios
+              </span>
+              <span class="text-xs text-cafe/60">
+                Filtrá por estilo, presupuesto y cupos.
+              </span>
+            </router-link>
+          </div>
+
+          <button
+            v-if="puedeDerecha"
+            type="button"
+            class="absolute -right-3 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-borde/60 bg-superficie text-granate shadow-md transition hover:bg-superficie-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-acento/60 lg:flex"
+            aria-label="Ver más servicios"
+            @click="desplazarServicios(1)"
+          >
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
         </div>
       </section>
 
