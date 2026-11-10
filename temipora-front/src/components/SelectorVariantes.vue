@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { acceptImagenes, validarImagen } from '../servicios/archivos'
 import { formatearPrecio } from '../servicios/moneda'
 import { subirImagenProducto } from '../servicios/productos'
@@ -29,6 +29,7 @@ const error = ref('')
 const confirmacion = ref(null)
 const galeriaAbierta = ref(false)
 const indiceGaleria = ref(null)
+const bulkAbierto = ref(false)
 
 const variantes = computed(() => props.modelValue)
 const esPresentacionUnica = computed(() => variantes.value.length === 1)
@@ -100,6 +101,7 @@ function aplicarPrecioATodas() {
   }
   error.value = ''
   confirmacion.value = null
+  bulkAbierto.value = false
   emit('update:modelValue', props.modelValue.map((variante) => ({
     ...variante,
     precio: precioMasivo.value,
@@ -131,6 +133,7 @@ function asignarImagenesEnOrden() {
   error.value = conLedger
     ? 'Las piezas únicas ya registradas conservan su imagen.'
     : ''
+  bulkAbierto.value = false
   emit('update:modelValue', copia)
 }
 
@@ -350,6 +353,24 @@ async function subirImagen(event, indice) {
     subiendo.value = null
   }
 }
+
+function toggleBulk() {
+  bulkAbierto.value = !bulkAbierto.value
+}
+
+function onDocumentClick(event) {
+  if (!event.target.closest('.bulk-acciones')) {
+    bulkAbierto.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', onDocumentClick)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onDocumentClick)
+})
 </script>
 
 <template>
@@ -451,57 +472,90 @@ async function subirImagen(event, indice) {
 
     <div
       v-if="!esPresentacionUnica"
-      class="flex flex-col gap-3 rounded-2xl border border-rosa/60 bg-crema/50 p-4 sm:flex-row sm:items-end sm:justify-between"
+      class="rounded-2xl border border-rosa/60 bg-crema/50 p-4"
     >
-      <div>
-        <p class="text-sm font-semibold text-granate">Mismo precio para todas</p>
-        <p class="mt-1 text-xs leading-relaxed text-cafe/55">
-          Aplica un precio único a las {{ variantes.length }} variantes.
-        </p>
-      </div>
-      <div class="flex items-end gap-2">
-        <div class="relative w-40">
-          <input
-            v-model="precioMasivo"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="0"
-            class="w-full rounded-lg border border-rosa/60 bg-blanco px-3 py-2 pr-14 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
-          />
-          <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-cafe/45">
-            {{ moneda }}
-          </span>
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="text-sm font-semibold text-granate">Acciones para todas</p>
+          <p class="mt-1 text-xs leading-relaxed text-cafe/55">
+            Aplicá un mismo precio o asigná las imágenes de la galería en orden.
+          </p>
         </div>
-        <button
-          type="button"
-          class="rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-rojizo"
-          @click="aplicarPrecioATodas"
-        >
-          Aplicar a todas
-        </button>
-      </div>
-    </div>
+        <div class="bulk-acciones relative">
+          <button
+            type="button"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-rosa/60 bg-blanco px-4 py-2 text-sm font-medium text-granate transition hover:bg-rosa/20"
+            :aria-expanded="bulkAbierto"
+            @click.stop="toggleBulk"
+          >
+            Abrir acciones
+            <svg
+              class="h-3 w-3 transition-transform"
+              :class="bulkAbierto ? 'rotate-180' : ''"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
 
-    <div
-      v-if="!esPresentacionUnica"
-      class="flex flex-col gap-3 rounded-2xl border border-rosa/60 bg-crema/50 p-4 sm:flex-row sm:items-end sm:justify-between"
-    >
-      <div>
-        <p class="text-sm font-semibold text-granate">Imágenes de las variantes</p>
-        <p class="mt-1 text-xs leading-relaxed text-cafe/55">
-          Asigna en orden las {{ imagenesAsignables }} imágenes de la galería,
-          salteando la portada.
-        </p>
+          <div
+            v-if="bulkAbierto"
+            class="absolute right-0 top-full z-20 mt-2 w-[390px] max-w-[calc(100vw-48px)] rounded-2xl border border-rosa/60 bg-blanco p-2.5 shadow-xl"
+          >
+            <div class="flex flex-col gap-3 rounded-xl p-2.5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p class="text-[11px] font-semibold text-granate">Mismo precio</p>
+                <p class="mt-0.5 text-[10px] leading-relaxed text-cafe/55">
+                  Aplica un precio único a las {{ variantes.length }} variantes.
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="relative w-28">
+                  <input
+                    v-model="precioMasivo"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0"
+                    class="w-full rounded-lg border border-rosa/60 bg-blanco px-2.5 py-1.5 pr-12 text-xs text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
+                  />
+                  <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[9px] font-semibold text-cafe/45">
+                    {{ moneda }}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="rounded-lg bg-coral px-3 py-1.5 text-[10px] font-semibold text-white transition hover:bg-rojizo"
+                  @click="aplicarPrecioATodas"
+                >
+                  Aplicar
+                </button>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-3 border-t border-rosa/40 p-2.5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p class="text-[11px] font-semibold text-granate">Asignar imágenes en orden</p>
+                <p class="mt-0.5 text-[10px] leading-relaxed text-cafe/55">
+                  Saltea la portada y usa las {{ imagenesAsignables }} imágenes de la galería.
+                </p>
+              </div>
+              <button
+                type="button"
+                class="shrink-0 rounded-lg border border-coral/40 bg-blanco px-3 py-1.5 text-[10px] font-semibold text-granate transition hover:bg-rosa/20 disabled:opacity-40"
+                :disabled="imagenesAsignables === 0"
+                @click="asignarImagenesEnOrden"
+              >
+                Asignar
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-      <button
-        type="button"
-        class="rounded-lg border border-coral/40 bg-blanco px-4 py-2 text-sm font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-40"
-        :disabled="imagenesAsignables === 0"
-        @click="asignarImagenesEnOrden"
-      >
-        Asignar en orden
-      </button>
     </div>
 
     <!-- Presentación única -->
@@ -645,7 +699,7 @@ async function subirImagen(event, indice) {
       </header>
 
       <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
-        <div class="space-y-4">
+        <div class="flex flex-col gap-4">
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
               <label class="mb-1.5 block text-xs font-medium text-cafe/70">
@@ -689,19 +743,6 @@ async function subirImagen(event, indice) {
           </div>
 
           <div>
-            <label class="mb-1.5 block text-xs font-medium text-cafe/70">
-              Descripción de la variante (opcional)
-            </label>
-            <textarea
-              :value="variante.descripcion"
-              rows="2"
-              maxlength="500"
-              class="w-full resize-none rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
-              @input="actualizar(indice, 'descripcion', $event.target.value)"
-            ></textarea>
-          </div>
-
-          <div>
             <p class="mb-1.5 text-xs font-medium text-cafe/70">Stock</p>
             <div class="inline-flex w-full max-w-md rounded-lg border border-rosa/60 bg-crema/40 p-0.5">
               <button
@@ -730,6 +771,19 @@ async function subirImagen(event, indice) {
             <p v-if="erroresVariantes[indice]?.stock" class="mt-1 text-xs font-medium text-rojizo">
               {{ erroresVariantes[indice].stock }}
             </p>
+          </div>
+
+          <div class="flex min-h-[120px] flex-1 flex-col">
+            <label class="mb-1.5 block text-xs font-medium text-cafe/70">
+              Descripción de la variante (opcional)
+            </label>
+            <textarea
+              :value="variante.descripcion"
+              rows="3"
+              maxlength="500"
+              class="min-h-[110px] w-full flex-1 resize-none rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
+              @input="actualizar(indice, 'descripcion', $event.target.value)"
+            ></textarea>
           </div>
         </div>
 
@@ -803,6 +857,16 @@ async function subirImagen(event, indice) {
         </div>
       </div>
     </article>
+
+    <button
+      v-if="variantes.length"
+      type="button"
+      class="flex w-full items-center justify-center rounded-lg border border-coral/40 bg-blanco px-4 py-2 text-sm font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-40"
+      :disabled="variantes.length >= MAX_VARIANTES"
+      @click="agregarVariante"
+    >
+      Agregar variante
+    </button>
 
     <Teleport to="body">
       <div
