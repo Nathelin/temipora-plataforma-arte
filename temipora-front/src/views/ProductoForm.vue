@@ -1129,31 +1129,67 @@ onBeforeUnmount(() => {
 
           <!-- Paso 2: precio y stock -->
           <section v-else-if="paso === 2" class="space-y-6">
-            <div class="rounded-2xl border border-rosa/60 bg-crema/50 p-5">
-              <label class="mb-2 block text-sm font-medium text-granate">
-                Moneda de la publicación <span class="text-rojizo">*</span>
-              </label>
-              <select
-                v-model="form.idMoneda"
-                :disabled="esEdicion"
-                class="block w-full max-w-sm rounded-lg border-0 px-3 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral disabled:bg-cafe/5 disabled:text-cafe/50"
-              >
-                <option value="" disabled>Elegí una moneda</option>
-                <option
-                  v-for="moneda in monedas"
-                  :key="moneda.idMoneda"
-                  :value="String(moneda.idMoneda)"
+            <div class="rounded-2xl border border-rosa/60 bg-crema/50 p-4">
+              <div class="flex items-center gap-2.5">
+                <label
+                  for="moneda-publicacion"
+                  class="shrink-0 whitespace-nowrap text-sm font-medium text-granate"
                 >
-                  {{ moneda.nombre }} ({{ moneda.codigo }})
-                </option>
-              </select>
-              <p class="mt-2 text-xs leading-relaxed text-cafe/55">
-                Todos los precios de esta publicación se expresan en esta moneda.
-                <template v-if="esEdicion">
-                  La moneda no se puede cambiar después de publicar; si necesitás
-                  otra, archivá esta publicación y creá una nueva.
-                </template>
-              </p>
+                  Moneda<span class="hidden sm:inline"> de la publicación</span>
+                  <span class="text-rojizo">*</span>
+                </label>
+
+                <div class="group relative inline-flex shrink-0">
+                  <button
+                    type="button"
+                    class="flex h-5 w-5 items-center justify-center rounded-full border border-rosa/70 text-cafe/50 transition hover:bg-rosa/20 hover:text-granate"
+                    aria-label="Información sobre la moneda de la publicación"
+                    aria-describedby="moneda-ayuda"
+                  >
+                    <svg
+                      class="h-3.5 w-3.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="9" />
+                      <path stroke-linecap="round" d="M12 11v5" />
+                      <path stroke-linecap="round" d="M12 8h.01" />
+                    </svg>
+                  </button>
+                  <span
+                    id="moneda-ayuda"
+                    role="tooltip"
+                    class="pointer-events-none invisible absolute left-0 top-full z-20 mt-2 w-72 max-w-[calc(100vw-72px)] rounded-xl border border-rosa/60 bg-blanco p-3 text-left text-xs font-normal leading-relaxed text-cafe/70 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
+                  >
+                    <span class="block">
+                      Todos los precios de esta publicación se expresan en esta moneda.
+                    </span>
+                    <span v-if="esEdicion" class="mt-1.5 block">
+                      La moneda no se puede cambiar después de publicar; si necesitás
+                      otra, archivá esta publicación y creá una nueva.
+                    </span>
+                  </span>
+                </div>
+
+                <select
+                  id="moneda-publicacion"
+                  v-model="form.idMoneda"
+                  :disabled="esEdicion"
+                  class="ml-auto w-36 min-w-0 rounded-lg border-0 px-3 py-2 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral disabled:bg-cafe/5 disabled:text-cafe/50 sm:w-64"
+                >
+                  <option value="" disabled>Elegí una moneda</option>
+                  <option
+                    v-for="moneda in monedas"
+                    :key="moneda.idMoneda"
+                    :value="String(moneda.idMoneda)"
+                  >
+                    {{ moneda.nombre }} ({{ moneda.codigo }})
+                  </option>
+                </select>
+              </div>
               <p v-if="erroresCampo.idMoneda" class="mt-1 text-xs font-medium text-rojizo">
                 {{ erroresCampo.idMoneda }}
               </p>

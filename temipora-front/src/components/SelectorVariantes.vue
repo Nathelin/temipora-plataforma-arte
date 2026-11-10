@@ -30,6 +30,7 @@ const confirmacion = ref(null)
 const galeriaAbierta = ref(false)
 const indiceGaleria = ref(null)
 const bulkAbierto = ref(false)
+const ayudaAbierta = ref(false)
 
 const variantes = computed(() => props.modelValue)
 const esPresentacionUnica = computed(() => variantes.value.length === 1)
@@ -40,6 +41,10 @@ const imagenesAsignables = computed(
 const textoBotonAdoptables = computed(() => {
   const total = Math.max(1, Math.min(50, Number(cantidadAdoptables.value) || 1))
   return `Ajustar a ${total} adoptable${total === 1 ? '' : 's'}`
+})
+const simboloMoneda = computed(() => {
+  const ejemplo = formatearPrecio(0, props.moneda)
+  return ejemplo.replace(/[\d.,\s]/g, '') || props.moneda
 })
 
 function esIlimitada(variante) {
@@ -241,13 +246,6 @@ function onStockInput(indice, event) {
   actualizar(indice, 'stockDisponible', Number.isFinite(valor) && valor >= 0 ? valor : 0)
 }
 
-function precioVisible(variante) {
-  const numero = Number(variante.precio)
-  return Number.isFinite(numero) && numero > 0
-    ? formatearPrecio(numero, props.moneda)
-    : ''
-}
-
 function imagenActual(variante) {
   return variante.urlImagen || ''
 }
@@ -386,14 +384,27 @@ onBeforeUnmount(() => {
             : 'Cada variante se vende por separado y puede tener su propio precio, stock e imagen. Máximo 50.' }}
         </p>
       </div>
-      <button
-        type="button"
-        class="shrink-0 rounded-lg border border-coral/40 bg-blanco px-4 py-2 text-sm font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-40"
-        :disabled="variantes.length >= MAX_VARIANTES"
-        @click="agregarVariante"
-      >
-        Agregar variante
-      </button>
+      <div class="flex shrink-0 flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-rosa/60 bg-blanco text-sm font-semibold text-cafe/55 transition hover:bg-rosa/20 hover:text-granate"
+          aria-label="Información sobre las variantes"
+          aria-haspopup="dialog"
+          :aria-expanded="ayudaAbierta"
+          title="¿Qué son las variantes?"
+          @click="ayudaAbierta = true"
+        >
+          i
+        </button>
+        <button
+          type="button"
+          class="shrink-0 rounded-lg border border-coral/40 bg-blanco px-4 py-2 text-sm font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-40"
+          :disabled="variantes.length >= MAX_VARIANTES"
+          @click="agregarVariante"
+        >
+          Agregar variante
+        </button>
+      </div>
     </div>
 
     <div
@@ -484,7 +495,10 @@ onBeforeUnmount(() => {
         <div class="bulk-acciones relative">
           <button
             type="button"
-            class="inline-flex items-center gap-1.5 rounded-lg border border-rosa/60 bg-blanco px-4 py-2 text-sm font-medium text-granate transition hover:bg-rosa/20"
+            class="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold text-granate shadow-sm transition"
+            :class="bulkAbierto
+              ? 'border-coral/50 bg-rosa/60'
+              : 'border-coral/30 bg-rosa/40 hover:bg-rosa/60'"
             :aria-expanded="bulkAbierto"
             @click.stop="toggleBulk"
           >
@@ -514,14 +528,17 @@ onBeforeUnmount(() => {
                 </p>
               </div>
               <div class="flex items-center gap-2">
-                <div class="relative w-28">
+                <div class="relative w-32">
+                  <span class="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[9px] font-semibold text-cafe/45">
+                    {{ simboloMoneda }}
+                  </span>
                   <input
                     v-model="precioMasivo"
                     type="number"
                     min="0"
                     step="0.01"
                     placeholder="0"
-                    class="w-full rounded-lg border border-rosa/60 bg-blanco px-2.5 py-1.5 pr-12 text-xs text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
+                    class="w-full rounded-lg border border-rosa/60 bg-blanco py-1.5 pl-7 pr-10 text-xs text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
                   />
                   <span class="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[9px] font-semibold text-cafe/45">
                     {{ moneda }}
@@ -561,37 +578,39 @@ onBeforeUnmount(() => {
     <!-- Presentación única -->
     <article
       v-if="esPresentacionUnica"
-      class="rounded-2xl border border-rosa/60 bg-blanco p-5 shadow-sm"
+      class="rounded-2xl border border-rosa/60 bg-blanco p-4 shadow-sm"
     >
-      <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_14rem]">
-        <div class="space-y-5">
-          <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_14rem]">
+        <div class="space-y-4">
+          <div class="grid gap-3 sm:grid-cols-2">
             <div>
-              <label class="mb-1.5 block text-xs font-medium text-cafe/70">
+              <label class="mb-1 block text-xs font-medium text-cafe/70">
                 Precio <span class="text-rojizo">*</span>
               </label>
               <div class="relative">
+                <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-xs font-semibold text-cafe/45">
+                  {{ simboloMoneda }}
+                </span>
                 <input
                   :value="variantes[0].precio"
                   type="number"
                   min="0"
                   step="0.01"
                   placeholder="0"
-                  class="w-full rounded-lg border border-rosa/60 bg-blanco px-3 py-2 pr-14 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
+                  class="w-full rounded-lg border border-rosa/60 bg-blanco py-2 pl-8 pr-14 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
                   @input="actualizar(0, 'precio', $event.target.value)"
                 />
                 <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-cafe/45">
                   {{ moneda }}
                 </span>
               </div>
-              <p class="mt-1 text-[11px] text-cafe/45">{{ precioVisible(variantes[0]) }}</p>
               <p v-if="erroresVariantes[0]?.precio" class="mt-1 text-xs font-medium text-rojizo">
                 {{ erroresVariantes[0].precio }}
               </p>
             </div>
 
             <div>
-              <p class="mb-1.5 text-xs font-medium text-cafe/70">Stock</p>
+              <p class="mb-1 text-xs font-medium text-cafe/70">Stock</p>
               <div class="inline-flex w-full rounded-lg border border-rosa/60 bg-crema/40 p-0.5">
                 <button
                   v-for="modo in MODOS_STOCK"
@@ -607,7 +626,7 @@ onBeforeUnmount(() => {
                   {{ modo.texto }}
                 </button>
               </div>
-              <div v-if="modoStock(variantes[0]) === 'LIMITADA'" class="mt-2">
+              <div v-if="modoStock(variantes[0]) === 'LIMITADA'" class="mt-1.5">
                 <input
                   :value="variantes[0].stockDisponible"
                   type="number"
@@ -619,7 +638,7 @@ onBeforeUnmount(() => {
               </div>
               <p
                 v-if="modoStock(variantes[0]) === 'UNICA'"
-                class="mt-2 text-[11px] leading-relaxed text-cafe/50"
+                class="mt-1.5 text-[11px] leading-relaxed text-cafe/50"
               >
                 Se vende una sola unidad. Si habilitás la reventa, puede transferirse.
               </p>
@@ -639,7 +658,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div>
-          <p class="mb-2 text-xs font-medium text-cafe/70">Imagen de portada</p>
+          <p class="mb-1.5 text-xs font-medium text-cafe/70">Imagen de portada</p>
           <div class="overflow-hidden rounded-xl border border-rosa/60 bg-rosa/10">
             <img
               v-if="imagenPortada"
@@ -663,9 +682,9 @@ onBeforeUnmount(() => {
     <article
       v-for="(variante, indice) in (esPresentacionUnica ? [] : variantes)"
       :key="variante.idVariante || `nueva-${indice}`"
-      class="rounded-2xl border border-rosa/60 bg-blanco p-5 shadow-sm"
+      class="rounded-2xl border border-rosa/60 bg-blanco p-4 shadow-sm"
     >
-      <header class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <header class="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h3 class="font-display text-base font-bold text-granate">
           Variante {{ indice + 1 }}
         </h3>
@@ -698,11 +717,11 @@ onBeforeUnmount(() => {
         </div>
       </header>
 
-      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
-        <div class="flex flex-col gap-4">
-          <div class="grid gap-4 sm:grid-cols-2">
+      <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem]">
+        <div class="flex flex-col gap-3">
+          <div class="grid gap-3 sm:grid-cols-2">
             <div>
-              <label class="mb-1.5 block text-xs font-medium text-cafe/70">
+              <label class="mb-1 block text-xs font-medium text-cafe/70">
                 Nombre <span class="text-rojizo">*</span>
               </label>
               <input
@@ -718,24 +737,26 @@ onBeforeUnmount(() => {
               </p>
             </div>
             <div>
-              <label class="mb-1.5 block text-xs font-medium text-cafe/70">
+              <label class="mb-1 block text-xs font-medium text-cafe/70">
                 Precio <span class="text-rojizo">*</span>
               </label>
               <div class="relative">
+                <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-xs font-semibold text-cafe/45">
+                  {{ simboloMoneda }}
+                </span>
                 <input
                   :value="variante.precio"
                   type="number"
                   min="0"
                   step="0.01"
                   placeholder="0"
-                  class="w-full rounded-lg border border-rosa/60 bg-blanco px-3 py-2 pr-14 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
+                  class="w-full rounded-lg border border-rosa/60 bg-blanco py-2 pl-8 pr-14 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
                   @input="actualizar(indice, 'precio', $event.target.value)"
                 />
                 <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-cafe/45">
                   {{ moneda }}
                 </span>
               </div>
-              <p class="mt-1 text-[11px] text-cafe/45">{{ precioVisible(variante) }}</p>
               <p v-if="erroresVariantes[indice]?.precio" class="mt-1 text-xs font-medium text-rojizo">
                 {{ erroresVariantes[indice].precio }}
               </p>
@@ -743,7 +764,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div>
-            <p class="mb-1.5 text-xs font-medium text-cafe/70">Stock</p>
+            <p class="mb-1 text-xs font-medium text-cafe/70">Stock</p>
             <div class="inline-flex w-full max-w-md rounded-lg border border-rosa/60 bg-crema/40 p-0.5">
               <button
                 v-for="modo in MODOS_STOCK"
@@ -765,7 +786,7 @@ onBeforeUnmount(() => {
               type="number"
               min="0"
               step="1"
-              class="mt-2 w-28 rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
+              class="mt-1.5 w-28 rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
               @input="onStockInput(indice, $event)"
             />
             <p v-if="erroresVariantes[indice]?.stock" class="mt-1 text-xs font-medium text-rojizo">
@@ -774,7 +795,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="flex min-h-[120px] flex-1 flex-col">
-            <label class="mb-1.5 block text-xs font-medium text-cafe/70">
+            <label class="mb-1 block text-xs font-medium text-cafe/70">
               Descripción de la variante (opcional)
             </label>
             <textarea
@@ -788,7 +809,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div>
-          <p class="mb-2 text-xs font-medium text-cafe/70">
+          <p class="mb-1.5 text-xs font-medium text-cafe/70">
             Imagen de la variante <span class="text-rojizo">*</span>
           </p>
           <div class="overflow-hidden rounded-xl border border-rosa/60 bg-rosa/10">
@@ -807,7 +828,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div v-if="imagenesGaleria.length" class="mt-2">
+          <div v-if="imagenesGaleria.length" class="mt-1.5">
             <div class="mb-1 flex items-center justify-between gap-2">
               <p class="text-[11px] text-cafe/50">Elegí de la galería:</p>
               <button
@@ -819,7 +840,7 @@ onBeforeUnmount(() => {
                 Ver todas ({{ imagenesGaleria.length }})
               </button>
             </div>
-            <div class="flex gap-2 overflow-x-auto pb-1">
+            <div class="flex gap-1.5 overflow-x-auto pb-1">
               <button
                 v-for="imagen in imagenesVisibles(variante)"
                 :key="imagen.url"
@@ -835,12 +856,12 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </div>
-          <p v-else class="mt-2 text-[11px] leading-relaxed text-cafe/50">
+          <p v-else class="mt-1.5 text-[11px] leading-relaxed text-cafe/50">
             No hay imágenes en la galería. Subí una acá o volvé al paso 1.
           </p>
 
           <label
-            class="mt-2 flex cursor-pointer items-center justify-center rounded-lg border border-coral/40 bg-blanco px-3 py-2 text-xs font-medium text-granate transition hover:bg-rosa/20"
+            class="mt-1.5 flex cursor-pointer items-center justify-center rounded-lg border border-coral/40 bg-blanco px-3 py-2 text-xs font-medium text-granate transition hover:bg-rosa/20"
             :class="subiendo === indice ? 'pointer-events-none opacity-50' : ''"
           >
             {{ subiendo === indice ? 'Subiendo...' : (variante.urlImagen ? 'Cambiar imagen' : 'Subir nueva imagen') }}
@@ -910,6 +931,102 @@ onBeforeUnmount(() => {
               <img :src="imagen.url" alt="" class="aspect-square w-full object-cover" />
             </button>
           </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="ayudaAbierta"
+        class="fixed inset-0 z-[95] flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="variantes-ayuda-titulo"
+      >
+        <div
+          class="absolute inset-0 bg-granate/50"
+          aria-hidden="true"
+          @click="ayudaAbierta = false"
+        ></div>
+        <div class="relative flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-blanco shadow-xl">
+          <header class="flex items-start justify-between gap-3 border-b border-rosa/60 px-5 py-4">
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                Ayuda
+              </p>
+              <h3 id="variantes-ayuda-titulo" class="mt-0.5 font-display text-lg font-bold text-granate">
+                ¿Qué son las variantes?
+              </h3>
+            </div>
+            <button
+              type="button"
+              class="rounded-lg border border-rosa/60 px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-rosa/20"
+              @click="ayudaAbierta = false"
+            >
+              Cerrar
+            </button>
+          </header>
+
+          <div class="overflow-y-auto px-5 py-4">
+            <p class="text-sm leading-relaxed text-cafe/70">
+              Si es tu primera vez vendiendo, no te preocupes: no siempre necesitás
+              variantes. Una variante es una versión vendible de la misma publicación.
+              Cada una tiene su propio precio, stock e imagen, y se vende por separado.
+            </p>
+
+            <div class="mt-4 space-y-3">
+              <div class="rounded-xl border border-rosa/60 bg-crema/30 p-3">
+                <p class="text-sm font-semibold text-granate">Una pieza única</p>
+                <p class="mt-1 text-xs leading-relaxed text-cafe/60">
+                  Si vendés un solo cuadro, una escultura o una pieza irrepetible,
+                  no necesitás crear variantes. Dejá la presentación única y usá
+                  la portada de la publicación.
+                </p>
+              </div>
+
+              <div class="rounded-xl border border-rosa/60 bg-crema/30 p-3">
+                <p class="text-sm font-semibold text-granate">Varios adoptables</p>
+                <p class="mt-1 text-xs leading-relaxed text-cafe/60">
+                  Si ofrecés una plancha de adoptables, cada adoptable puede ser
+                  una variante. Así cada uno tiene su nombre, precio, stock e imagen
+                  propios y se vende por separado. Una plancha de 5 adoptables puede
+                  tener 5 variantes.
+                </p>
+              </div>
+
+              <div class="rounded-xl border border-rosa/60 bg-crema/30 p-3">
+                <p class="text-sm font-semibold text-granate">
+                  El mismo producto en varias versiones
+                </p>
+                <p class="mt-1 text-xs leading-relaxed text-cafe/60">
+                  Si vendés el mismo diseño en distintos tamaños, colores o formatos,
+                  creá una variante por opción. El comprador elige la que quiere y
+                  el stock se controla por separado.
+                </p>
+              </div>
+            </div>
+
+            <p class="mt-4 rounded-xl bg-mantequilla/20 px-3 py-2.5 text-xs font-medium leading-relaxed text-granate">
+              En resumen: una pieza única es una sola presentación; varios adoptables
+              o versiones son una variante por opción. Podés empezar con una y agregar
+              más cuando quieras.
+            </p>
+
+            <p class="mt-3 text-[11px] leading-relaxed text-cafe/50">
+              Máximo 50 variantes por publicación. La portada es la imagen general;
+              cada variante puede usar otra imagen de la galería.
+            </p>
+          </div>
+
+          <footer class="flex justify-end border-t border-rosa/60 px-5 py-3">
+            <button
+              type="button"
+              class="rounded-lg bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-rojizo"
+              @click="ayudaAbierta = false"
+            >
+              Entendido
+            </button>
+          </footer>
         </div>
       </div>
     </Teleport>
