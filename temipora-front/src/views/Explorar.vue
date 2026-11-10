@@ -646,8 +646,8 @@ watch(serviciosGrilla, async () => {
         <article class="flex flex-col items-start gap-3 rounded-2xl border border-borde/60 bg-superficie p-7">
           <h2 class="font-display text-xl font-extrabold text-granate">¿Buscás algo específico?</h2>
           <p class="text-sm leading-relaxed text-cafe/70">
-            En <span class="font-semibold text-granate">Servicios</span> filtrás por estilo,
-            presupuesto, plazo y cupos disponibles.
+            En <span class="font-semibold text-granate">Servicios</span>,
+             encontrá miles de propuestas con distintos e increíbles estilos.
           </p>
           <button
             type="button"
@@ -662,8 +662,8 @@ watch(serviciosGrilla, async () => {
         <article class="flex flex-col items-start gap-3 rounded-2xl border border-borde/60 bg-superficie p-7">
           <h2 class="font-display text-xl font-extrabold text-granate">Recursos al instante</h2>
           <p class="text-sm leading-relaxed text-cafe/70">
-            En <span class="font-semibold text-granate">Productos</span> filtrás por tipo,
-            medio, precio y disponibilidad.
+            En <span class="font-semibold text-granate">Productos</span>,
+            descubrí hermosas piezas prefabricadas.
           </p>
           <button
             type="button"
