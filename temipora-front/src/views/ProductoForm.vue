@@ -42,24 +42,14 @@ const PASOS = [
   },
   {
     n: 4,
-    label: 'Entregables',
-    titulo: 'Entregables',
-    descripcion: 'Qué archivo recibe el comprador al pagar.',
-  },
-  {
-    n: 5,
     label: 'Revisión',
     titulo: 'Revisión y publicación',
     descripcion: 'Revisá todo antes de publicar el producto.',
   },
 ]
 
-const PASOS_VISIBLES = computed(() => (
-  esEntregaFisica.value
-    ? PASOS.filter((p) => p.n !== 4)
-    : PASOS
-))
-const TOTAL_PASOS = computed(() => PASOS_VISIBLES.value.length)
+const PASOS_VISIBLES = PASOS
+const TOTAL_PASOS = computed(() => PASOS_VISIBLES.length)
 
 const paso = ref(1)
 const cargando = ref(true)
@@ -71,7 +61,6 @@ const avisoBorrador = ref('')
 const errores = ref([])
 const erroresCampo = ref({})
 const erroresVariantes = ref({})
-const erroresEntregables = ref({})
 const MAX_IMAGENES_PRODUCTO = 60
 const MAX_MB_IMAGEN = TAMANO_MAXIMO_BYTES / (1024 * 1024)
 const subiendoImagen = ref(false)
@@ -107,7 +96,6 @@ const form = ref({
 
 const variantes = ref([])
 const etiquetas = ref([])
-const entregablesComunes = ref([])
 const estadoProducto = ref(null)
 const licencia = ref({
   idsDerechos: [],
@@ -149,7 +137,7 @@ const esEntregaFisica = computed(
 )
 
 watch(esEntregaFisica, (fisica) => {
-  if (fisica && (paso.value === 4 || paso.value === 5)) {
+  if (fisica && paso.value === 4) {
     paso.value = 3
     errores.value = []
     erroresCampo.value = {}
@@ -157,19 +145,6 @@ watch(esEntregaFisica, (fisica) => {
   }
 })
 
-// La imagen de la variante entra preseleccionada como entregable en cuanto
-// existe. Solo se inicializa cuando la variante no tiene el campo todavía:
-// si el artista desmarca todo, la selección vacía se respeta.
-watch(
-  variantes,
-  (lista) => {
-    lista.forEach((variante) => {
-      if (Array.isArray(variante.entregablesSha256)) return
-      variante.entregablesSha256 = variante.sha256 ? [variante.sha256] : []
-    })
-  },
-  { deep: true },
-)
 const esAdoptable = computed(() => esTipoUnico(nombreTipo.value) && nombreTipo.value.toLowerCase().includes('adoptable'))
 const hayVarianteUnica = computed(
   () => variantes.value.some(
@@ -221,7 +196,6 @@ function instantanea() {
     variantes: variantes.value,
     etiquetas: etiquetas.value,
     licencia: licencia.value,
-    entregablesComunes: entregablesComunes.value,
   })
 }
 
@@ -301,53 +275,25 @@ function mapearProducto(d) {
     })),
   }
 
-  const entregables = Array.isArray(d.entregables) ? d.entregables : []
-  const entregablesPorVariante = new Map()
-  entregables
-    .filter((entregable) => entregable.idVariante)
-    .forEach((entregable) => {
-      const lista = entregablesPorVariante.get(entregable.idVariante) || []
-      lista.push(entregable)
-      entregablesPorVariante.set(entregable.idVariante, lista)
-    })
-
-  variantes.value = (d.variantes || []).map((variante) => {
-    const propios = entregablesPorVariante.get(variante.idVariante) || []
-    return {
-      idVariante: variante.idVariante,
-      nombre: variante.nombre || 'Única',
-      descripcion: variante.descripcion || '',
-      precio: Number(variante.precio) || '',
-      stockDisponible: variante.stockDisponible === null
-        || variante.stockDisponible === undefined
-        ? null
-        : Number(variante.stockDisponible),
-      estado: variante.estado || 'DISPONIBLE',
-      urlImagen: variante.imagenUrl || '',
-      sha256: variante.sha256 || '',
-      claveArchivoOriginal: '',
-      numeroEdicion: variante.numeroEdicion || null,
-      tieneLedger: !!variante.tieneLedger,
-      entregablesSha256: propios.length
-        ? propios
-          .sort((a, b) => (a.orden || 0) - (b.orden || 0))
-          .map((entregable) => entregable.sha256)
-          .filter(Boolean)
-        : (variante.sha256 ? [variante.sha256] : []),
-      entregableNombre: propios[0]?.nombre || '',
-    }
-  })
+  variantes.value = (d.variantes || []).map((variante) => ({
+    idVariante: variante.idVariante,
+    nombre: variante.nombre || 'Única',
+    descripcion: variante.descripcion || '',
+    precio: Number(variante.precio) || '',
+    stockDisponible: variante.stockDisponible === null
+      || variante.stockDisponible === undefined
+      ? null
+      : Number(variante.stockDisponible),
+    estado: variante.estado || 'DISPONIBLE',
+    urlImagen: variante.imagenUrl || '',
+    sha256: variante.sha256 || '',
+    claveArchivoOriginal: '',
+    numeroEdicion: variante.numeroEdicion || null,
+    tieneLedger: !!variante.tieneLedger,
+  }))
   if (!variantes.value.length) {
     variantes.value = [nuevaPresentacion()]
   }
-
-  entregablesComunes.value = entregables
-    .filter((entregable) => !entregable.idVariante)
-    .map((entregable) => ({
-      sha256: entregable.sha256 || '',
-      nombre: entregable.nombre || '',
-      orden: entregable.orden || 0,
-    }))
 
   etiquetas.value = Array.isArray(d.etiquetas) ? [...d.etiquetas] : []
 
@@ -635,31 +581,31 @@ function validarLicencia() {
 
 function validarEntregables() {
   const errs = []
-  erroresEntregables.value = {}
   if (esEntregaFisica.value) return errs
 
+  const vistos = new Set()
   variantes.value.forEach((variante, indice) => {
-    const seleccion = (variante.entregablesSha256 || []).filter(Boolean)
-    const tieneImagen = variante.sha256 || variante.urlImagen
-    if (!seleccion.length && !tieneImagen) {
+    const sha = String(variante.sha256 || '').trim().toLowerCase()
+    if (!sha) {
       const mensaje = presentacionUnica.value
-        ? 'El comprador tiene que recibir al menos un archivo.'
-        : `La variante ${indice + 1} no tiene archivos para entregar.`
-      erroresEntregables.value[indice] = mensaje
+        ? 'Cada presentación necesita su imagen: es el archivo que recibe el comprador.'
+        : `La variante ${indice + 1} necesita su imagen para entregar.`
       errs.push(mensaje)
+      erroresVariantes.value[indice] = { ...(erroresVariantes.value[indice] || {}), imagen: mensaje }
+      return
     }
-  })
-
-  entregablesComunes.value.forEach((entregable, indice) => {
-    if (!entregable.sha256) {
-      const mensaje = `Elegí el archivo del entregable común ${indice + 1}.`
-      erroresEntregables.value[`comun-${indice}`] = mensaje
+    if (vistos.has(sha)) {
+      const mensaje = 'Dos variantes no pueden entregar la misma imagen. '
+        + 'Cada una necesita su propio archivo.'
       errs.push(mensaje)
+      erroresVariantes.value[indice] = { ...(erroresVariantes.value[indice] || {}), imagen: mensaje }
+      return
     }
+    vistos.add(sha)
   })
 
   if (errs.length) {
-    erroresCampo.value.entregables = 'Revisá los entregables marcados.'
+    erroresCampo.value.entregables = 'Revisá las imágenes de las presentaciones.'
   }
   return errs
 }
@@ -670,8 +616,7 @@ function validarPasoActual() {
   if (paso.value === 1) problemas = [...validarDatos(), ...validarImagenes()]
   else if (paso.value === 2) problemas = [...validarMoneda(), ...validarVariantes()]
   else if (paso.value === 3) problemas = validarLicencia()
-  else if (paso.value === 4) problemas = validarEntregables()
-  else if (paso.value === 5) problemas = validarTodo()
+  else if (paso.value === 4) problemas = validarTodo()
 
   errores.value = problemas
   return problemas.length === 0
@@ -700,7 +645,7 @@ function validarTodo() {
   const entregables = validarEntregables()
   if (entregables.length) {
     errores.value = entregables
-    paso.value = 4
+    paso.value = 2
     return false
   }
   errores.value = []
@@ -795,10 +740,6 @@ function construirPayload() {
           ? portada.claveArchivoOriginal
           : variante.claveArchivoOriginal),
         numeroEdicion: variante.numeroEdicion || null,
-        entregablesSha256: (variante.entregablesSha256 || [])
-          .map((sha) => textoODefecto(sha))
-          .filter(Boolean),
-        entregableNombre: textoODefecto(variante.entregableNombre),
       }
     }),
     idsEtiquetas: etiquetas.value.map((etiqueta) => etiqueta.idEtiqueta),
@@ -811,11 +752,6 @@ function construirPayload() {
         : 0,
       textoAdicional: licencia.value.textoAdicional?.trim() || null,
     },
-    entregablesComunes: entregablesComunes.value.map((entregable, indice) => ({
-      sha256: textoODefecto(entregable.sha256),
-      nombre: textoODefecto(entregable.nombre),
-      orden: indice,
-    })),
   }
 }
 
@@ -895,78 +831,6 @@ function nombrePresentacion(variante) {
 }
 
 const presentacionUnica = computed(() => variantes.value.length === 1)
-
-function imagenDeSha(sha) {
-  if (!sha) return null
-  const buscado = String(sha).toLowerCase()
-  return form.value.imagenes.find(
-    (imagen) => String(imagen.sha256 || '').toLowerCase() === buscado,
-  ) || null
-}
-
-/**
- * La imagen de la variante viene marcada por defecto. El artista puede
- * sumar otras imágenes de la galería o desmarcar la portada.
- */
-function seleccionDe(variante) {
-  return Array.isArray(variante.entregablesSha256)
-    ? variante.entregablesSha256
-    : []
-}
-
-function entregableSeleccionado(variante, sha) {
-  if (!sha) return false
-  const buscado = String(sha).toLowerCase()
-  return seleccionDe(variante).some(
-    (item) => String(item).toLowerCase() === buscado,
-  )
-}
-
-function alternarEntregable(sha, variante) {
-  if (!sha) return
-  if (!Array.isArray(variante.entregablesSha256)) {
-    variante.entregablesSha256 = variante.sha256 ? [variante.sha256] : []
-  }
-  const seleccion = variante.entregablesSha256
-  const indice = seleccion.findIndex(
-    (item) => String(item).toLowerCase() === String(sha).toLowerCase(),
-  )
-  if (indice >= 0) {
-    seleccion.splice(indice, 1)
-  } else {
-    seleccion.push(sha)
-  }
-}
-
-function usarImagenComoEntregable(variante) {
-  if (!variante.sha256) return
-  variante.entregablesSha256 = [variante.sha256]
-}
-
-function seleccionarTodaLaGaleria(variante) {
-  variante.entregablesSha256 = form.value.imagenes
-    .map((imagen) => imagen.sha256)
-    .filter(Boolean)
-}
-
-function agregarEntregableComun() {
-  const portada = form.value.imagenes[0]
-  if (!portada) return
-  if (entregablesComunes.value.some((item) => item.sha256 === portada.sha256)) return
-  entregablesComunes.value.push({
-    sha256: portada.sha256,
-    nombre: 'Archivo común',
-    orden: entregablesComunes.value.length,
-  })
-}
-
-function quitarEntregableComun(indice) {
-  entregablesComunes.value.splice(indice, 1)
-}
-
-function cambiarEntregableComun(event, entregable) {
-  entregable.sha256 = event.target.value
-}
 
 const {
   actualizar: marcarCambios,
@@ -1632,198 +1496,8 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <!-- Paso 4: entregables -->
-          <section v-else-if="paso === 4" class="space-y-6">
-            <div class="rounded-2xl border border-coral/25 bg-coral/5 p-4">
-              <div class="flex items-start gap-3">
-                <span
-                  class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-coral/15 text-coral"
-                  aria-hidden="true"
-                >
-                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
-                  </svg>
-                </span>
-                <div class="min-w-0">
-                  <p class="text-sm font-semibold text-granate">Qué recibe el comprador</p>
-                  <p class="mt-1 text-xs leading-relaxed text-cafe/65">
-                    Marcá las imágenes de la galería que se entregan al acreditarse el
-                    pago. La imagen de la variante viene marcada; podés sumar más o
-                    desmarcar la portada si no forma parte del producto.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <p v-if="erroresCampo.entregables" class="text-xs font-medium text-rojizo">
-              {{ erroresCampo.entregables }}
-            </p>
-
-            <div class="space-y-4">
-              <article
-                v-for="(variante, indice) in variantes"
-                :key="variante.idVariante || `v-${indice}`"
-                class="rounded-2xl border border-rosa/60 bg-blanco p-4"
-              >
-                <div class="flex items-start justify-between gap-3">
-                  <div class="flex min-w-0 items-center gap-3">
-                    <img
-                      v-if="imagenVariante(variante)"
-                      :src="imagenVariante(variante)"
-                      :alt="nombrePresentacion(variante)"
-                      class="h-12 w-12 shrink-0 rounded-xl object-cover ring-1 ring-rosa/50"
-                    />
-                    <div class="min-w-0">
-                      <p class="text-sm font-semibold text-granate">
-                        {{ nombrePresentacion(variante) }}
-                      </p>
-                      <p class="mt-0.5 text-xs text-cafe/55">
-                        {{ seleccionDe(variante).length }}
-                        {{ seleccionDe(variante).length === 1 ? 'archivo' : 'archivos' }}
-                      </p>
-                    </div>
-                  </div>
-                  <div class="flex shrink-0 flex-wrap justify-end gap-2">
-                    <button
-                      v-if="form.imagenes.length > 1"
-                      type="button"
-                      class="rounded-lg border border-rosa px-2.5 py-1.5 text-xs font-medium text-cafe transition hover:bg-rosa/20"
-                      @click="seleccionarTodaLaGaleria(variante)"
-                    >
-                      Toda la galería
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-lg border border-coral/40 bg-coral/10 px-2.5 py-1.5 text-xs font-medium text-granate transition hover:bg-coral/20 disabled:cursor-not-allowed disabled:opacity-50"
-                      :disabled="!variante.sha256"
-                      @click="usarImagenComoEntregable(variante)"
-                    >
-                      Solo la de la variante
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  v-if="form.imagenes.length"
-                  class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4"
-                >
-                  <label
-                    v-for="imagen in form.imagenes"
-                    :key="imagen.sha256"
-                    class="group relative cursor-pointer overflow-hidden rounded-xl border-2 transition"
-                    :class="entregableSeleccionado(variante, imagen.sha256)
-                      ? 'border-coral ring-2 ring-coral/20'
-                      : 'border-transparent hover:border-rosa'"
-                  >
-                    <input
-                      type="checkbox"
-                      class="sr-only"
-                      :checked="entregableSeleccionado(variante, imagen.sha256)"
-                      @change="alternarEntregable(imagen.sha256, variante)"
-                    />
-                    <img
-                      :src="imagen.url"
-                      :alt="`Imagen ${(imagen.url || '').split('/').pop()}`"
-                      class="aspect-square h-full w-full object-cover"
-                    />
-                    <span
-                      class="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white transition"
-                      :class="entregableSeleccionado(variante, imagen.sha256)
-                        ? 'bg-coral text-white'
-                        : 'bg-white/85 text-transparent'"
-                      aria-hidden="true"
-                    >
-                      <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                      </svg>
-                    </span>
-                  </label>
-                </div>
-
-                <p v-else class="mt-3 text-xs text-cafe/50">
-                  Subí imágenes en el paso “Detalles” para poder elegir qué se entrega.
-                </p>
-
-                <p
-                  v-if="erroresEntregables[indice]"
-                  class="mt-2 text-xs font-medium text-rojizo"
-                >
-                  {{ erroresEntregables[indice] }}
-                </p>
-              </article>
-            </div>
-
-            <div v-if="!presentacionUnica" class="rounded-2xl border border-rosa/60 bg-crema/40 p-4">
-              <div class="flex flex-wrap items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="text-sm font-semibold text-granate">
-                    Archivos para todos los compradores
-                    <span class="ml-1 text-xs font-normal text-cafe/50">(opcional)</span>
-                  </p>
-                  <p class="mt-1 text-xs leading-relaxed text-cafe/60">
-                    Se entregan además de la variante, a cualquier comprador. Por
-                    ejemplo, el manual o la licencia en PDF.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  class="rounded-lg border border-rosa px-3 py-1.5 text-xs font-medium text-cafe transition hover:bg-rosa/20 disabled:opacity-50"
-                  :disabled="!form.imagenes.length"
-                  @click="agregarEntregableComun"
-                >
-                  Agregar archivo
-                </button>
-              </div>
-
-              <ul v-if="entregablesComunes.length" class="mt-3 space-y-2">
-                <li
-                  v-for="(entregable, indice) in entregablesComunes"
-                  :key="`comun-${indice}`"
-                  class="flex flex-wrap items-center gap-2 rounded-xl border border-rosa/50 bg-blanco px-3 py-2"
-                >
-                  <select
-                    class="min-w-0 flex-1 rounded-lg border-0 px-2.5 py-1.5 text-xs text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-                    :value="entregable.sha256"
-                    @change="cambiarEntregableComun($event, entregable)"
-                  >
-                    <option value="">Elegí una imagen…</option>
-                    <option
-                      v-for="imagen in form.imagenes"
-                      :key="imagen.sha256"
-                      :value="imagen.sha256"
-                    >
-                      {{ (imagen.url || '').split('/').pop() }}
-                    </option>
-                  </select>
-                  <button
-                    type="button"
-                    class="rounded-lg px-2 py-1 text-xs font-medium text-rojizo/80 transition hover:text-rojizo"
-                    @click="quitarEntregableComun(indice)"
-                  >
-                    Quitar
-                  </button>
-                  <p
-                    v-if="erroresEntregables[`comun-${indice}`]"
-                    class="w-full text-xs font-medium text-rojizo"
-                  >
-                    {{ erroresEntregables[`comun-${indice}`] }}
-                  </p>
-                </li>
-              </ul>
-              <p v-else class="mt-3 text-xs text-cafe/45">
-                Sin archivos comunes: cada comprador recibe solo su variante.
-              </p>
-            </div>
-
-            <p class="rounded-xl bg-crema/60 px-4 py-3 text-xs leading-relaxed text-cafe/65">
-              <span class="font-semibold text-granate">Se entrega el archivo original.</span>
-              La vidriera pública usa una copia optimizada; el comprador recibe el
-              archivo tal como lo subiste.
-            </p>
-          </section>
-
-          <!-- Paso 5: revisión -->
-          <section v-else-if="paso === 5" class="space-y-5">
+          <!-- Paso 4: revisión -->
+          <section v-else-if="paso === 4" class="space-y-5">
             <article class="rounded-2xl border border-rosa/60 bg-crema/40 p-5">
               <div class="flex items-start justify-between gap-3">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
@@ -1986,20 +1660,18 @@ onBeforeUnmount(() => {
             <article v-if="!esEntregaFisica" class="rounded-2xl border border-rosa/60 bg-blanco p-5">
               <div class="flex items-start justify-between gap-3">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
-                  Entregables
+                  Entrega
                 </p>
                 <button
                   type="button"
                   class="text-xs font-medium text-coral transition hover:text-rojizo"
-                  @click="irAEditar(4)"
+                  @click="irAEditar(2)"
                 >
                   Editar
                 </button>
               </div>
               <p class="mt-2 text-sm text-cafe/65">
-                {{ entregablesComunes.length
-                  ? `Cada comprador recibe su variante más ${entregablesComunes.length} archivo(s) común(es).`
-                  : 'Cada comprador recibe el archivo de su variante.' }}
+                Cada comprador recibe el archivo original de la variante que compra.
               </p>
               <div class="mt-3 divide-y divide-rosa/40">
                 <div
@@ -2018,9 +1690,7 @@ onBeforeUnmount(() => {
                       {{ nombrePresentacion(variante) }}
                     </p>
                     <p class="text-xs text-cafe/55">
-                      {{ variante.entregableSha256
-                        ? 'Archivo elegido'
-                        : 'Imagen original de la variante' }}
+                      Imagen original de la variante
                     </p>
                   </div>
                   <span
@@ -2079,7 +1749,7 @@ onBeforeUnmount(() => {
 
             <div class="flex items-center gap-3">
               <button
-                v-if="paso !== 5"
+                v-if="paso !== 4"
                 type="button"
                 class="rounded-lg bg-coral px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-rojizo"
                 @click="siguiente"

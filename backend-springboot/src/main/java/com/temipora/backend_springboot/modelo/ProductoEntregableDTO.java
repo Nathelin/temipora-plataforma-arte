@@ -6,6 +6,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Archivo que recibe el comprador. Hoy hay exactamente uno por variante y es
+ * su imagen original; el modelo deja lugar a varios (bundles, packs) sin
+ * cambiar el contrato.
+ */
 @Getter
 @Setter
 @NoArgsConstructor
@@ -13,8 +18,7 @@ import lombok.Setter;
 @Builder
 public class ProductoEntregableDTO {
 
-    private Long idEntregable;
-    private AlcanceEntregable alcance;
+    private Long idProducto;
     private Long idVariante;
     private String nombreVariante;
     private String nombre;

@@ -45,11 +45,4 @@ public class ProductoRequest {
 
     @Valid
     private LicenciaProductoRequest licencia;
-
-    /**
-     * Archivos que reciben todos los compradores, además de su variante.
-     * Opcional.
-     */
-    @Size(max = 20, message = "Un producto puede tener como máximo 20 entregables comunes.")
-    private List<@Valid ProductoEntregableRequest> entregablesComunes;
 }

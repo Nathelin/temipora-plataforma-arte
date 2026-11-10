@@ -47,8 +47,8 @@ import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
 import com.temipora.backend_springboot.repositorios.ProductoImagenRepository;
-import com.temipora.backend_springboot.repositorios.ProductoEntregableRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
+import com.temipora.backend_springboot.repositorios.ProductoVarianteImagenRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
 import com.temipora.backend_springboot.repositorios.TipoProductoRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
@@ -69,7 +69,7 @@ class ProductoServiceTest {
     @Mock private EtiquetaRepository etiquetaRepository;
     @Mock private MonedaService monedaService;
     @Mock private DerechoTerminoRepository derechoTerminoRepository;
-    @Mock private ProductoEntregableRepository entregableRepository;
+    @Mock private ProductoVarianteImagenRepository varianteImagenRepository;
     @Mock private AlmacenPrivadoService almacenPrivadoService;
     @Mock private LedgerService ledgerService;
     @Mock private AuditoriaService auditoriaService;
@@ -416,10 +416,17 @@ class ProductoServiceTest {
             .thenAnswer(inv -> {
                 Producto producto = inv.getArgument(0);
                 producto.setIdProducto(10L);
+                long id = 20L;
+                for (ProductoVariante variante : producto.getVariantes()) {
+                    variante.setIdVariante(id++);
+                }
                 return producto;
             });
-        when(entregableRepository.findByProductoIdProductoInOrderByOrdenAsc(any()))
-            .thenReturn(List.of());
+        when(varianteImagenRepository.findByVarianteIdVarianteAndVigenteTrue(any()))
+            .thenReturn(java.util.Optional.empty());
+        when(varianteImagenRepository.findTopByVarianteIdVarianteOrderByNumeroDesc(any()))
+            .thenReturn(java.util.Optional.empty());
+        when(varianteImagenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ProductoRequest request = new ProductoRequest();
         request.setTitulo("Bo");
@@ -446,10 +453,17 @@ class ProductoServiceTest {
             .thenAnswer(inv -> {
                 Producto producto = inv.getArgument(0);
                 producto.setIdProducto(10L);
+                long id = 20L;
+                for (ProductoVariante variante : producto.getVariantes()) {
+                    variante.setIdVariante(id++);
+                }
                 return producto;
             });
-        when(entregableRepository.findByProductoIdProductoInOrderByOrdenAsc(any()))
-            .thenReturn(List.of());
+        when(varianteImagenRepository.findByVarianteIdVarianteAndVigenteTrue(any()))
+            .thenReturn(java.util.Optional.empty());
+        when(varianteImagenRepository.findTopByVarianteIdVarianteOrderByNumeroDesc(any()))
+            .thenReturn(java.util.Optional.empty());
+        when(varianteImagenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ProductoRequest request = new ProductoRequest();
         request.setIdMedio(2L);
@@ -458,7 +472,8 @@ class ProductoServiceTest {
 
         productoService.guardarBorrador(5L, null, request);
 
-        verify(entregableRepository).saveAll(any());
+        verify(varianteImagenRepository, org.mockito.Mockito.atLeastOnce())
+            .save(any());
         verify(ledgerService, never()).registrarGenesis(
             any(ProductoVariante.class), anyString());
     }
@@ -477,7 +492,6 @@ class ProductoServiceTest {
         ProductoRequest request = request();
         request.getVariantes().get(0).setSha256(null);
         request.getVariantes().get(0).setClaveArchivoOriginal(null);
-        request.getVariantes().get(0).setEntregablesSha256(null);
 
         assertThatThrownBy(() -> productoService.publicarBorrador(10L, 5L, request))
             .isInstanceOf(IllegalArgumentException.class)
@@ -503,13 +517,24 @@ class ProductoServiceTest {
             .thenReturn(Optional.of(medio(2L, "Digital")));
         when(monedaService.obtener(3L)).thenReturn(moneda(3L, "ARS"));
         when(productoRepository.saveAndFlush(any(Producto.class)))
-            .thenAnswer(inv -> inv.getArgument(0));
+            .thenAnswer(inv -> {
+                Producto guardado = inv.getArgument(0);
+                long id = 20L;
+                for (ProductoVariante variante : guardado.getVariantes()) {
+                    if (variante.getIdVariante() == null) {
+                        variante.setIdVariante(id++);
+                    }
+                }
+                return guardado;
+            });
         when(eventoLedgerRepository.existsByVarianteIdVariante(20L)).thenReturn(false);
         when(eventoLedgerRepository.findVariantesConLedger(List.of(10L)))
             .thenReturn(Set.of(20L));
-        when(entregableRepository.findByProductoIdProductoInOrderByOrdenAsc(any()))
-            .thenReturn(List.of());
-        when(entregableRepository.saveAll(any())).thenReturn(List.of());
+        when(varianteImagenRepository.findByVarianteIdVarianteAndVigenteTrue(any()))
+            .thenReturn(java.util.Optional.empty());
+        when(varianteImagenRepository.findTopByVarianteIdVarianteOrderByNumeroDesc(any()))
+            .thenReturn(java.util.Optional.empty());
+        when(varianteImagenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ProductoDTO dto = productoService.publicarBorrador(10L, 5L, request());
 
@@ -579,9 +604,11 @@ class ProductoServiceTest {
             });
         when(eventoLedgerRepository.findVariantesConLedger(List.of(10L)))
             .thenReturn(Set.of(20L));
-        when(entregableRepository.findByProductoIdProductoInOrderByOrdenAsc(any()))
-            .thenReturn(List.of());
-        when(entregableRepository.saveAll(any())).thenReturn(List.of());
+        when(varianteImagenRepository.findByVarianteIdVarianteAndVigenteTrue(any()))
+            .thenReturn(java.util.Optional.empty());
+        when(varianteImagenRepository.findTopByVarianteIdVarianteOrderByNumeroDesc(any()))
+            .thenReturn(java.util.Optional.empty());
+        when(varianteImagenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
     private void prepararModificacion(Producto producto) {
@@ -604,9 +631,11 @@ class ProductoServiceTest {
         when(eventoLedgerRepository.existsByVarianteIdVariante(20L)).thenReturn(true);
         when(eventoLedgerRepository.findVariantesConLedger(List.of(10L)))
             .thenReturn(Set.of(20L));
-        when(entregableRepository.findByProductoIdProductoInOrderByOrdenAsc(any()))
-            .thenReturn(List.of());
-        when(entregableRepository.saveAll(any())).thenReturn(List.of());
+        when(varianteImagenRepository.findByVarianteIdVarianteAndVigenteTrue(any()))
+            .thenReturn(java.util.Optional.empty());
+        when(varianteImagenRepository.findTopByVarianteIdVarianteOrderByNumeroDesc(any()))
+            .thenReturn(java.util.Optional.empty());
+        when(varianteImagenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
     private ProductoRequest request() {

@@ -28,7 +28,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-import com.temipora.backend_springboot.modelo.AlcanceEntregable;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.DerechoTerminoDTO;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
@@ -46,15 +45,14 @@ import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Producto;
 import com.temipora.backend_springboot.modelo.ProductoDTO;
 import com.temipora.backend_springboot.modelo.ProductoEtiqueta;
-import com.temipora.backend_springboot.modelo.ProductoEntregable;
 import com.temipora.backend_springboot.modelo.ProductoEntregableDTO;
-import com.temipora.backend_springboot.modelo.ProductoEntregableRequest;
 import com.temipora.backend_springboot.modelo.ProductoImagen;
 import com.temipora.backend_springboot.modelo.ProductoImagenDTO;
 import com.temipora.backend_springboot.modelo.ProductoImagenRequest;
 import com.temipora.backend_springboot.modelo.ProductoRequest;
 import com.temipora.backend_springboot.modelo.ProductoVariante;
 import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
+import com.temipora.backend_springboot.modelo.ProductoVarianteImagen;
 import com.temipora.backend_springboot.modelo.ProductoVarianteRequest;
 import com.temipora.backend_springboot.modelo.TipoProducto;
 import com.temipora.backend_springboot.modelo.TipoEntrega;
@@ -64,8 +62,8 @@ import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
 import com.temipora.backend_springboot.repositorios.ProductoImagenRepository;
-import com.temipora.backend_springboot.repositorios.ProductoEntregableRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
+import com.temipora.backend_springboot.repositorios.ProductoVarianteImagenRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
 import com.temipora.backend_springboot.repositorios.TipoProductoRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
@@ -98,7 +96,7 @@ public class ProductoService {
     private final EtiquetaRepository etiquetaRepository;
     private final MonedaService monedaService;
     private final DerechoTerminoRepository derechoTerminoRepository;
-    private final ProductoEntregableRepository entregableRepository;
+    private final ProductoVarianteImagenRepository varianteImagenRepository;
     private final AlmacenPrivadoService almacenPrivadoService;
     private final LedgerService ledgerService;
     private final AuditoriaService auditoria;
@@ -114,7 +112,7 @@ public class ProductoService {
             EtiquetaRepository etiquetaRepository,
             MonedaService monedaService,
             DerechoTerminoRepository derechoTerminoRepository,
-            ProductoEntregableRepository entregableRepository,
+            ProductoVarianteImagenRepository varianteImagenRepository,
             AlmacenPrivadoService almacenPrivadoService,
             LedgerService ledgerService,
             AuditoriaService auditoria) {
@@ -128,7 +126,7 @@ public class ProductoService {
         this.etiquetaRepository = etiquetaRepository;
         this.monedaService = monedaService;
         this.derechoTerminoRepository = derechoTerminoRepository;
-        this.entregableRepository = entregableRepository;
+        this.varianteImagenRepository = varianteImagenRepository;
         this.almacenPrivadoService = almacenPrivadoService;
         this.ledgerService = ledgerService;
         this.auditoria = auditoria;
@@ -144,10 +142,8 @@ public class ProductoService {
         }
         Set<Long> conLedger = eventoLedgerRepository.findVariantesConLedger(
             productos.stream().map(Producto::getIdProducto).toList());
-        Map<Long, List<ProductoEntregableDTO>> entregables = entregablesPorProducto(
-            productos.stream().map(Producto::getIdProducto).toList());
         return productos.stream()
-            .map(producto -> aDTO(producto, conLedger, entregables))
+            .map(producto -> aDTO(producto, conLedger))
             .toList();
     }
 
@@ -156,9 +152,7 @@ public class ProductoService {
         Producto producto = obtenerEntidadPropia(idProducto, idArtista);
         Set<Long> conLedger = eventoLedgerRepository.findVariantesConLedger(
             List.of(idProducto));
-        Map<Long, List<ProductoEntregableDTO>> entregables = entregablesPorProducto(
-            List.of(idProducto));
-        return aDTO(producto, conLedger, entregables);
+        return aDTO(producto, conLedger);
     }
 
     @Transactional(readOnly = true)
@@ -233,7 +227,7 @@ public class ProductoService {
             1, true));
 
         Producto guardado = productoRepository.saveAndFlush(producto);
-        reemplazarEntregables(guardado, request);
+        registrarVersionesDeImagen(guardado, guardado.getArtista());
 
         String hashLicencia = hashLicencia(guardado.licenciaVigente());
         for (ProductoVariante variante : guardado.getVariantes()) {
@@ -299,7 +293,7 @@ public class ProductoService {
         producto.setFechaActualizacion(LocalDateTime.now());
 
         Producto guardado = productoRepository.saveAndFlush(producto);
-        reemplazarEntregables(guardado, request);
+        registrarVersionesDeImagen(guardado, guardado.getArtista());
 
         auditoria.registrar(
             esNuevo ? AccionesAdmin.PRODUCTO_BORRADOR_CREAR
@@ -347,7 +341,7 @@ public class ProductoService {
         producto.setFechaActualizacion(LocalDateTime.now());
 
         Producto guardado = productoRepository.saveAndFlush(producto);
-        reemplazarEntregables(guardado, request);
+        registrarVersionesDeImagen(guardado, guardado.getArtista());
 
         String hashLicencia = hashLicencia(guardado.licenciaVigente());
         for (ProductoVariante variante : guardado.getVariantes()) {
@@ -398,7 +392,7 @@ public class ProductoService {
         producto.setFechaActualizacion(LocalDateTime.now());
 
         Producto guardado = productoRepository.saveAndFlush(producto);
-        reemplazarEntregables(guardado, request);
+        registrarVersionesDeImagen(guardado, guardado.getArtista());
 
         String hashLicencia = hashLicencia(guardado.licenciaVigente());
         for (ProductoVariante variante : guardado.getVariantes()) {
@@ -483,18 +477,16 @@ public class ProductoService {
 
     public ProductoDTO aDTO(Producto producto) {
         if (producto.getIdProducto() == null) {
-            return aDTO(producto, Set.of(), Map.of());
+            return aDTO(producto, Set.of());
         }
         Set<Long> conLedger = eventoLedgerRepository.findVariantesConLedger(
             List.of(producto.getIdProducto()));
-        return aDTO(producto, conLedger,
-            entregablesPorProducto(List.of(producto.getIdProducto())));
+        return aDTO(producto, conLedger);
     }
 
     private ProductoDTO aDTO(
             Producto producto,
-            Set<Long> variantesConLedger,
-            Map<Long, List<ProductoEntregableDTO>> entregables) {
+            Set<Long> variantesConLedger) {
         List<ProductoVariante> variantes = producto.getVariantes().stream()
             .sorted(Comparator.comparing(ProductoVariante::getOrden,
                 Comparator.nullsLast(Integer::compareTo)))
@@ -573,8 +565,7 @@ public class ProductoService {
                     .build())
                 .toList())
             .variantes(variantesDTO)
-            .entregables(entregables.getOrDefault(
-                producto.getIdProducto(), List.of()))
+            .entregables(entregablesDe(producto))
             .etiquetas(producto.getEtiquetas().stream()
                 .map(ProductoEtiqueta::getEtiqueta)
                 .sorted(Comparator.comparing(Etiqueta::getNombre,
@@ -615,30 +606,46 @@ public class ProductoService {
             .build();
     }
 
-    private Map<Long, List<ProductoEntregableDTO>> entregablesPorProducto(
-            Collection<Long> idsProducto) {
-        if (idsProducto == null || idsProducto.isEmpty()) {
-            return Map.of();
+    /**
+     * Entregable de una variante. Hoy es siempre el archivo original de su
+     * imagen: no se elige ni se puede quitar, de modo que el hash del ledger
+     * (hash_imagen) coincide con el archivo que recibe el comprador.
+     *
+     * Cuando se admitan varios archivos por variante (o bundles), este método
+     * pasa a devolver una lista sin cambiar a sus llamadores.
+     */
+    private List<ProductoEntregableDTO> entregablesDeVariante(ProductoVariante variante) {
+        if (variante == null || !hayTexto(variante.getClaveArchivoOriginal())) {
+            return List.of();
         }
-        return entregableRepository
-            .findByProductoIdProductoInOrderByOrdenAsc(idsProducto)
-            .stream()
-            .collect(Collectors.groupingBy(
-                entregable -> entregable.getProducto().getIdProducto(),
-                Collectors.mapping(entregable -> ProductoEntregableDTO.builder()
-                    .idEntregable(entregable.getIdEntregable())
-                    .alcance(entregable.getAlcance())
-                    .idVariante(entregable.getVariante() != null
-                        ? entregable.getVariante().getIdVariante() : null)
-                    .nombreVariante(entregable.getVariante() != null
-                        ? entregable.getVariante().getNombre() : null)
-                    .nombre(entregable.getNombre())
-                    .mime(entregable.getMime())
-                    .tamanoBytes(entregable.getTamanoBytes())
-                    .sha256(entregable.getSha256())
-                    .orden(entregable.getOrden())
-                    .build(),
-                    Collectors.toList())));
+        return List.of(ProductoEntregableDTO.builder()
+            .idVariante(variante.getIdVariante())
+            .nombreVariante(variante.getNombre())
+            .nombre(variante.getNombre())
+            .sha256(variante.getSha256())
+            .mime(mimeDe(variante.getClaveArchivoOriginal()))
+            .tamanoBytes(tamanoSeguro(variante.getClaveArchivoOriginal()))
+            .orden(0)
+            .build());
+    }
+
+    /**
+     * Entregables de un producto: la concatenación de los de sus variantes.
+     */
+    private List<ProductoEntregableDTO> entregablesDe(Producto producto) {
+        if (producto == null) {
+            return List.of();
+        }
+        return producto.getVariantes().stream()
+            .filter(variante -> variante.getEstado() != EstadoVariante.ARCHIVADO)
+            .sorted(Comparator.comparing(ProductoVariante::getOrden,
+                Comparator.nullsLast(Integer::compareTo)))
+            .flatMap(variante -> entregablesDeVariante(variante).stream()
+                .map(entregable -> {
+                    entregable.setIdProducto(producto.getIdProducto());
+                    return entregable;
+                }))
+            .toList();
     }
 
     private void aplicarProducto(
@@ -1262,26 +1269,29 @@ public class ProductoService {
     }
 
     /**
-     * Los entregables son obligatorios para productos de entrega digital:
-     * publicar un producto cuyo comprador no recibiría nada es un error.
+     * El entregable de una variante es su imagen, así que publicar un producto
+     * digital sin imagen de variante dejaría al comprador sin archivo. Tampoco
+     * se admite que dos variantes del mismo producto entreguen la misma imagen.
      */
     private void validarEntregables(ProductoRequest request) {
         boolean digital = esEntregaDigital(request.getIdMedio());
         if (!digital) {
             return;
         }
+        Set<String> shasDelProducto = new HashSet<>();
         for (ProductoVarianteRequest variante : request.getVariantes()) {
-            List<String> seleccion = variante.getEntregablesSha256();
-            boolean traeLista = seleccion != null && !seleccion.isEmpty()
-                && seleccion.stream().anyMatch(this::hayTexto);
-            // Sin lista explícita se preselecciona la imagen de la variante.
-            boolean tienePropia = hayTexto(variante.getSha256());
-            if (!traeLista && !tienePropia) {
+            if (!hayTexto(variante.getSha256())) {
                 throw new IllegalArgumentException(
                     "Falta el archivo que recibe el comprador de la variante “"
                         + (variante.getNombre() != null ? variante.getNombre().trim()
                             : "sin nombre")
-                        + "”. Subí su imagen para usarla como entregable.");
+                        + "”. Cada variante entrega su propia imagen.");
+            }
+            String sha = variante.getSha256().trim().toLowerCase(Locale.ROOT);
+            if (!shasDelProducto.add(sha)) {
+                throw new IllegalArgumentException(
+                    "Dos variantes del mismo producto no pueden entregar la misma "
+                        + "imagen. Cada variante necesita su propio archivo.");
             }
         }
     }
@@ -1296,156 +1306,47 @@ public class ProductoService {
     }
 
     /**
-     * Persiste los entregables declarados. En v1 el archivo se resuelve a
-     * partir de imágenes ya subidas del propio producto, de modo que una
-     * variante sin entregable explícito usa su archivo privado original.
+     * Deja registrada la imagen vigente de cada variante en el historial.
+     *
+     * Las variantes de stock 1 no rotan: el ledger fija su imagen y el servicio
+     * rechaza cualquier cambio. Las de más stock sí pueden cambiar, y cada
+     * cambio abre una versión nueva, de modo que queda trazado qué archivo se
+     * entregaba en cada momento.
      */
-    private void reemplazarEntregables(Producto producto, ProductoRequest request) {
-        entregableRepository.deleteByProductoIdProducto(producto.getIdProducto());
-        // Hibernate ejecuta los INSERT antes que los DELETE. Sin este flush, al
-        // editar un producto que ya tenía entregables los nuevos chocan contra
-        // uk_entregable_variante mientras las filas anteriores siguen presentes.
-        entregableRepository.flush();
-        if (!esEntregaDigital(producto.getMedio() != null
-                ? producto.getMedio().getIdMedio() : null)) {
-            return;
-        }
-
-        Map<String, ProductoImagen> imagenesPorSha = new HashMap<>();
-        for (ProductoImagen imagen : producto.getImagenes()) {
-            if (imagen.getSha256() != null) {
-                imagenesPorSha.put(imagen.getSha256().toLowerCase(Locale.ROOT), imagen);
-            }
-        }
-
-        List<ProductoEntregable> nuevos = new ArrayList<>();
-        if (request.getEntregablesComunes() != null) {
-            int orden = 0;
-            for (ProductoEntregableRequest comun : request.getEntregablesComunes()) {
-                ProductoImagen imagen = resolverImagenEntregable(
-                    comun.getSha256(), imagenesPorSha);
-                if (imagen == null) {
-                    throw new IllegalArgumentException(
-                        "El entregable común tiene que ser una imagen de este producto.");
-                }
-                nuevos.add(construirEntregable(
-                    producto, null, AlcanceEntregable.COMUN, imagen,
-                    comun.getNombre(), comun.getOrden() != null ? comun.getOrden() : orden));
-                orden++;
-            }
-        }
-
-        for (ProductoVarianteRequest varianteRequest : request.getVariantes()) {
-            ProductoVariante variante = buscarVariante(
-                producto, varianteRequest.getOrden(), varianteRequest.getIdVariante());
-            if (variante == null) {
+    private void registrarVersionesDeImagen(
+            Producto producto, Usuario autor) {
+        for (ProductoVariante variante : producto.getVariantes()) {
+            if (variante.getIdVariante() == null || !hayTexto(variante.getSha256())) {
                 continue;
             }
-            agregarEntregablesDeVariante(
-                producto, variante, varianteRequest, imagenesPorSha, nuevos);
-        }
-        entregableRepository.saveAll(nuevos);
-    }
-
-    /**
-     * Resuelve los archivos de una variante. Si el request no trae la lista,
-     * se preselecciona la imagen propia de la variante: publicar un producto
-     * digital cuyo comprador no recibe nada sería un error.
-     */
-    private void agregarEntregablesDeVariante(
-            Producto producto,
-            ProductoVariante variante,
-            ProductoVarianteRequest request,
-            Map<String, ProductoImagen> imagenesPorSha,
-            List<ProductoEntregable> destino) {
-        List<String> seleccion = request.getEntregablesSha256();
-        if (seleccion == null || seleccion.isEmpty()) {
-            seleccion = new ArrayList<>();
-            String propia = hayTexto(variante.getSha256())
-                ? variante.getSha256()
-                : request.getSha256();
-            if (hayTexto(propia)) {
-                seleccion.add(propia);
-            }
-        }
-
-        Set<String> vistos = new LinkedHashSet<>();
-        int orden = 0;
-        for (String sha : seleccion) {
-            if (!hayTexto(sha)) {
+            ProductoVarianteImagen vigente = varianteImagenRepository
+                .findByVarianteIdVarianteAndVigenteTrue(variante.getIdVariante())
+                .orElse(null);
+            if (vigente != null
+                    && Objects.equals(vigente.getSha256(), variante.getSha256())) {
                 continue;
             }
-            String normalizado = sha.trim().toLowerCase(Locale.ROOT);
-            if (!vistos.add(normalizado)) {
-                continue;
+            if (vigente != null) {
+                vigente.setVigente(false);
+                vigente.setFechaHasta(LocalDateTime.now());
+                varianteImagenRepository.save(vigente);
+                // Flush del cierre antes del alta: el índice único parcial de
+                // vigencia no admite dos filas vigentes a la vez.
+                varianteImagenRepository.flush();
             }
-            ProductoImagen imagen = imagenesPorSha.get(normalizado);
-            if (imagen != null) {
-                destino.add(construirEntregable(
-                    producto, variante, AlcanceEntregable.VARIANTE, imagen,
-                    orden == 0 ? request.getEntregableNombre() : null, orden));
-                orden++;
-                continue;
-            }
-            // La imagen de la variante puede no estar en la galería.
-            if (hayTexto(variante.getClaveArchivoOriginal())
-                    && normalizado.equalsIgnoreCase(variante.getSha256())) {
-                destino.add(entregableDesdeVariante(producto, variante, orden));
-                orden++;
-                continue;
-            }
-            throw new IllegalArgumentException(
-                "Uno de los archivos de la variante “" + variante.getNombre()
-                    + "” no pertenece a la galería del producto.");
+            ProductoVarianteImagen nueva = new ProductoVarianteImagen();
+            nueva.setVariante(variante);
+            nueva.setNumero(varianteImagenRepository
+                .findTopByVarianteIdVarianteOrderByNumeroDesc(variante.getIdVariante())
+                .map(anterior -> anterior.getNumero() + 1)
+                .orElse(1));
+            nueva.setUrl(variante.getImagenUrl());
+            nueva.setSha256(variante.getSha256());
+            nueva.setClaveArchivoOriginal(variante.getClaveArchivoOriginal());
+            nueva.setVigente(true);
+            nueva.setUsuarioCambio(autor);
+            varianteImagenRepository.save(nueva);
         }
-    }
-
-    private ProductoEntregable entregableDesdeVariante(
-            Producto producto, ProductoVariante variante, int orden) {
-        ProductoEntregable entregable = new ProductoEntregable();
-        entregable.setProducto(producto);
-        entregable.setVariante(variante);
-        entregable.setAlcance(AlcanceEntregable.VARIANTE);
-        entregable.setNombre(nombreArchivo(variante));
-        entregable.setClaveArchivo(variante.getClaveArchivoOriginal());
-        entregable.setSha256(variante.getSha256());
-        entregable.setMime(mimeDe(variante.getClaveArchivoOriginal()));
-        entregable.setTamanoBytes(tamanoSeguro(variante.getClaveArchivoOriginal()));
-        entregable.setOrden(orden);
-        return entregable;
-    }
-
-    private ProductoEntregable construirEntregable(
-            Producto producto,
-            ProductoVariante variante,
-            AlcanceEntregable alcance,
-            ProductoImagen imagen,
-            String nombre,
-            Integer orden) {
-        ProductoEntregable entregable = new ProductoEntregable();
-        entregable.setProducto(producto);
-        entregable.setVariante(variante);
-        entregable.setAlcance(alcance);
-        entregable.setNombre(hayTexto(nombre)
-            ? nombre.trim()
-            : (imagen.getUrl() != null
-                ? imagen.getUrl().substring(imagen.getUrl().lastIndexOf('/') + 1)
-                : "archivo"));
-        entregable.setClaveArchivo(imagen.getClaveArchivoOriginal());
-        entregable.setSha256(imagen.getSha256());
-        entregable.setMime("image/webp");
-        entregable.setTamanoBytes(imagen.getClaveArchivoOriginal() != null
-            ? tamanoSeguro(imagen.getClaveArchivoOriginal()) : null);
-        entregable.setOrden(orden != null ? orden : 0);
-        return entregable;
-    }
-
-    private ProductoImagen resolverImagenEntregable(
-            String sha256, Map<String, ProductoImagen> imagenesPorSha) {
-        if (!hayTexto(sha256)) {
-            return null;
-        }
-        return imagenesPorSha.get(sha256.trim().toLowerCase(Locale.ROOT));
     }
 
     private ProductoVariante buscarVariante(

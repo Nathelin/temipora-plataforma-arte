@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -13,7 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.temipora.backend_springboot.modelo.AlcanceEntregable;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
@@ -42,6 +42,7 @@ import com.temipora.backend_springboot.repositorios.MedioRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
 import com.temipora.backend_springboot.repositorios.TipoProductoRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
+import com.temipora.backend_springboot.repositorios.ProductoVarianteImagenRepository;
 import com.temipora.backend_springboot.servicios.LedgerService;
 import com.temipora.backend_springboot.servicios.MonedaService;
 import com.temipora.backend_springboot.servicios.ProductoService;
@@ -59,6 +60,7 @@ class ProductoIntegracionTest {
     @Autowired private ProductoRepository productoRepository;
     @Autowired private EventoLedgerRepository eventoLedgerRepository;
     @Autowired private DerechoTerminoRepository derechoTerminoRepository;
+    @Autowired private ProductoVarianteImagenRepository varianteImagenRepository;
 
     @Test
     void crearProductoUnico_persisteVariantesLicenciaYGenesis() {
@@ -254,7 +256,7 @@ class ProductoIntegracionTest {
     }
 
     @Test
-    void publicarProducto_entregaVariosArchivosPorVariante() {
+    void publicarProducto_cadaVarianteEntregaSuPropiaImagen() {
         Usuario artista = usuarioRepository.findAll().stream()
             .filter(usuario -> usuario.getRol() != null
                 && usuario.getRol().getNombre() == ERol.ARTISTA)
@@ -269,38 +271,39 @@ class ProductoIntegracionTest {
             .orElseThrow();
         Moneda moneda = monedaService.predeterminada();
 
-        List<String> shasGaleria = List.of(
-            shaAleatorio(), shaAleatorio(), shaAleatorio());
+        List<String> shas = List.of(shaAleatorio(), shaAleatorio());
 
         List<ProductoImagenRequest> imagenes = new ArrayList<>();
-        for (int i = 0; i < shasGaleria.size(); i++) {
+        for (int i = 0; i < shas.size(); i++) {
             ProductoImagenRequest imagen = new ProductoImagenRequest();
-            imagen.setUrl("/uploads/pack-" + i + ".webp");
-            imagen.setSha256(shasGaleria.get(i));
-            imagen.setClaveArchivoOriginal("productos/pack-" + i + ".jpg");
+            imagen.setUrl("/uploads/dos-" + i + ".webp");
+            imagen.setSha256(shas.get(i));
+            imagen.setClaveArchivoOriginal("productos/dos-" + i + ".jpg");
             imagen.setOrden(i);
             imagenes.add(imagen);
         }
 
-        ProductoVarianteRequest variante = new ProductoVarianteRequest();
-        variante.setNombre("Pack de fondos");
-        variante.setPrecio(new BigDecimal("500.00"));
-        variante.setStockDisponible(null);
-        variante.setOrden(0);
-        variante.setEstado(EstadoVariante.DISPONIBLE);
-        variante.setUrlImagen("/uploads/pack-0.webp");
-        variante.setSha256(shasGaleria.get(0));
-        variante.setClaveArchivoOriginal("productos/pack-0.jpg");
-        variante.setEntregablesSha256(new ArrayList<>(shasGaleria));
+        List<ProductoVarianteRequest> variantes = new ArrayList<>();
+        for (int i = 0; i < shas.size(); i++) {
+            ProductoVarianteRequest variante = new ProductoVarianteRequest();
+            variante.setNombre("Variante " + (i + 1));
+            variante.setPrecio(new BigDecimal("100.00"));
+            variante.setStockDisponible(null);
+            variante.setOrden(i);
+            variante.setUrlImagen(imagenes.get(i).getUrl());
+            variante.setSha256(shas.get(i));
+            variante.setClaveArchivoOriginal(imagenes.get(i).getClaveArchivoOriginal());
+            variantes.add(variante);
+        }
 
         ProductoRequest request = new ProductoRequest();
         request.setIdTipoProducto(tipo.getIdTipoProducto());
         request.setIdMedio(medio.getIdMedio());
         request.setIdMoneda(moneda.getIdMoneda());
-        request.setTitulo("Pack tres fondos " + UUID.randomUUID());
-        request.setDescripcion("Pack de prueba con tres archivos.");
+        request.setTitulo("Dos variantes " + UUID.randomUUID());
+        request.setDescripcion("Cada variante entrega su propia imagen.");
         request.setImagenes(imagenes);
-        request.setVariantes(new ArrayList<>(List.of(variante)));
+        request.setVariantes(variantes);
         request.setIdsEtiquetas(Set.of());
         request.setContenidosSensibles(Set.of());
 
@@ -316,16 +319,81 @@ class ProductoIntegracionTest {
 
         ProductoDTO dto = productoService.crear(artista.getIdUsuario(), request);
 
-        List<ProductoEntregableDTO> entregables = dto.getEntregables().stream()
-            .filter(e -> e.getAlcance() == AlcanceEntregable.VARIANTE)
-            .toList();
-        assertThat(entregables).hasSize(3);
-        assertThat(entregables)
+        assertThat(dto.getEntregables()).hasSize(2);
+        assertThat(dto.getEntregables())
             .extracting(ProductoEntregableDTO::getSha256)
-            .containsExactlyInAnyOrderElementsOf(shasGaleria);
-        assertThat(entregables)
-            .extracting(ProductoEntregableDTO::getOrden)
-            .containsExactly(0, 1, 2);
+            .containsExactlyInAnyOrderElementsOf(shas);
+        // El entregable es la imagen de su propia variante.
+        for (ProductoEntregableDTO entregable : dto.getEntregables()) {
+            var variante = dto.getVariantes().stream()
+                .filter(v -> v.getIdVariante().equals(entregable.getIdVariante()))
+                .findFirst()
+                .orElseThrow();
+            assertThat(entregable.getSha256()).isEqualTo(variante.getSha256());
+        }
+    }
+
+    @Test
+    void publicarProducto_dosVariantesConLaMismaImagen_lanzaError() {
+        Usuario artista = usuarioRepository.findAll().stream()
+            .filter(usuario -> usuario.getRol() != null
+                && usuario.getRol().getNombre() == ERol.ARTISTA)
+            .findFirst()
+            .orElseThrow();
+
+        TipoProducto tipo = tipoProductoRepository
+            .findByActivoTrueOrderByNombreAsc().get(0);
+        Medio medio = medioRepository.findByActivoTrueOrderByNombreAsc().stream()
+            .filter(m -> m.getTipoEntrega() == TipoEntrega.DIGITAL)
+            .findFirst()
+            .orElseThrow();
+        Moneda moneda = monedaService.predeterminada();
+
+        String shaCompartido = shaAleatorio();
+
+        ProductoImagenRequest imagen = new ProductoImagenRequest();
+        imagen.setUrl("/uploads/compartida.webp");
+        imagen.setSha256(shaCompartido);
+        imagen.setClaveArchivoOriginal("productos/compartida.jpg");
+        imagen.setOrden(0);
+
+        List<ProductoVarianteRequest> variantes = new ArrayList<>();
+        for (int i = 0; i < 2; i++) {
+            ProductoVarianteRequest variante = new ProductoVarianteRequest();
+            variante.setNombre("Variante " + (i + 1));
+            variante.setPrecio(new BigDecimal("100.00"));
+            variante.setStockDisponible(null);
+            variante.setOrden(i);
+            variante.setUrlImagen(imagen.getUrl());
+            variante.setSha256(shaCompartido);
+            variante.setClaveArchivoOriginal(imagen.getClaveArchivoOriginal());
+            variantes.add(variante);
+        }
+
+        ProductoRequest request = new ProductoRequest();
+        request.setIdTipoProducto(tipo.getIdTipoProducto());
+        request.setIdMedio(medio.getIdMedio());
+        request.setIdMoneda(moneda.getIdMoneda());
+        request.setTitulo("Imagen compartida " + UUID.randomUUID());
+        request.setDescripcion("Dos variantes con el mismo archivo.");
+        request.setImagenes(new ArrayList<>(List.of(imagen)));
+        request.setVariantes(variantes);
+        request.setIdsEtiquetas(Set.of());
+        request.setContenidosSensibles(Set.of());
+
+        DerechoTermino personal = derechoTerminoRepository
+            .findByActivoTrueOrderByOrdenAsc().stream()
+            .filter(derecho -> "PERSONAL".equals(derecho.getCodigo()))
+            .findFirst()
+            .orElseThrow();
+        LicenciaProductoRequest licencia = new LicenciaProductoRequest();
+        licencia.setIdsDerechos(Set.of(personal.getIdDerechoTermino()));
+        licencia.setPorcentajeRegalia(BigDecimal.ZERO);
+        request.setLicencia(licencia);
+
+        assertThatThrownBy(() -> productoService.crear(artista.getIdUsuario(), request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("no pueden entregar la misma imagen");
     }
 
     @Test
@@ -384,9 +452,7 @@ class ProductoIntegracionTest {
 
         ProductoDTO dto = productoService.crear(artista.getIdUsuario(), request);
 
-        List<ProductoEntregableDTO> entregables = dto.getEntregables().stream()
-            .filter(e -> e.getAlcance() == AlcanceEntregable.VARIANTE)
-            .toList();
+        List<ProductoEntregableDTO> entregables = dto.getEntregables();
         assertThat(entregables).hasSize(1);
         assertThat(entregables.get(0).getSha256()).isEqualTo(shaPropio);
     }
@@ -462,7 +528,6 @@ class ProductoIntegracionTest {
         editada.setUrlImagen("/uploads/edit-0.webp");
         editada.setSha256(shas.get(0));
         editada.setClaveArchivoOriginal("productos/edit-0.jpg");
-        editada.setEntregablesSha256(new ArrayList<>(List.of(shas.get(1))));
 
         ProductoRequest segunda = new ProductoRequest();
         segunda.setIdTipoProducto(tipo.getIdTipoProducto());
@@ -479,11 +544,108 @@ class ProductoIntegracionTest {
         ProductoDTO actualizado = productoService.modificar(
             creado.getIdProducto(), artista.getIdUsuario(), segunda);
 
-        List<ProductoEntregableDTO> entregables = actualizado.getEntregables().stream()
-            .filter(e -> e.getAlcance() == AlcanceEntregable.VARIANTE)
-            .toList();
+        List<ProductoEntregableDTO> entregables = actualizado.getEntregables();
         assertThat(entregables).hasSize(1);
-        assertThat(entregables.get(0).getSha256()).isEqualTo(shas.get(1));
+        assertThat(entregables.get(0).getSha256()).isEqualTo(shas.get(0));
+    }
+
+    @Test
+    void cambiarImagenDeVarianteConStock_abreVersionEnElHistorial() {
+        Usuario artista = usuarioRepository.findAll().stream()
+            .filter(usuario -> usuario.getRol() != null
+                && usuario.getRol().getNombre() == ERol.ARTISTA)
+            .findFirst()
+            .orElseThrow();
+        TipoProducto tipo = tipoProductoRepository
+            .findByActivoTrueOrderByNombreAsc().get(0);
+        Medio medio = medioRepository.findByActivoTrueOrderByNombreAsc().stream()
+            .filter(m -> m.getTipoEntrega() == TipoEntrega.DIGITAL)
+            .findFirst()
+            .orElseThrow();
+        Moneda moneda = monedaService.predeterminada();
+        DerechoTermino personal = derechoTerminoRepository
+            .findByActivoTrueOrderByOrdenAsc().stream()
+            .filter(derecho -> "PERSONAL".equals(derecho.getCodigo()))
+            .findFirst()
+            .orElseThrow();
+
+        String sha1 = shaAleatorio();
+        String sha2 = shaAleatorio();
+
+        ProductoImagenRequest imagen1 = new ProductoImagenRequest();
+        imagen1.setUrl("/uploads/v1-" + UUID.randomUUID() + ".webp");
+        imagen1.setSha256(sha1);
+        imagen1.setClaveArchivoOriginal("productos/v1-" + UUID.randomUUID() + ".jpg");
+        imagen1.setOrden(0);
+
+        ProductoVarianteRequest variante = new ProductoVarianteRequest();
+        variante.setNombre("Giclée");
+        variante.setPrecio(new BigDecimal("100.00"));
+        variante.setStockDisponible(5);
+        variante.setOrden(0);
+        variante.setUrlImagen(imagen1.getUrl());
+        variante.setSha256(sha1);
+        variante.setClaveArchivoOriginal(imagen1.getClaveArchivoOriginal());
+
+        LicenciaProductoRequest licencia = new LicenciaProductoRequest();
+        licencia.setIdsDerechos(Set.of(personal.getIdDerechoTermino()));
+        licencia.setPorcentajeRegalia(BigDecimal.ZERO);
+
+        ProductoRequest request = new ProductoRequest();
+        request.setIdTipoProducto(tipo.getIdTipoProducto());
+        request.setIdMedio(medio.getIdMedio());
+        request.setIdMoneda(moneda.getIdMoneda());
+        request.setTitulo("Historial " + UUID.randomUUID());
+        request.setDescripcion("Variante con stock que cambia de imagen.");
+        request.setImagenes(new ArrayList<>(List.of(imagen1)));
+        request.setVariantes(new ArrayList<>(List.of(variante)));
+        request.setIdsEtiquetas(Set.of());
+        request.setContenidosSensibles(Set.of());
+        request.setLicencia(licencia);
+
+        ProductoDTO creado = productoService.crear(artista.getIdUsuario(), request);
+        Long idVariante = creado.getVariantes().get(0).getIdVariante();
+        assertThat(varianteImagenRepository
+            .findByVarianteIdVarianteOrderByNumeroDesc(idVariante)).hasSize(1);
+
+        ProductoImagenRequest imagen2 = new ProductoImagenRequest();
+        imagen2.setUrl("/uploads/v2-" + UUID.randomUUID() + ".webp");
+        imagen2.setSha256(sha2);
+        imagen2.setClaveArchivoOriginal("productos/v2-" + UUID.randomUUID() + ".jpg");
+        imagen2.setOrden(0);
+
+        ProductoVarianteRequest editada = new ProductoVarianteRequest();
+        editada.setIdVariante(idVariante);
+        editada.setNombre("Giclée");
+        editada.setPrecio(new BigDecimal("100.00"));
+        editada.setStockDisponible(5);
+        editada.setOrden(0);
+        editada.setUrlImagen(imagen2.getUrl());
+        editada.setSha256(sha2);
+        editada.setClaveArchivoOriginal(imagen2.getClaveArchivoOriginal());
+
+        ProductoRequest segunda = new ProductoRequest();
+        segunda.setIdTipoProducto(tipo.getIdTipoProducto());
+        segunda.setIdMedio(medio.getIdMedio());
+        segunda.setIdMoneda(moneda.getIdMoneda());
+        segunda.setTitulo(creado.getTitulo());
+        segunda.setDescripcion("Variante con stock que cambia de imagen.");
+        segunda.setImagenes(new ArrayList<>(List.of(imagen2)));
+        segunda.setVariantes(new ArrayList<>(List.of(editada)));
+        segunda.setIdsEtiquetas(Set.of());
+        segunda.setContenidosSensibles(Set.of());
+        segunda.setLicencia(licencia);
+
+        productoService.modificar(creado.getIdProducto(), artista.getIdUsuario(), segunda);
+
+        var historial = varianteImagenRepository
+            .findByVarianteIdVarianteOrderByNumeroDesc(idVariante);
+        assertThat(historial).hasSize(2);
+        assertThat(historial.get(0).isVigente()).isTrue();
+        assertThat(historial.get(0).getSha256()).isEqualTo(sha2);
+        assertThat(historial.get(1).isVigente()).isFalse();
+        assertThat(historial.get(1).getSha256()).isEqualTo(sha1);
+        assertThat(historial.get(1).getFechaHasta()).isNotNull();
     }
 
     private String shaAleatorio() {
