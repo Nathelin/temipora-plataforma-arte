@@ -31,6 +31,7 @@ import ConfiguracionLayout from '../layouts/ConfiguracionLayout.vue'
 import ArtistLayout from '../layouts/ArtistLayout.vue'
 import ClientLayout from '../layouts/ClientLayout.vue'
 import Inicio from '../views/Inicio.vue'
+import Explorar from '../views/Explorar.vue'
 import AdminResumen from '../views/AdminResumen.vue'
 import PanelResumen from '../views/PanelResumen.vue'
 import Ventas from '../views/Ventas.vue'
@@ -84,6 +85,9 @@ const routes = [
         name: 'inicio', 
         component: Inicio,
         meta: { title: 'Temipora - inicio' }  },
+      { path: 'explorar', name: 'explorar', component: Explorar,
+        meta: { title: 'Explorar' }
+      },
       { path: 'productos', name: 'productos', component: Productos,
         meta: { title: 'Productos' }
       },

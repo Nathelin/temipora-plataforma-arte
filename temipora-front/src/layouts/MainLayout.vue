@@ -41,6 +41,9 @@ const enPanel = computed(() => route.path.startsWith('/panel'))
 const enMensajes = computed(() => route.path.startsWith('/mensajes')
   || route.path.startsWith('/panel/mensajes'))
 const enFavoritos = computed(() => route.path.startsWith('/favoritos'))
+// Con sesión el logo lleva a Explorar; sin sesión, a la landing pública.
+// No se redirige `/` para no dejar la landing inalcanzable.
+const destinoLogo = computed(() => (estaLogueado.value ? '/explorar' : '/'))
 
 const {
   noLeidos: mensajesNoLeidos,
@@ -166,14 +169,21 @@ function irAPerfil() {
         <!-- Marca y navegación -->
         <div class="flex items-center gap-7">
           <router-link
-            to="/"
+            :to="destinoLogo"
             class="group inline-flex items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-4 focus-visible:ring-offset-crema"
-            aria-label="Temipora, ir al inicio"
+            :aria-label="estaLogueado ? 'Temipora, ir a explorar' : 'Temipora, ir al inicio'"
           >
             <BrandLogo />
           </router-link>
 
           <nav class="hidden items-center gap-6 lg:flex" aria-label="Navegación principal">
+            <router-link
+              v-if="estaLogueado"
+              to="/explorar"
+              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+            >
+              Explorar
+            </router-link>
             <router-link
               to="/servicios"
               class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
@@ -371,6 +381,14 @@ function irAPerfil() {
                   <span>Panel de artista</span>
                 </span>
                 <span aria-hidden="true">→</span>
+              </router-link>
+              <router-link
+                v-if="estaLogueado"
+                to="/explorar"
+                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                @click="menuMovilAbierto = false"
+              >
+                Explorar
               </router-link>
               <router-link
                 to="/servicios"

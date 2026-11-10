@@ -61,7 +61,8 @@ async function iniciarSesion() {
     } else if (rol === 'ADMIN') {
       router.push({ name: 'admin-resumen' })
     } else {
-      router.push({ name: 'servicios' })
+      // Clientes y artistas entran directo al descubrimiento.
+      router.push({ name: 'explorar' })
     }
   } catch (e) {
     const data = e.response?.data
