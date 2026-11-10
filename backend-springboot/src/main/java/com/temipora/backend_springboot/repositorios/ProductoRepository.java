@@ -63,4 +63,38 @@ public interface ProductoRepository
     boolean existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNotIn(
             Long idUsuario, Long idTipoProducto, String titulo, Long idProducto,
             List<EstadoProducto> estados);
+
+    /**
+     * Catálogo público: mismo grafo que la vista del artista salvo licencias,
+     * que el catálogo no expone.
+     */
+    @EntityGraph(attributePaths = {
+        "artista",
+        "tipoProducto",
+        "medio",
+        "moneda",
+        "variantes",
+        "imagenes",
+        "etiquetas",
+        "etiquetas.etiqueta"
+    })
+    List<Producto> findByEstadoOrderByFechaCreacionDesc(EstadoProducto estado);
+
+    @EntityGraph(attributePaths = {
+        "artista",
+        "tipoProducto",
+        "medio",
+        "moneda",
+        "variantes",
+        "variantes.propietarioActual",
+        "imagenes",
+        "licencias",
+        "licencias.derechos",
+        "licencias.derechos.derecho",
+        "etiquetas",
+        "etiquetas.etiqueta",
+        "etiquetas.etiqueta.categoria"
+    })
+    List<Producto> findByArtistaIdUsuarioAndEstadoOrderByTituloAsc(
+            Long idUsuario, EstadoProducto estado);
 }

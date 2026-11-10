@@ -26,6 +26,7 @@ import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Producto;
 import com.temipora.backend_springboot.modelo.ProductoDTO;
+import com.temipora.backend_springboot.modelo.ProductoCatalogoDTO;
 import com.temipora.backend_springboot.modelo.ProductoEntregableDTO;
 import com.temipora.backend_springboot.modelo.ProductoImagenRequest;
 import com.temipora.backend_springboot.modelo.ProductoLedgerDTO;
@@ -45,6 +46,7 @@ import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteImagenRepository;
 import com.temipora.backend_springboot.servicios.LedgerService;
 import com.temipora.backend_springboot.servicios.MonedaService;
+import com.temipora.backend_springboot.servicios.ProductoCatalogoService;
 import com.temipora.backend_springboot.servicios.ProductoService;
 
 @SpringBootTest
@@ -61,6 +63,7 @@ class ProductoIntegracionTest {
     @Autowired private EventoLedgerRepository eventoLedgerRepository;
     @Autowired private DerechoTerminoRepository derechoTerminoRepository;
     @Autowired private ProductoVarianteImagenRepository varianteImagenRepository;
+    @Autowired private ProductoCatalogoService productoCatalogoService;
 
     @Test
     void crearProductoUnico_persisteVariantesLicenciaYGenesis() {
@@ -646,6 +649,123 @@ class ProductoIntegracionTest {
         assertThat(historial.get(1).isVigente()).isFalse();
         assertThat(historial.get(1).getSha256()).isEqualTo(sha1);
         assertThat(historial.get(1).getFechaHasta()).isNotNull();
+    }
+
+    @Test
+    void catalogoPublico_listaPublicadosYExcluyeBorradores() {
+        ProductoDTO borrador = crearBorradorSimple();
+        ProductoDTO publicado = crearProductoSimple("Catálogo " + UUID.randomUUID());
+
+        List<ProductoCatalogoDTO> lista = productoCatalogoService
+            .listarDeArtista(
+                usuarioRepository.findByIdUsuario(publicado.getIdArtista())
+                    .orElseThrow().getNombreUsuario(),
+                null);
+
+        assertThat(lista)
+            .extracting(ProductoCatalogoDTO::getIdProducto)
+            .contains(publicado.getIdProducto())
+            .doesNotContain(borrador.getIdProducto());
+    }
+
+    @Test
+    void catalogoPublico_noExponeUnBorradorPorId() {
+        ProductoDTO borrador = crearBorradorSimple();
+
+        assertThatThrownBy(() -> productoCatalogoService.obtener(
+            borrador.getIdProducto(), null))
+            .isInstanceOf(java.util.NoSuchElementException.class);
+    }
+
+    @Test
+    void catalogoPublico_calculaPrecioDesdeYDisponibilidad() {
+        ProductoDTO publicado = crearProductoSimple("Precio " + UUID.randomUUID());
+
+        ProductoCatalogoDTO dto = productoCatalogoService.obtener(
+            publicado.getIdProducto(), null);
+
+        assertThat(dto.getPrecioDesde()).isEqualByComparingTo("100.00");
+        assertThat(dto.isDisponible()).isTrue();
+        assertThat(dto.getCantidadVariantes()).isEqualTo(1);
+        assertThat(dto.getIdArtista()).isEqualTo(publicado.getIdArtista());
+    }
+
+    private ProductoDTO crearBorradorSimple() {
+        Usuario artista = usuarioRepository.findAll().stream()
+            .filter(usuario -> usuario.getRol() != null
+                && usuario.getRol().getNombre() == ERol.ARTISTA)
+            .findFirst()
+            .orElseThrow();
+        String sha = shaAleatorio();
+        ProductoImagenRequest imagen = new ProductoImagenRequest();
+        imagen.setUrl("/uploads/borrador-" + UUID.randomUUID() + ".webp");
+        imagen.setSha256(sha);
+        imagen.setClaveArchivoOriginal("productos/borrador-" + UUID.randomUUID() + ".jpg");
+        imagen.setOrden(0);
+        ProductoVarianteRequest variante = new ProductoVarianteRequest();
+        variante.setNombre("Única");
+        variante.setOrden(0);
+        variante.setUrlImagen(imagen.getUrl());
+        variante.setSha256(sha);
+        variante.setClaveArchivoOriginal(imagen.getClaveArchivoOriginal());
+        ProductoRequest request = new ProductoRequest();
+        request.setTitulo("Borrador catálogo " + UUID.randomUUID());
+        request.setVariantes(new ArrayList<>(List.of(variante)));
+        request.setImagenes(new ArrayList<>(List.of(imagen)));
+        return productoService.guardarBorrador(artista.getIdUsuario(), null, request);
+    }
+
+    private ProductoDTO crearProductoSimple(String titulo) {
+        Usuario artista = usuarioRepository.findAll().stream()
+            .filter(usuario -> usuario.getRol() != null
+                && usuario.getRol().getNombre() == ERol.ARTISTA)
+            .findFirst()
+            .orElseThrow();
+        TipoProducto tipo = tipoProductoRepository
+            .findByActivoTrueOrderByNombreAsc().get(0);
+        Medio medio = medioRepository.findByActivoTrueOrderByNombreAsc().stream()
+            .filter(m -> m.getTipoEntrega() == TipoEntrega.DIGITAL)
+            .findFirst()
+            .orElseThrow();
+        Moneda moneda = monedaService.predeterminada();
+        DerechoTermino personal = derechoTerminoRepository
+            .findByActivoTrueOrderByOrdenAsc().stream()
+            .filter(derecho -> "PERSONAL".equals(derecho.getCodigo()))
+            .findFirst()
+            .orElseThrow();
+
+        String sha = shaAleatorio();
+        ProductoImagenRequest imagen = new ProductoImagenRequest();
+        imagen.setUrl("/uploads/cat-" + UUID.randomUUID() + ".webp");
+        imagen.setSha256(sha);
+        imagen.setClaveArchivoOriginal("productos/cat-" + UUID.randomUUID() + ".jpg");
+        imagen.setOrden(0);
+
+        ProductoVarianteRequest variante = new ProductoVarianteRequest();
+        variante.setNombre("Única");
+        variante.setPrecio(new BigDecimal("100.00"));
+        variante.setStockDisponible(null);
+        variante.setOrden(0);
+        variante.setUrlImagen(imagen.getUrl());
+        variante.setSha256(sha);
+        variante.setClaveArchivoOriginal(imagen.getClaveArchivoOriginal());
+
+        LicenciaProductoRequest licencia = new LicenciaProductoRequest();
+        licencia.setIdsDerechos(Set.of(personal.getIdDerechoTermino()));
+        licencia.setPorcentajeRegalia(BigDecimal.ZERO);
+
+        ProductoRequest request = new ProductoRequest();
+        request.setIdTipoProducto(tipo.getIdTipoProducto());
+        request.setIdMedio(medio.getIdMedio());
+        request.setIdMoneda(moneda.getIdMoneda());
+        request.setTitulo(titulo);
+        request.setDescripcion("Producto de catálogo.");
+        request.setImagenes(new ArrayList<>(List.of(imagen)));
+        request.setVariantes(new ArrayList<>(List.of(variante)));
+        request.setIdsEtiquetas(Set.of());
+        request.setContenidosSensibles(Set.of());
+        request.setLicencia(licencia);
+        return productoService.crear(artista.getIdUsuario(), request);
     }
 
     private String shaAleatorio() {

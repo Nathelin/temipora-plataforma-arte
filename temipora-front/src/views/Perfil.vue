@@ -7,6 +7,8 @@ import { useNotificaciones } from '../composables/useNotificaciones'
 import { cargarGaleria as cargarGaleriaApi, ocultarPublicacionPedido } from '../servicios/galeria'
 import { formatearFecha } from '../servicios/pedidos'
 import TarjetaServicio from '../components/TarjetaServicio.vue'
+import TarjetaProducto from '../components/TarjetaProducto.vue'
+import { cargarProductosDeArtista } from '../servicios/productos'
 import ImagenGaleria from '../components/ImagenGaleria.vue'
 import ResumenResenias from '../components/ResumenResenias.vue'
 import ListaResenias from '../components/ListaResenias.vue'
@@ -99,6 +101,7 @@ async function cargarPerfil() {
         cargarEtiquetasPortfolio(),
         cargarTiposArte(),
         cargarServicios(),
+        cargarProductos(),
         cargarResumenResenias(),
       ])
       if (route.query.tab === 'resenas') {
@@ -368,6 +371,21 @@ async function cargarServicios() {
     }
   } finally {
     if (perfil.value.nombreUsuario === nombre) cargandoServicios.value = false
+  }
+}
+
+async function cargarProductos() {
+  const nombre = perfil.value.nombreUsuario
+  if (perfil.value.rol !== 'ARTISTA' || !nombre) return
+  try {
+    const data = await cargarProductosDeArtista(nombre)
+    if (perfil.value.nombreUsuario === nombre) {
+      perfil.value.productos = data
+    }
+  } catch {
+    if (perfil.value.nombreUsuario === nombre) {
+      perfil.value.productos = []
+    }
   }
 }
 
@@ -1201,12 +1219,12 @@ function irASubirImagen(imagen = null) {
             <p v-if="!perfil.productos.length" class="rounded-3xl border border-dashed border-borde bg-superficie px-6 py-14 text-center text-sm text-cafe/60">
               Este artista todavía no tiene productos publicados.
             </p>
-            <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div v-for="p in perfil.productos" :key="p.id" class="rounded-[22px] border border-borde/60 bg-superficie p-5 shadow-sm">
-                <h3 class="text-granate">{{ p.titulo }}</h3>
-                <p class="text-sm text-cafe/70 mt-1">{{ p.descripcion }}</p>
-                <p class="text-sm text-rojizo mt-3">{{ p.precio }}</p>
-              </div>
+            <div v-else class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              <TarjetaProducto
+                v-for="producto in perfil.productos"
+                :key="producto.idProducto"
+                :producto="producto"
+              />
             </div>
           </div>
           <div v-if="tabActiva === 'resenas'" class="mt-6">

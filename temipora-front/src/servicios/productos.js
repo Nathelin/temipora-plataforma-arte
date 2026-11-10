@@ -88,3 +88,47 @@ export async function subirImagenProducto(archivo) {
   const res = await api.post('/mis-productos/imagenes', fd)
   return res.data
 }
+
+// ---------------------------------------------------------------------
+// Catálogo público
+// ---------------------------------------------------------------------
+
+export async function cargarCatalogoProductos(params = {}) {
+  const res = await api.get('/productos', { params })
+  return res.data
+}
+
+export async function cargarProductoPublico(idProducto) {
+  const res = await api.get(`/productos/${idProducto}`)
+  return res.data
+}
+
+export async function cargarProductosDeArtista(nombreUsuario) {
+  const res = await api.get(`/productos/artista/${nombreUsuario}`)
+  return res.data
+}
+
+// ---------------------------------------------------------------------
+// Favoritos de producto
+// ---------------------------------------------------------------------
+
+export async function cargarIdsProductosFavoritos() {
+  const res = await api.get('/favoritos/productos/ids')
+  return res.data
+}
+
+export async function agregarProductoFavorito(idProducto) {
+  await api.post(`/favoritos/productos/${idProducto}`)
+}
+
+export async function eliminarProductoFavorito(idProducto) {
+  await api.delete(`/favoritos/productos/${idProducto}`)
+}
+
+export function etiquetaDisponibilidad(producto) {
+  if (!producto) return ''
+  if (!producto.disponible) return 'Sin stock'
+  if (producto.esPiezaUnica) return 'Pieza única'
+  if (producto.tieneStockIlimitado) return 'Disponible'
+  return `${producto.stockTotal} disponibles`
+}

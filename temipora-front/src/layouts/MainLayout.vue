@@ -165,7 +165,13 @@ function irAPerfil() {
               to="/servicios"
               class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
             >
-              Explorar
+              Servicios
+            </router-link>
+            <router-link
+              to="/productos"
+              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+            >
+              Productos
             </router-link>
             <router-link
               v-if="estaLogueado && !esAdmin"
@@ -347,7 +353,14 @@ function irAPerfil() {
                 class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
                 @click="menuMovilAbierto = false"
               >
-                Explorar
+                Servicios
+              </router-link>
+              <router-link
+                to="/productos"
+                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                @click="menuMovilAbierto = false"
+              >
+                Productos
               </router-link>
               <router-link
                 v-if="estaLogueado && !esAdmin"

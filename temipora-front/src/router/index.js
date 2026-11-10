@@ -68,6 +68,8 @@ import ServicioSolicitudes from '../views/ServicioSolicitudes.vue'
 import MisProductos from '../views/MisProductos.vue'
 import ProductoForm from '../views/ProductoForm.vue'
 import ProductoDetalle from '../views/ProductoDetalle.vue'
+import ProductoPublico from '../views/ProductoPublico.vue'
+import Productos from '../views/Productos.vue'
 import ServiciosArchivados from '../views/ServiciosArchivados.vue'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useConfirmacionSalida } from '../composables/useConfirmacionSalida'
@@ -82,7 +84,13 @@ const routes = [
         name: 'inicio', 
         component: Inicio,
         meta: { title: 'Temipora - inicio' }  },
-      { path: 'productos', redirect: '/' },
+      { path: 'productos', name: 'productos', component: Productos,
+        meta: { title: 'Productos' }
+      },
+      { path: 'productos/:id', name: 'producto-publico', component: ProductoPublico,
+        props: (route) => ({ id: Number(route.params.id) }),
+        meta: { title: 'Detalle del producto' }
+      },
       { path: 'servicios', name: 'servicios', component: Servicios,
         meta: { title: 'Servicios' }
       },
