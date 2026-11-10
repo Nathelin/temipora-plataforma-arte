@@ -7,6 +7,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 
@@ -119,6 +124,33 @@ class LedgerServiceTest {
     }
 
     @Test
+    void verificarVariante_eventoVersion1_usaElCanonicoHistorico() {
+        ProductoVariante variante = variante(1);
+        EventoLedger evento = new EventoLedger();
+        evento.setVariante(variante);
+        evento.setSecuencia(1L);
+        evento.setTipo(TipoEventoLedger.GENESIS);
+        evento.setActorOrigen(variante.getProducto().getArtista());
+        evento.setActorDestino(variante.getProducto().getArtista());
+        evento.setMoneda(variante.getProducto().getMoneda());
+        evento.setOcurridoEn(LocalDateTime.of(2026, 11, 9, 20, 43, 28, 440_000_000));
+        evento.setHashPrevio("");
+        evento.setHashImagen(SHA);
+        evento.setDatos("{\"titulo\":\"Plancha de otoño\"}");
+        evento.setVersionHash(1);
+        evento.setHashDatos(null);
+        evento.setHashEvento(hashCanonicoV1(evento));
+
+        when(eventoRepository.findByVarianteIdVarianteOrderBySecuenciaAsc(20L))
+            .thenReturn(List.of(evento));
+
+        VarianteLedgerDTO dto = ledgerService.verificarVariante(variante);
+
+        assertThat(dto.isIntegridad()).isTrue();
+        assertThat(dto.getEventos().get(0).isVerificado()).isTrue();
+    }
+
+    @Test
     void verificarVariante_cadenaAlterada_marcaEventoNoVerificado() {
         ProductoVariante variante = variante(1);
         EventoLedger evento = genesis(variante);
@@ -146,6 +178,34 @@ class LedgerServiceTest {
         assertThat(dto.isIntegridad()).isTrue();
         assertThat(dto.getVariantes()).hasSize(1);
         assertThat(dto.getVariantes().get(0).getEventos()).hasSize(1);
+    }
+
+    /**
+     * Canónico exacto que usaba la versión 1: termina en hashImagen y no
+     * incluye hashDatos. Reproduce lo que hay guardado en la base para los
+     * eventos previos a la migración V95.
+     */
+    private String hashCanonicoV1(EventoLedger evento) {
+        String canonico = String.join("|",
+            String.valueOf(evento.getVariante().getIdVariante()),
+            String.valueOf(evento.getSecuencia()),
+            evento.getTipo().name(),
+            "",
+            String.valueOf(evento.getActorOrigen().getIdUsuario()),
+            String.valueOf(evento.getActorDestino().getIdUsuario()),
+            "",
+            evento.getMoneda().getCodigo(),
+            String.valueOf(evento.getOcurridoEn()
+                .toInstant(ZoneOffset.UTC).toEpochMilli()),
+            "",
+            evento.getHashImagen());
+        try {
+            return HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256")
+                    .digest(canonico.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private EventoLedger genesis(ProductoVariante variante) {

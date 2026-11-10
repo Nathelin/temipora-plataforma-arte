@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { formatearPrecio } from '../servicios/moneda'
 import { formatearFechaHora } from '../servicios/fechas'
 import {
@@ -33,11 +33,15 @@ const ETIQUETAS_SENSIBLE = {
   GENERAL: 'Contenido sensible general',
 }
 
+const galeria = ref(null)
 const indiceImagen = ref(0)
 const visorAbierto = ref(false)
 const visorIndice = ref(0)
 const revelado = ref(false)
 const mostrarInfoLedger = ref(false)
+const abrirInfoArriba = ref(false)
+const contenedorInfoLedger = ref(null)
+const tooltipLedger = ref(null)
 
 const esSensible = computed(() => !!props.producto?.contenidoSensible)
 const requiereAdvertencia = computed(() => esSensible.value && !revelado.value)
@@ -110,6 +114,33 @@ function abrirVisor(indice = indiceImagen.value) {
   visorAbierto.value = true
 }
 
+function irAGaleria() {
+  const el = galeria.value
+  if (!el) return
+  const top = el.getBoundingClientRect().top + window.scrollY - 88
+  window.scrollTo({ top, behavior: 'smooth' })
+}
+
+function seleccionarVariante(variante) {
+  imagenDeVariante(variante)
+  irAGaleria()
+}
+
+async function alternarInfoLedger() {
+  if (mostrarInfoLedger.value) {
+    mostrarInfoLedger.value = false
+    return
+  }
+  mostrarInfoLedger.value = true
+  abrirInfoArriba.value = false
+  await nextTick()
+  const contenedor = contenedorInfoLedger.value
+  const tooltip = tooltipLedger.value
+  if (!contenedor || !tooltip) return
+  const espacioAbajo = window.innerHeight - contenedor.getBoundingClientRect().bottom
+  abrirInfoArriba.value = espacioAbajo < tooltip.offsetHeight + 16
+}
+
 watch(
   () => props.producto,
   () => {
@@ -124,8 +155,11 @@ watch(
 <template>
   <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)]">
     <div class="min-w-0 space-y-6">
-      <section class="overflow-hidden rounded-[22px] border border-borde/60 bg-superficie shadow-[0_10px_28px_rgba(74,29,46,0.08)]">
-        <div class="relative aspect-[4/3] w-full overflow-hidden bg-rosa/20">
+      <section
+        ref="galeria"
+        class="overflow-hidden rounded-[22px] border border-borde/60 bg-superficie shadow-[0_10px_28px_rgba(74,29,46,0.08)]"
+      >
+        <div class="relative aspect-[3/2] w-full overflow-hidden bg-rosa/20">
           <button
             v-if="imagenActiva"
             type="button"
@@ -250,20 +284,22 @@ watch(
           <article
             v-for="variante in variantesPagina"
             :key="variante.idVariante"
-            class="flex flex-col gap-4 py-4 sm:flex-row sm:items-center"
+            role="button"
+            tabindex="0"
+            :aria-label="`Ver ${variante.nombre} en la galería`"
+            class="group flex cursor-pointer flex-col gap-4 rounded-xl px-3 py-4 transition hover:bg-rosa/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/50 sm:flex-row sm:items-center"
+            @click="seleccionarVariante(variante)"
+            @keydown.enter="seleccionarVariante(variante)"
+            @keydown.space.prevent="seleccionarVariante(variante)"
           >
-            <button
-              type="button"
-              class="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-rosa/50 bg-rosa/10"
-              @click="imagenDeVariante(variante)"
-            >
+            <div class="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-rosa/50 bg-rosa/10">
               <img
                 v-if="variante.imagenUrl"
                 :src="variante.imagenUrl"
                 :alt="variante.nombre"
-                class="h-full w-full object-cover"
+                class="h-full w-full object-cover transition duration-300 group-hover:scale-105"
               />
-            </button>
+            </div>
 
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">
@@ -541,11 +577,11 @@ watch(
                 Historial de autenticidad
               </h2>
             </div>
-            <div class="relative flex items-center gap-2">
+            <div ref="contenedorInfoLedger" class="relative flex items-center gap-2">
               <button
                 type="button"
                 class="rounded-full border border-rosa/60 bg-blanco px-2.5 py-1 text-[11px] font-semibold text-granate transition hover:bg-rosa/20"
-                @click="mostrarInfoLedger = !mostrarInfoLedger"
+                @click="alternarInfoLedger"
               >
                 ¿Qué es?
               </button>
@@ -561,7 +597,9 @@ watch(
 
               <div
                 v-if="mostrarInfoLedger"
-                class="absolute right-0 top-9 z-30 w-72 rounded-xl border border-rosa/60 bg-blanco p-4 text-xs leading-relaxed text-cafe/70 shadow-xl"
+                ref="tooltipLedger"
+                class="absolute right-0 z-30 w-72 rounded-xl border border-rosa/60 bg-blanco p-4 text-xs leading-relaxed text-cafe/70 shadow-xl"
+                :class="abrirInfoArriba ? 'bottom-full mb-2' : 'top-full mt-2'"
               >
                 <p class="font-semibold text-granate">Historial de autenticidad</p>
                 <p class="mt-1">

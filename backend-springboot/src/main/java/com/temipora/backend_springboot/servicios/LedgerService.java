@@ -274,7 +274,7 @@ public class LedgerService {
             String hashPrevio,
             String hashImagen,
             String hashDatos) {
-        String canonico = String.join("|",
+        List<String> partes = new ArrayList<>(List.of(
             String.valueOf(idVariante),
             String.valueOf(secuencia),
             tipo != null ? tipo.name() : "",
@@ -287,10 +287,13 @@ public class LedgerService {
                 ? String.valueOf(ocurrido.toInstant(ZoneOffset.UTC).toEpochMilli())
                 : "",
             hashPrevio != null ? hashPrevio : "",
-            hashImagen != null ? hashImagen : "",
-            // Desde la versión 2 el hash cubre también el contenido de `datos`.
-            version >= 2 ? (hashDatos != null ? hashDatos : "") : "");
-        return sha256Hex(canonico);
+            hashImagen != null ? hashImagen : ""));
+        // La versión 1 termina en hashImagen. Agregar una parte vacía cambiaría
+        // el canónico (un "|" final) e invalidaría todos los eventos históricos.
+        if (version >= 2) {
+            partes.add(hashDatos != null ? hashDatos : "");
+        }
+        return sha256Hex(String.join("|", partes));
     }
 
     private String datosGenesis(
