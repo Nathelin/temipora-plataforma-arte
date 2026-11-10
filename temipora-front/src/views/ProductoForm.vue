@@ -60,6 +60,7 @@ const progresoImagen = ref('')
 const errorImagen = ref('')
 const visorAbierto = ref(false)
 const visorIndice = ref(0)
+const modalReventaAbierto = ref(false)
 
 const tipos = ref([])
 const medios = ref([])
@@ -374,6 +375,10 @@ function validarMoneda() {
 
 function validarVariantes() {
   const errs = []
+  if (variantes.value.length > 50) {
+    errs.push('Un producto puede tener como máximo 50 variantes.')
+    return errs
+  }
   if (!variantes.value.length) {
     return ['Agregá al menos una presentación.']
   }
@@ -835,7 +840,17 @@ onBeforeUnmount(() => {
             </div>
 
             <div>
-              <h3 class="font-display text-lg font-bold text-granate">Portada y galería</h3>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-display text-lg font-bold text-granate">Portada y galería</h3>
+                <button
+                  v-if="form.imagenes.length > 3"
+                  type="button"
+                  class="text-xs font-medium text-coral transition hover:text-rojizo"
+                  @click="abrirVisor(0)"
+                >
+                  Ver galería ({{ form.imagenes.length }})
+                </button>
+              </div>
               <p class="mt-1 text-sm text-cafe/60">
                 La primera imagen será la portada. La galería se reutiliza para
                 asignar imágenes a las variantes sin volver a subirlas.
@@ -978,7 +993,16 @@ onBeforeUnmount(() => {
           <!-- Paso 3: licencia -->
           <section v-else-if="paso === 3" class="space-y-6">
             <div class="rounded-2xl border border-rosa/60 bg-crema/50 p-5">
-              <h3 class="font-display text-lg font-bold text-granate">Usos permitidos</h3>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-display text-lg font-bold text-granate">Usos permitidos</h3>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-coral transition hover:text-rojizo"
+                  @click="modalReventaAbierto = true"
+                >
+                  ¿Cómo funciona la reventa?
+                </button>
+              </div>
               <p class="mt-1 text-sm text-cafe/60">
                 Elegí qué puede hacer el comprador con la obra. Podés combinar más de uno.
               </p>
@@ -1195,9 +1219,9 @@ onBeforeUnmount(() => {
                   <span
                     v-if="!esIlimitada(variante) && Number(variante.stockDisponible) === 1"
                     class="shrink-0 rounded-full bg-mantequilla/60 px-2.5 py-0.5 text-[11px] font-bold text-granate"
-                    title="Al publicar se crea el evento génesis en el ledger"
+                    title="Al publicar se registra el origen de la pieza única"
                   >
-                    Génesis al publicar
+                    Se registra al publicar
                   </span>
                 </div>
               </div>
@@ -1324,5 +1348,98 @@ onBeforeUnmount(() => {
       @cerrar="visorAbierto = false"
       @actualizar:indice="visorIndice = $event"
     />
+
+    <Teleport to="body">
+      <div
+        v-if="modalReventaAbierto"
+        class="fixed inset-0 z-[100] flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Cómo funciona la reventa"
+      >
+        <div
+          class="absolute inset-0 bg-granate/50"
+          aria-hidden="true"
+          @click="modalReventaAbierto = false"
+        ></div>
+        <div class="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-blanco p-6 shadow-xl">
+          <header class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                Licencia
+              </p>
+              <h2 class="mt-1 font-display text-xl font-bold text-granate">
+                ¿Cómo funciona la reventa?
+              </h2>
+            </div>
+            <button
+              type="button"
+              class="rounded-lg border border-rosa/60 px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-rosa/20"
+              @click="modalReventaAbierto = false"
+            >
+              Cerrar
+            </button>
+          </header>
+
+          <div class="mt-5 space-y-4 text-sm leading-relaxed text-cafe/75">
+            <p>
+              Permitir la reventa significa que quien compre una pieza única puede
+              transferirla a otra persona dentro de Temipora. Vos seguís siendo el
+              autor: no se transfiere el derecho de autor.
+            </p>
+
+            <div>
+              <p class="font-semibold text-granate">Solo para piezas únicas</p>
+              <p class="mt-1">
+                Solo se aplica a variantes con stock 1. Las variantes ilimitadas o
+                con varias unidades no se pueden revender.
+              </p>
+            </div>
+
+            <div>
+              <p class="font-semibold text-granate">Qué pasa cuando se revende</p>
+              <ul class="mt-1 list-disc space-y-1 pl-5">
+                <li>El comprador actual transfiere la pieza a otra persona.</li>
+                <li>El nuevo comprador queda como propietario y acepta la licencia vigente.</li>
+                <li>El historial de autenticidad registra la transferencia y conserva el origen.</li>
+                <li>La regalía se calcula sobre el precio de reventa y queda registrada en la operación.</li>
+              </ul>
+            </div>
+
+            <div>
+              <p class="font-semibold text-granate">Regalía</p>
+              <p class="mt-1">
+                Podés elegir entre 0% y 10% sobre el precio de reventa. Si elegís
+                0%, la reventa se permite sin regalía.
+              </p>
+            </div>
+
+            <div>
+              <p class="font-semibold text-granate">Qué no permite</p>
+              <p class="mt-1">
+                No permite vender copias, redistribuir la obra ni transferir tus
+                derechos de autor. Tampoco se aplica a variantes que no sean piezas
+                únicas.
+              </p>
+            </div>
+
+            <p class="rounded-xl bg-crema/70 px-4 py-3 text-xs text-cafe/65">
+              Si no habilitás la reventa, la pieza no podrá transferirse a otra
+              persona dentro de Temipora.
+            </p>
+          </div>
+
+          <div class="mt-6 flex justify-end">
+            <button
+              type="button"
+              class="rounded-lg bg-coral px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rojizo"
+              @click="modalReventaAbierto = false"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>

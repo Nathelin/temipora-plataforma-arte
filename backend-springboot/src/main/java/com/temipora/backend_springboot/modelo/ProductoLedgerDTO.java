@@ -20,4 +20,8 @@ public class ProductoLedgerDTO {
     private boolean integridad;
     private String mensaje;
     private List<VarianteLedgerDTO> variantes;
+    private int pagina;
+    private int tamano;
+    private long totalElementos;
+    private int totalPaginas;
 }

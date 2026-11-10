@@ -101,7 +101,7 @@ public class LedgerService {
             return VarianteLedgerDTO.builder()
                 .tieneLedger(false)
                 .integridad(true)
-                .mensaje("Variante sin registro.")
+                .mensaje("Pieza sin historial.")
                 .eventos(List.of())
                 .build();
         }
@@ -114,13 +114,13 @@ public class LedgerService {
                 .nombre(variante.getNombre())
                 .tieneLedger(false)
                 .integridad(true)
-                .mensaje("La variante no tiene eventos de ledger (no es una pieza única).")
+                .mensaje("Esta variante no tiene historial porque no es una pieza única.")
                 .eventos(List.of())
                 .build();
         }
 
         boolean integridad = true;
-        String mensaje = "Cadena verificada.";
+        String mensaje = "Historial verificado.";
         String hashPrevioEsperado = "";
         List<EventoLedgerDTO> dtos = new ArrayList<>();
         for (int i = 0; i < eventos.size(); i++) {
@@ -133,7 +133,7 @@ public class LedgerService {
             boolean ok = secuenciaOk && previoOk && hashOk;
             if (!ok && integridad) {
                 integridad = false;
-                mensaje = "La cadena no coincide en la secuencia "
+                mensaje = "El historial no coincide en el registro "
                     + evento.getSecuencia() + ".";
             }
             dtos.add(aDTO(evento, ok));
@@ -158,14 +158,49 @@ public class LedgerService {
         boolean integridad = variantes.stream()
             .allMatch(VarianteLedgerDTO::isIntegridad);
         String mensaje = integridad
-            ? "Todas las cadenas de la publicación verifican."
-            : "Hay al menos una variante con la cadena alterada.";
+            ? "El historial de todas las piezas coincide."
+            : "Hay al menos una pieza con el historial alterado.";
         return ProductoLedgerDTO.builder()
             .idProducto(producto.getIdProducto())
             .titulo(producto.getTitulo())
             .integridad(integridad)
             .mensaje(mensaje)
             .variantes(variantes)
+            .build();
+    }
+
+    @Transactional(readOnly = true)
+    public ProductoLedgerDTO verificarProducto(
+            Producto producto, int pagina, int tamano) {
+        ProductoLedgerDTO completo = verificarProducto(producto);
+        List<VarianteLedgerDTO> registros = completo.getVariantes().stream()
+            .filter(VarianteLedgerDTO::isTieneLedger)
+            .toList();
+        int tamanoSeguro = Math.min(Math.max(tamano, 1), 50);
+        int total = registros.size();
+        int totalPaginas = total == 0
+            ? 0
+            : (int) Math.ceil((double) total / tamanoSeguro);
+        int paginaSegura = totalPaginas == 0
+            ? 1
+            : Math.min(Math.max(pagina, 1), totalPaginas);
+        int desde = total == 0
+            ? 0
+            : Math.min((paginaSegura - 1) * tamanoSeguro, total);
+        int hasta = total == 0
+            ? 0
+            : Math.min(desde + tamanoSeguro, total);
+
+        return ProductoLedgerDTO.builder()
+            .idProducto(completo.getIdProducto())
+            .titulo(completo.getTitulo())
+            .integridad(completo.isIntegridad())
+            .mensaje(completo.getMensaje())
+            .variantes(registros.subList(desde, hasta))
+            .pagina(paginaSegura)
+            .tamano(tamanoSeguro)
+            .totalElementos(total)
+            .totalPaginas(totalPaginas)
             .build();
     }
 

@@ -12,15 +12,18 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.temipora.backend_springboot.modelo.ImagenProductoSubidaDTO;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.ProductoDTO;
 import com.temipora.backend_springboot.modelo.ProductoLedgerDTO;
 import com.temipora.backend_springboot.modelo.ProductoRequest;
 import com.temipora.backend_springboot.modelo.ProductoResumenEstadoDTO;
+import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
 import com.temipora.backend_springboot.servicios.AlmacenPrivadoService;
 import com.temipora.backend_springboot.servicios.LedgerService;
 import com.temipora.backend_springboot.servicios.ProductoBajaService;
@@ -68,6 +71,17 @@ public class ProductoController {
             @PathVariable Long id,
             Authentication authentication) {
         return productoService.obtenerPropio(id, idAutenticado(authentication));
+    }
+
+    @GetMapping("/mis-productos/{id}/variantes")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public PaginaDTO<ProductoVarianteDTO> variantes(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "1") int pagina,
+            @RequestParam(defaultValue = "4") int tamano,
+            Authentication authentication) {
+        return productoService.obtenerVariantes(
+            id, idAutenticado(authentication), pagina, tamano);
     }
 
     @PostMapping("/mis-productos")
@@ -127,10 +141,14 @@ public class ProductoController {
     @PreAuthorize("hasRole('ARTISTA')")
     public ProductoLedgerDTO ledger(
             @PathVariable Long id,
+            @RequestParam(defaultValue = "1") int pagina,
+            @RequestParam(defaultValue = "4") int tamano,
             Authentication authentication) {
         return ledgerService.verificarProducto(
             productoService.obtenerEntidadPropia(
-                id, idAutenticado(authentication)));
+                id, idAutenticado(authentication)),
+            pagina,
+            tamano);
     }
 
     @PostMapping("/mis-productos/imagenes")

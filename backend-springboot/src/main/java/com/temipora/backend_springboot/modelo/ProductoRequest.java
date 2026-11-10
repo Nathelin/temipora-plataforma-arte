@@ -39,6 +39,7 @@ public class ProductoRequest {
     private List<@Valid ProductoImagenRequest> imagenes;
 
     @NotEmpty(message = "Debés agregar al menos una variante.")
+    @Size(max = 50, message = "Un producto puede tener como máximo 50 variantes.")
     private List<@Valid ProductoVarianteRequest> variantes;
 
     @Size(max = 5, message = "Un producto puede tener como máximo 5 etiquetas.")

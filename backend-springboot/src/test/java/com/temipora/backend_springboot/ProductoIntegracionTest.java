@@ -21,10 +21,13 @@ import com.temipora.backend_springboot.modelo.LicenciaProducto;
 import com.temipora.backend_springboot.modelo.LicenciaProductoRequest;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Producto;
 import com.temipora.backend_springboot.modelo.ProductoDTO;
 import com.temipora.backend_springboot.modelo.ProductoImagenRequest;
+import com.temipora.backend_springboot.modelo.ProductoLedgerDTO;
 import com.temipora.backend_springboot.modelo.ProductoRequest;
+import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
 import com.temipora.backend_springboot.modelo.ProductoVarianteRequest;
 import com.temipora.backend_springboot.modelo.TipoEventoLedger;
 import com.temipora.backend_springboot.modelo.TipoEntrega;
@@ -148,6 +151,17 @@ class ProductoIntegracionTest {
         assertThat(licenciaGuardada.getDerechos()).hasSize(2);
         assertThat(licenciaGuardada.isRequiereCredito()).isTrue();
         Long idVariante = producto.getVariantes().iterator().next().getIdVariante();
+
+        PaginaDTO<ProductoVarianteDTO> paginaVariantes = productoService
+            .obtenerVariantes(dto.getIdProducto(), artista.getIdUsuario(), 1, 4);
+        assertThat(paginaVariantes.getContenido()).hasSize(1);
+        assertThat(paginaVariantes.getTotalElementos()).isEqualTo(1);
+        assertThat(paginaVariantes.getTotalPaginas()).isEqualTo(1);
+
+        ProductoLedgerDTO ledgerPagina = ledgerService
+            .verificarProducto(producto, 1, 4);
+        assertThat(ledgerPagina.getVariantes()).hasSize(1);
+        assertThat(ledgerPagina.getTotalElementos()).isEqualTo(1);
 
         List<EventoLedger> eventos = eventoLedgerRepository
             .findByVarianteIdVarianteOrderBySecuenciaAsc(idVariante);

@@ -19,6 +19,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -36,6 +40,7 @@ import com.temipora.backend_springboot.modelo.LicenciaProductoDerecho;
 import com.temipora.backend_springboot.modelo.LicenciaProductoRequest;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Producto;
 import com.temipora.backend_springboot.modelo.ProductoDTO;
 import com.temipora.backend_springboot.modelo.ProductoEtiqueta;
@@ -64,6 +69,7 @@ public class ProductoService {
 
     private static final String ENTIDAD = "Producto";
     private static final BigDecimal REGALIA_MAXIMA = new BigDecimal("10.00");
+    private static final int MAX_VARIANTES = 50;
     private static final List<CampoAuditado> CAMPOS = List.of(
         CampoAuditado.de("titulo", "Título"),
         CampoAuditado.de("descripcion", "Descripción"),
@@ -138,6 +144,38 @@ public class ProductoService {
     }
 
     @Transactional(readOnly = true)
+    public PaginaDTO<ProductoVarianteDTO> obtenerVariantes(
+            Long idProducto, Long idArtista, int pagina, int tamano) {
+        Producto producto = productoRepository.findById(idProducto)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Producto no encontrado: " + idProducto));
+        verificarDuenio(producto, idArtista);
+
+        int paginaSegura = Math.max(pagina, 1);
+        int tamanoSeguro = Math.min(Math.max(tamano, 1), MAX_VARIANTES);
+        Pageable pageable = PageRequest.of(
+            paginaSegura - 1,
+            tamanoSeguro,
+            Sort.by(Sort.Direction.ASC, "orden"));
+        Page<ProductoVariante> page = varianteRepository
+            .findByProductoIdProducto(idProducto, pageable);
+        Set<Long> conLedger = eventoLedgerRepository.findVariantesConLedger(
+            List.of(idProducto));
+        List<ProductoVarianteDTO> contenido = page.getContent().stream()
+            .map(variante -> aVarianteDTO(variante, conLedger))
+            .toList();
+        int totalPaginas = Math.max(1, page.getTotalPages());
+        return PaginaDTO.<ProductoVarianteDTO>builder()
+            .contenido(contenido)
+            .pagina(paginaSegura)
+            .tamanio(tamanoSeguro)
+            .totalElementos(page.getTotalElements())
+            .totalPaginas(totalPaginas)
+            .hayMas(paginaSegura < totalPaginas)
+            .build();
+    }
+
+    @Transactional(readOnly = true)
     public Producto obtenerEntidadPropia(Long idProducto, Long idArtista) {
         Producto producto = productoRepository.findByIdProducto(idProducto)
             .orElseThrow(() -> new NoSuchElementException(
@@ -151,6 +189,7 @@ public class ProductoService {
         validarUnico(idArtista, request.getIdTipoProducto(), request.getTitulo(), null);
         LicenciaContenido licenciaContenido = validarLicencia(
             request.getLicencia(), request.getVariantes());
+        validarCantidadVariantes(request.getVariantes());
         validarDuplicados(request, null);
         validarVariantesBasicas(request.getVariantes());
 
@@ -212,6 +251,7 @@ public class ProductoService {
         validarUnico(idArtista, request.getIdTipoProducto(), request.getTitulo(), idProducto);
         LicenciaContenido licenciaContenido = validarLicencia(
             request.getLicencia(), request.getVariantes());
+        validarCantidadVariantes(request.getVariantes());
         validarDuplicados(request, idProducto);
         validarVariantesBasicas(request.getVariantes());
 
@@ -313,25 +353,7 @@ public class ProductoService {
                 Comparator.nullsLast(Integer::compareTo)))
             .toList();
         List<ProductoVarianteDTO> variantesDTO = variantes.stream()
-            .map(variante -> ProductoVarianteDTO.builder()
-                .idVariante(variante.getIdVariante())
-                .nombre(variante.getNombre())
-                .descripcion(variante.getDescripcion())
-                .precio(variante.getPrecio())
-                .stockDisponible(variante.getStockDisponible())
-                .orden(variante.getOrden())
-                .estado(variante.getEstado())
-                .imagenUrl(variante.getImagenUrl())
-                .sha256(variante.getSha256())
-                .numeroEdicion(variante.getNumeroEdicion())
-                .idPropietarioActual(variante.getPropietarioActual() != null
-                    ? variante.getPropietarioActual().getIdUsuario() : null)
-                .nombrePropietario(variante.getPropietarioActual() != null
-                    ? variante.getPropietarioActual().getNombreUsuario() : null)
-                .esUnica(variante.esUnica())
-                .tieneLedger(variante.getIdVariante() != null
-                    && variantesConLedger.contains(variante.getIdVariante()))
-                .build())
+            .map(variante -> aVarianteDTO(variante, variantesConLedger))
             .toList();
 
         boolean disponible = variantes.stream()
@@ -418,6 +440,29 @@ public class ProductoService {
             .fechaActualizacion(producto.getFechaActualizacion())
             .pausadoEn(producto.getPausadoEn())
             .archivadoEn(producto.getArchivadoEn())
+            .build();
+    }
+
+    private ProductoVarianteDTO aVarianteDTO(
+            ProductoVariante variante, Set<Long> variantesConLedger) {
+        return ProductoVarianteDTO.builder()
+            .idVariante(variante.getIdVariante())
+            .nombre(variante.getNombre())
+            .descripcion(variante.getDescripcion())
+            .precio(variante.getPrecio())
+            .stockDisponible(variante.getStockDisponible())
+            .orden(variante.getOrden())
+            .estado(variante.getEstado())
+            .imagenUrl(variante.getImagenUrl())
+            .sha256(variante.getSha256())
+            .numeroEdicion(variante.getNumeroEdicion())
+            .idPropietarioActual(variante.getPropietarioActual() != null
+                ? variante.getPropietarioActual().getIdUsuario() : null)
+            .nombrePropietario(variante.getPropietarioActual() != null
+                ? variante.getPropietarioActual().getNombreUsuario() : null)
+            .esUnica(variante.esUnica())
+            .tieneLedger(variante.getIdVariante() != null
+                && variantesConLedger.contains(variante.getIdVariante()))
             .build();
     }
 
@@ -653,6 +698,13 @@ public class ProductoService {
             orden++;
         }
         return imagenes;
+    }
+
+    private void validarCantidadVariantes(List<ProductoVarianteRequest> variantes) {
+        if (variantes != null && variantes.size() > MAX_VARIANTES) {
+            throw new IllegalArgumentException(
+                "Un producto puede tener como máximo " + MAX_VARIANTES + " variantes.");
+        }
     }
 
     private void validarVariantesBasicas(List<ProductoVarianteRequest> variantes) {

@@ -20,7 +20,9 @@ const MODOS_STOCK = [
   { valor: 'UNICA', texto: 'Pieza única' },
 ]
 
+const MAX_VARIANTES = 50
 const cantidadAdoptables = ref(3)
+const precioMasivo = ref('')
 const subiendo = ref(null)
 const error = ref('')
 const confirmacion = ref(null)
@@ -68,6 +70,10 @@ function nuevaVariante(overrides = {}) {
 
 function agregarVariante() {
   confirmacion.value = null
+  if (props.modelValue.length >= MAX_VARIANTES) {
+    error.value = `Un producto puede tener como máximo ${MAX_VARIANTES} variantes.`
+    return
+  }
   const total = props.modelValue.length
   const iniciales = props.modelValue.map((variante, i) =>
     i === 0 && variante.nombre === 'Única'
@@ -80,6 +86,20 @@ function agregarVariante() {
       nombre: props.esAdoptable ? `Adoptable ${total + 1}` : `Variante ${total + 1}`,
     }),
   ])
+}
+
+function aplicarPrecioATodas() {
+  const precio = Number(precioMasivo.value)
+  if (!Number.isFinite(precio) || precio <= 0) {
+    error.value = 'Ingresá un precio mayor a cero para aplicar a todas.'
+    return
+  }
+  error.value = ''
+  confirmacion.value = null
+  emit('update:modelValue', props.modelValue.map((variante) => ({
+    ...variante,
+    precio: precioMasivo.value,
+  })))
 }
 
 function tieneDatos(variante) {
@@ -102,7 +122,7 @@ function tieneDatos(variante) {
 
 function crearVariosAdoptables() {
   confirmacion.value = null
-  const objetivo = Math.max(1, Math.min(50, Number(cantidadAdoptables.value) || 1))
+  const objetivo = Math.max(1, Math.min(MAX_VARIANTES, Number(cantidadAdoptables.value) || 1))
   const soloPresentacionUnica =
     props.modelValue.length === 1 && props.modelValue[0].nombre === 'Única'
   const base = soloPresentacionUnica
@@ -299,12 +319,13 @@ async function subirImagen(event, indice) {
         <p class="mt-1 text-sm text-cafe/60">
           {{ esPresentacionUnica
             ? 'Esta publicación tiene una sola presentación.'
-            : 'Cada variante se vende por separado y puede tener su propio precio, stock e imagen.' }}
+            : 'Cada variante se vende por separado y puede tener su propio precio, stock e imagen. Máximo 50.' }}
         </p>
       </div>
       <button
         type="button"
-        class="shrink-0 rounded-lg border border-coral/40 bg-blanco px-4 py-2 text-sm font-medium text-granate transition hover:bg-rosa/20"
+        class="shrink-0 rounded-lg border border-coral/40 bg-blanco px-4 py-2 text-sm font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-40"
+        :disabled="variantes.length >= MAX_VARIANTES"
         @click="agregarVariante"
       >
         Agregar variante
@@ -384,6 +405,40 @@ async function subirImagen(event, indice) {
     <p v-if="error" class="rounded-xl border border-rojizo/30 bg-rojizo/5 px-4 py-3 text-sm text-rojizo">
       {{ error }}
     </p>
+
+    <div
+      v-if="!esPresentacionUnica"
+      class="flex flex-col gap-3 rounded-2xl border border-rosa/60 bg-crema/50 p-4 sm:flex-row sm:items-end sm:justify-between"
+    >
+      <div>
+        <p class="text-sm font-semibold text-granate">Mismo precio para todas</p>
+        <p class="mt-1 text-xs leading-relaxed text-cafe/55">
+          Aplica un precio único a las {{ variantes.length }} variantes.
+        </p>
+      </div>
+      <div class="flex items-end gap-2">
+        <div class="relative w-40">
+          <input
+            v-model="precioMasivo"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0"
+            class="w-full rounded-lg border border-rosa/60 bg-blanco px-3 py-2 pr-14 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
+          />
+          <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-cafe/45">
+            {{ moneda }}
+          </span>
+        </div>
+        <button
+          type="button"
+          class="rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-rojizo"
+          @click="aplicarPrecioATodas"
+        >
+          Aplicar a todas
+        </button>
+      </div>
+    </div>
 
     <!-- Presentación única -->
     <article

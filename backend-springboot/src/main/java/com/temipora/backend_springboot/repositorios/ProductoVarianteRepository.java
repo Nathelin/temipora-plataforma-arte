@@ -3,6 +3,9 @@ package com.temipora.backend_springboot.repositorios;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -23,6 +26,9 @@ public interface ProductoVarianteRepository
     Optional<ProductoVariante> findByIdVarianteForUpdate(@Param("idVariante") Long idVariante);
 
     List<ProductoVariante> findByProductoIdProductoOrderByOrdenAsc(Long idProducto);
+
+    @EntityGraph(attributePaths = "propietarioActual")
+    Page<ProductoVariante> findByProductoIdProducto(Long idProducto, Pageable pageable);
 
     boolean existsBySha256AndEstadoNot(String sha256, EstadoVariante estado);
 

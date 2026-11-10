@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -381,6 +382,24 @@ class ProductoServiceTest {
         assertThat(dto.getVariantes().get(0).getSha256()).isEqualTo(SHA_IMAGEN);
         assertThat(producto.getVariantes().iterator().next().getClaveArchivoOriginal())
             .isEqualTo("productos/img.webp");
+    }
+
+    @Test
+    void crear_masDe50Variantes_lanzaError() {
+        when(productoRepository
+            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
+                5L, 1L, "Plancha de otoño", EstadoProducto.ARCHIVADO))
+            .thenReturn(false);
+        when(derechoTerminoRepository.findAllById(any()))
+            .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
+
+        ProductoRequest request = request();
+        request.setVariantes(new ArrayList<>(
+            Collections.nCopies(51, varianteRequest(null))));
+
+        assertThatThrownBy(() -> productoService.crear(5L, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Un producto puede tener como máximo 50 variantes.");
     }
 
     // ---------------------------------------------------------------

@@ -20,7 +20,12 @@ const cargando = ref(true)
 const error = ref('')
 const visorAbierto = ref(false)
 const visorIndice = ref(0)
+const indiceImagen = ref(0)
 const revelado = ref(false)
+const mostrarInfoLedger = ref(false)
+const POR_PAGINA = 4
+const paginaVariantes = ref(1)
+const paginaLedger = ref(1)
 
 const imagenes = computed(() => {
   const deGaleria = (producto.value?.imagenes || []).map((imagen) => imagen.url)
@@ -29,8 +34,12 @@ const imagenes = computed(() => {
     .filter(Boolean)
   return [...new Set([...deGaleria, ...deVariantes])]
 })
+const imagenActiva = computed(() => imagenes.value[indiceImagen.value] || null)
 
 const variantes = computed(() => producto.value?.variantes || [])
+const variantesPagina = ref([])
+const totalPaginasVariantes = ref(1)
+const totalVariantes = ref(0)
 const esSensible = computed(() => !!producto.value?.contenidoSensible)
 const requiereAdvertencia = computed(() => esSensible.value && !revelado.value)
 const precioDesde = computed(() => {
@@ -44,38 +53,126 @@ const resumenDerechos = computed(
 const esEntregaFisica = computed(
   () => producto.value?.tipoEntregaMedio === 'FISICA',
 )
-const ledgerVariantes = computed(() => ledger.value?.variantes || [])
-const tieneAlgunLedger = computed(
-  () => ledgerVariantes.value.some((variante) => variante.tieneLedger),
+const ledgerPagina = computed(() => ledger.value?.variantes || [])
+const totalPaginasLedger = computed(
+  () => Math.max(1, Number(ledger.value?.totalPaginas) || 1),
 )
+const totalLedger = computed(() => Number(ledger.value?.totalElementos) || 0)
+const tieneAlgunLedger = computed(() => totalLedger.value > 0)
 
 function hashCorto(hash) {
   if (!hash) return '—'
   return `${hash.slice(0, 10)}…${hash.slice(-6)}`
 }
 
-function imagenDeVariante(variante, indice) {
+function etiquetaEvento(tipo) {
+  const etiquetas = {
+    GENESIS: 'Origen',
+    VENTA: 'Venta',
+    TRANSFERENCIA: 'Transferencia',
+    REVENTA: 'Reventa',
+    ANULACION: 'Anulación',
+  }
+  return etiquetas[tipo] || tipo
+}
+
+function imagenDeVariante(variante) {
   const url = variante.imagenUrl || producto.value?.imagenPortada || imagenes.value[0]
   if (!url) return
   const posicion = imagenes.value.indexOf(url)
-  abrirVisor(posicion >= 0 ? posicion : indice)
+  if (posicion >= 0) seleccionarImagen(posicion)
 }
 
-function abrirVisor(indice) {
-  visorIndice.value = indice
+function seleccionarImagen(indice) {
+  if (!imagenes.value.length) return
+  const destino = Math.min(
+    Math.max(Number(indice) || 0, 0),
+    imagenes.value.length - 1,
+  )
+  indiceImagen.value = destino
+  if (visorAbierto.value) visorIndice.value = destino
+}
+
+function moverImagen(paso) {
+  if (imagenes.value.length < 2) return
+  const total = imagenes.value.length
+  seleccionarImagen((indiceImagen.value + paso + total) % total)
+}
+
+function abrirVisor(indice = indiceImagen.value) {
+  if (!imagenes.value.length || requiereAdvertencia.value) return
+  const destino = Math.min(
+    Math.max(Number(indice) || 0, 0),
+    imagenes.value.length - 1,
+  )
+  visorIndice.value = destino
   visorAbierto.value = true
+}
+
+function aplicarVariantes(data) {
+  variantesPagina.value = data?.contenido || []
+  paginaVariantes.value = data?.pagina || 1
+  totalPaginasVariantes.value = Math.max(1, Number(data?.totalPaginas) || 1)
+  totalVariantes.value = Number(data?.totalElementos) || 0
+}
+
+function aplicarLedger(data) {
+  ledger.value = data || null
+  paginaLedger.value = data?.pagina || 1
+}
+
+async function cambiarPaginaVariantes(paso) {
+  const destino = Math.min(
+    Math.max(paginaVariantes.value + paso, 1),
+    totalPaginasVariantes.value,
+  )
+  if (destino === paginaVariantes.value) return
+  try {
+    const res = await api.get(`/mis-productos/${idProducto.value}/variantes`, {
+      params: { pagina: destino, tamano: POR_PAGINA },
+    })
+    aplicarVariantes(res.data)
+  } catch (e) {
+    error.value = e.response?.data?.message
+      || 'No se pudieron cargar las variantes.'
+  }
+}
+
+async function cambiarPaginaLedger(paso) {
+  const destino = Math.min(
+    Math.max(paginaLedger.value + paso, 1),
+    totalPaginasLedger.value,
+  )
+  if (destino === paginaLedger.value) return
+  try {
+    const res = await api.get(`/mis-productos/${idProducto.value}/ledger`, {
+      params: { pagina: destino, tamano: POR_PAGINA },
+    })
+    aplicarLedger(res.data)
+  } catch (e) {
+    error.value = e.response?.data?.message
+      || 'No se pudo cargar el historial de autenticidad.'
+  }
 }
 
 async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    const [productoRes, ledgerRes] = await Promise.all([
+    const [productoRes, variantesRes, ledgerRes] = await Promise.all([
       api.get(`/mis-productos/${idProducto.value}`),
-      api.get(`/mis-productos/${idProducto.value}/ledger`),
+      api.get(`/mis-productos/${idProducto.value}/variantes`, {
+        params: { pagina: 1, tamano: POR_PAGINA },
+      }),
+      api.get(`/mis-productos/${idProducto.value}/ledger`, {
+        params: { pagina: 1, tamano: POR_PAGINA },
+      }),
     ])
     producto.value = productoRes.data
-    ledger.value = ledgerRes.data
+    aplicarVariantes(variantesRes.data)
+    aplicarLedger(ledgerRes.data)
+    indiceImagen.value = 0
+    visorIndice.value = 0
   } catch (e) {
     error.value = e.response?.data?.message
       || 'No se pudo cargar la vista previa del producto.'
@@ -110,13 +207,20 @@ onMounted(cargar)
         <div class="min-w-0 space-y-6">
           <section class="overflow-hidden rounded-[22px] border border-borde/60 bg-superficie shadow-[0_10px_28px_rgba(74,29,46,0.08)]">
             <div class="relative aspect-[4/3] w-full overflow-hidden bg-rosa/20">
-              <img
-                v-if="imagenes[0]"
-                :src="imagenes[0]"
-                :alt="producto.titulo"
-                class="h-full w-full object-cover transition duration-500"
-                :class="requiereAdvertencia ? 'scale-105 blur-[18px]' : ''"
-              />
+              <button
+                v-if="imagenActiva"
+                type="button"
+                class="block h-full w-full"
+                aria-label="Ampliar imagen del producto"
+                @click="abrirVisor()"
+              >
+                <img
+                  :src="imagenActiva"
+                  :alt="producto.titulo"
+                  class="h-full w-full object-cover transition duration-500"
+                  :class="requiereAdvertencia ? 'scale-105 blur-[18px]' : ''"
+                />
+              </button>
               <div
                 v-else
                 class="flex h-full items-center justify-center text-sm text-cafe/45"
@@ -139,10 +243,36 @@ onMounted(cargar)
               </div>
 
               <button
+                v-if="imagenes.length > 1 && !requiereAdvertencia"
+                type="button"
+                class="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-superficie/95 text-lg text-granate shadow-sm ring-1 ring-borde/60 transition hover:bg-white"
+                aria-label="Imagen anterior"
+                @click.stop="moverImagen(-1)"
+              >
+                ←
+              </button>
+              <button
+                v-if="imagenes.length > 1 && !requiereAdvertencia"
+                type="button"
+                class="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-superficie/95 text-lg text-granate shadow-sm ring-1 ring-borde/60 transition hover:bg-white"
+                aria-label="Imagen siguiente"
+                @click.stop="moverImagen(1)"
+              >
+                →
+              </button>
+
+              <span
+                v-if="imagenes.length > 1"
+                class="absolute bottom-3 left-3 rounded-full bg-granate/85 px-2.5 py-1 text-[11px] font-semibold text-white"
+              >
+                {{ indiceImagen + 1 }} / {{ imagenes.length }}
+              </span>
+
+              <button
                 v-if="imagenes.length && !requiereAdvertencia"
                 type="button"
                 class="absolute bottom-3 right-3 rounded-full bg-superficie/95 px-3 py-1.5 text-xs font-semibold text-granate shadow-sm ring-1 ring-borde/60 transition hover:bg-white"
-                @click="abrirVisor(0)"
+                @click.stop="abrirVisor()"
               >
                 Ampliar
               </button>
@@ -154,9 +284,9 @@ onMounted(cargar)
                 :key="`${url}-${indice}`"
                 type="button"
                 class="h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition"
-                :class="indice === 0 ? 'border-coral' : 'border-rosa/50 hover:border-coral/50'"
+                :class="indice === indiceImagen ? 'border-coral' : 'border-rosa/50 hover:border-coral/50'"
                 :aria-label="`Ver imagen ${indice + 1}`"
-                @click="abrirVisor(indice)"
+                @click="seleccionarImagen(indice)"
               >
                 <img :src="url" alt="" class="h-full w-full object-cover" />
               </button>
@@ -182,8 +312,8 @@ onMounted(cargar)
           <section class="rounded-[22px] border border-borde/60 bg-superficie p-6 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <h2 class="font-display text-lg font-bold text-granate">
-                {{ variantes.length === 1 ? 'Presentación' : 'Variantes' }}
-                ({{ variantes.length }})
+                {{ totalVariantes === 1 ? 'Presentación' : 'Variantes' }}
+                ({{ totalVariantes }})
               </h2>
               <span class="text-xs text-cafe/45">
                 Cada variante es un ítem vendible.
@@ -192,14 +322,14 @@ onMounted(cargar)
 
             <div class="mt-4 divide-y divide-rosa/40">
               <article
-                v-for="(variante, indice) in variantes"
+                v-for="variante in variantesPagina"
                 :key="variante.idVariante"
                 class="flex flex-col gap-4 py-4 sm:flex-row sm:items-center"
               >
                 <button
                   type="button"
                   class="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-rosa/50 bg-rosa/10"
-                  @click="imagenDeVariante(variante, indice)"
+                  @click="imagenDeVariante(variante)"
                 >
                   <img
                     v-if="variante.imagenUrl"
@@ -224,7 +354,7 @@ onMounted(cargar)
                       v-if="variante.tieneLedger"
                       class="rounded-full bg-mantequilla/60 px-2.5 py-0.5 text-[11px] font-bold text-granate"
                     >
-                      Génesis registrado
+                      Origen registrado
                     </span>
                   </div>
                   <p v-if="variante.descripcion" class="mt-1 text-sm text-cafe/65">
@@ -242,6 +372,31 @@ onMounted(cargar)
                   {{ formatearPrecio(variante.precio, producto.moneda) }}
                 </p>
               </article>
+            </div>
+
+            <div
+              v-if="totalPaginasVariantes > 1"
+              class="mt-4 flex items-center justify-between gap-3 border-t border-rosa/40 pt-3"
+            >
+              <button
+                type="button"
+                class="rounded-lg border border-rosa/60 px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-40"
+                :disabled="paginaVariantes === 1"
+                @click="cambiarPaginaVariantes(-1)"
+              >
+                ← Anterior
+              </button>
+              <span class="text-xs text-cafe/55">
+                Página {{ paginaVariantes }} de {{ totalPaginasVariantes }}
+              </span>
+              <button
+                type="button"
+                class="rounded-lg border border-rosa/60 px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-40"
+                :disabled="paginaVariantes === totalPaginasVariantes"
+                @click="cambiarPaginaVariantes(1)"
+              >
+                Siguiente →
+              </button>
             </div>
           </section>
 
@@ -412,21 +567,54 @@ onMounted(cargar)
               <div class="flex items-start justify-between gap-3">
                 <div>
                   <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
-                    Registro de autenticidad
+                    Propiedad y procedencia
                   </p>
                   <h2 class="mt-1 font-display text-base font-bold text-granate">
-                    Ledger de piezas únicas
+                    Historial de autenticidad
                   </h2>
                 </div>
-                <span
-                  v-if="tieneAlgunLedger"
-                  class="rounded-full px-2.5 py-0.5 text-[11px] font-bold"
-                  :class="ledger?.integridad
-                    ? 'bg-green-500/10 text-green-700'
-                    : 'bg-rojizo/10 text-rojizo'"
-                >
-                  {{ ledger?.integridad ? 'Integridad OK' : 'Revisar cadena' }}
-                </span>
+                <div class="relative flex items-center gap-2">
+                  <button
+                    type="button"
+                    class="rounded-full border border-rosa/60 bg-blanco px-2.5 py-1 text-[11px] font-semibold text-granate transition hover:bg-rosa/20"
+                    @click="mostrarInfoLedger = !mostrarInfoLedger"
+                  >
+                    ¿Qué es?
+                  </button>
+                  <span
+                    v-if="tieneAlgunLedger"
+                    class="rounded-full px-2.5 py-0.5 text-[11px] font-bold"
+                    :class="ledger?.integridad
+                      ? 'bg-green-500/10 text-green-700'
+                      : 'bg-rojizo/10 text-rojizo'"
+                  >
+                    {{ ledger?.integridad ? 'Verificado' : 'Revisar historial' }}
+                  </span>
+
+                  <div
+                    v-if="mostrarInfoLedger"
+                    class="absolute right-0 top-9 z-30 w-72 rounded-xl border border-rosa/60 bg-blanco p-4 text-xs leading-relaxed text-cafe/70 shadow-xl"
+                  >
+                    <p class="font-semibold text-granate">Historial de autenticidad</p>
+                    <p class="mt-1">
+                      Es un registro digital de la pieza. Guarda su origen, quién la
+                      creó y cada cambio de propiedad. Cada registro se encadena con
+                      el anterior: si alguien intenta modificarlo, la verificación lo
+                      detecta.
+                    </p>
+                    <p class="mt-2">
+                      No es una criptomoneda ni una wallet, y no reemplaza tus
+                      derechos de autor.
+                    </p>
+                    <button
+                      type="button"
+                      class="mt-3 text-[11px] font-semibold text-coral transition hover:text-rojizo"
+                      @click="mostrarInfoLedger = false"
+                    >
+                      Entendido
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <p v-if="ledger?.mensaje" class="mt-3 text-xs leading-relaxed text-cafe/60">
@@ -440,7 +628,7 @@ onMounted(cargar)
 
               <div v-else class="mt-4 space-y-4">
                 <article
-                  v-for="varianteLedger in ledgerVariantes.filter((v) => v.tieneLedger)"
+                  v-for="varianteLedger in ledgerPagina"
                   :key="varianteLedger.idVariante"
                   class="rounded-xl border border-rosa/50 bg-crema/40 p-3"
                 >
@@ -454,7 +642,7 @@ onMounted(cargar)
                         ? 'bg-green-500/10 text-green-700'
                         : 'bg-rojizo/10 text-rojizo'"
                     >
-                      {{ varianteLedger.integridad ? 'Verificada' : 'Alterada' }}
+                      {{ varianteLedger.integridad ? 'Verificado' : 'Con diferencias' }}
                     </span>
                   </div>
                   <p class="mt-1 text-[11px] text-cafe/55">
@@ -469,7 +657,7 @@ onMounted(cargar)
                     >
                       <div class="flex items-center justify-between gap-2">
                         <p class="text-[11px] font-bold uppercase tracking-wide text-coral">
-                          #{{ evento.secuencia }} · {{ evento.tipo }}
+                          #{{ evento.secuencia }} · {{ etiquetaEvento(evento.tipo) }}
                         </p>
                         <span
                           class="text-[10px] font-semibold"
@@ -491,6 +679,31 @@ onMounted(cargar)
                   </ol>
                 </article>
               </div>
+
+              <div
+                v-if="tieneAlgunLedger && totalPaginasLedger > 1"
+                class="mt-4 flex items-center justify-between gap-3 border-t border-rosa/40 pt-3"
+              >
+                <button
+                  type="button"
+                  class="rounded-lg border border-rosa/60 px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-40"
+                  :disabled="paginaLedger === 1"
+                  @click="cambiarPaginaLedger(-1)"
+                >
+                  ← Anterior
+                </button>
+                <span class="text-xs text-cafe/55">
+                  Página {{ paginaLedger }} de {{ totalPaginasLedger }}
+                </span>
+                <button
+                  type="button"
+                  class="rounded-lg border border-rosa/60 px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-40"
+                  :disabled="paginaLedger === totalPaginasLedger"
+                  @click="cambiarPaginaLedger(1)"
+                >
+                  Siguiente →
+                </button>
+              </div>
             </section>
 
             <section
@@ -511,7 +724,7 @@ onMounted(cargar)
       :indice="visorIndice"
       :etiqueta="producto?.titulo || 'Producto'"
       @cerrar="visorAbierto = false"
-      @actualizar:indice="visorIndice = $event"
+      @actualizar:indice="seleccionarImagen"
     />
   </div>
 </template>
