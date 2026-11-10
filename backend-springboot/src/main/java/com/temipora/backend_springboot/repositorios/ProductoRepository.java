@@ -60,6 +60,7 @@ public interface ProductoRepository
     boolean existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
             Long idUsuario, Long idTipoProducto, String titulo, EstadoProducto estado);
 
-    boolean existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNot(
-            Long idUsuario, Long idTipoProducto, String titulo, Long idProducto, EstadoProducto estado);
+    boolean existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNotIn(
+            Long idUsuario, Long idTipoProducto, String titulo, Long idProducto,
+            List<EstadoProducto> estados);
 }

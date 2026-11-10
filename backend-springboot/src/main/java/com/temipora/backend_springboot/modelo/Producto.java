@@ -44,26 +44,24 @@ public class Producto {
     @JoinColumn(name = "id_artista", nullable = false)
     private Usuario artista;
 
-    @ManyToOne(fetch = FetchType.EAGER, optional = false)
-    @JoinColumn(name = "id_tipo_producto", nullable = false)
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "id_tipo_producto")
     private TipoProducto tipoProducto;
 
-    @ManyToOne(fetch = FetchType.EAGER, optional = false)
-    @JoinColumn(name = "id_medio", nullable = false)
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "id_medio")
     private Medio medio;
 
-    @ManyToOne(fetch = FetchType.EAGER, optional = false)
-    @JoinColumn(name = "id_moneda", nullable = false)
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "id_moneda")
     private Moneda moneda;
 
-    @NotBlank
     @Size(max = 100)
-    @Column(nullable = false, length = 100)
+    @Column(length = 100)
     private String titulo;
 
-    @NotBlank
     @Size(max = 500)
-    @Column(nullable = false, length = 500)
+    @Column(length = 500)
     private String descripcion;
 
     @Column(name = "contenido_sensible", nullable = false)

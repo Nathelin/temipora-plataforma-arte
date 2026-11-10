@@ -34,4 +34,9 @@ public interface ProductoVarianteRepository
 
     boolean existsBySha256AndEstadoNotAndProductoIdProductoNot(
             String sha256, EstadoVariante estado, Long idProducto);
+
+    @Query("SELECT v.imagenUrl FROM ProductoVariante v WHERE v.imagenUrl IS NOT NULL")
+    List<String> findUrlsImagen();
+
+    boolean existsByImagenUrl(String imagenUrl);
 }

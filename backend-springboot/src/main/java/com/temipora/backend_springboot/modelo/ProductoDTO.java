@@ -39,6 +39,7 @@ public class ProductoDTO {
     private String imagenPortada;
     private List<ProductoImagenDTO> imagenes;
     private List<ProductoVarianteDTO> variantes;
+    private List<ProductoEntregableDTO> entregables;
     private List<EtiquetaDTO> etiquetas;
     private BigDecimal precioDesde;
     private boolean disponible;

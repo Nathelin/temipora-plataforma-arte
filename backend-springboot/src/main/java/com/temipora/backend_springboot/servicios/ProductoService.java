@@ -6,6 +6,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import com.temipora.backend_springboot.modelo.AlcanceEntregable;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.DerechoTerminoDTO;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
@@ -44,6 +46,9 @@ import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Producto;
 import com.temipora.backend_springboot.modelo.ProductoDTO;
 import com.temipora.backend_springboot.modelo.ProductoEtiqueta;
+import com.temipora.backend_springboot.modelo.ProductoEntregable;
+import com.temipora.backend_springboot.modelo.ProductoEntregableDTO;
+import com.temipora.backend_springboot.modelo.ProductoEntregableRequest;
 import com.temipora.backend_springboot.modelo.ProductoImagen;
 import com.temipora.backend_springboot.modelo.ProductoImagenDTO;
 import com.temipora.backend_springboot.modelo.ProductoImagenRequest;
@@ -52,12 +57,14 @@ import com.temipora.backend_springboot.modelo.ProductoVariante;
 import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
 import com.temipora.backend_springboot.modelo.ProductoVarianteRequest;
 import com.temipora.backend_springboot.modelo.TipoProducto;
+import com.temipora.backend_springboot.modelo.TipoEntrega;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
 import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
 import com.temipora.backend_springboot.repositorios.ProductoImagenRepository;
+import com.temipora.backend_springboot.repositorios.ProductoEntregableRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
 import com.temipora.backend_springboot.repositorios.TipoProductoRepository;
@@ -91,6 +98,8 @@ public class ProductoService {
     private final EtiquetaRepository etiquetaRepository;
     private final MonedaService monedaService;
     private final DerechoTerminoRepository derechoTerminoRepository;
+    private final ProductoEntregableRepository entregableRepository;
+    private final AlmacenPrivadoService almacenPrivadoService;
     private final LedgerService ledgerService;
     private final AuditoriaService auditoria;
 
@@ -105,6 +114,8 @@ public class ProductoService {
             EtiquetaRepository etiquetaRepository,
             MonedaService monedaService,
             DerechoTerminoRepository derechoTerminoRepository,
+            ProductoEntregableRepository entregableRepository,
+            AlmacenPrivadoService almacenPrivadoService,
             LedgerService ledgerService,
             AuditoriaService auditoria) {
         this.productoRepository = productoRepository;
@@ -117,6 +128,8 @@ public class ProductoService {
         this.etiquetaRepository = etiquetaRepository;
         this.monedaService = monedaService;
         this.derechoTerminoRepository = derechoTerminoRepository;
+        this.entregableRepository = entregableRepository;
+        this.almacenPrivadoService = almacenPrivadoService;
         this.ledgerService = ledgerService;
         this.auditoria = auditoria;
     }
@@ -131,8 +144,10 @@ public class ProductoService {
         }
         Set<Long> conLedger = eventoLedgerRepository.findVariantesConLedger(
             productos.stream().map(Producto::getIdProducto).toList());
+        Map<Long, List<ProductoEntregableDTO>> entregables = entregablesPorProducto(
+            productos.stream().map(Producto::getIdProducto).toList());
         return productos.stream()
-            .map(producto -> aDTO(producto, conLedger))
+            .map(producto -> aDTO(producto, conLedger, entregables))
             .toList();
     }
 
@@ -141,7 +156,9 @@ public class ProductoService {
         Producto producto = obtenerEntidadPropia(idProducto, idArtista);
         Set<Long> conLedger = eventoLedgerRepository.findVariantesConLedger(
             List.of(idProducto));
-        return aDTO(producto, conLedger);
+        Map<Long, List<ProductoEntregableDTO>> entregables = entregablesPorProducto(
+            List.of(idProducto));
+        return aDTO(producto, conLedger, entregables);
     }
 
     @Transactional(readOnly = true)
@@ -187,12 +204,7 @@ public class ProductoService {
 
     @Transactional
     public ProductoDTO crear(Long idArtista, ProductoRequest request) {
-        validarUnico(idArtista, request.getIdTipoProducto(), request.getTitulo(), null);
-        LicenciaContenido licenciaContenido = validarLicencia(
-            request.getLicencia(), request.getVariantes());
-        validarCantidadVariantes(request.getVariantes());
-        validarDuplicados(request, null);
-        validarVariantesBasicas(request.getVariantes());
+        validarParaPublicar(idArtista, request, null);
 
         Usuario artista = usuarioRepository.findByIdUsuario(idArtista)
             .orElseThrow(() -> new NoSuchElementException(
@@ -201,12 +213,12 @@ public class ProductoService {
         Producto producto = new Producto();
         producto.setArtista(artista);
         producto.setEstado(EstadoProducto.DISPONIBLE);
-        aplicarProducto(producto, request);
+        aplicarProducto(producto, request, false);
 
         int indice = 0;
         for (ProductoVarianteRequest varianteRequest : request.getVariantes()) {
             ProductoVariante variante = new ProductoVariante();
-            aplicarVariante(variante, producto, artista, varianteRequest, true, indice);
+            aplicarVariante(variante, producto, artista, varianteRequest, true, indice, false);
             producto.agregarVariante(variante);
             indice++;
         }
@@ -216,9 +228,12 @@ public class ProductoService {
         producto.reemplazarEtiquetas(
             cargarEtiquetas(artista, request.getIdsEtiquetas()));
         producto.agregarLicencia(construirLicencia(
-            producto, request.getLicencia(), licenciaContenido, 1, true));
+            producto, request.getLicencia(), validarLicencia(
+                request.getLicencia(), request.getVariantes()),
+            1, true));
 
         Producto guardado = productoRepository.saveAndFlush(producto);
+        reemplazarEntregables(guardado, request);
 
         String hashLicencia = hashLicencia(guardado.licenciaVigente());
         for (ProductoVariante variante : guardado.getVariantes()) {
@@ -230,7 +245,123 @@ public class ProductoService {
 
         auditoria.registrar(
             AccionesAdmin.PRODUCTO_CREAR, ENTIDAD, guardado.getIdProducto(),
-            "Creó el producto “" + guardado.getTitulo() + "” con "
+            "Publicó el producto “" + guardado.getTitulo() + "” con "
+                + guardado.getVariantes().size() + " variante(s) y licencia v"
+                + versionLicencia(guardado),
+            null, guardado, CAMPOS);
+        return aDTO(guardado);
+    }
+
+    /**
+     * Guarda un producto incompleto. No valida los datos de publicación, no
+     * exige licencia ni imágenes, y nunca emite eventos del ledger: un
+     * borrador no representa todavía una pieza publicada.
+     */
+    @Transactional
+    public ProductoDTO guardarBorrador(
+            Long idArtista, Long idProducto, ProductoRequest request) {
+        validarBorrador(idArtista, request);
+
+        Usuario artista = usuarioRepository.findByIdUsuario(idArtista)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Usuario no encontrado: " + idArtista));
+
+        Producto producto;
+        boolean esNuevo = idProducto == null;
+        if (esNuevo) {
+            producto = new Producto();
+            producto.setArtista(artista);
+            producto.setEstado(EstadoProducto.BORRADOR);
+        } else {
+            producto = productoRepository.findByIdProductoForUpdate(idProducto)
+                .orElseThrow(() -> new NoSuchElementException(
+                    "Producto no encontrado: " + idProducto));
+            verificarDuenio(producto, idArtista);
+            if (producto.getEstado() == EstadoProducto.ARCHIVADO) {
+                throw new ConflictoException(
+                    "El producto está archivado y no se puede modificar.");
+            }
+            if (producto.getEstado() != EstadoProducto.BORRADOR) {
+                throw new ConflictoException(
+                    "El producto ya está publicado. Editá la publicación en lugar "
+                        + "de guardarla como borrador.");
+            }
+        }
+
+        aplicarProducto(producto, request, true);
+        actualizarVariantes(producto, producto.getArtista(),
+            request.getVariantes(), true);
+        producto.reemplazarImagenes(
+            construirImagenes(producto, request.getImagenes(), producto.getImagenes()));
+        producto.reemplazarEtiquetas(
+            cargarEtiquetas(producto.getArtista(), request.getIdsEtiquetas()));
+        aplicarLicenciaBorrador(producto, request.getLicencia());
+        producto.setFechaActualizacion(LocalDateTime.now());
+
+        Producto guardado = productoRepository.saveAndFlush(producto);
+        reemplazarEntregables(guardado, request);
+
+        auditoria.registrar(
+            esNuevo ? AccionesAdmin.PRODUCTO_BORRADOR_CREAR
+                : AccionesAdmin.PRODUCTO_BORRADOR_MODIFICAR,
+            ENTIDAD, guardado.getIdProducto(),
+            (esNuevo ? "Creó" : "Actualizó") + " el borrador de producto “"
+                + (guardado.getTitulo() != null ? guardado.getTitulo() : "Sin título")
+                + "”",
+            null, guardado, CAMPOS);
+        return aDTO(guardado);
+    }
+
+    /**
+     * Publica un borrador. Es la única transición BORRADOR -> DISPONIBLE y el
+     * único punto donde se emite el génesis del ledger.
+     */
+    @Transactional
+    public ProductoDTO publicarBorrador(
+            Long idProducto, Long idArtista, ProductoRequest request) {
+        Producto producto = productoRepository.findByIdProductoForUpdate(idProducto)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Producto no encontrado: " + idProducto));
+        verificarDuenio(producto, idArtista);
+        if (producto.getEstado() == EstadoProducto.ARCHIVADO) {
+            throw new ConflictoException(
+                "El producto está archivado y no se puede publicar.");
+        }
+        if (producto.getEstado() != EstadoProducto.BORRADOR) {
+            throw new ConflictoException("El producto ya está publicado.");
+        }
+
+        validarParaPublicar(idArtista, request, idProducto);
+
+        aplicarProducto(producto, request, false);
+        actualizarVariantes(producto, producto.getArtista(),
+            request.getVariantes(), false);
+        producto.reemplazarImagenes(
+            construirImagenes(producto, request.getImagenes(), producto.getImagenes()));
+        producto.reemplazarEtiquetas(
+            cargarEtiquetas(producto.getArtista(), request.getIdsEtiquetas()));
+        actualizarLicencia(producto, request.getLicencia(), validarLicencia(
+            request.getLicencia(), request.getVariantes()));
+        producto.setEstado(EstadoProducto.DISPONIBLE);
+        producto.setPausadoEn(null);
+        producto.setFechaActualizacion(LocalDateTime.now());
+
+        Producto guardado = productoRepository.saveAndFlush(producto);
+        reemplazarEntregables(guardado, request);
+
+        String hashLicencia = hashLicencia(guardado.licenciaVigente());
+        for (ProductoVariante variante : guardado.getVariantes()) {
+            if (variante.esUnica()
+                    && !eventoLedgerRepository.existsByVarianteIdVariante(
+                        variante.getIdVariante())) {
+                ledgerService.registrarGenesis(variante, hashLicencia);
+            }
+        }
+        productoRepository.flush();
+
+        auditoria.registrar(
+            AccionesAdmin.PRODUCTO_PUBLICAR, ENTIDAD, guardado.getIdProducto(),
+            "Publicó el borrador “" + guardado.getTitulo() + "” con "
                 + guardado.getVariantes().size() + " variante(s) y licencia v"
                 + versionLicencia(guardado),
             null, guardado, CAMPOS);
@@ -247,25 +378,27 @@ public class ProductoService {
             throw new ConflictoException(
                 "El producto está archivado y no se puede modificar.");
         }
+        if (producto.getEstado() == EstadoProducto.BORRADOR) {
+            throw new ConflictoException(
+                "El producto es un borrador. Guardalo como borrador o publicalo.");
+        }
 
         Snapshot antes = Snapshot.de(producto, CAMPOS);
-        validarUnico(idArtista, request.getIdTipoProducto(), request.getTitulo(), idProducto);
-        LicenciaContenido licenciaContenido = validarLicencia(
-            request.getLicencia(), request.getVariantes());
-        validarCantidadVariantes(request.getVariantes());
-        validarDuplicados(request, idProducto);
-        validarVariantesBasicas(request.getVariantes());
+        validarParaPublicar(idArtista, request, idProducto);
 
-        aplicarProducto(producto, request);
-        actualizarVariantes(producto, producto.getArtista(), request.getVariantes());
+        aplicarProducto(producto, request, false);
+        actualizarVariantes(producto, producto.getArtista(),
+            request.getVariantes(), false);
         producto.reemplazarImagenes(
             construirImagenes(producto, request.getImagenes(), producto.getImagenes()));
         producto.reemplazarEtiquetas(
             cargarEtiquetas(producto.getArtista(), request.getIdsEtiquetas()));
-        actualizarLicencia(producto, request.getLicencia(), licenciaContenido);
+        actualizarLicencia(producto, request.getLicencia(), validarLicencia(
+            request.getLicencia(), request.getVariantes()));
         producto.setFechaActualizacion(LocalDateTime.now());
 
         Producto guardado = productoRepository.saveAndFlush(producto);
+        reemplazarEntregables(guardado, request);
 
         String hashLicencia = hashLicencia(guardado.licenciaVigente());
         for (ProductoVariante variante : guardado.getVariantes()) {
@@ -292,6 +425,10 @@ public class ProductoService {
             throw new ConflictoException(
                 "El producto está archivado y no se puede pausar.");
         }
+        if (producto.getEstado() == EstadoProducto.BORRADOR) {
+            throw new ConflictoException(
+                "El producto es un borrador: todavía no está publicado.");
+        }
         if (producto.getEstado() != EstadoProducto.PAUSADO) {
             Snapshot antes = Snapshot.de(producto, CAMPOS);
             producto.setEstado(EstadoProducto.PAUSADO);
@@ -315,6 +452,10 @@ public class ProductoService {
         }
         if (producto.getEstado() == EstadoProducto.DISPONIBLE) {
             return obtenerPropio(idProducto, idArtista);
+        }
+        if (producto.getEstado() == EstadoProducto.BORRADOR) {
+            throw new ConflictoException(
+                "El producto es un borrador: publicalo en lugar de reactivarlo.");
         }
         if (producto.licenciaVigente() == null) {
             throw new IllegalArgumentException(
@@ -341,14 +482,19 @@ public class ProductoService {
     }
 
     public ProductoDTO aDTO(Producto producto) {
-        Set<Long> conLedger = producto.getIdProducto() != null
-            ? eventoLedgerRepository.findVariantesConLedger(
-                List.of(producto.getIdProducto()))
-            : Set.of();
-        return aDTO(producto, conLedger);
+        if (producto.getIdProducto() == null) {
+            return aDTO(producto, Set.of(), Map.of());
+        }
+        Set<Long> conLedger = eventoLedgerRepository.findVariantesConLedger(
+            List.of(producto.getIdProducto()));
+        return aDTO(producto, conLedger,
+            entregablesPorProducto(List.of(producto.getIdProducto())));
     }
 
-    private ProductoDTO aDTO(Producto producto, Set<Long> variantesConLedger) {
+    private ProductoDTO aDTO(
+            Producto producto,
+            Set<Long> variantesConLedger,
+            Map<Long, List<ProductoEntregableDTO>> entregables) {
         List<ProductoVariante> variantes = producto.getVariantes().stream()
             .sorted(Comparator.comparing(ProductoVariante::getOrden,
                 Comparator.nullsLast(Integer::compareTo)))
@@ -427,6 +573,8 @@ public class ProductoService {
                     .build())
                 .toList())
             .variantes(variantesDTO)
+            .entregables(entregables.getOrDefault(
+                producto.getIdProducto(), List.of()))
             .etiquetas(producto.getEtiquetas().stream()
                 .map(ProductoEtiqueta::getEtiqueta)
                 .sorted(Comparator.comparing(Etiqueta::getNombre,
@@ -467,35 +615,71 @@ public class ProductoService {
             .build();
     }
 
-    private void aplicarProducto(Producto producto, ProductoRequest request) {
-        if (request.getImagenes() == null || request.getImagenes().isEmpty()) {
-            throw new IllegalArgumentException(
-                "Debés agregar al menos una imagen del producto.");
+    private Map<Long, List<ProductoEntregableDTO>> entregablesPorProducto(
+            Collection<Long> idsProducto) {
+        if (idsProducto == null || idsProducto.isEmpty()) {
+            return Map.of();
         }
-        if (request.getImagenes().size() > MAX_IMAGENES) {
+        return entregableRepository
+            .findByProductoIdProductoInOrderByOrdenAsc(idsProducto)
+            .stream()
+            .collect(Collectors.groupingBy(
+                entregable -> entregable.getProducto().getIdProducto(),
+                Collectors.mapping(entregable -> ProductoEntregableDTO.builder()
+                    .idEntregable(entregable.getIdEntregable())
+                    .alcance(entregable.getAlcance())
+                    .idVariante(entregable.getVariante() != null
+                        ? entregable.getVariante().getIdVariante() : null)
+                    .nombreVariante(entregable.getVariante() != null
+                        ? entregable.getVariante().getNombre() : null)
+                    .nombre(entregable.getNombre())
+                    .mime(entregable.getMime())
+                    .tamanoBytes(entregable.getTamanoBytes())
+                    .sha256(entregable.getSha256())
+                    .orden(entregable.getOrden())
+                    .build(),
+                    Collectors.toList())));
+    }
+
+    private void aplicarProducto(
+            Producto producto, ProductoRequest request, boolean borrador) {
+        if (!borrador) {
+            if (request.getImagenes() == null || request.getImagenes().isEmpty()) {
+                throw new IllegalArgumentException(
+                    "Debés agregar al menos una imagen del producto.");
+            }
+        }
+        List<ProductoImagenRequest> imagenes = request.getImagenes() != null
+            ? request.getImagenes()
+            : List.of();
+        if (imagenes.size() > MAX_IMAGENES) {
             throw new IllegalArgumentException(
                 "Un producto puede tener como máximo " + MAX_IMAGENES + " imágenes.");
         }
-        TipoProducto tipo = tipoProductoRepository
-            .findByIdTipoProducto(request.getIdTipoProducto())
-            .orElseThrow(() -> new IllegalArgumentException(
-                "Tipo de producto no encontrado: " + request.getIdTipoProducto()));
-        if (!tipo.isActivo()) {
+        TipoProducto tipo = request.getIdTipoProducto() != null
+            ? tipoProductoRepository
+                .findByIdTipoProducto(request.getIdTipoProducto())
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "Tipo de producto no encontrado: " + request.getIdTipoProducto()))
+            : null;
+        if (tipo != null && !tipo.isActivo()) {
             throw new IllegalArgumentException(
                 "El tipo de producto “" + tipo.getNombre() + "” está dado de baja.");
         }
-        Medio medio = medioRepository.findByIdMedio(request.getIdMedio())
-            .orElseThrow(() -> new IllegalArgumentException(
-                "Medio no encontrado: " + request.getIdMedio()));
-        if (!medio.isActivo()) {
+        Medio medio = request.getIdMedio() != null
+            ? medioRepository.findByIdMedio(request.getIdMedio())
+                .orElseThrow(() -> new IllegalArgumentException(
+                    "Medio no encontrado: " + request.getIdMedio()))
+            : null;
+        if (medio != null && !medio.isActivo()) {
             throw new IllegalArgumentException(
                 "El medio “" + medio.getNombre() + "” está dado de baja.");
         }
 
         producto.setTipoProducto(tipo);
         producto.setMedio(medio);
-        producto.setTitulo(request.getTitulo().trim());
-        producto.setDescripcion(request.getDescripcion().trim());
+        producto.setTitulo(limpiar(request.getTitulo()));
+        producto.setDescripcion(limpiar(request.getDescripcion()));
         producto.setMoneda(resolverMoneda(request.getIdMoneda()));
         validarContenidoSensible(request);
         producto.setContenidoSensible(request.isContenidoSensible());
@@ -505,16 +689,18 @@ public class ProductoService {
                 : Set.of());
 
         producto.setImagenPortada(
-            request.getImagenes().isEmpty()
+            imagenes.isEmpty()
                 ? null
-                : request.getImagenes().get(0).getUrl().trim());
+                : imagenes.get(0).getUrl().trim());
         producto.setFechaActualizacion(LocalDateTime.now());
     }
 
     private void actualizarVariantes(
             Producto producto,
             Usuario artista,
-            List<ProductoVarianteRequest> requests) {
+            List<ProductoVarianteRequest> requests,
+            boolean borrador) {
+        List<ProductoVarianteRequest> lista = requests != null ? requests : List.of();
         Map<Long, ProductoVariante> existentes = new HashMap<>();
         for (ProductoVariante variante : producto.getVariantes()) {
             existentes.put(variante.getIdVariante(), variante);
@@ -522,7 +708,7 @@ public class ProductoService {
 
         Set<Long> idsSolicitados = new HashSet<>();
         int indice = 0;
-        for (ProductoVarianteRequest request : requests) {
+        for (ProductoVarianteRequest request : lista) {
             ProductoVariante variante;
             boolean esNueva;
             if (request.getIdVariante() != null) {
@@ -538,7 +724,7 @@ public class ProductoService {
                 producto.agregarVariante(variante);
                 esNueva = true;
             }
-            aplicarVariante(variante, producto, artista, request, esNueva, indice);
+            aplicarVariante(variante, producto, artista, request, esNueva, indice, borrador);
             indice++;
         }
 
@@ -562,7 +748,8 @@ public class ProductoService {
             Usuario artista,
             ProductoVarianteRequest request,
             boolean esNueva,
-            int indice) {
+            int indice,
+            boolean borrador) {
         String oldSha = variante.getSha256();
         boolean tieneLedger = !esNueva
             && variante.getIdVariante() != null
@@ -584,7 +771,9 @@ public class ProductoService {
             }
         }
 
-        String nombre = request.getNombre().trim();
+        String nombre = hayTexto(request.getNombre())
+            ? request.getNombre().trim()
+            : "Variante " + (indice + 1);
         variante.setNombre(nombre);
         variante.setDescripcion(limpiar(request.getDescripcion()));
         variante.setPrecio(request.getPrecio());
@@ -621,9 +810,9 @@ public class ProductoService {
             || hayTexto(request.getSha256())
             || hayTexto(request.getClaveArchivoOriginal());
         if (!imagenEnviada) {
-            if (esNueva
+            if (!borrador && (esNueva
                     || !hayTexto(variante.getImagenUrl())
-                    || !hayTexto(variante.getSha256())) {
+                    || !hayTexto(variante.getSha256()))) {
                 throw new IllegalArgumentException(
                     "La imagen de la variante es obligatoria.");
             }
@@ -670,8 +859,8 @@ public class ProductoService {
             List<ProductoImagenRequest> requests,
             java.util.Collection<ProductoImagen> existentes) {
         if (requests == null || requests.isEmpty()) {
-            throw new IllegalArgumentException(
-                "Debés agregar al menos una imagen del producto.");
+            // Solo se llega acá en un borrador: publicar exige imágenes.
+            return new ArrayList<>();
         }
         Map<String, String> clavesPorSha = new HashMap<>();
         if (existentes != null) {
@@ -687,8 +876,13 @@ public class ProductoService {
         List<ProductoImagen> imagenes = new ArrayList<>();
         int orden = 0;
         for (ProductoImagenRequest request : requests) {
-            String url = request.getUrl().trim();
-            String sha = request.getSha256().trim().toLowerCase(Locale.ROOT);
+            String url = limpiar(request.getUrl());
+            String sha = limpiar(request.getSha256());
+            if (url == null || sha == null) {
+                throw new IllegalArgumentException(
+                    "Cada imagen necesita su URL y su huella SHA-256.");
+            }
+            sha = sha.toLowerCase(Locale.ROOT);
             String clave = limpiar(request.getClaveArchivoOriginal());
             if (clave == null) {
                 clave = clavesPorSha.get(sha);
@@ -710,6 +904,47 @@ public class ProductoService {
             throw new IllegalArgumentException(
                 "Un producto puede tener como máximo " + MAX_VARIANTES + " variantes.");
         }
+    }
+
+    private void validarOrdenesVariantes(List<ProductoVarianteRequest> variantes) {
+        Set<Integer> ordenes = new HashSet<>();
+        int indice = 0;
+        for (ProductoVarianteRequest variante : variantes) {
+            int orden = variante.getOrden() != null ? variante.getOrden() : indice;
+            if (!ordenes.add(orden)) {
+                throw new IllegalArgumentException(
+                    "El orden de las variantes no puede repetirse.");
+            }
+            indice++;
+        }
+    }
+
+    /**
+     * Un borrador puede no tener licencia todavía. Si la tiene, se guarda como
+     * versión vigente sin exigir los derechos completos.
+     */
+    private void aplicarLicenciaBorrador(
+            Producto producto, LicenciaProductoRequest request) {
+        if (request == null) {
+            return;
+        }
+        Set<Long> ids = request.getIdsDerechos() == null
+            ? Set.of()
+            : request.getIdsDerechos().stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        LicenciaContenido contenido;
+        if (ids.isEmpty()) {
+            contenido = new LicenciaContenido(Set.of(), BigDecimal.ZERO);
+        } else {
+            Set<DerechoTermino> derechos = new LinkedHashSet<>(
+                derechoTerminoRepository.findAllById(ids));
+            BigDecimal regalia = request.getPorcentajeRegalia() != null
+                ? request.getPorcentajeRegalia()
+                : BigDecimal.ZERO;
+            contenido = new LicenciaContenido(derechos, regalia);
+        }
+        actualizarLicencia(producto, request, contenido);
     }
 
     private void validarVariantesBasicas(List<ProductoVarianteRequest> variantes) {
@@ -978,20 +1213,246 @@ public class ProductoService {
             BigDecimal porcentajeRegalia) {
     }
 
+    /**
+     * Validación mínima para guardar un borrador: solo integridad de lo que
+     * vino, sin exigir nada de la publicación.
+     */
+    private void validarBorrador(Long idArtista, ProductoRequest request) {
+        validarCantidadVariantes(request.getVariantes());
+        if (request.getVariantes() != null && request.getVariantes().size() > 0) {
+            validarOrdenesVariantes(request.getVariantes());
+        }
+        validarContenidoSensible(request);
+    }
+
+    /**
+     * Validación completa de publicación. Es la que existía antes, ahora
+     * invocada tanto por el alta directa como por la publicación de un
+     * borrador.
+     */
+    private void validarParaPublicar(
+            Long idArtista, ProductoRequest request, Long idExcluido) {
+        if (request.getIdTipoProducto() == null) {
+            throw new IllegalArgumentException("El tipo de producto es obligatorio.");
+        }
+        if (request.getIdMedio() == null) {
+            throw new IllegalArgumentException("El medio es obligatorio.");
+        }
+        if (!hayTexto(request.getTitulo())) {
+            throw new IllegalArgumentException("El título es obligatorio.");
+        }
+        if (!hayTexto(request.getDescripcion())) {
+            throw new IllegalArgumentException("La descripción es obligatoria.");
+        }
+        if (request.getImagenes() == null || request.getImagenes().isEmpty()) {
+            throw new IllegalArgumentException(
+                "Debés agregar al menos una imagen del producto.");
+        }
+        if (request.getVariantes() == null || request.getVariantes().isEmpty()) {
+            throw new IllegalArgumentException("Debés agregar al menos una variante.");
+        }
+
+        validarUnico(idArtista, request.getIdTipoProducto(), request.getTitulo(),
+            idExcluido);
+        validarLicencia(request.getLicencia(), request.getVariantes());
+        validarCantidadVariantes(request.getVariantes());
+        validarDuplicados(request, idExcluido);
+        validarVariantesBasicas(request.getVariantes());
+        validarEntregables(request);
+    }
+
+    /**
+     * Los entregables son obligatorios para productos de entrega digital:
+     * publicar un producto cuyo comprador no recibiría nada es un error.
+     */
+    private void validarEntregables(ProductoRequest request) {
+        boolean digital = esEntregaDigital(request.getIdMedio());
+        if (!digital) {
+            return;
+        }
+        for (ProductoVarianteRequest variante : request.getVariantes()) {
+            boolean tieneArchivo = hayTexto(variante.getEntregableSha256())
+                || (hayTexto(variante.getClaveArchivoOriginal())
+                    && hayTexto(variante.getSha256()))
+                || hayTexto(variante.getSha256());
+            if (!tieneArchivo) {
+                throw new IllegalArgumentException(
+                    "Falta el archivo que recibe el comprador de la variante “"
+                        + (variante.getNombre() != null ? variante.getNombre().trim()
+                            : "sin nombre")
+                        + "”. Subí su imagen para usarla como entregable.");
+            }
+        }
+    }
+
+    private boolean esEntregaDigital(Long idMedio) {
+        if (idMedio == null) {
+            return false;
+        }
+        return medioRepository.findByIdMedio(idMedio)
+            .map(medio -> medio.getTipoEntrega() == TipoEntrega.DIGITAL)
+            .orElse(false);
+    }
+
+    /**
+     * Persiste los entregables declarados. En v1 el archivo se resuelve a
+     * partir de imágenes ya subidas del propio producto, de modo que una
+     * variante sin entregable explícito usa su archivo privado original.
+     */
+    private void reemplazarEntregables(Producto producto, ProductoRequest request) {
+        entregableRepository.deleteByProductoIdProducto(producto.getIdProducto());
+        if (!esEntregaDigital(producto.getMedio() != null
+                ? producto.getMedio().getIdMedio() : null)) {
+            return;
+        }
+
+        Map<String, ProductoImagen> imagenesPorSha = new HashMap<>();
+        for (ProductoImagen imagen : producto.getImagenes()) {
+            if (imagen.getSha256() != null) {
+                imagenesPorSha.put(imagen.getSha256().toLowerCase(Locale.ROOT), imagen);
+            }
+        }
+
+        List<ProductoEntregable> nuevos = new ArrayList<>();
+        if (request.getEntregablesComunes() != null) {
+            int orden = 0;
+            for (ProductoEntregableRequest comun : request.getEntregablesComunes()) {
+                ProductoImagen imagen = resolverImagenEntregable(
+                    comun.getSha256(), imagenesPorSha);
+                if (imagen == null) {
+                    throw new IllegalArgumentException(
+                        "El entregable común tiene que ser una imagen de este producto.");
+                }
+                nuevos.add(construirEntregable(
+                    producto, null, AlcanceEntregable.COMUN, imagen,
+                    comun.getNombre(), comun.getOrden() != null ? comun.getOrden() : orden));
+                orden++;
+            }
+        }
+
+        for (ProductoVarianteRequest varianteRequest : request.getVariantes()) {
+            ProductoVariante variante = buscarVariante(
+                producto, varianteRequest.getOrden(), varianteRequest.getIdVariante());
+            if (variante == null) {
+                continue;
+            }
+            String sha = hayTexto(varianteRequest.getEntregableSha256())
+                ? varianteRequest.getEntregableSha256()
+                : varianteRequest.getSha256();
+            ProductoImagen imagen = resolverImagenEntregable(sha, imagenesPorSha);
+            if (imagen == null && hayTexto(variante.getClaveArchivoOriginal())) {
+                ProductoEntregable derivado = new ProductoEntregable();
+                derivado.setProducto(producto);
+                derivado.setVariante(variante);
+                derivado.setAlcance(AlcanceEntregable.VARIANTE);
+                derivado.setNombre(nombreArchivo(variante));
+                derivado.setClaveArchivo(variante.getClaveArchivoOriginal());
+                derivado.setSha256(variante.getSha256());
+                derivado.setMime(mimeDe(variante.getClaveArchivoOriginal()));
+                derivado.setTamanoBytes(tamanoSeguro(variante.getClaveArchivoOriginal()));
+                derivado.setOrden(0);
+                nuevos.add(derivado);
+                continue;
+            }
+            if (imagen == null) {
+                throw new IllegalArgumentException(
+                    "La variante “" + variante.getNombre()
+                        + "” necesita un archivo entregable.");
+            }
+            nuevos.add(construirEntregable(
+                producto, variante, AlcanceEntregable.VARIANTE, imagen,
+                varianteRequest.getEntregableNombre(), 0));
+        }
+        entregableRepository.saveAll(nuevos);
+    }
+
+    private ProductoEntregable construirEntregable(
+            Producto producto,
+            ProductoVariante variante,
+            AlcanceEntregable alcance,
+            ProductoImagen imagen,
+            String nombre,
+            Integer orden) {
+        ProductoEntregable entregable = new ProductoEntregable();
+        entregable.setProducto(producto);
+        entregable.setVariante(variante);
+        entregable.setAlcance(alcance);
+        entregable.setNombre(hayTexto(nombre)
+            ? nombre.trim()
+            : (imagen.getUrl() != null
+                ? imagen.getUrl().substring(imagen.getUrl().lastIndexOf('/') + 1)
+                : "archivo"));
+        entregable.setClaveArchivo(imagen.getClaveArchivoOriginal());
+        entregable.setSha256(imagen.getSha256());
+        entregable.setMime("image/webp");
+        entregable.setTamanoBytes(imagen.getClaveArchivoOriginal() != null
+            ? tamanoSeguro(imagen.getClaveArchivoOriginal()) : null);
+        entregable.setOrden(orden != null ? orden : 0);
+        return entregable;
+    }
+
+    private ProductoImagen resolverImagenEntregable(
+            String sha256, Map<String, ProductoImagen> imagenesPorSha) {
+        if (!hayTexto(sha256)) {
+            return null;
+        }
+        return imagenesPorSha.get(sha256.trim().toLowerCase(Locale.ROOT));
+    }
+
+    private ProductoVariante buscarVariante(
+            Producto producto, Integer orden, Long idVariante) {
+        if (idVariante != null) {
+            return producto.getVariantes().stream()
+                .filter(variante -> idVariante.equals(variante.getIdVariante()))
+                .findFirst()
+                .orElse(null);
+        }
+        return producto.getVariantes().stream()
+            .filter(variante -> Objects.equals(variante.getOrden(), orden))
+            .findFirst()
+            .orElse(null);
+    }
+
+    private String nombreArchivo(ProductoVariante variante) {
+        return "Variante " + variante.getNombre();
+    }
+
+    private String mimeDe(String clave) {
+        if (clave == null) {
+            return null;
+        }
+        String minuscula = clave.toLowerCase(Locale.ROOT);
+        if (minuscula.endsWith(".png")) {
+            return "image/png";
+        }
+        if (minuscula.endsWith(".jpg") || minuscula.endsWith(".jpeg")) {
+            return "image/jpeg";
+        }
+        if (minuscula.endsWith(".webp")) {
+            return "image/webp";
+        }
+        return null;
+    }
+
+    private Long tamanoSeguro(String clave) {
+        try {
+            return almacenPrivadoService.tamano(clave);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     private void validarUnico(
             Long idArtista,
             Long idTipoProducto,
             String titulo,
             Long idExcluido) {
         String limpio = titulo.trim();
-        boolean existe = idExcluido == null
-            ? productoRepository
-                .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
-                    idArtista, idTipoProducto, limpio, EstadoProducto.ARCHIVADO)
-            : productoRepository
-                .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNot(
-                    idArtista, idTipoProducto, limpio, idExcluido,
-                    EstadoProducto.ARCHIVADO);
+        boolean existe = productoRepository
+            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNotIn(
+                idArtista, idTipoProducto, limpio,
+                idExcluido != null ? idExcluido : -1L,
+                List.of(EstadoProducto.ARCHIVADO, EstadoProducto.BORRADOR));
         if (existe) {
             throw new IllegalArgumentException(
                 "Ya tenés un producto con ese título y tipo.");

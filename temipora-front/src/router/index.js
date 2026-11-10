@@ -484,7 +484,13 @@ const router = createRouter({
 
 const { subidaEnCurso, publicadasEnSesion, proteccionActiva } = useSubirImagen()
 const { pedir } = useConfirmacionSalida()
-const { hayCambios: hayCambiosConfig, mensaje: mensajeConfig, limpiar: limpiarConfig } = useCambiosSinGuardar()
+const {
+  hayCambios: hayCambiosConfig,
+  mensaje: mensajeConfig,
+  textoAlternativo: alternativaConfig,
+  limpiar: limpiarConfig,
+  ejecutarAlternativa: ejecutarAlternativaConfig,
+} = useCambiosSinGuardar()
 
 router.beforeEach(async (to, from) => {
   const saliendoDeSubir = from.path === '/panel/portfolio' && to.path !== from.path
@@ -516,6 +522,10 @@ router.beforeEach(async (to, from) => {
     titulo: '¿Salir sin guardar?',
     textoConfirmar: 'Salir sin guardar',
     textoCancelar: 'Seguir editando',
+    textoAlternativo: alternativaConfig.value || undefined,
+    alAlternar: alternativaConfig.value
+      ? () => ejecutarAlternativaConfig()
+      : undefined,
   })
   if (permitir) limpiarConfig()
   return permitir

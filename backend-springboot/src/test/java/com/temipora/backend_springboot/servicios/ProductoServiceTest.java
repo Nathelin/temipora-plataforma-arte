@@ -47,6 +47,7 @@ import com.temipora.backend_springboot.repositorios.EtiquetaRepository;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
 import com.temipora.backend_springboot.repositorios.ProductoImagenRepository;
+import com.temipora.backend_springboot.repositorios.ProductoEntregableRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
 import com.temipora.backend_springboot.repositorios.TipoProductoRepository;
@@ -68,6 +69,8 @@ class ProductoServiceTest {
     @Mock private EtiquetaRepository etiquetaRepository;
     @Mock private MonedaService monedaService;
     @Mock private DerechoTerminoRepository derechoTerminoRepository;
+    @Mock private ProductoEntregableRepository entregableRepository;
+    @Mock private AlmacenPrivadoService almacenPrivadoService;
     @Mock private LedgerService ledgerService;
     @Mock private AuditoriaService auditoriaService;
 
@@ -99,8 +102,9 @@ class ProductoServiceTest {
     @Test
     void crear_tituloRepetido_lanzaErrorYNoGuarda() {
         when(productoRepository
-            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
-                5L, 1L, "Plancha de otoño", EstadoProducto.ARCHIVADO))
+            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNotIn(
+                5L, 1L, "Plancha de otoño", -1L,
+                List.of(EstadoProducto.ARCHIVADO, EstadoProducto.BORRADOR)))
             .thenReturn(true);
 
         assertThatThrownBy(() -> productoService.crear(5L, request()))
@@ -113,8 +117,9 @@ class ProductoServiceTest {
     @Test
     void crear_sinDerechos_lanzaError() {
         when(productoRepository
-            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
-                5L, 1L, "Plancha de otoño", EstadoProducto.ARCHIVADO))
+            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNotIn(
+                5L, 1L, "Plancha de otoño", -1L,
+                List.of(EstadoProducto.ARCHIVADO, EstadoProducto.BORRADOR)))
             .thenReturn(false);
         ProductoRequest request = request();
         request.getLicencia().setIdsDerechos(Set.of());
@@ -127,8 +132,9 @@ class ProductoServiceTest {
     @Test
     void crear_shaDuplicado_lanzaConflicto() {
         when(productoRepository
-            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
-                5L, 1L, "Plancha de otoño", EstadoProducto.ARCHIVADO))
+            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNotIn(
+                5L, 1L, "Plancha de otoño", -1L,
+                List.of(EstadoProducto.ARCHIVADO, EstadoProducto.BORRADOR)))
             .thenReturn(false);
         when(derechoTerminoRepository.findAllById(any()))
             .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
@@ -145,8 +151,9 @@ class ProductoServiceTest {
     @Test
     void crear_reventaSinVarianteUnica_lanzaError() {
         when(productoRepository
-            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
-                5L, 1L, "Plancha de otoño", EstadoProducto.ARCHIVADO))
+            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNotIn(
+                5L, 1L, "Plancha de otoño", -1L,
+                List.of(EstadoProducto.ARCHIVADO, EstadoProducto.BORRADOR)))
             .thenReturn(false);
         when(derechoTerminoRepository.findAllById(any()))
             .thenReturn(List.of(derecho(1L, "REVENTA", true)));
@@ -162,13 +169,6 @@ class ProductoServiceTest {
 
     @Test
     void crear_sinVariantes_lanzaError() {
-        when(productoRepository
-            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
-                5L, 1L, "Plancha de otoño", EstadoProducto.ARCHIVADO))
-            .thenReturn(false);
-        when(derechoTerminoRepository.findAllById(any()))
-            .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
-
         ProductoRequest request = request();
         request.setVariantes(new ArrayList<>());
 
@@ -201,8 +201,9 @@ class ProductoServiceTest {
         when(productoRepository.findByIdProductoForUpdate(10L))
             .thenReturn(Optional.of(producto));
         when(productoRepository
-            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNot(
-                5L, 1L, "Plancha nueva", 10L, EstadoProducto.ARCHIVADO))
+            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNotIn(
+                5L, 1L, "Plancha nueva", 10L,
+                List.of(EstadoProducto.ARCHIVADO, EstadoProducto.BORRADOR)))
             .thenReturn(false);
         when(derechoTerminoRepository.findAllById(any()))
             .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
@@ -387,8 +388,9 @@ class ProductoServiceTest {
     @Test
     void crear_masDe50Variantes_lanzaError() {
         when(productoRepository
-            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
-                5L, 1L, "Plancha de otoño", EstadoProducto.ARCHIVADO))
+            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNotIn(
+                5L, 1L, "Plancha de otoño", -1L,
+                List.of(EstadoProducto.ARCHIVADO, EstadoProducto.BORRADOR)))
             .thenReturn(false);
         when(derechoTerminoRepository.findAllById(any()))
             .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
@@ -403,13 +405,155 @@ class ProductoServiceTest {
     }
 
     // ---------------------------------------------------------------
+    // borradores y entregables
+    // ---------------------------------------------------------------
+
+    @Test
+    void guardarBorrador_sinDatosDePublicacion_noExigeNadaNiEmiteGenesis() {
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+        when(monedaService.predeterminada()).thenReturn(moneda(3L, "ARS"));
+        when(productoRepository.saveAndFlush(any(Producto.class)))
+            .thenAnswer(inv -> {
+                Producto producto = inv.getArgument(0);
+                producto.setIdProducto(10L);
+                return producto;
+            });
+        when(entregableRepository.findByProductoIdProductoInOrderByOrdenAsc(any()))
+            .thenReturn(List.of());
+
+        ProductoRequest request = new ProductoRequest();
+        request.setTitulo("Bo");
+        request.setVariantes(List.of(varianteRequest(null)));
+        request.setImagenes(List.of(imagenRequest()));
+
+        ProductoDTO dto = productoService.guardarBorrador(5L, null, request);
+
+        assertThat(dto.getEstado()).isEqualTo(EstadoProducto.BORRADOR);
+        verify(ledgerService, never()).registrarGenesis(
+            any(ProductoVariante.class), anyString());
+        verify(auditoriaService).registrar(
+            eq(AccionesAdmin.PRODUCTO_BORRADOR_CREAR), eq("Producto"), eq(10L),
+            anyString(), isNull(), any(Producto.class), anyList());
+    }
+
+    @Test
+    void guardarBorrador_conMedioDigital_noGuardaEntregables() {
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+        when(monedaService.predeterminada()).thenReturn(moneda(3L, "ARS"));
+        when(medioRepository.findByIdMedio(2L))
+            .thenReturn(Optional.of(medio(2L, "Digital")));
+        when(productoRepository.saveAndFlush(any(Producto.class)))
+            .thenAnswer(inv -> {
+                Producto producto = inv.getArgument(0);
+                producto.setIdProducto(10L);
+                return producto;
+            });
+        when(entregableRepository.findByProductoIdProductoInOrderByOrdenAsc(any()))
+            .thenReturn(List.of());
+
+        ProductoRequest request = new ProductoRequest();
+        request.setIdMedio(2L);
+        request.setVariantes(List.of(varianteRequest(null)));
+        request.setImagenes(List.of(imagenRequest()));
+
+        productoService.guardarBorrador(5L, null, request);
+
+        verify(entregableRepository).saveAll(any());
+        verify(ledgerService, never()).registrarGenesis(
+            any(ProductoVariante.class), anyString());
+    }
+
+    @Test
+    void publicarBorrador_sinEntregableEnDigital_lanzaError() {
+        Producto producto = productoConVariante(10L, 5L, 20L, SHA_VARIANTE);
+        producto.setEstado(EstadoProducto.BORRADOR);
+        when(productoRepository.findByIdProductoForUpdate(10L))
+            .thenReturn(Optional.of(producto));
+        when(derechoTerminoRepository.findAllById(any()))
+            .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
+        when(medioRepository.findByIdMedio(2L))
+            .thenReturn(Optional.of(medio(2L, "Digital")));
+
+        ProductoRequest request = request();
+        request.getVariantes().get(0).setSha256(null);
+        request.getVariantes().get(0).setClaveArchivoOriginal(null);
+        request.getVariantes().get(0).setEntregableSha256(null);
+
+        assertThatThrownBy(() -> productoService.publicarBorrador(10L, 5L, request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Falta el archivo que recibe el comprador");
+    }
+
+    @Test
+    void publicarBorrador_pasaADisponibleYEmiteGenesis() {
+        Producto producto = productoConVariante(10L, 5L, 20L, SHA_VARIANTE);
+        producto.setEstado(EstadoProducto.BORRADOR);
+        when(productoRepository.findByIdProductoForUpdate(10L))
+            .thenReturn(Optional.of(producto));
+        when(productoRepository
+            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNotIn(
+                5L, 1L, "Plancha de otoño", 10L,
+                List.of(EstadoProducto.ARCHIVADO, EstadoProducto.BORRADOR)))
+            .thenReturn(false);
+        when(derechoTerminoRepository.findAllById(any()))
+            .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
+        when(tipoProductoRepository.findByIdTipoProducto(1L))
+            .thenReturn(Optional.of(tipo(1L, "Adoptable")));
+        when(medioRepository.findByIdMedio(2L))
+            .thenReturn(Optional.of(medio(2L, "Digital")));
+        when(monedaService.obtener(3L)).thenReturn(moneda(3L, "ARS"));
+        when(productoRepository.saveAndFlush(any(Producto.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+        when(eventoLedgerRepository.existsByVarianteIdVariante(20L)).thenReturn(false);
+        when(eventoLedgerRepository.findVariantesConLedger(List.of(10L)))
+            .thenReturn(Set.of(20L));
+        when(entregableRepository.findByProductoIdProductoInOrderByOrdenAsc(any()))
+            .thenReturn(List.of());
+        when(entregableRepository.saveAll(any())).thenReturn(List.of());
+
+        ProductoDTO dto = productoService.publicarBorrador(10L, 5L, request());
+
+        assertThat(dto.getEstado()).isEqualTo(EstadoProducto.DISPONIBLE);
+        verify(ledgerService).registrarGenesis(
+            any(ProductoVariante.class), anyString());
+        verify(auditoriaService).registrar(
+            eq(AccionesAdmin.PRODUCTO_PUBLICAR), eq("Producto"), eq(10L),
+            anyString(), isNull(), any(Producto.class), anyList());
+    }
+
+    @Test
+    void publicarBorrador_yaPublicado_lanzaConflicto() {
+        Producto producto = productoConVariante(10L, 5L, 20L, SHA_VARIANTE);
+        producto.setEstado(EstadoProducto.DISPONIBLE);
+        when(productoRepository.findByIdProductoForUpdate(10L))
+            .thenReturn(Optional.of(producto));
+
+        assertThatThrownBy(() -> productoService.publicarBorrador(10L, 5L, request()))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessage("El producto ya está publicado.");
+    }
+
+    @Test
+    void modificar_borrador_lanzaConflicto() {
+        Producto producto = productoConVariante(10L, 5L, 20L, SHA_VARIANTE);
+        producto.setEstado(EstadoProducto.BORRADOR);
+        when(productoRepository.findByIdProductoForUpdate(10L))
+            .thenReturn(Optional.of(producto));
+
+        assertThatThrownBy(() -> productoService.modificar(10L, 5L, request()))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("Guardalo como borrador");
+    }
+
+    // ---------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------
 
     private void prepararCreacion() {
         when(productoRepository
-            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndEstadoNot(
-                5L, 1L, "Plancha de otoño", EstadoProducto.ARCHIVADO))
+            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNotIn(
+                5L, 1L, "Plancha de otoño", -1L,
+                List.of(EstadoProducto.ARCHIVADO, EstadoProducto.BORRADOR)))
             .thenReturn(false);
         when(derechoTerminoRepository.findAllById(any()))
             .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
@@ -435,14 +579,18 @@ class ProductoServiceTest {
             });
         when(eventoLedgerRepository.findVariantesConLedger(List.of(10L)))
             .thenReturn(Set.of(20L));
+        when(entregableRepository.findByProductoIdProductoInOrderByOrdenAsc(any()))
+            .thenReturn(List.of());
+        when(entregableRepository.saveAll(any())).thenReturn(List.of());
     }
 
     private void prepararModificacion(Producto producto) {
         when(productoRepository.findByIdProductoForUpdate(10L))
             .thenReturn(Optional.of(producto));
         when(productoRepository
-            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNot(
-                5L, 1L, "Plancha nueva", 10L, EstadoProducto.ARCHIVADO))
+            .existsByArtistaIdUsuarioAndTipoProductoIdTipoProductoAndTituloIgnoreCaseAndIdProductoNotAndEstadoNotIn(
+                5L, 1L, "Plancha nueva", 10L,
+                List.of(EstadoProducto.ARCHIVADO, EstadoProducto.BORRADOR)))
             .thenReturn(false);
         when(derechoTerminoRepository.findAllById(any()))
             .thenReturn(List.of(derecho(2L, "CONTENIDO", false)));
@@ -456,6 +604,9 @@ class ProductoServiceTest {
         when(eventoLedgerRepository.existsByVarianteIdVariante(20L)).thenReturn(true);
         when(eventoLedgerRepository.findVariantesConLedger(List.of(10L)))
             .thenReturn(Set.of(20L));
+        when(entregableRepository.findByProductoIdProductoInOrderByOrdenAsc(any()))
+            .thenReturn(List.of());
+        when(entregableRepository.saveAll(any())).thenReturn(List.of());
     }
 
     private ProductoRequest request() {

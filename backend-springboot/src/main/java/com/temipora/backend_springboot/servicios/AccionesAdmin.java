@@ -35,6 +35,9 @@ public final class AccionesAdmin {
     public static final String TIPO_PRODUCTO_REACTIVAR = "TIPO_PRODUCTO_REACTIVAR";
 
     public static final String PRODUCTO_CREAR = "PRODUCTO_CREAR";
+    public static final String PRODUCTO_BORRADOR_CREAR = "PRODUCTO_BORRADOR_CREAR";
+    public static final String PRODUCTO_BORRADOR_MODIFICAR = "PRODUCTO_BORRADOR_MODIFICAR";
+    public static final String PRODUCTO_PUBLICAR = "PRODUCTO_PUBLICAR";
     public static final String PRODUCTO_MODIFICAR = "PRODUCTO_MODIFICAR";
     public static final String PRODUCTO_PAUSAR = "PRODUCTO_PAUSAR";
     public static final String PRODUCTO_REACTIVAR = "PRODUCTO_REACTIVAR";

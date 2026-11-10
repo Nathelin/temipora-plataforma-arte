@@ -1,6 +1,10 @@
 import api from './api'
 
 const ESTADOS_PRODUCTO = {
+  BORRADOR: {
+    texto: 'Borrador',
+    clase: 'border-cafe/20 bg-cafe/10 text-cafe/70',
+  },
   DISPONIBLE: {
     texto: 'Disponible',
     clase: 'border-green-600/20 bg-green-500/10 text-green-700',

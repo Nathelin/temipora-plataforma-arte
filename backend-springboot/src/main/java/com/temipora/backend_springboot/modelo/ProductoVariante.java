@@ -47,9 +47,11 @@ public class ProductoVariante {
     @Column(length = 500)
     private String descripcion;
 
-    @NotNull
-    @DecimalMin(value = "0", inclusive = false)
-    @Column(nullable = false, precision = 12, scale = 2)
+    /**
+     * En un borrador puede quedar vacío; al publicar se exige mayor a cero.
+     */
+    @DecimalMin(value = "0")
+    @Column(precision = 12, scale = 2)
     private BigDecimal precio;
 
     /**

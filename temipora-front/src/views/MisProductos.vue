@@ -23,15 +23,28 @@ const disponibles = computed(
 const pausados = computed(
   () => productos.value.filter((producto) => producto.estado === 'PAUSADO'),
 )
-const productosFiltrados = computed(
-  () => (filtro.value === 'pausados' ? pausados.value : disponibles.value),
+const borradores = computed(
+  () => productos.value.filter((producto) => producto.estado === 'BORRADOR'),
 )
+const productosFiltrados = computed(() => {
+  if (filtro.value === 'pausados') return pausados.value
+  if (filtro.value === 'borradores') return borradores.value
+  return disponibles.value
+})
 const opcionesFiltro = computed(() => [
   { valor: 'disponibles', texto: 'Disponibles', cantidad: disponibles.value.length },
+  { valor: 'borradores', texto: 'Borradores', cantidad: borradores.value.length },
   { valor: 'pausados', texto: 'Pausados', cantidad: pausados.value.length },
 ])
 
 const estadoVacio = computed(() => {
+  if (filtro.value === 'borradores') {
+    return {
+      titulo: 'No tenés borradores.',
+      detalle: 'Los productos que guardes sin publicar aparecen acá.',
+      accion: null,
+    }
+  }
   if (filtro.value === 'pausados') {
     return {
       titulo: 'No tenés productos pausados.',
@@ -323,10 +336,15 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
 
             <div class="flex flex-1 flex-col p-4">
               <h2 class="line-clamp-1 font-display text-base font-bold text-granate">
-                {{ producto.titulo }}
+                {{ producto.titulo || 'Borrador sin título' }}
               </h2>
               <p class="mt-1 text-xs text-cafe/60">
-                {{ producto.nombreTipoProducto }} · {{ producto.nombreMedio }}
+                <template v-if="producto.estado === 'BORRADOR'">
+                  Sin publicar
+                </template>
+                <template v-else>
+                  {{ producto.nombreTipoProducto }} · {{ producto.nombreMedio }}
+                </template>
               </p>
               <p class="mt-2 line-clamp-2 text-sm leading-relaxed text-cafe/70">
                 {{ producto.descripcion }}
@@ -357,32 +375,49 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
               </p>
 
               <div class="mt-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-2 border-t border-rosa/40 pt-4">
-                <router-link
-                  :to="`/panel/productos/${producto.idProducto}`"
-                  class="text-sm text-cafe/60 transition hover:text-granate"
-                >
-                  Vista previa
-                </router-link>
-                <router-link
-                  :to="`/panel/productos/${producto.idProducto}/editar`"
-                  class="text-sm text-coral transition hover:text-rojizo"
-                >
-                  Editar
-                </router-link>
-                <button
-                  type="button"
-                  class="text-sm text-cafe/60 transition hover:text-granate"
-                  @click="abrirDialogo(producto.estado === 'DISPONIBLE' ? 'pausar' : 'reactivar', producto)"
-                >
-                  {{ producto.estado === 'DISPONIBLE' ? 'Pausar' : 'Reactivar' }}
-                </button>
-                <button
-                  type="button"
-                  class="text-sm text-rojizo/80 transition hover:text-rojizo"
-                  @click="abrirDialogo('archivar', producto)"
-                >
-                  Dar de baja
-                </button>
+                <template v-if="producto.estado === 'BORRADOR'">
+                  <button
+                    type="button"
+                    class="text-sm text-rojizo/80 transition hover:text-rojizo"
+                    @click="abrirDialogo('archivar', producto)"
+                  >
+                    Descartar
+                  </button>
+                  <router-link
+                    :to="`/panel/productos/${producto.idProducto}/editar`"
+                    class="rounded-lg bg-coral px-3.5 py-1.5 text-sm font-medium text-white shadow-sm transition hover:bg-rojizo"
+                  >
+                    Continuar
+                  </router-link>
+                </template>
+                <template v-else>
+                  <router-link
+                    :to="`/panel/productos/${producto.idProducto}`"
+                    class="text-sm text-cafe/60 transition hover:text-granate"
+                  >
+                    Vista previa
+                  </router-link>
+                  <router-link
+                    :to="`/panel/productos/${producto.idProducto}/editar`"
+                    class="text-sm text-coral transition hover:text-rojizo"
+                  >
+                    Editar
+                  </router-link>
+                  <button
+                    type="button"
+                    class="text-sm text-cafe/60 transition hover:text-granate"
+                    @click="abrirDialogo(producto.estado === 'DISPONIBLE' ? 'pausar' : 'reactivar', producto)"
+                  >
+                    {{ producto.estado === 'DISPONIBLE' ? 'Pausar' : 'Reactivar' }}
+                  </button>
+                  <button
+                    type="button"
+                    class="text-sm text-rojizo/80 transition hover:text-rojizo"
+                    @click="abrirDialogo('archivar', producto)"
+                  >
+                    Dar de baja
+                  </button>
+                </template>
               </div>
             </div>
           </article>

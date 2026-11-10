@@ -94,6 +94,36 @@ public class ProductoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(creado);
     }
 
+    @PostMapping("/mis-productos/borradores")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public ResponseEntity<ProductoDTO> crearBorrador(
+            @Valid @RequestBody ProductoRequest request,
+            Authentication authentication) {
+        ProductoDTO creado = productoService.guardarBorrador(
+            idAutenticado(authentication), null, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(creado);
+    }
+
+    @PutMapping("/mis-productos/{id}/borrador")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public ProductoDTO guardarBorrador(
+            @PathVariable Long id,
+            @Valid @RequestBody ProductoRequest request,
+            Authentication authentication) {
+        return productoService.guardarBorrador(
+            idAutenticado(authentication), id, request);
+    }
+
+    @PostMapping("/mis-productos/{id}/publicar")
+    @PreAuthorize("hasRole('ARTISTA')")
+    public ProductoDTO publicar(
+            @PathVariable Long id,
+            @Valid @RequestBody ProductoRequest request,
+            Authentication authentication) {
+        return productoService.publicarBorrador(
+            id, idAutenticado(authentication), request);
+    }
+
     @PutMapping("/mis-productos/{id}")
     @PreAuthorize("hasRole('ARTISTA')")
     public ProductoDTO modificar(

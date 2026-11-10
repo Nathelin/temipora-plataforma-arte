@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.EstadoProducto;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
 import com.temipora.backend_springboot.modelo.EventoLedger;
 import com.temipora.backend_springboot.modelo.LicenciaProducto;
@@ -171,6 +172,83 @@ class ProductoIntegracionTest {
         assertThat(eventos.get(0).getHashImagen()).isEqualTo(shaVariante);
 
         assertThat(ledgerService.verificarProducto(producto).isIntegridad()).isTrue();
+    }
+
+    @Test
+    void guardarBorrador_sinPrecioNiImagenes_persisteComoBorrador() {
+        Usuario artista = usuarioRepository.findAll().stream()
+            .filter(usuario -> usuario.getRol() != null
+                && usuario.getRol().getNombre() == ERol.ARTISTA)
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException(
+                "No hay un usuario ARTISTA para la prueba de integración."));
+
+        ProductoVarianteRequest variante = new ProductoVarianteRequest();
+        variante.setNombre("Única");
+        variante.setPrecio(null);
+        variante.setStockDisponible(null);
+        variante.setOrden(0);
+        variante.setEstado(EstadoVariante.DISPONIBLE);
+        variante.setSha256("");
+
+        ProductoRequest request = new ProductoRequest();
+        request.setTitulo("Borrador de integración " + UUID.randomUUID());
+        request.setVariantes(new ArrayList<>(List.of(variante)));
+        request.setImagenes(new ArrayList<>());
+        request.setIdsEtiquetas(Set.of());
+        request.setContenidosSensibles(Set.of());
+
+        ProductoDTO dto = productoService.guardarBorrador(
+            artista.getIdUsuario(), null, request);
+
+        assertThat(dto.getIdProducto()).isNotNull();
+        assertThat(dto.getEstado()).isEqualTo(EstadoProducto.BORRADOR);
+        assertThat(dto.getVariantes()).hasSize(1);
+        assertThat(dto.getVariantes().get(0).getPrecio()).isNull();
+        assertThat(dto.getVariantes().get(0).isTieneLedger()).isFalse();
+        assertThat(dto.getImagenes()).isEmpty();
+        assertThat(dto.getPrecioDesde()).isNull();
+    }
+
+    @Test
+    void guardarBorrador_dosVeces_noDuplicaLicenciaNiVariantes() {
+        Usuario artista = usuarioRepository.findAll().stream()
+            .filter(usuario -> usuario.getRol() != null
+                && usuario.getRol().getNombre() == ERol.ARTISTA)
+            .findFirst()
+            .orElseThrow();
+
+        ProductoVarianteRequest variante = new ProductoVarianteRequest();
+        variante.setNombre("Única");
+        variante.setOrden(0);
+
+        ProductoRequest request = new ProductoRequest();
+        request.setTitulo("Borrador repetido " + UUID.randomUUID());
+        request.setVariantes(new ArrayList<>(List.of(variante)));
+        request.setImagenes(new ArrayList<>());
+        request.setIdsEtiquetas(Set.of());
+        request.setContenidosSensibles(Set.of());
+
+        ProductoDTO primero = productoService.guardarBorrador(
+            artista.getIdUsuario(), null, request);
+        Long idVariante = primero.getVariantes().get(0).getIdVariante();
+
+        ProductoRequest segundo = new ProductoRequest();
+        segundo.setTitulo(primero.getTitulo());
+        ProductoVarianteRequest misma = new ProductoVarianteRequest();
+        misma.setIdVariante(idVariante);
+        misma.setNombre("Única");
+        misma.setOrden(0);
+        segundo.setVariantes(new ArrayList<>(List.of(misma)));
+        segundo.setImagenes(new ArrayList<>());
+        segundo.setIdsEtiquetas(Set.of());
+        segundo.setContenidosSensibles(Set.of());
+
+        ProductoDTO actualizado = productoService.guardarBorrador(
+            artista.getIdUsuario(), primero.getIdProducto(), segundo);
+
+        assertThat(actualizado.getEstado()).isEqualTo(EstadoProducto.BORRADOR);
+        assertThat(actualizado.getVariantes()).hasSize(1);
     }
 
     private String shaAleatorio() {

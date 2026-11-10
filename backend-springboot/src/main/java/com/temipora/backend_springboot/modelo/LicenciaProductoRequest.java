@@ -15,7 +15,9 @@ import lombok.Setter;
 @Setter
 public class LicenciaProductoRequest {
 
-    @NotEmpty(message = "Elegí al menos un uso permitido para la licencia.")
+    /**
+     * En un borrador puede quedar vacío; al publicar se exige al menos uno.
+     */
     private Set<@NotNull(message = "El derecho no puede ser nulo.") Long> idsDerechos;
 
     private boolean permiteModificaciones;

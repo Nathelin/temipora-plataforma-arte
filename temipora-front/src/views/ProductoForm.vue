@@ -24,8 +24,8 @@ const esEdicion = computed(() => idProducto.value !== null)
 const PASOS = [
   {
     n: 1,
-    label: 'Publicación',
-    titulo: 'Publicación',
+    label: 'Detalles',
+    titulo: 'Detalles',
     descripcion: 'Título, descripción, tipo, medio, imágenes y etiquetas.',
   },
   {
@@ -42,21 +42,36 @@ const PASOS = [
   },
   {
     n: 4,
+    label: 'Entregables',
+    titulo: 'Entregables',
+    descripcion: 'Qué archivo recibe el comprador al pagar.',
+  },
+  {
+    n: 5,
     label: 'Revisión',
     titulo: 'Revisión y publicación',
     descripcion: 'Revisá todo antes de publicar el producto.',
   },
 ]
-const TOTAL_PASOS = PASOS.length
+
+const PASOS_VISIBLES = computed(() => (
+  esEntregaFisica.value
+    ? PASOS.filter((p) => p.n !== 4)
+    : PASOS
+))
+const TOTAL_PASOS = computed(() => PASOS_VISIBLES.value.length)
 
 const paso = ref(1)
 const cargando = ref(true)
 const error = ref('')
 const guardando = ref(false)
+const guardandoBorrador = ref(false)
 const errorGuardado = ref('')
+const avisoBorrador = ref('')
 const errores = ref([])
 const erroresCampo = ref({})
 const erroresVariantes = ref({})
+const erroresEntregables = ref({})
 const MAX_IMAGENES_PRODUCTO = 60
 const MAX_MB_IMAGEN = TAMANO_MAXIMO_BYTES / (1024 * 1024)
 const subiendoImagen = ref(false)
@@ -92,6 +107,8 @@ const form = ref({
 
 const variantes = ref([])
 const etiquetas = ref([])
+const entregablesComunes = ref([])
+const estadoProducto = ref(null)
 const licencia = ref({
   idsDerechos: [],
   permiteModificaciones: false,
@@ -101,7 +118,16 @@ const licencia = ref({
 })
 const estadoGuardado = ref(null)
 
-const pasoActual = computed(() => PASOS.find((p) => p.n === paso.value) || PASOS[0])
+const esBorrador = computed(
+  () => !esEdicion.value || estadoProducto.value === 'BORRADOR',
+)
+
+const pasoActual = computed(
+  () => PASOS.find((p) => p.n === paso.value) || PASOS[0],
+)
+const indicePaso = computed(
+  () => PASOS_VISIBLES.value.findIndex((p) => p.n === paso.value) + 1,
+)
 const monedaSeleccionada = computed(
   () => monedas.value.find((m) => String(m.idMoneda) === form.value.idMoneda) || null,
 )
@@ -121,6 +147,15 @@ const medioSeleccionado = computed(
 const esEntregaFisica = computed(
   () => medioSeleccionado.value?.tipoEntrega === 'FISICA',
 )
+
+watch(esEntregaFisica, (fisica) => {
+  if (fisica && (paso.value === 4 || paso.value === 5)) {
+    paso.value = 3
+    errores.value = []
+    erroresCampo.value = {}
+    erroresVariantes.value = {}
+  }
+})
 const esAdoptable = computed(() => esTipoUnico(nombreTipo.value) && nombreTipo.value.toLowerCase().includes('adoptable'))
 const hayVarianteUnica = computed(
   () => variantes.value.some(
@@ -153,7 +188,10 @@ const precioDesde = computed(() => {
   return precios.length ? Math.min(...precios) : null
 })
 const imagenesUrl = computed(() => form.value.imagenes.map((imagen) => imagen.url))
-const tituloPagina = computed(() => (esEdicion.value ? 'Editar producto' : 'Crear producto'))
+const tituloPagina = computed(() => {
+  if (!esEdicion.value) return 'Crear producto'
+  return estadoProducto.value === 'BORRADOR' ? 'Editar borrador' : 'Editar producto'
+})
 
 function esTipoUnico(nombre) {
   const texto = String(nombre || '').toLowerCase()
@@ -169,6 +207,7 @@ function instantanea() {
     variantes: variantes.value,
     etiquetas: etiquetas.value,
     licencia: licencia.value,
+    entregablesComunes: entregablesComunes.value,
   })
 }
 
@@ -230,6 +269,7 @@ async function cargar() {
 }
 
 function mapearProducto(d) {
+  estadoProducto.value = d.estado || null
   form.value = {
     titulo: d.titulo || '',
     descripcion: d.descripcion || '',
@@ -247,25 +287,45 @@ function mapearProducto(d) {
     })),
   }
 
-  variantes.value = (d.variantes || []).map((variante) => ({
-    idVariante: variante.idVariante,
-    nombre: variante.nombre || 'Única',
-    descripcion: variante.descripcion || '',
-    precio: Number(variante.precio) || '',
-    stockDisponible: variante.stockDisponible === null
-      || variante.stockDisponible === undefined
-      ? null
-      : Number(variante.stockDisponible),
-    estado: variante.estado || 'DISPONIBLE',
-    urlImagen: variante.imagenUrl || '',
-    sha256: variante.sha256 || '',
-    claveArchivoOriginal: '',
-    numeroEdicion: variante.numeroEdicion || null,
-    tieneLedger: !!variante.tieneLedger,
-  }))
+  const entregables = Array.isArray(d.entregables) ? d.entregables : []
+  const entregablesPorVariante = new Map(
+    entregables
+      .filter((entregable) => entregable.idVariante)
+      .map((entregable) => [entregable.idVariante, entregable]),
+  )
+
+  variantes.value = (d.variantes || []).map((variante) => {
+    const entregable = entregablesPorVariante.get(variante.idVariante)
+    return {
+      idVariante: variante.idVariante,
+      nombre: variante.nombre || 'Única',
+      descripcion: variante.descripcion || '',
+      precio: Number(variante.precio) || '',
+      stockDisponible: variante.stockDisponible === null
+        || variante.stockDisponible === undefined
+        ? null
+        : Number(variante.stockDisponible),
+      estado: variante.estado || 'DISPONIBLE',
+      urlImagen: variante.imagenUrl || '',
+      sha256: variante.sha256 || '',
+      claveArchivoOriginal: '',
+      numeroEdicion: variante.numeroEdicion || null,
+      tieneLedger: !!variante.tieneLedger,
+      entregableSha256: entregable?.sha256 || '',
+      entregableNombre: entregable?.nombre || '',
+    }
+  })
   if (!variantes.value.length) {
     variantes.value = [nuevaPresentacion()]
   }
+
+  entregablesComunes.value = entregables
+    .filter((entregable) => !entregable.idVariante)
+    .map((entregable) => ({
+      sha256: entregable.sha256 || '',
+      nombre: entregable.nombre || '',
+      orden: entregable.orden || 0,
+    }))
 
   etiquetas.value = Array.isArray(d.etiquetas) ? [...d.etiquetas] : []
 
@@ -551,13 +611,45 @@ function validarLicencia() {
   return errs
 }
 
+function validarEntregables() {
+  const errs = []
+  erroresEntregables.value = {}
+  if (esEntregaFisica.value) return errs
+
+  variantes.value.forEach((variante, indice) => {
+    const tieneImagen = variante.sha256 || variante.urlImagen
+    const tieneEntregable = variante.entregableSha256 || tieneImagen
+    if (!tieneEntregable) {
+      const mensaje = presentacionUnica.value
+        ? 'El comprador tiene que recibir un archivo.'
+        : `La variante ${indice + 1} no tiene archivo entregable.`
+      erroresEntregables.value[indice] = mensaje
+      errs.push(mensaje)
+    }
+  })
+
+  entregablesComunes.value.forEach((entregable, indice) => {
+    if (!entregable.sha256) {
+      const mensaje = `Elegí el archivo del entregable común ${indice + 1}.`
+      erroresEntregables.value[`comun-${indice}`] = mensaje
+      errs.push(mensaje)
+    }
+  })
+
+  if (errs.length) {
+    erroresCampo.value.entregables = 'Revisá los entregables marcados.'
+  }
+  return errs
+}
+
 function validarPasoActual() {
   limpiarErroresCampos()
   let problemas = []
   if (paso.value === 1) problemas = [...validarDatos(), ...validarImagenes()]
   else if (paso.value === 2) problemas = [...validarMoneda(), ...validarVariantes()]
   else if (paso.value === 3) problemas = validarLicencia()
-  else if (paso.value === 4) problemas = validarTodo()
+  else if (paso.value === 4) problemas = validarEntregables()
+  else if (paso.value === 5) problemas = validarTodo()
 
   errores.value = problemas
   return problemas.length === 0
@@ -583,6 +675,12 @@ function validarTodo() {
     paso.value = 3
     return false
   }
+  const entregables = validarEntregables()
+  if (entregables.length) {
+    errores.value = entregables
+    paso.value = 4
+    return false
+  }
   errores.value = []
   return true
 }
@@ -593,8 +691,10 @@ function irAlPrincipio() {
 
 function siguiente() {
   if (!validarPasoActual()) return
-  if (paso.value < TOTAL_PASOS) {
-    paso.value++
+  const orden = PASOS_VISIBLES.value.map((p) => p.n)
+  const actual = orden.indexOf(paso.value)
+  if (actual >= 0 && actual < orden.length - 1) {
+    paso.value = orden[actual + 1]
     irAlPrincipio()
   }
 }
@@ -602,8 +702,10 @@ function siguiente() {
 function anterior() {
   errores.value = []
   limpiarErroresCampos()
-  if (paso.value > 1) {
-    paso.value--
+  const orden = PASOS_VISIBLES.value.map((p) => p.n)
+  const actual = orden.indexOf(paso.value)
+  if (actual > 0) {
+    paso.value = orden[actual - 1]
     irAlPrincipio()
   }
 }
@@ -625,15 +727,21 @@ function irAEditar(n) {
   irAlPrincipio()
 }
 
+function textoODefecto(valor) {
+  const limpio = String(valor || '').trim()
+  return limpio === '' ? undefined : limpio
+}
+
 function construirPayload() {
   const portada = form.value.imagenes[0]
-  const presentacionUnica = variantes.value.length === 1
+  const presentacion = variantes.value.length === 1
   return {
-    idTipoProducto: Number(form.value.idTipoProducto),
-    idMedio: Number(form.value.idMedio),
+    idTipoProducto: form.value.idTipoProducto
+      ? Number(form.value.idTipoProducto) : null,
+    idMedio: form.value.idMedio ? Number(form.value.idMedio) : null,
     titulo: form.value.titulo.trim(),
     descripcion: form.value.descripcion.trim(),
-    idMoneda: Number(form.value.idMoneda),
+    idMoneda: form.value.idMoneda ? Number(form.value.idMoneda) : null,
     contenidoSensible: form.value.contenidoSensible,
     contenidosSensibles: form.value.contenidoSensible
       ? form.value.contenidosSensibles
@@ -641,28 +749,32 @@ function construirPayload() {
     imagenes: form.value.imagenes.map((imagen, indice) => ({
       url: imagen.url,
       sha256: imagen.sha256,
-      claveArchivoOriginal: imagen.claveArchivoOriginal || undefined,
+      claveArchivoOriginal: textoODefecto(imagen.claveArchivoOriginal),
       orden: indice,
     })),
     variantes: variantes.value.map((variante, indice) => {
-      const usarPortada = presentacionUnica && !variante.urlImagen && portada
+      const usarPortada = presentacion && !variante.urlImagen && portada
       return {
         idVariante: variante.idVariante || undefined,
         nombre: String(variante.nombre || 'Única').trim(),
-        descripcion: variante.descripcion?.trim() || null,
-        precio: Number(variante.precio),
+        descripcion: textoODefecto(variante.descripcion) || null,
+        precio: variante.precio === '' || variante.precio === null
+          ? null
+          : Number(variante.precio),
         stockDisponible: variante.stockDisponible === null
           || variante.stockDisponible === undefined
           ? null
           : Number(variante.stockDisponible),
         orden: indice,
         estado: variante.estado || 'DISPONIBLE',
-        urlImagen: usarPortada ? portada.url : variante.urlImagen,
-        sha256: usarPortada ? portada.sha256 : variante.sha256,
-        claveArchivoOriginal: usarPortada
-          ? (portada.claveArchivoOriginal || undefined)
-          : (variante.claveArchivoOriginal || undefined),
+        urlImagen: textoODefecto(usarPortada ? portada.url : variante.urlImagen),
+        sha256: textoODefecto(usarPortada ? portada.sha256 : variante.sha256),
+        claveArchivoOriginal: textoODefecto(usarPortada
+          ? portada.claveArchivoOriginal
+          : variante.claveArchivoOriginal),
         numeroEdicion: variante.numeroEdicion || null,
+        entregableSha256: textoODefecto(variante.entregableSha256),
+        entregableNombre: textoODefecto(variante.entregableNombre),
       }
     }),
     idsEtiquetas: etiquetas.value.map((etiqueta) => etiqueta.idEtiqueta),
@@ -675,11 +787,46 @@ function construirPayload() {
         : 0,
       textoAdicional: licencia.value.textoAdicional?.trim() || null,
     },
+    entregablesComunes: entregablesComunes.value.map((entregable, indice) => ({
+      sha256: textoODefecto(entregable.sha256),
+      nombre: textoODefecto(entregable.nombre),
+      orden: indice,
+    })),
   }
 }
 
-async function guardar() {
+async function guardarBorrador(alSalir = false) {
   errorGuardado.value = ''
+  avisoBorrador.value = ''
+  guardandoBorrador.value = true
+  try {
+    const payload = construirPayload()
+    const res = esEdicion.value
+      ? await api.put(`/mis-productos/${idProducto.value}/borrador`, payload)
+      : await api.post('/mis-productos/borradores', payload)
+
+    estadoProducto.value = res.data.estado
+    estadoGuardado.value = instantanea()
+    limpiarCambios()
+    retirarAlternativa()
+    avisoBorrador.value = 'Borrador guardado.'
+
+    if (!alSalir && !esEdicion.value && res.data.idProducto) {
+      await router.replace(`/panel/productos/${res.data.idProducto}/editar`)
+    }
+  } catch (e) {
+    errorGuardado.value = e.response?.data?.message
+      || 'No se pudo guardar el borrador.'
+    if (!alSalir) irAlPrincipio()
+    throw e
+  } finally {
+    guardandoBorrador.value = false
+  }
+}
+
+async function publicar() {
+  errorGuardado.value = ''
+  avisoBorrador.value = ''
   if (!validarTodo()) {
     irAlPrincipio()
     return
@@ -688,7 +835,9 @@ async function guardar() {
   guardando.value = true
   try {
     const payload = construirPayload()
-    if (esEdicion.value) {
+    if (esEdicion.value && estadoProducto.value === 'BORRADOR') {
+      await api.post(`/mis-productos/${idProducto.value}/publicar`, payload)
+    } else if (esEdicion.value) {
       await api.put(`/mis-productos/${idProducto.value}`, payload)
     } else {
       await api.post('/mis-productos', payload)
@@ -698,7 +847,8 @@ async function guardar() {
     router.push('/panel/productos')
   } catch (e) {
     errorGuardado.value = e.response?.data?.message
-      || 'No se pudo guardar el producto.'
+      || 'No se pudo publicar el producto.'
+    irAlPrincipio()
   } finally {
     guardando.value = false
   }
@@ -720,13 +870,78 @@ function nombrePresentacion(variante) {
   return variantes.value.length === 1 ? 'Presentación' : variante.nombre
 }
 
-const { actualizar: marcarCambios, limpiar: limpiarCambios } = useCambiosSinGuardar()
+const presentacionUnica = computed(() => variantes.value.length === 1)
+
+function imagenDeSha(sha) {
+  if (!sha) return null
+  const buscado = String(sha).toLowerCase()
+  return form.value.imagenes.find(
+    (imagen) => String(imagen.sha256 || '').toLowerCase() === buscado,
+  ) || null
+}
+
+function usarImagenComoEntregable(variante) {
+  if (!variante.sha256) return
+  variante.entregableSha256 = variante.sha256
+  variante.entregableNombre = nombrePresentacion(variante)
+}
+
+function elegirEntregableVariante(event, variante) {
+  const sha = event.target.value
+  if (!sha) return
+  variante.entregableSha256 = sha
+  variante.entregableNombre = variante.entregableNombre
+    || (imagenDeSha(sha)?.url || '').split('/').pop()
+    || nombrePresentacion(variante)
+}
+
+function asignarTodosLosEntregables() {
+  variantes.value.forEach((variante) => {
+    if (variante.sha256 && !variante.entregableSha256) {
+      usarImagenComoEntregable(variante)
+    }
+  })
+}
+
+function agregarEntregableComun() {
+  const portada = form.value.imagenes[0]
+  if (!portada) return
+  if (entregablesComunes.value.some((item) => item.sha256 === portada.sha256)) return
+  entregablesComunes.value.push({
+    sha256: portada.sha256,
+    nombre: 'Archivo común',
+    orden: entregablesComunes.value.length,
+  })
+}
+
+function quitarEntregableComun(indice) {
+  entregablesComunes.value.splice(indice, 1)
+}
+
+function cambiarEntregableComun(event, entregable) {
+  entregable.sha256 = event.target.value
+}
+
+const {
+  actualizar: marcarCambios,
+  limpiar: limpiarCambios,
+  ofrecerAlternativa,
+  retirarAlternativa,
+} = useCambiosSinGuardar()
 
 watch(hayCambios, (pendiente) => {
   marcarCambios(
     pendiente,
-    'Tenés cambios sin guardar en el producto. Si salís, se perderán.',
+    'Tenés cambios sin guardar en el producto. Podés guardarlos como borrador '
+      + 'y continuar más tarde, o salir y perderlos.',
   )
+  if (pendiente && esBorrador.value) {
+    ofrecerAlternativa('Guardar borrador y salir', async () => {
+      await guardarBorrador(true)
+    })
+  } else {
+    retirarAlternativa()
+  }
 })
 
 function antesDeSalir(event) {
@@ -744,6 +959,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', antesDeSalir)
   limpiarCambios()
+  retirarAlternativa()
 })
 </script>
 
@@ -758,9 +974,18 @@ onBeforeUnmount(() => {
     </button>
 
     <div class="mx-auto mt-4 text-center">
-      <h1 class="text-2xl text-granate sm:text-3xl">{{ tituloPagina }}</h1>
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <h1 class="text-2xl text-granate sm:text-3xl">{{ tituloPagina }}</h1>
+        <span
+          v-if="esEdicion && estadoProducto === 'BORRADOR'"
+          class="rounded-full border border-cafe/20 bg-cafe/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cafe/70"
+        >
+          Borrador
+        </span>
+      </div>
       <p class="mt-2 text-sm text-cafe/60">
-        Completá la publicación y sus condiciones paso a paso.
+        Completá la publicación y sus condiciones paso a paso. Podés guardar un
+        borrador y continuar más tarde.
       </p>
     </div>
 
@@ -771,10 +996,10 @@ onBeforeUnmount(() => {
       <nav aria-label="Pasos del alta de producto" class="mt-8">
         <ol class="mx-auto flex w-full max-w-4xl items-start">
           <li
-            v-for="(p, i) in PASOS"
+            v-for="(p, i) in PASOS_VISIBLES"
             :key="p.n"
             class="flex items-start"
-            :class="i < PASOS.length - 1 ? 'flex-1' : ''"
+            :class="i < PASOS_VISIBLES.length - 1 ? 'flex-1' : ''"
           >
             <button
               type="button"
@@ -800,7 +1025,7 @@ onBeforeUnmount(() => {
                 >
                   <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                 </svg>
-                <span v-else>{{ p.n }}</span>
+                <span v-else>{{ i + 1 }}</span>
               </span>
               <span
                 class="hidden text-center text-[11px] leading-tight transition sm:block"
@@ -810,14 +1035,14 @@ onBeforeUnmount(() => {
               </span>
             </button>
             <span
-              v-if="i < PASOS.length - 1"
+              v-if="i < PASOS_VISIBLES.length - 1"
               class="mt-4.5 h-px flex-1 transition"
               :class="p.n < paso ? 'bg-coral/50' : 'bg-rosa/70'"
             ></span>
           </li>
         </ol>
         <p class="mt-4 text-center text-xs text-cafe/50 sm:hidden">
-          Paso {{ paso }} de {{ TOTAL_PASOS }} · {{ pasoActual.label }}
+          Paso {{ indicePaso }} de {{ TOTAL_PASOS }} · {{ pasoActual.label }}
         </p>
       </nav>
 
@@ -825,7 +1050,7 @@ onBeforeUnmount(() => {
         <div class="rounded-3xl border border-rosa/50 bg-blanco p-6 shadow-sm sm:p-10">
           <header class="mb-8">
             <p class="text-xs uppercase tracking-[0.18em] text-coral">
-              Paso {{ paso }} de {{ TOTAL_PASOS }}
+              Paso {{ indicePaso }} de {{ TOTAL_PASOS }}
             </p>
             <h2 class="mt-2 text-xl text-granate sm:text-2xl">{{ pasoActual.titulo }}</h2>
             <p class="mt-1 text-sm text-cafe/60">{{ pasoActual.descripcion }}</p>
@@ -1361,8 +1586,161 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <!-- Paso 4: revisión -->
-          <section v-else-if="paso === 4" class="space-y-5">
+          <!-- Paso 4: entregables -->
+          <section v-else-if="paso === 4" class="space-y-6">
+            <div class="rounded-2xl border border-coral/25 bg-coral/5 p-4">
+              <div class="flex items-start gap-3">
+                <span
+                  class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-coral/15 text-coral"
+                  aria-hidden="true"
+                >
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+                  </svg>
+                </span>
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-granate">Qué recibe el comprador</p>
+                  <p class="mt-1 text-xs leading-relaxed text-cafe/65">
+                    El archivo que se entrega al acreditarse el pago. Por defecto se usa
+                    la imagen original de cada variante; podés elegir otra imagen de la
+                    galería si querés entregar algo distinto de la vidriera.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <p v-if="erroresCampo.entregables" class="text-xs font-medium text-rojizo">
+              {{ erroresCampo.entregables }}
+            </p>
+
+            <div class="space-y-4">
+              <article
+                v-for="(variante, indice) in variantes"
+                :key="variante.idVariante || `v-${indice}`"
+                class="rounded-2xl border border-rosa/60 bg-blanco p-4"
+              >
+                <div class="flex items-start gap-3">
+                  <img
+                    v-if="imagenVariante(variante)"
+                    :src="imagenVariante(variante)"
+                    :alt="nombrePresentacion(variante)"
+                    class="h-16 w-16 shrink-0 rounded-xl object-cover ring-1 ring-rosa/50"
+                  />
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-granate">
+                      {{ nombrePresentacion(variante) }}
+                    </p>
+                    <p class="mt-0.5 text-xs text-cafe/55">
+                      {{ variante.entregableSha256
+                        ? 'Entrega la imagen elegida.'
+                        : 'Entrega la imagen original de esta presentación.' }}
+                    </p>
+                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        class="rounded-lg border border-coral/40 bg-coral/10 px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-coral/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="!variante.sha256"
+                        @click="usarImagenComoEntregable(variante)"
+                      >
+                        Usar la imagen de la variante
+                      </button>
+                      <select
+                        class="min-w-0 rounded-lg border-0 px-2.5 py-1.5 text-xs text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                        :value="variante.entregableSha256"
+                        @change="elegirEntregableVariante($event, variante)"
+                      >
+                        <option value="">Elegir otra imagen…</option>
+                        <option
+                          v-for="imagen in form.imagenes"
+                          :key="imagen.sha256"
+                          :value="imagen.sha256"
+                        >
+                          {{ (imagen.url || '').split('/').pop() }}
+                        </option>
+                      </select>
+                    </div>
+                    <p
+                      v-if="erroresEntregables[indice]"
+                      class="mt-2 text-xs font-medium text-rojizo"
+                    >
+                      {{ erroresEntregables[indice] }}
+                    </p>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <div v-if="!presentacionUnica" class="rounded-2xl border border-rosa/60 bg-crema/40 p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-granate">
+                    Archivos para todos los compradores
+                    <span class="ml-1 text-xs font-normal text-cafe/50">(opcional)</span>
+                  </p>
+                  <p class="mt-1 text-xs leading-relaxed text-cafe/60">
+                    Se entregan además de la variante, a cualquier comprador. Por
+                    ejemplo, el manual o la licencia en PDF.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="rounded-lg border border-rosa px-3 py-1.5 text-xs font-medium text-cafe transition hover:bg-rosa/20 disabled:opacity-50"
+                  :disabled="!form.imagenes.length"
+                  @click="agregarEntregableComun"
+                >
+                  Agregar archivo
+                </button>
+              </div>
+
+              <ul v-if="entregablesComunes.length" class="mt-3 space-y-2">
+                <li
+                  v-for="(entregable, indice) in entregablesComunes"
+                  :key="`comun-${indice}`"
+                  class="flex flex-wrap items-center gap-2 rounded-xl border border-rosa/50 bg-blanco px-3 py-2"
+                >
+                  <select
+                    class="min-w-0 flex-1 rounded-lg border-0 px-2.5 py-1.5 text-xs text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                    :value="entregable.sha256"
+                    @change="cambiarEntregableComun($event, entregable)"
+                  >
+                    <option value="">Elegí una imagen…</option>
+                    <option
+                      v-for="imagen in form.imagenes"
+                      :key="imagen.sha256"
+                      :value="imagen.sha256"
+                    >
+                      {{ (imagen.url || '').split('/').pop() }}
+                    </option>
+                  </select>
+                  <button
+                    type="button"
+                    class="rounded-lg px-2 py-1 text-xs font-medium text-rojizo/80 transition hover:text-rojizo"
+                    @click="quitarEntregableComun(indice)"
+                  >
+                    Quitar
+                  </button>
+                  <p
+                    v-if="erroresEntregables[`comun-${indice}`]"
+                    class="w-full text-xs font-medium text-rojizo"
+                  >
+                    {{ erroresEntregables[`comun-${indice}`] }}
+                  </p>
+                </li>
+              </ul>
+              <p v-else class="mt-3 text-xs text-cafe/45">
+                Sin archivos comunes: cada comprador recibe solo su variante.
+              </p>
+            </div>
+
+            <p class="rounded-xl bg-crema/60 px-4 py-3 text-xs leading-relaxed text-cafe/65">
+              <span class="font-semibold text-granate">Se entrega el archivo original.</span>
+              La vidriera pública usa una copia optimizada; el comprador recibe el
+              archivo tal como lo subiste.
+            </p>
+          </section>
+
+          <!-- Paso 5: revisión -->
+          <section v-else-if="paso === 5" class="space-y-5">
             <article class="rounded-2xl border border-rosa/60 bg-crema/40 p-5">
               <div class="flex items-start justify-between gap-3">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
@@ -1522,6 +1900,71 @@ onBeforeUnmount(() => {
               </div>
             </article>
 
+            <article v-if="!esEntregaFisica" class="rounded-2xl border border-rosa/60 bg-blanco p-5">
+              <div class="flex items-start justify-between gap-3">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                  Entregables
+                </p>
+                <button
+                  type="button"
+                  class="text-xs font-medium text-coral transition hover:text-rojizo"
+                  @click="irAEditar(4)"
+                >
+                  Editar
+                </button>
+              </div>
+              <p class="mt-2 text-sm text-cafe/65">
+                {{ entregablesComunes.length
+                  ? `Cada comprador recibe su variante más ${entregablesComunes.length} archivo(s) común(es).`
+                  : 'Cada comprador recibe el archivo de su variante.' }}
+              </p>
+              <div class="mt-3 divide-y divide-rosa/40">
+                <div
+                  v-for="(variante, indice) in variantes"
+                  :key="`entrega-${variante.idVariante || indice}`"
+                  class="flex items-center gap-3 py-2.5"
+                >
+                  <img
+                    v-if="imagenVariante(variante)"
+                    :src="imagenVariante(variante)"
+                    :alt="nombrePresentacion(variante)"
+                    class="h-10 w-10 shrink-0 rounded-lg object-cover ring-1 ring-rosa/50"
+                  />
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-sm font-semibold text-granate">
+                      {{ nombrePresentacion(variante) }}
+                    </p>
+                    <p class="text-xs text-cafe/55">
+                      {{ variante.entregableSha256
+                        ? 'Archivo elegido'
+                        : 'Imagen original de la variante' }}
+                    </p>
+                  </div>
+                  <span
+                    class="shrink-0 rounded-full bg-mantequilla/60 px-2.5 py-0.5 text-[11px] font-bold text-granate"
+                  >
+                    Se entrega al pagar
+                  </span>
+                </div>
+              </div>
+            </article>
+
+            <p
+              v-if="esEntregaFisica"
+              class="rounded-2xl border border-coral/20 bg-rosa/20 px-4 py-3 text-xs leading-relaxed text-granate"
+            >
+              Producto con entrega física: no hay archivos que entregar por la
+              plataforma. El envío se coordina con el comprador.
+            </p>
+
+            <p
+              v-if="avisoBorrador"
+              class="rounded-xl border border-green-600/20 bg-green-500/10 px-4 py-3 text-sm text-green-700"
+              role="status"
+            >
+              {{ avisoBorrador }}
+            </p>
+
             <p
               v-if="errorGuardado"
               class="rounded-xl border border-rojizo/30 bg-rojizo/5 px-4 py-3 text-sm text-rojizo"
@@ -1531,19 +1974,29 @@ onBeforeUnmount(() => {
           </section>
 
           <footer class="mt-10 flex flex-col-reverse gap-3 border-t border-rosa/50 pt-6 sm:flex-row sm:items-center sm:justify-between">
-            <button
-              v-if="paso > 1"
-              type="button"
-              class="rounded-lg border border-rosa px-4 py-2 text-sm text-cafe transition hover:bg-rosa/20"
-              @click="anterior"
-            >
-              Anterior
-            </button>
-            <span v-else></span>
+            <div class="flex flex-wrap items-center gap-3">
+              <button
+                v-if="indicePaso > 1"
+                type="button"
+                class="rounded-lg border border-rosa px-4 py-2 text-sm text-cafe transition hover:bg-rosa/20"
+                @click="anterior"
+              >
+                Anterior
+              </button>
+              <button
+                v-if="esBorrador"
+                type="button"
+                :disabled="guardandoBorrador || guardando"
+                class="rounded-lg border border-rosa px-4 py-2 text-sm font-medium text-cafe transition hover:bg-rosa/20 disabled:opacity-50"
+                @click="guardarBorrador"
+              >
+                {{ guardandoBorrador ? 'Guardando…' : 'Guardar borrador' }}
+              </button>
+            </div>
 
             <div class="flex items-center gap-3">
               <button
-                v-if="paso < TOTAL_PASOS"
+                v-if="paso !== 5"
                 type="button"
                 class="rounded-lg bg-coral px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-rojizo"
                 @click="siguiente"
@@ -1555,11 +2008,11 @@ onBeforeUnmount(() => {
                 type="button"
                 :disabled="guardando"
                 class="rounded-lg bg-coral px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-rojizo disabled:opacity-50"
-                @click="guardar"
+                @click="publicar"
               >
                 {{ guardando
-                  ? 'Guardando...'
-                  : (esEdicion ? 'Guardar cambios' : 'Publicar producto') }}
+                  ? 'Publicando...'
+                  : (esBorrador ? 'Publicar producto' : 'Guardar cambios') }}
               </button>
             </div>
           </footer>
