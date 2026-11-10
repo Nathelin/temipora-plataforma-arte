@@ -181,6 +181,12 @@ async function alternarFavorito(producto) {
 }
 
 onMounted(async () => {
+  // Los chips de Explorar llegan como query para abrir el catálogo filtrado.
+  const tipoInicial = route.query.idTipoProducto
+  if (tipoInicial) filtros.value.idTipoProducto = String(tipoInicial)
+  const medioInicial = route.query.idMedio
+  if (medioInicial) filtros.value.idMedio = String(medioInicial)
+
   cargarFavoritos()
   try {
     const [tiposRes, mediosRes] = await Promise.all([
