@@ -156,7 +156,9 @@ async function cargar() {
   }
 
   if (productosRes.status === 'fulfilled') {
-    productos.value = productosRes.value.data?.contenido || []
+    // cargarCatalogoProductos ya devuelve el cuerpo de la respuesta,
+    // no el objeto de Axios.
+    productos.value = productosRes.value?.contenido || []
   } else {
     productos.value = []
   }
