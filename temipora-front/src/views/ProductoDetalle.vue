@@ -53,7 +53,6 @@ const resumenDerechos = computed(
 const esEntregaFisica = computed(
   () => producto.value?.tipoEntregaMedio === 'FISICA',
 )
-const entregables = computed(() => producto.value?.entregables || [])
 const ledgerPagina = computed(() => ledger.value?.variantes || [])
 const totalPaginasLedger = computed(
   () => Math.max(1, Number(ledger.value?.totalPaginas) || 1),
@@ -569,48 +568,6 @@ onMounted(cargar)
               >
                 {{ producto.estado === 'BORRADOR' ? 'Continuar borrador' : 'Editar producto' }}
               </router-link>
-            </section>
-
-            <section
-              v-if="!esEntregaFisica && entregables.length"
-              class="rounded-[22px] border border-borde/60 bg-superficie p-5 shadow-sm"
-            >
-              <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
-                Entrega
-              </p>
-              <h2 class="mt-1 font-display text-base font-bold text-granate">
-                Qué recibe el comprador
-              </h2>
-              <p class="mt-2 text-xs leading-relaxed text-cafe/60">
-                Archivos originales, tal como los subiste. Se habilitan al
-                acreditarse el pago.
-              </p>
-              <ul class="mt-3 space-y-2">
-                <li
-                  v-for="entregable in entregables"
-                  :key="entregable.idEntregable"
-                  class="flex items-start gap-2.5 rounded-xl border border-rosa/50 bg-crema/40 px-3 py-2"
-                >
-                  <span
-                    class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-coral/10 text-coral"
-                    aria-hidden="true"
-                  >
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M14 3v5h5M7 3h7l6 6v12H7z" />
-                    </svg>
-                  </span>
-                  <span class="min-w-0">
-                    <span class="block break-words text-sm font-semibold text-granate">
-                      {{ entregable.nombre }}
-                    </span>
-                    <span class="block text-xs text-cafe/55">
-                      {{ entregable.alcance === 'COMUN'
-                        ? 'Para todos los compradores'
-                        : `Variante: ${entregable.nombreVariante}` }}
-                    </span>
-                  </span>
-                </li>
-              </ul>
             </section>
 
             <section class="rounded-[22px] border border-borde/60 bg-superficie p-5 shadow-sm">

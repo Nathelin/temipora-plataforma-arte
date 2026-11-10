@@ -48,12 +48,14 @@ public class ProductoVarianteRequest {
     private String claveArchivoOriginal;
 
     /**
-     * Imagen del producto que se entrega con esta variante. Si no se indica,
-     * se deriva del archivo original de la variante.
+     * Archivos que recibe el comprador de esta variante. Vienen
+     * preseleccionados con la imagen de la variante, y el artista puede
+     * agregar más imágenes de la galería o quitar la de portada.
      */
-    @Pattern(regexp = "^\\s*$|^[0-9a-fA-F]{64}$",
-        message = "La huella SHA-256 del entregable no es válida")
-    private String entregableSha256;
+    @Size(max = 50, message = "Una variante puede entregar como máximo 50 archivos")
+    private java.util.List<@Pattern(
+        regexp = "^[0-9a-fA-F]{64}$",
+        message = "La huella SHA-256 del entregable no es válida") String> entregablesSha256;
 
     @Size(max = 255, message = "El nombre del entregable no puede superar los 255 caracteres")
     private String entregableNombre;

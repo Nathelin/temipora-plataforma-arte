@@ -25,6 +25,9 @@ import lombok.Setter;
 @NoArgsConstructor
 public class EventoLedger {
 
+    /** Versión del formato de hash que emite el código hoy. */
+    public static final int VERSION_ACTUAL = 2;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long idEventoLedger;
@@ -63,6 +66,16 @@ public class EventoLedger {
 
     @Column(columnDefinition = "TEXT")
     private String datos;
+
+    /**
+     * Formato del hash: 1 = sin datos (eventos históricos), 2 = incluye
+     * hashDatos. Permite endurecer la verificación sin invalidar el pasado.
+     */
+    @Column(name = "version_hash", nullable = false)
+    private Integer versionHash = VERSION_ACTUAL;
+
+    @Column(name = "hash_datos", length = 64)
+    private String hashDatos;
 
     @Column(name = "hash_previo", nullable = false, length = 64)
     private String hashPrevio;

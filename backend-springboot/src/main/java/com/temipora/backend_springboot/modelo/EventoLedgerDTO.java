@@ -25,5 +25,6 @@ public class EventoLedgerDTO {
     private String nombreDestino;
     private String hashPrevio;
     private String hashEvento;
+    private Integer versionHash;
     private boolean verificado;
 }

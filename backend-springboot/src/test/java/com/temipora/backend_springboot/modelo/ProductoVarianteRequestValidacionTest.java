@@ -72,9 +72,29 @@ class ProductoVarianteRequestValidacionTest {
     }
 
     @Test
-    void entregableSha256VacioEsValido() {
+    void listaDeEntregablesVaciaEsValida() {
         ProductoVarianteRequest request = variante();
-        request.setEntregableSha256("");
+        request.setEntregablesSha256(java.util.List.of());
+
+        assertThat(validador.validate(request)).isEmpty();
+    }
+
+    @Test
+    void listaDeEntregablesConHashInvalidoSeRechaza() {
+        ProductoVarianteRequest request = variante();
+        request.setEntregablesSha256(java.util.List.of("no-es-un-hash"));
+
+        Set<ConstraintViolation<ProductoVarianteRequest>> errores =
+            validador.validate(request);
+
+        assertThat(errores).hasSize(1);
+    }
+
+    @Test
+    void listaDeEntregablesConVariosHasgosValidosPasa() {
+        ProductoVarianteRequest request = variante();
+        request.setEntregablesSha256(java.util.List.of(
+            "b".repeat(64), "c".repeat(64), "d".repeat(64)));
 
         assertThat(validador.validate(request)).isEmpty();
     }

@@ -68,6 +68,8 @@ public class LedgerService {
         LocalDateTime ocurrido = LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
         String hashPrevio = "";
         String hashImagen = variante.getSha256();
+        String datos = datosGenesis(producto, variante, artista, hashLicencia, hashImagen);
+        String hashDatos = sha256Hex(datos);
 
         EventoLedger evento = new EventoLedger();
         evento.setVariante(variante);
@@ -79,8 +81,11 @@ public class LedgerService {
         evento.setOcurridoEn(ocurrido);
         evento.setHashPrevio(hashPrevio);
         evento.setHashImagen(hashImagen);
-        evento.setDatos(datosGenesis(producto, variante, artista, hashLicencia, hashImagen));
+        evento.setDatos(datos);
+        evento.setVersionHash(EventoLedger.VERSION_ACTUAL);
+        evento.setHashDatos(hashDatos);
         evento.setHashEvento(calcularHash(
+            EventoLedger.VERSION_ACTUAL,
             variante.getIdVariante(),
             1L,
             TipoEventoLedger.GENESIS,
@@ -91,7 +96,8 @@ public class LedgerService {
             moneda != null ? moneda.getCodigo() : null,
             ocurrido,
             hashPrevio,
-            hashImagen));
+            hashImagen,
+            hashDatos));
         return eventoRepository.save(evento);
     }
 
@@ -130,11 +136,15 @@ public class LedgerService {
             boolean previoOk = Objects.equals(evento.getHashPrevio(), hashPrevioEsperado);
             boolean hashOk = Objects.equals(
                 evento.getHashEvento(), recomputarHash(evento));
-            boolean ok = secuenciaOk && previoOk && hashOk;
+            boolean datosOk = hashDatosCoincide(evento);
+            boolean ok = secuenciaOk && previoOk && hashOk && datosOk;
             if (!ok && integridad) {
                 integridad = false;
-                mensaje = "El historial no coincide en el registro "
-                    + evento.getSecuencia() + ".";
+                mensaje = !datosOk
+                    ? "El contenido del registro " + evento.getSecuencia()
+                        + " fue alterado: el hash de datos no coincide."
+                    : "El historial no coincide en el registro "
+                        + evento.getSecuencia() + ".";
             }
             dtos.add(aDTO(evento, ok));
             hashPrevioEsperado = evento.getHashEvento();
@@ -204,8 +214,21 @@ public class LedgerService {
             .build();
     }
 
+    /**
+     * Recalcula el hash desde el contenido actual de la fila. Para la versión 2
+     * se vuelve a hashear la columna `datos` en vez de confiar en `hash_datos`:
+     * si alguien reescribe `datos` sin tocar `hash_datos`, el hash del evento
+     * deja de coincidir.
+     */
     private String recomputarHash(EventoLedger evento) {
+        int version = evento.getVersionHash() != null
+            ? evento.getVersionHash()
+            : 1;
+        String hashDatos = version >= 2
+            ? sha256Hex(evento.getDatos() != null ? evento.getDatos() : "")
+            : null;
         return calcularHash(
+            version,
             evento.getVariante() != null ? evento.getVariante().getIdVariante() : null,
             evento.getSecuencia(),
             evento.getTipo(),
@@ -218,10 +241,27 @@ public class LedgerService {
             evento.getMoneda() != null ? evento.getMoneda().getCodigo() : null,
             evento.getOcurridoEn(),
             evento.getHashPrevio(),
-            evento.getHashImagen());
+            evento.getHashImagen(),
+            hashDatos);
+    }
+
+    /**
+     * Comprueba que `hash_datos` corresponda al contenido guardado en `datos`.
+     * Los eventos de versión 1 no protegían ese campo, así que no se validan.
+     */
+    private boolean hashDatosCoincide(EventoLedger evento) {
+        int version = evento.getVersionHash() != null
+            ? evento.getVersionHash()
+            : 1;
+        if (version < 2) {
+            return true;
+        }
+        String esperado = sha256Hex(evento.getDatos() != null ? evento.getDatos() : "");
+        return Objects.equals(evento.getHashDatos(), esperado);
     }
 
     private String calcularHash(
+            int version,
             Long idVariante,
             Long secuencia,
             TipoEventoLedger tipo,
@@ -232,7 +272,8 @@ public class LedgerService {
             String moneda,
             LocalDateTime ocurrido,
             String hashPrevio,
-            String hashImagen) {
+            String hashImagen,
+            String hashDatos) {
         String canonico = String.join("|",
             String.valueOf(idVariante),
             String.valueOf(secuencia),
@@ -246,7 +287,9 @@ public class LedgerService {
                 ? String.valueOf(ocurrido.toInstant(ZoneOffset.UTC).toEpochMilli())
                 : "",
             hashPrevio != null ? hashPrevio : "",
-            hashImagen != null ? hashImagen : "");
+            hashImagen != null ? hashImagen : "",
+            // Desde la versión 2 el hash cubre también el contenido de `datos`.
+            version >= 2 ? (hashDatos != null ? hashDatos : "") : "");
         return sha256Hex(canonico);
     }
 
@@ -280,6 +323,7 @@ public class LedgerService {
                 ? evento.getActorDestino().getNombreUsuario() : null)
             .hashPrevio(evento.getHashPrevio())
             .hashEvento(evento.getHashEvento())
+            .versionHash(evento.getVersionHash())
             .verificado(verificado)
             .build();
     }

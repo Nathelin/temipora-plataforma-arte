@@ -477,7 +477,7 @@ class ProductoServiceTest {
         ProductoRequest request = request();
         request.getVariantes().get(0).setSha256(null);
         request.getVariantes().get(0).setClaveArchivoOriginal(null);
-        request.getVariantes().get(0).setEntregableSha256(null);
+        request.getVariantes().get(0).setEntregablesSha256(null);
 
         assertThatThrownBy(() -> productoService.publicarBorrador(10L, 5L, request))
             .isInstanceOf(IllegalArgumentException.class)

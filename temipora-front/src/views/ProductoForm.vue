@@ -156,6 +156,20 @@ watch(esEntregaFisica, (fisica) => {
     erroresVariantes.value = {}
   }
 })
+
+// La imagen de la variante entra preseleccionada como entregable en cuanto
+// existe. Solo se inicializa cuando la variante no tiene el campo todavía:
+// si el artista desmarca todo, la selección vacía se respeta.
+watch(
+  variantes,
+  (lista) => {
+    lista.forEach((variante) => {
+      if (Array.isArray(variante.entregablesSha256)) return
+      variante.entregablesSha256 = variante.sha256 ? [variante.sha256] : []
+    })
+  },
+  { deep: true },
+)
 const esAdoptable = computed(() => esTipoUnico(nombreTipo.value) && nombreTipo.value.toLowerCase().includes('adoptable'))
 const hayVarianteUnica = computed(
   () => variantes.value.some(
@@ -288,14 +302,17 @@ function mapearProducto(d) {
   }
 
   const entregables = Array.isArray(d.entregables) ? d.entregables : []
-  const entregablesPorVariante = new Map(
-    entregables
-      .filter((entregable) => entregable.idVariante)
-      .map((entregable) => [entregable.idVariante, entregable]),
-  )
+  const entregablesPorVariante = new Map()
+  entregables
+    .filter((entregable) => entregable.idVariante)
+    .forEach((entregable) => {
+      const lista = entregablesPorVariante.get(entregable.idVariante) || []
+      lista.push(entregable)
+      entregablesPorVariante.set(entregable.idVariante, lista)
+    })
 
   variantes.value = (d.variantes || []).map((variante) => {
-    const entregable = entregablesPorVariante.get(variante.idVariante)
+    const propios = entregablesPorVariante.get(variante.idVariante) || []
     return {
       idVariante: variante.idVariante,
       nombre: variante.nombre || 'Única',
@@ -311,8 +328,13 @@ function mapearProducto(d) {
       claveArchivoOriginal: '',
       numeroEdicion: variante.numeroEdicion || null,
       tieneLedger: !!variante.tieneLedger,
-      entregableSha256: entregable?.sha256 || '',
-      entregableNombre: entregable?.nombre || '',
+      entregablesSha256: propios.length
+        ? propios
+          .sort((a, b) => (a.orden || 0) - (b.orden || 0))
+          .map((entregable) => entregable.sha256)
+          .filter(Boolean)
+        : (variante.sha256 ? [variante.sha256] : []),
+      entregableNombre: propios[0]?.nombre || '',
     }
   })
   if (!variantes.value.length) {
@@ -617,12 +639,12 @@ function validarEntregables() {
   if (esEntregaFisica.value) return errs
 
   variantes.value.forEach((variante, indice) => {
+    const seleccion = (variante.entregablesSha256 || []).filter(Boolean)
     const tieneImagen = variante.sha256 || variante.urlImagen
-    const tieneEntregable = variante.entregableSha256 || tieneImagen
-    if (!tieneEntregable) {
+    if (!seleccion.length && !tieneImagen) {
       const mensaje = presentacionUnica.value
-        ? 'El comprador tiene que recibir un archivo.'
-        : `La variante ${indice + 1} no tiene archivo entregable.`
+        ? 'El comprador tiene que recibir al menos un archivo.'
+        : `La variante ${indice + 1} no tiene archivos para entregar.`
       erroresEntregables.value[indice] = mensaje
       errs.push(mensaje)
     }
@@ -773,7 +795,9 @@ function construirPayload() {
           ? portada.claveArchivoOriginal
           : variante.claveArchivoOriginal),
         numeroEdicion: variante.numeroEdicion || null,
-        entregableSha256: textoODefecto(variante.entregableSha256),
+        entregablesSha256: (variante.entregablesSha256 || [])
+          .map((sha) => textoODefecto(sha))
+          .filter(Boolean),
         entregableNombre: textoODefecto(variante.entregableNombre),
       }
     }),
@@ -880,27 +904,49 @@ function imagenDeSha(sha) {
   ) || null
 }
 
+/**
+ * La imagen de la variante viene marcada por defecto. El artista puede
+ * sumar otras imágenes de la galería o desmarcar la portada.
+ */
+function seleccionDe(variante) {
+  return Array.isArray(variante.entregablesSha256)
+    ? variante.entregablesSha256
+    : []
+}
+
+function entregableSeleccionado(variante, sha) {
+  if (!sha) return false
+  const buscado = String(sha).toLowerCase()
+  return seleccionDe(variante).some(
+    (item) => String(item).toLowerCase() === buscado,
+  )
+}
+
+function alternarEntregable(sha, variante) {
+  if (!sha) return
+  if (!Array.isArray(variante.entregablesSha256)) {
+    variante.entregablesSha256 = variante.sha256 ? [variante.sha256] : []
+  }
+  const seleccion = variante.entregablesSha256
+  const indice = seleccion.findIndex(
+    (item) => String(item).toLowerCase() === String(sha).toLowerCase(),
+  )
+  if (indice >= 0) {
+    seleccion.splice(indice, 1)
+  } else {
+    seleccion.push(sha)
+  }
+}
+
 function usarImagenComoEntregable(variante) {
   if (!variante.sha256) return
-  variante.entregableSha256 = variante.sha256
-  variante.entregableNombre = nombrePresentacion(variante)
+  variante.entregablesSha256 = [variante.sha256]
 }
 
-function elegirEntregableVariante(event, variante) {
-  const sha = event.target.value
-  if (!sha) return
-  variante.entregableSha256 = sha
-  variante.entregableNombre = variante.entregableNombre
-    || (imagenDeSha(sha)?.url || '').split('/').pop()
-    || nombrePresentacion(variante)
-}
-
-function asignarTodosLosEntregables() {
-  variantes.value.forEach((variante) => {
-    if (variante.sha256 && !variante.entregableSha256) {
-      usarImagenComoEntregable(variante)
-    }
-  })
+function seleccionarTodaLaGaleria(variante) {
+  variante.entregablesSha256 = form.value.imagenes
+    .map((imagen) => imagen.sha256)
+    .filter(Boolean)
 }
 
 function agregarEntregableComun() {
@@ -1601,9 +1647,9 @@ onBeforeUnmount(() => {
                 <div class="min-w-0">
                   <p class="text-sm font-semibold text-granate">Qué recibe el comprador</p>
                   <p class="mt-1 text-xs leading-relaxed text-cafe/65">
-                    El archivo que se entrega al acreditarse el pago. Por defecto se usa
-                    la imagen original de cada variante; podés elegir otra imagen de la
-                    galería si querés entregar algo distinto de la vidriera.
+                    Marcá las imágenes de la galería que se entregan al acreditarse el
+                    pago. La imagen de la variante viene marcada; podés sumar más o
+                    desmarcar la portada si no forma parte del producto.
                   </p>
                 </div>
               </div>
@@ -1619,54 +1665,91 @@ onBeforeUnmount(() => {
                 :key="variante.idVariante || `v-${indice}`"
                 class="rounded-2xl border border-rosa/60 bg-blanco p-4"
               >
-                <div class="flex items-start gap-3">
-                  <img
-                    v-if="imagenVariante(variante)"
-                    :src="imagenVariante(variante)"
-                    :alt="nombrePresentacion(variante)"
-                    class="h-16 w-16 shrink-0 rounded-xl object-cover ring-1 ring-rosa/50"
-                  />
-                  <div class="min-w-0 flex-1">
-                    <p class="text-sm font-semibold text-granate">
-                      {{ nombrePresentacion(variante) }}
-                    </p>
-                    <p class="mt-0.5 text-xs text-cafe/55">
-                      {{ variante.entregableSha256
-                        ? 'Entrega la imagen elegida.'
-                        : 'Entrega la imagen original de esta presentación.' }}
-                    </p>
-                    <div class="mt-3 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        class="rounded-lg border border-coral/40 bg-coral/10 px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-coral/20 disabled:cursor-not-allowed disabled:opacity-50"
-                        :disabled="!variante.sha256"
-                        @click="usarImagenComoEntregable(variante)"
-                      >
-                        Usar la imagen de la variante
-                      </button>
-                      <select
-                        class="min-w-0 rounded-lg border-0 px-2.5 py-1.5 text-xs text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-                        :value="variante.entregableSha256"
-                        @change="elegirEntregableVariante($event, variante)"
-                      >
-                        <option value="">Elegir otra imagen…</option>
-                        <option
-                          v-for="imagen in form.imagenes"
-                          :key="imagen.sha256"
-                          :value="imagen.sha256"
-                        >
-                          {{ (imagen.url || '').split('/').pop() }}
-                        </option>
-                      </select>
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex min-w-0 items-center gap-3">
+                    <img
+                      v-if="imagenVariante(variante)"
+                      :src="imagenVariante(variante)"
+                      :alt="nombrePresentacion(variante)"
+                      class="h-12 w-12 shrink-0 rounded-xl object-cover ring-1 ring-rosa/50"
+                    />
+                    <div class="min-w-0">
+                      <p class="text-sm font-semibold text-granate">
+                        {{ nombrePresentacion(variante) }}
+                      </p>
+                      <p class="mt-0.5 text-xs text-cafe/55">
+                        {{ seleccionDe(variante).length }}
+                        {{ seleccionDe(variante).length === 1 ? 'archivo' : 'archivos' }}
+                      </p>
                     </div>
-                    <p
-                      v-if="erroresEntregables[indice]"
-                      class="mt-2 text-xs font-medium text-rojizo"
+                  </div>
+                  <div class="flex shrink-0 flex-wrap justify-end gap-2">
+                    <button
+                      v-if="form.imagenes.length > 1"
+                      type="button"
+                      class="rounded-lg border border-rosa px-2.5 py-1.5 text-xs font-medium text-cafe transition hover:bg-rosa/20"
+                      @click="seleccionarTodaLaGaleria(variante)"
                     >
-                      {{ erroresEntregables[indice] }}
-                    </p>
+                      Toda la galería
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-lg border border-coral/40 bg-coral/10 px-2.5 py-1.5 text-xs font-medium text-granate transition hover:bg-coral/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      :disabled="!variante.sha256"
+                      @click="usarImagenComoEntregable(variante)"
+                    >
+                      Solo la de la variante
+                    </button>
                   </div>
                 </div>
+
+                <div
+                  v-if="form.imagenes.length"
+                  class="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4"
+                >
+                  <label
+                    v-for="imagen in form.imagenes"
+                    :key="imagen.sha256"
+                    class="group relative cursor-pointer overflow-hidden rounded-xl border-2 transition"
+                    :class="entregableSeleccionado(variante, imagen.sha256)
+                      ? 'border-coral ring-2 ring-coral/20'
+                      : 'border-transparent hover:border-rosa'"
+                  >
+                    <input
+                      type="checkbox"
+                      class="sr-only"
+                      :checked="entregableSeleccionado(variante, imagen.sha256)"
+                      @change="alternarEntregable(imagen.sha256, variante)"
+                    />
+                    <img
+                      :src="imagen.url"
+                      :alt="`Imagen ${(imagen.url || '').split('/').pop()}`"
+                      class="aspect-square h-full w-full object-cover"
+                    />
+                    <span
+                      class="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white transition"
+                      :class="entregableSeleccionado(variante, imagen.sha256)
+                        ? 'bg-coral text-white'
+                        : 'bg-white/85 text-transparent'"
+                      aria-hidden="true"
+                    >
+                      <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                      </svg>
+                    </span>
+                  </label>
+                </div>
+
+                <p v-else class="mt-3 text-xs text-cafe/50">
+                  Subí imágenes en el paso “Detalles” para poder elegir qué se entrega.
+                </p>
+
+                <p
+                  v-if="erroresEntregables[indice]"
+                  class="mt-2 text-xs font-medium text-rojizo"
+                >
+                  {{ erroresEntregables[indice] }}
+                </p>
               </article>
             </div>
 

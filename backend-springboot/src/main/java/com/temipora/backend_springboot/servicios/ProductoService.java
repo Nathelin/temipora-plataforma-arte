@@ -1271,11 +1271,12 @@ public class ProductoService {
             return;
         }
         for (ProductoVarianteRequest variante : request.getVariantes()) {
-            boolean tieneArchivo = hayTexto(variante.getEntregableSha256())
-                || (hayTexto(variante.getClaveArchivoOriginal())
-                    && hayTexto(variante.getSha256()))
-                || hayTexto(variante.getSha256());
-            if (!tieneArchivo) {
+            List<String> seleccion = variante.getEntregablesSha256();
+            boolean traeLista = seleccion != null && !seleccion.isEmpty()
+                && seleccion.stream().anyMatch(this::hayTexto);
+            // Sin lista explícita se preselecciona la imagen de la variante.
+            boolean tienePropia = hayTexto(variante.getSha256());
+            if (!traeLista && !tienePropia) {
                 throw new IllegalArgumentException(
                     "Falta el archivo que recibe el comprador de la variante “"
                         + (variante.getNombre() != null ? variante.getNombre().trim()
@@ -1301,6 +1302,10 @@ public class ProductoService {
      */
     private void reemplazarEntregables(Producto producto, ProductoRequest request) {
         entregableRepository.deleteByProductoIdProducto(producto.getIdProducto());
+        // Hibernate ejecuta los INSERT antes que los DELETE. Sin este flush, al
+        // editar un producto que ya tenía entregables los nuevos chocan contra
+        // uk_entregable_variante mientras las filas anteriores siguen presentes.
+        entregableRepository.flush();
         if (!esEntregaDigital(producto.getMedio() != null
                 ? producto.getMedio().getIdMedio() : null)) {
             return;
@@ -1336,34 +1341,78 @@ public class ProductoService {
             if (variante == null) {
                 continue;
             }
-            String sha = hayTexto(varianteRequest.getEntregableSha256())
-                ? varianteRequest.getEntregableSha256()
-                : varianteRequest.getSha256();
-            ProductoImagen imagen = resolverImagenEntregable(sha, imagenesPorSha);
-            if (imagen == null && hayTexto(variante.getClaveArchivoOriginal())) {
-                ProductoEntregable derivado = new ProductoEntregable();
-                derivado.setProducto(producto);
-                derivado.setVariante(variante);
-                derivado.setAlcance(AlcanceEntregable.VARIANTE);
-                derivado.setNombre(nombreArchivo(variante));
-                derivado.setClaveArchivo(variante.getClaveArchivoOriginal());
-                derivado.setSha256(variante.getSha256());
-                derivado.setMime(mimeDe(variante.getClaveArchivoOriginal()));
-                derivado.setTamanoBytes(tamanoSeguro(variante.getClaveArchivoOriginal()));
-                derivado.setOrden(0);
-                nuevos.add(derivado);
-                continue;
-            }
-            if (imagen == null) {
-                throw new IllegalArgumentException(
-                    "La variante “" + variante.getNombre()
-                        + "” necesita un archivo entregable.");
-            }
-            nuevos.add(construirEntregable(
-                producto, variante, AlcanceEntregable.VARIANTE, imagen,
-                varianteRequest.getEntregableNombre(), 0));
+            agregarEntregablesDeVariante(
+                producto, variante, varianteRequest, imagenesPorSha, nuevos);
         }
         entregableRepository.saveAll(nuevos);
+    }
+
+    /**
+     * Resuelve los archivos de una variante. Si el request no trae la lista,
+     * se preselecciona la imagen propia de la variante: publicar un producto
+     * digital cuyo comprador no recibe nada sería un error.
+     */
+    private void agregarEntregablesDeVariante(
+            Producto producto,
+            ProductoVariante variante,
+            ProductoVarianteRequest request,
+            Map<String, ProductoImagen> imagenesPorSha,
+            List<ProductoEntregable> destino) {
+        List<String> seleccion = request.getEntregablesSha256();
+        if (seleccion == null || seleccion.isEmpty()) {
+            seleccion = new ArrayList<>();
+            String propia = hayTexto(variante.getSha256())
+                ? variante.getSha256()
+                : request.getSha256();
+            if (hayTexto(propia)) {
+                seleccion.add(propia);
+            }
+        }
+
+        Set<String> vistos = new LinkedHashSet<>();
+        int orden = 0;
+        for (String sha : seleccion) {
+            if (!hayTexto(sha)) {
+                continue;
+            }
+            String normalizado = sha.trim().toLowerCase(Locale.ROOT);
+            if (!vistos.add(normalizado)) {
+                continue;
+            }
+            ProductoImagen imagen = imagenesPorSha.get(normalizado);
+            if (imagen != null) {
+                destino.add(construirEntregable(
+                    producto, variante, AlcanceEntregable.VARIANTE, imagen,
+                    orden == 0 ? request.getEntregableNombre() : null, orden));
+                orden++;
+                continue;
+            }
+            // La imagen de la variante puede no estar en la galería.
+            if (hayTexto(variante.getClaveArchivoOriginal())
+                    && normalizado.equalsIgnoreCase(variante.getSha256())) {
+                destino.add(entregableDesdeVariante(producto, variante, orden));
+                orden++;
+                continue;
+            }
+            throw new IllegalArgumentException(
+                "Uno de los archivos de la variante “" + variante.getNombre()
+                    + "” no pertenece a la galería del producto.");
+        }
+    }
+
+    private ProductoEntregable entregableDesdeVariante(
+            Producto producto, ProductoVariante variante, int orden) {
+        ProductoEntregable entregable = new ProductoEntregable();
+        entregable.setProducto(producto);
+        entregable.setVariante(variante);
+        entregable.setAlcance(AlcanceEntregable.VARIANTE);
+        entregable.setNombre(nombreArchivo(variante));
+        entregable.setClaveArchivo(variante.getClaveArchivoOriginal());
+        entregable.setSha256(variante.getSha256());
+        entregable.setMime(mimeDe(variante.getClaveArchivoOriginal()));
+        entregable.setTamanoBytes(tamanoSeguro(variante.getClaveArchivoOriginal()));
+        entregable.setOrden(orden);
+        return entregable;
     }
 
     private ProductoEntregable construirEntregable(
