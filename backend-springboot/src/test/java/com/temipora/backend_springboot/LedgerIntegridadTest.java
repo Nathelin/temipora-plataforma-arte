@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -26,6 +27,7 @@ import com.temipora.backend_springboot.modelo.ProductoDTO;
 import com.temipora.backend_springboot.modelo.ProductoImagenRequest;
 import com.temipora.backend_springboot.modelo.ProductoRequest;
 import com.temipora.backend_springboot.modelo.ProductoVarianteRequest;
+import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.TipoEntrega;
 import com.temipora.backend_springboot.modelo.TipoProducto;
 import com.temipora.backend_springboot.modelo.Usuario;
@@ -33,6 +35,7 @@ import com.temipora.backend_springboot.modelo.VarianteLedgerDTO;
 import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
+import com.temipora.backend_springboot.repositorios.RolRepository;
 import com.temipora.backend_springboot.repositorios.TipoProductoRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 import com.temipora.backend_springboot.servicios.LedgerService;
@@ -51,6 +54,7 @@ class LedgerIntegridadTest {
     @Autowired private ProductoService productoService;
     @Autowired private LedgerService ledgerService;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private RolRepository rolRepository;
     @Autowired private TipoProductoRepository tipoProductoRepository;
     @Autowired private MedioRepository medioRepository;
     @Autowired private MonedaService monedaService;
@@ -149,12 +153,7 @@ class LedgerIntegridadTest {
     }
 
     private ProductoDTO crearProductoUnico() {
-        Usuario artista = usuarioRepository.findAll().stream()
-            .filter(usuario -> usuario.getRol() != null
-                && usuario.getRol().getNombre() == ERol.ARTISTA)
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException(
-                "No hay un usuario ARTISTA para la prueba."));
+        Usuario artista = artista();
         TipoProducto tipo = tipoProductoRepository
             .findByActivoTrueOrderByNombreAsc().get(0);
         Medio medio = medioRepository.findByActivoTrueOrderByNombreAsc().stream()
@@ -202,6 +201,36 @@ class LedgerIntegridadTest {
         request.setLicencia(licencia);
 
         return productoService.crear(artista.getIdUsuario(), request);
+    }
+
+    /**
+     * Devuelve un artista existente o crea uno para que la prueba no dependa
+     * de datos sembrados en una base local. El test es transaccional, así que
+     * el usuario creado se revierte al terminar.
+     */
+    private Usuario artista() {
+        return usuarioRepository.findAll().stream()
+            .filter(usuario -> usuario.getRol() != null
+                && usuario.getRol().getNombre() == ERol.ARTISTA)
+            .findFirst()
+            .orElseGet(this::crearArtista);
+    }
+
+    private Usuario crearArtista() {
+        Rol rol = rolRepository.findByNombre(ERol.ARTISTA)
+            .orElseThrow(() -> new IllegalStateException(
+                "No existe el rol ARTISTA."));
+        String nombreUsuario = "artista"
+            + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        Usuario artista = new Usuario();
+        artista.setNombreUsuario(nombreUsuario);
+        artista.setNombreDisplay("Artista Test");
+        artista.setContrasenia("test");
+        artista.setCorreo(nombreUsuario + "@test.local");
+        artista.setFechaCreacion(LocalDateTime.now());
+        artista.setMonedaPreferida(monedaService.predeterminada());
+        artista.setRol(rol);
+        return usuarioRepository.save(artista);
     }
 
     private String shaAleatorio() {

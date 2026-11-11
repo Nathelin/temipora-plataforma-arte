@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -33,6 +34,7 @@ import com.temipora.backend_springboot.modelo.ProductoLedgerDTO;
 import com.temipora.backend_springboot.modelo.ProductoRequest;
 import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
 import com.temipora.backend_springboot.modelo.ProductoVarianteRequest;
+import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.TipoEventoLedger;
 import com.temipora.backend_springboot.modelo.TipoEntrega;
 import com.temipora.backend_springboot.modelo.TipoProducto;
@@ -41,6 +43,7 @@ import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
+import com.temipora.backend_springboot.repositorios.RolRepository;
 import com.temipora.backend_springboot.repositorios.TipoProductoRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteImagenRepository;
@@ -56,6 +59,7 @@ class ProductoIntegracionTest {
     @Autowired private ProductoService productoService;
     @Autowired private LedgerService ledgerService;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private RolRepository rolRepository;
     @Autowired private TipoProductoRepository tipoProductoRepository;
     @Autowired private MedioRepository medioRepository;
     @Autowired private MonedaService monedaService;
@@ -67,12 +71,7 @@ class ProductoIntegracionTest {
 
     @Test
     void crearProductoUnico_persisteVariantesLicenciaYGenesis() {
-        Usuario artista = usuarioRepository.findAll().stream()
-            .filter(usuario -> usuario.getRol() != null
-                && usuario.getRol().getNombre() == ERol.ARTISTA)
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException(
-                "No hay un usuario ARTISTA para la prueba de integración."));
+        Usuario artista = artista();
         TipoProducto tipo = tipoProductoRepository
             .findByActivoTrueOrderByNombreAsc().get(0);
         Medio medio = medioRepository.findByActivoTrueOrderByNombreAsc().get(0);
@@ -183,12 +182,7 @@ class ProductoIntegracionTest {
 
     @Test
     void guardarBorrador_sinPrecioNiImagenes_persisteComoBorrador() {
-        Usuario artista = usuarioRepository.findAll().stream()
-            .filter(usuario -> usuario.getRol() != null
-                && usuario.getRol().getNombre() == ERol.ARTISTA)
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException(
-                "No hay un usuario ARTISTA para la prueba de integración."));
+        Usuario artista = artista();
 
         ProductoVarianteRequest variante = new ProductoVarianteRequest();
         variante.setNombre("Única");
@@ -219,11 +213,7 @@ class ProductoIntegracionTest {
 
     @Test
     void guardarBorrador_dosVeces_noDuplicaLicenciaNiVariantes() {
-        Usuario artista = usuarioRepository.findAll().stream()
-            .filter(usuario -> usuario.getRol() != null
-                && usuario.getRol().getNombre() == ERol.ARTISTA)
-            .findFirst()
-            .orElseThrow();
+        Usuario artista = artista();
 
         ProductoVarianteRequest variante = new ProductoVarianteRequest();
         variante.setNombre("Única");
@@ -260,11 +250,7 @@ class ProductoIntegracionTest {
 
     @Test
     void publicarProducto_cadaVarianteEntregaSuPropiaImagen() {
-        Usuario artista = usuarioRepository.findAll().stream()
-            .filter(usuario -> usuario.getRol() != null
-                && usuario.getRol().getNombre() == ERol.ARTISTA)
-            .findFirst()
-            .orElseThrow();
+        Usuario artista = artista();
 
         TipoProducto tipo = tipoProductoRepository
             .findByActivoTrueOrderByNombreAsc().get(0);
@@ -338,11 +324,7 @@ class ProductoIntegracionTest {
 
     @Test
     void publicarProducto_dosVariantesConLaMismaImagen_lanzaError() {
-        Usuario artista = usuarioRepository.findAll().stream()
-            .filter(usuario -> usuario.getRol() != null
-                && usuario.getRol().getNombre() == ERol.ARTISTA)
-            .findFirst()
-            .orElseThrow();
+        Usuario artista = artista();
 
         TipoProducto tipo = tipoProductoRepository
             .findByActivoTrueOrderByNombreAsc().get(0);
@@ -401,11 +383,7 @@ class ProductoIntegracionTest {
 
     @Test
     void publicarProducto_sinSeleccionDeEntregables_usaLaImagenDeLaVariante() {
-        Usuario artista = usuarioRepository.findAll().stream()
-            .filter(usuario -> usuario.getRol() != null
-                && usuario.getRol().getNombre() == ERol.ARTISTA)
-            .findFirst()
-            .orElseThrow();
+        Usuario artista = artista();
 
         TipoProducto tipo = tipoProductoRepository
             .findByActivoTrueOrderByNombreAsc().get(0);
@@ -462,11 +440,7 @@ class ProductoIntegracionTest {
 
     @Test
     void modificarProducto_reemplazaEntregablesSinChocarConElIndiceUnico() {
-        Usuario artista = usuarioRepository.findAll().stream()
-            .filter(usuario -> usuario.getRol() != null
-                && usuario.getRol().getNombre() == ERol.ARTISTA)
-            .findFirst()
-            .orElseThrow();
+        Usuario artista = artista();
 
         TipoProducto tipo = tipoProductoRepository
             .findByActivoTrueOrderByNombreAsc().get(0);
@@ -554,11 +528,7 @@ class ProductoIntegracionTest {
 
     @Test
     void cambiarImagenDeVarianteConStock_abreVersionEnElHistorial() {
-        Usuario artista = usuarioRepository.findAll().stream()
-            .filter(usuario -> usuario.getRol() != null
-                && usuario.getRol().getNombre() == ERol.ARTISTA)
-            .findFirst()
-            .orElseThrow();
+        Usuario artista = artista();
         TipoProducto tipo = tipoProductoRepository
             .findByActivoTrueOrderByNombreAsc().get(0);
         Medio medio = medioRepository.findByActivoTrueOrderByNombreAsc().stream()
@@ -691,11 +661,7 @@ class ProductoIntegracionTest {
     }
 
     private ProductoDTO crearBorradorSimple() {
-        Usuario artista = usuarioRepository.findAll().stream()
-            .filter(usuario -> usuario.getRol() != null
-                && usuario.getRol().getNombre() == ERol.ARTISTA)
-            .findFirst()
-            .orElseThrow();
+        Usuario artista = artista();
         String sha = shaAleatorio();
         ProductoImagenRequest imagen = new ProductoImagenRequest();
         imagen.setUrl("/uploads/borrador-" + UUID.randomUUID() + ".webp");
@@ -716,11 +682,7 @@ class ProductoIntegracionTest {
     }
 
     private ProductoDTO crearProductoSimple(String titulo) {
-        Usuario artista = usuarioRepository.findAll().stream()
-            .filter(usuario -> usuario.getRol() != null
-                && usuario.getRol().getNombre() == ERol.ARTISTA)
-            .findFirst()
-            .orElseThrow();
+        Usuario artista = artista();
         TipoProducto tipo = tipoProductoRepository
             .findByActivoTrueOrderByNombreAsc().get(0);
         Medio medio = medioRepository.findByActivoTrueOrderByNombreAsc().stream()
@@ -766,6 +728,36 @@ class ProductoIntegracionTest {
         request.setContenidosSensibles(Set.of());
         request.setLicencia(licencia);
         return productoService.crear(artista.getIdUsuario(), request);
+    }
+
+    /**
+     * Devuelve un artista existente o crea uno para que la prueba no dependa
+     * de datos sembrados en una base local. El test es transaccional, así que
+     * el usuario creado se revierte al terminar.
+     */
+    private Usuario artista() {
+        return usuarioRepository.findAll().stream()
+            .filter(usuario -> usuario.getRol() != null
+                && usuario.getRol().getNombre() == ERol.ARTISTA)
+            .findFirst()
+            .orElseGet(this::crearArtista);
+    }
+
+    private Usuario crearArtista() {
+        Rol rol = rolRepository.findByNombre(ERol.ARTISTA)
+            .orElseThrow(() -> new IllegalStateException(
+                "No existe el rol ARTISTA."));
+        String nombreUsuario = "artista"
+            + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        Usuario artista = new Usuario();
+        artista.setNombreUsuario(nombreUsuario);
+        artista.setNombreDisplay("Artista Test");
+        artista.setContrasenia("test");
+        artista.setCorreo(nombreUsuario + "@test.local");
+        artista.setFechaCreacion(LocalDateTime.now());
+        artista.setMonedaPreferida(monedaService.predeterminada());
+        artista.setRol(rol);
+        return usuarioRepository.save(artista);
     }
 
     private String shaAleatorio() {
