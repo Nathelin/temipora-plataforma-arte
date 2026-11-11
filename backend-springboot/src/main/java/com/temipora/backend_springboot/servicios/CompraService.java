@@ -265,6 +265,10 @@ public class CompraService {
             Moneda ars,
             BigDecimal porcentaje,
             LocalDateTime ahora) {
+        if (item.getCantidad() != 1) {
+            throw new ConflictoException(
+                "Por ahora cada producto se compra de a una unidad.");
+        }
         ProductoVariante variante = varianteRepository
             .findByIdVarianteForUpdate(item.getVariante().getIdVariante())
             .orElseThrow(() -> new NoSuchElementException(

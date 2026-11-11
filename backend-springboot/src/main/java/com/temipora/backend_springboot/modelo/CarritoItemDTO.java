@@ -27,6 +27,8 @@ public class CarritoItemDTO {
     private BigDecimal precioCobro;
     private String monedaCobro;
     private Integer cantidad;
+    private boolean cantidadEditable;
+    private String motivoCantidadFija;
     private Integer stockDisponible;
     private boolean esUnica;
     private TipoEntrega tipoEntrega;

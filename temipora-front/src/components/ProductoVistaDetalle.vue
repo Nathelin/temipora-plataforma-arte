@@ -23,6 +23,7 @@ const props = defineProps({
   modo: { type: String, default: 'publico' },
   disponibilidad: { type: String, default: '' },
   precioDesde: { type: String, default: '—' },
+  idsEnCarrito: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits([
@@ -47,6 +48,9 @@ const abrirInfoArriba = ref(false)
 const contenedorInfoLedger = ref(null)
 const tooltipLedger = ref(null)
 
+const idsCarrito = computed(
+  () => new Set((props.idsEnCarrito || []).map((id) => Number(id))),
+)
 const esSensible = computed(() => !!props.producto?.contenidoSensible)
 const requiereAdvertencia = computed(() => esSensible.value && !revelado.value)
 const tiposSensibles = computed(() =>
@@ -136,8 +140,12 @@ function varianteDisponible(variante) {
     && (stock === null || stock === undefined || Number(stock) > 0)
 }
 
+function varianteEnCarrito(variante) {
+  return idsCarrito.value.has(Number(variante?.idVariante))
+}
+
 function agregarVariante(variante) {
-  if (!varianteDisponible(variante)) return
+  if (!varianteDisponible(variante) || varianteEnCarrito(variante)) return
   emit('agregar-carrito', variante)
 }
 
@@ -353,10 +361,12 @@ watch(
                 v-if="!esPrevia"
                 type="button"
                 class="rounded-lg bg-coral px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rojizo disabled:cursor-not-allowed disabled:opacity-50"
-                :disabled="!varianteDisponible(variante)"
+                :disabled="!varianteDisponible(variante) || varianteEnCarrito(variante)"
                 @click.stop="agregarVariante(variante)"
               >
-                {{ varianteDisponible(variante) ? 'Agregar' : 'Sin stock' }}
+                {{ varianteEnCarrito(variante)
+                  ? 'En el carrito'
+                  : (varianteDisponible(variante) ? 'Agregar' : 'Sin stock') }}
               </button>
             </div>
           </article>

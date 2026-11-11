@@ -35,7 +35,14 @@ const paginaLedger = ref(1)
 const esFavorito = ref(false)
 const actualizandoFavorito = ref(false)
 
-const { cantidad: cantidadCarrito, agregar: agregarAlCarritoStore } = useCarrito()
+const {
+  cantidad: cantidadCarrito,
+  items: itemsCarrito,
+  agregar: agregarAlCarritoStore,
+} = useCarrito()
+const idsEnCarrito = computed(
+  () => (itemsCarrito.value || []).map((item) => item.idVariante),
+)
 const { exito, error: toastError } = useNotificaciones()
 
 async function agregarAlCarrito(variante) {
@@ -221,6 +228,7 @@ onMounted(cargar)
           :total-ledger="totalLedger"
           :disponibilidad="disponibilidad"
           :precio-desde="precioMostrado"
+          :ids-en-carrito="idsEnCarrito"
           @cambiar-pagina-variantes="cambiarPaginaVariantes"
           @cambiar-pagina-ledger="cambiarPaginaLedger"
           @agregar-carrito="agregarAlCarrito"

@@ -190,12 +190,15 @@ onMounted(cargar)
                 <p v-if="!item.disponible" class="mt-1 text-xs text-rojizo">
                   {{ item.motivoNoDisponible }}
                 </p>
-                <div class="mt-2 flex items-center gap-3">
-                  <div class="inline-flex items-center rounded-lg border border-rosa/70">
+                <div class="mt-2 flex flex-wrap items-center gap-3">
+                  <div
+                    v-if="item.cantidadEditable"
+                    class="inline-flex items-center rounded-lg border border-rosa/70"
+                  >
                     <button
                       type="button"
                       class="px-2.5 py-1 text-sm text-granate transition hover:bg-rosa/20 disabled:opacity-40"
-                      :disabled="item.esUnica || item.cantidad <= 1"
+                      :disabled="item.cantidad <= 1"
                       @click="cambiarCantidad(item, -1)"
                     >
                       −
@@ -206,12 +209,17 @@ onMounted(cargar)
                     <button
                       type="button"
                       class="px-2.5 py-1 text-sm text-granate transition hover:bg-rosa/20 disabled:opacity-40"
-                      :disabled="item.esUnica"
                       @click="cambiarCantidad(item, 1)"
                     >
                       +
                     </button>
                   </div>
+                  <p v-else class="text-xs text-cafe/55">
+                    {{ item.cantidad }} unidad
+                    <span v-if="item.motivoCantidadFija" class="text-cafe/40">
+                      · {{ item.motivoCantidadFija }}
+                    </span>
+                  </p>
                   <button
                     type="button"
                     class="text-xs font-medium text-cafe/55 transition hover:text-rojizo"

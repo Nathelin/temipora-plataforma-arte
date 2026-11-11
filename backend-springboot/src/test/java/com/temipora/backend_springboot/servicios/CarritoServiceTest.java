@@ -190,7 +190,7 @@ class CarritoServiceTest {
             .thenReturn(Optional.of(item));
 
         assertThatThrownBy(() -> service.actualizar("cliente", 5L, 2))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(ConflictoException.class)
             .hasMessageContaining("una unidad");
     }
 
@@ -215,8 +215,8 @@ class CarritoServiceTest {
         when(carritoRepository.save(any(Carrito.class))).thenAnswer(inv -> inv.getArgument(0));
         stubsDeCalculo();
 
-        CarritoDTO actualizado = service.actualizar("cliente", 5L, 3);
-        assertThat(actualizado.getCantidadItems()).isEqualTo(3);
+        CarritoDTO actualizado = service.actualizar("cliente", 5L, 1);
+        assertThat(actualizado.getCantidadItems()).isEqualTo(1);
 
         CarritoDTO quitado = service.quitar("cliente", 5L);
         assertThat(quitado.getCantidadItems()).isZero();

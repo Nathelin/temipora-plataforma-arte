@@ -96,12 +96,9 @@ public class CarritoService {
         validarComprable(producto, variante, usuario);
 
         int cantidad = request.getCantidad() != null ? request.getCantidad() : 1;
-        if (cantidad < 1) {
-            throw new IllegalArgumentException("La cantidad debe ser al menos 1.");
-        }
-        if (variante.esUnica() && cantidad != 1) {
+        if (cantidad != 1) {
             throw new IllegalArgumentException(
-                "Una pieza única solo se puede comprar de a una unidad.");
+                "Por ahora cada producto se agrega de a una unidad.");
         }
         validarStock(variante, cantidad);
 
@@ -112,20 +109,14 @@ public class CarritoService {
             .findByCarritoIdCarritoAndVarianteIdVariante(
                 carrito.getIdCarrito(), variante.getIdVariante())
             .orElse(null);
-        if (item == null) {
-            item = new CarritoItem();
-            item.setVariante(variante);
-            item.setCantidad(cantidad);
-            carrito.agregarItem(item);
-        } else {
-            if (variante.esUnica()) {
-                throw new ConflictoException(
-                    "Esa pieza única ya está en tu carrito.");
-            }
-            int nueva = item.getCantidad() + cantidad;
-            validarStock(variante, nueva);
-            item.setCantidad(nueva);
+        if (item != null) {
+            throw new ConflictoException(
+                "Ese producto ya está en tu carrito.");
         }
+        item = new CarritoItem();
+        item.setVariante(variante);
+        item.setCantidad(1);
+        carrito.agregarItem(item);
         carrito.setFechaActualizacion(LocalDateTime.now());
         carritoRepository.save(carrito);
         return aDTO(carrito);
@@ -140,15 +131,12 @@ public class CarritoService {
             .findByIdCarritoItemAndCarritoIdCarrito(idItem, carrito.getIdCarrito())
             .orElseThrow(() -> new NoSuchElementException(
                 "Ítem de carrito no encontrado: " + idItem));
-        if (cantidad == null || cantidad < 1) {
-            throw new IllegalArgumentException("La cantidad debe ser al menos 1.");
+        if (cantidad == null || cantidad != 1) {
+            throw new ConflictoException(
+                "Por ahora cada producto se agrega de a una unidad.");
         }
-        if (item.getVariante().esUnica() && cantidad != 1) {
-            throw new IllegalArgumentException(
-                "Una pieza única solo se puede comprar de a una unidad.");
-        }
-        validarStock(item.getVariante(), cantidad);
-        item.setCantidad(cantidad);
+        validarStock(item.getVariante(), 1);
+        item.setCantidad(1);
         carrito.setFechaActualizacion(LocalDateTime.now());
         carritoRepository.save(carrito);
         return aDTO(carrito);
@@ -367,6 +355,9 @@ public class CarritoService {
             .precioCobro(precioCobro)
             .monedaCobro(ARS)
             .cantidad(item.getCantidad())
+            .cantidadEditable(false)
+            .motivoCantidadFija(
+                "Por ahora cada producto se agrega de a una unidad.")
             .stockDisponible(variante.getStockDisponible())
             .esUnica(variante.esUnica())
             .tipoEntrega(producto.getMedio() != null

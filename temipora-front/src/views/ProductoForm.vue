@@ -114,7 +114,7 @@ const pasoActual = computed(
   () => PASOS.find((p) => p.n === paso.value) || PASOS[0],
 )
 const indicePaso = computed(
-  () => PASOS_VISIBLES.value.findIndex((p) => p.n === paso.value) + 1,
+  () => PASOS_VISIBLES.findIndex((p) => p.n === paso.value) + 1,
 )
 const monedaSeleccionada = computed(
   () => monedas.value.find((m) => String(m.idMoneda) === form.value.idMoneda) || null,
@@ -658,7 +658,7 @@ function irAlPrincipio() {
 
 function siguiente() {
   if (!validarPasoActual()) return
-  const orden = PASOS_VISIBLES.value.map((p) => p.n)
+  const orden = PASOS_VISIBLES.map((p) => p.n)
   const actual = orden.indexOf(paso.value)
   if (actual >= 0 && actual < orden.length - 1) {
     paso.value = orden[actual + 1]
@@ -669,7 +669,7 @@ function siguiente() {
 function anterior() {
   errores.value = []
   limpiarErroresCampos()
-  const orden = PASOS_VISIBLES.value.map((p) => p.n)
+  const orden = PASOS_VISIBLES.map((p) => p.n)
   const actual = orden.indexOf(paso.value)
   if (actual > 0) {
     paso.value = orden[actual - 1]
