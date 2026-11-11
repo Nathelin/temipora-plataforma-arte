@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.temipora.backend_springboot.modelo.CompraDTO;
+import com.temipora.backend_springboot.modelo.CompraLedgerDTO;
 import com.temipora.backend_springboot.modelo.CompraResumenDTO;
 import com.temipora.backend_springboot.modelo.ContadoresComprasDTO;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
@@ -45,5 +46,14 @@ public class CompraController {
             @PathVariable Long idCompra,
             Authentication authentication) {
         return compraService.obtener(authentication.getName(), idCompra);
+    }
+
+    @GetMapping("/{idCompra}/items/{idItem}/ledger")
+    public CompraLedgerDTO ledgerItem(
+            @PathVariable Long idCompra,
+            @PathVariable Long idItem,
+            Authentication authentication) {
+        return compraService.ledgerItem(
+            authentication.getName(), idCompra, idItem);
     }
 }

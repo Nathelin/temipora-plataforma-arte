@@ -20,9 +20,6 @@ const totalProductos = computed(() => Number(
   props.compra.cantidadProductos || props.compra.cantidadItems || 0,
 ))
 const extra = computed(() => Math.max(0, totalProductos.value - previews.value.length))
-const descarga = computed(
-  () => previews.value.find((preview) => preview.puedeDescargar) || null,
-)
 const fecha = computed(() => {
   const valor = props.compra.fechaCreacion
   if (!valor) return '—'
@@ -109,13 +106,13 @@ const fecha = computed(() => {
       </p>
       <div class="flex flex-wrap items-center gap-2">
         <button
-          v-if="descarga"
+          v-if="compra.puedeDescargar"
           type="button"
           class="inline-flex min-h-8 items-center gap-1 rounded-full border border-rosa bg-blanco px-3 text-xs font-semibold text-granate transition hover:bg-rosa/20 disabled:opacity-50"
-          :disabled="descargando === descarga.idCompraItem"
-          @click="$emit('descargar', descarga)"
+          :disabled="descargando === compra.idCompra"
+          @click="$emit('descargar')"
         >
-          {{ descargando === descarga.idCompraItem ? 'Descargando...' : 'Descargar' }}
+          {{ descargando === compra.idCompra ? 'Preparando...' : 'Descargar' }}
         </button>
         <router-link
           :to="detalle"

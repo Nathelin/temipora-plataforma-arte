@@ -21,11 +21,11 @@ public class CompraDTO {
     private Long idCompra;
     private EstadoCompra estado;
     private BigDecimal subtotal;
-    private BigDecimal comisionTotal;
     private BigDecimal total;
     private String moneda;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaActualizacion;
+    private boolean puedeDescargar;
     @Builder.Default
     private List<CompraGrupoDTO> grupos = new ArrayList<>();
 }

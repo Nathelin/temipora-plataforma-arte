@@ -23,8 +23,6 @@ public class CompraGrupoDTO {
     private String nombreArtista;
     private String urlFotoArtista;
     private BigDecimal subtotal;
-    private BigDecimal comision;
-    private BigDecimal netoArtista;
     private String moneda;
     private EstadoCompraGrupo estado;
     private LocalDateTime fechaPago;

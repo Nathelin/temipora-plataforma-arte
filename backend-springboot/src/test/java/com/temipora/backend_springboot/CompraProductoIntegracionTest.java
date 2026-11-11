@@ -153,6 +153,20 @@ class CompraProductoIntegracionTest {
         assertThat(itemDto.isTieneLedger()).isTrue();
         assertThat(itemDto.getPrecioTotalCobro()).isEqualByComparingTo("150.00");
 
+        var ledgerCompra = compraService.ledgerItem(
+            cliente.getNombreUsuario(),
+            compra.getIdCompra(),
+            itemDto.getIdCompraItem());
+        assertThat(ledgerCompra.isIntegridad()).isTrue();
+        assertThat(ledgerCompra.getEventos()).hasSizeGreaterThanOrEqualTo(2);
+        assertThat(ledgerCompra.getEventos())
+            .anyMatch(evento -> evento.isEsEventoDeEstaCompra()
+                && evento.getMonto() != null
+                && evento.getMonto().compareTo(new BigDecimal("150.00")) == 0);
+        assertThat(ledgerCompra.getEventos())
+            .anyMatch(evento -> !evento.isEsEventoDeEstaCompra()
+                && evento.getMonto() == null);
+
         PaginaDTO<CompraResumenDTO> pagina = compraService.listar(
             cliente.getNombreUsuario(), 0, 10);
         assertThat(pagina.getContenido()).isNotEmpty();
@@ -301,7 +315,7 @@ class CompraProductoIntegracionTest {
     }
 
     @Test
-    void compraFisica_pagoSimulado_marcaEntregadoSinDescarga() {
+    void compraFisica_pagoSimulado_permiteDescargarLaImagen() {
         Usuario artista = crearUsuario(ERol.ARTISTA);
         Usuario cliente = crearUsuario(ERol.CLIENTE);
         ProductoDTO producto = crearProducto(artista, TipoEntrega.FISICA);
@@ -320,8 +334,9 @@ class CompraProductoIntegracionTest {
         CompraItemDTO item = pagada.getGrupos().get(0).getItems().get(0);
         assertThat(item.getTipoEntrega()).isEqualTo(TipoEntrega.FISICA);
         assertThat(item.getEstadoEntrega()).isEqualTo(EstadoEntregaItem.ENTREGADO);
-        assertThat(item.isPuedeDescargar()).isFalse();
-        assertThat(item.getMotivoNoDescarga()).contains("coordina");
+        assertThat(item.isPuedeDescargar()).isTrue();
+        assertThat(item.getMotivoNoDescarga()).isNull();
+        assertThat(item.getImagenUrl()).isNotBlank();
     }
 
     private void agregar(Usuario cliente, ProductoDTO producto) {

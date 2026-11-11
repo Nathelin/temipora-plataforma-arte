@@ -13,12 +13,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Duration;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import javax.imageio.ImageIO;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.core.io.Resource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -167,6 +169,42 @@ class LocalStorageServiceTest {
         assertThat(svc.eliminar("/uploads/nota.txt")).isFalse();
         assertThat(svc.eliminar("/uploads/../" + guardado.getFileName())).isFalse();
         assertThat(Files.exists(guardado)).isTrue();
+    }
+
+    // ---------------------------------------------------------------
+    // abrir
+    // ---------------------------------------------------------------
+
+    @Test
+    void abrir_devuelveLaImagenPublicaValida() throws IOException {
+        String nombre = UUID.randomUUID() + ".webp";
+        Files.writeString(directorio.resolve(nombre), "imagen",
+            StandardCharsets.UTF_8);
+
+        Resource recurso = servicio().abrir("/uploads/" + nombre);
+
+        assertThat(recurso.exists()).isTrue();
+        assertThat(recurso.getContentAsString(StandardCharsets.UTF_8))
+            .isEqualTo("imagen");
+    }
+
+    @Test
+    void abrir_rechazaNombresInvalidosYTraversal() {
+        assertThatThrownBy(() -> servicio().abrir("/uploads/otro.webp"))
+            .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> servicio().abrir(
+            "/uploads/../" + UUID.randomUUID() + ".webp"))
+            .isInstanceOf(NoSuchElementException.class);
+        assertThatThrownBy(() -> servicio().abrir(null))
+            .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    void abrir_archivoInexistente_lanzaError() {
+        String nombre = UUID.randomUUID() + ".webp";
+
+        assertThatThrownBy(() -> servicio().abrir("/uploads/" + nombre))
+            .isInstanceOf(NoSuchElementException.class);
     }
 
     // ---------------------------------------------------------------

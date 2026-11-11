@@ -10,8 +10,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -29,6 +31,7 @@ import com.temipora.backend_springboot.modelo.CompraGrupo;
 import com.temipora.backend_springboot.modelo.CompraGrupoDTO;
 import com.temipora.backend_springboot.modelo.CompraItem;
 import com.temipora.backend_springboot.modelo.CompraItemDTO;
+import com.temipora.backend_springboot.modelo.CompraLedgerDTO;
 import com.temipora.backend_springboot.modelo.CompraPreviewDTO;
 import com.temipora.backend_springboot.modelo.CompraResumenDTO;
 import com.temipora.backend_springboot.modelo.ContadoresComprasDTO;
@@ -40,6 +43,9 @@ import com.temipora.backend_springboot.modelo.EstadoCuentaPago;
 import com.temipora.backend_springboot.modelo.EstadoEntregaItem;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
 import com.temipora.backend_springboot.modelo.EstadoReserva;
+import com.temipora.backend_springboot.modelo.EventoLedger;
+import com.temipora.backend_springboot.modelo.EventoLedgerCompraDTO;
+import com.temipora.backend_springboot.modelo.EventoLedgerDTO;
 import com.temipora.backend_springboot.modelo.LicenciaProducto;
 import com.temipora.backend_springboot.modelo.LicenciaCompraDTO;
 import com.temipora.backend_springboot.modelo.LicenciaProductoDerecho;
@@ -51,6 +57,7 @@ import com.temipora.backend_springboot.modelo.ProductoVariante;
 import com.temipora.backend_springboot.modelo.ReservaStock;
 import com.temipora.backend_springboot.modelo.TipoEntrega;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.modelo.VarianteLedgerDTO;
 import com.temipora.backend_springboot.repositorios.CarritoRepository;
 import com.temipora.backend_springboot.repositorios.CompraRepository;
 import com.temipora.backend_springboot.repositorios.CuentaPagoUsuarioRepository;
@@ -87,6 +94,7 @@ public class CompraService {
     private final ComisionService comisionService;
     private final ProductoVarianteImagenRepository varianteImagenRepository;
     private final EventoLedgerRepository eventoLedgerRepository;
+    private final LedgerService ledgerService;
     private final String proveedorPago;
     private final int reservaMinutos;
 
@@ -102,6 +110,7 @@ public class CompraService {
             ComisionService comisionService,
             ProductoVarianteImagenRepository varianteImagenRepository,
             EventoLedgerRepository eventoLedgerRepository,
+            LedgerService ledgerService,
             @Value("${pagos.proveedor:simulado}") String proveedorPago,
             @Value("${compra.reserva-minutos:30}") int reservaMinutos) {
         this.compraRepository = compraRepository;
@@ -115,6 +124,7 @@ public class CompraService {
         this.comisionService = comisionService;
         this.varianteImagenRepository = varianteImagenRepository;
         this.eventoLedgerRepository = eventoLedgerRepository;
+        this.ledgerService = ledgerService;
         this.proveedorPago = proveedorPago;
         this.reservaMinutos = reservaMinutos;
     }
@@ -288,6 +298,88 @@ public class CompraService {
             .pendientes(pendientes)
             .pagadas(pagadas)
             .archivo(archivo)
+            .build();
+    }
+
+    @Transactional(readOnly = true)
+    public CompraLedgerDTO ledgerItem(
+            String nombreUsuario, Long idCompra, Long idItem) {
+        Usuario cliente = usuarioService.getByNombreUsuario(nombreUsuario);
+        Compra compra = compraRepository
+            .findByIdCompraAndClienteIdUsuario(idCompra, cliente.getIdUsuario())
+            .orElseThrow(() -> new NoSuchElementException(
+                "Compra no encontrada: " + idCompra));
+        CompraItem item = compra.getGrupos().stream()
+            .flatMap(grupo -> grupo.getItems().stream())
+            .filter(candidato -> Objects.equals(
+                candidato.getIdCompraItem(), idItem))
+            .findFirst()
+            .orElseThrow(() -> new NoSuchElementException(
+                "Ítem no encontrado: " + idItem));
+
+        if (item.getVariante() == null
+                || item.getVariante().getIdVariante() == null) {
+            throw new NoSuchElementException(
+                "Este ítem no tiene historial de procedencia.");
+        }
+
+        VarianteLedgerDTO verificacion =
+            ledgerService.verificarVariante(item.getVariante());
+        Map<Long, Boolean> verificados = verificacion.getEventos().stream()
+            .collect(Collectors.toMap(
+                EventoLedgerDTO::getIdEventoLedger,
+                EventoLedgerDTO::isVerificado,
+                (anterior, actual) -> anterior));
+
+        List<EventoLedger> eventos = eventoLedgerRepository
+            .findByVarianteIdVarianteOrderBySecuenciaAsc(
+                item.getVariante().getIdVariante());
+        List<EventoLedgerCompraDTO> dtos = eventos.stream()
+            .map(evento -> {
+                boolean esEsta = Objects.equals(
+                    evento.getIdCompraItem(), item.getIdCompraItem());
+                Usuario origen = evento.getActorOrigen();
+                Usuario destino = evento.getActorDestino();
+                return EventoLedgerCompraDTO.builder()
+                    .idEventoLedger(evento.getIdEventoLedger())
+                    .secuencia(evento.getSecuencia())
+                    .tipo(evento.getTipo())
+                    .ocurridoEn(evento.getOcurridoEn())
+                    .idCompraItem(evento.getIdCompraItem())
+                    .idActorOrigen(origen != null
+                        ? origen.getIdUsuario() : null)
+                    .nombreOrigen(origen != null
+                        ? origen.getNombreUsuario() : null)
+                    .idActorDestino(destino != null
+                        ? destino.getIdUsuario() : null)
+                    .nombreDestino(destino != null
+                        ? destino.getNombreUsuario() : null)
+                    .monto(esEsta ? evento.getMonto() : null)
+                    .moneda(esEsta && evento.getMoneda() != null
+                        ? evento.getMoneda().getCodigo() : null)
+                    .hashPrevio(evento.getHashPrevio())
+                    .hashEvento(evento.getHashEvento())
+                    .hashDatos(evento.getHashDatos())
+                    .hashImagen(evento.getHashImagen())
+                    .versionHash(evento.getVersionHash())
+                    .verificado(verificados.getOrDefault(
+                        evento.getIdEventoLedger(), false))
+                    .esEventoDeEstaCompra(esEsta)
+                    .build();
+            })
+            .toList();
+
+        return CompraLedgerDTO.builder()
+            .idCompra(idCompra)
+            .idCompraItem(item.getIdCompraItem())
+            .idProducto(item.getProducto() != null
+                ? item.getProducto().getIdProducto() : null)
+            .idVariante(item.getVariante().getIdVariante())
+            .nombreVariante(item.getNombreVariante())
+            .tieneLedger(verificacion.isTieneLedger())
+            .integridad(verificacion.isIntegridad())
+            .mensaje(verificacion.getMensaje())
+            .eventos(dtos)
             .build();
     }
 
@@ -537,12 +629,14 @@ public class CompraService {
             .idCompra(compra.getIdCompra())
             .estado(compra.getEstado())
             .subtotal(compra.getSubtotal())
-            .comisionTotal(compra.getComisionTotal())
             .total(compra.getTotal())
             .moneda(compra.getMoneda() != null
                 ? compra.getMoneda().getCodigo() : ARS)
             .fechaCreacion(compra.getFechaCreacion())
             .fechaActualizacion(compra.getFechaActualizacion())
+            .puedeDescargar(compra.getGrupos().stream()
+                .flatMap(grupo -> grupo.getItems().stream())
+                .anyMatch(this::puedeDescargar))
             .grupos(grupos)
             .build();
     }
@@ -572,8 +666,6 @@ public class CompraService {
             .nombreArtista(artista != null ? artista.getNombreUsuario() : null)
             .urlFotoArtista(artista != null ? fotoArtista(artista) : null)
             .subtotal(grupo.getSubtotal())
-            .comision(grupo.getComision())
-            .netoArtista(grupo.getNetoArtista())
             .moneda(grupo.getMoneda() != null
                 ? grupo.getMoneda().getCodigo() : ARS)
             .estado(grupo.getEstado())
@@ -607,7 +699,6 @@ public class CompraService {
                 ? item.getMonedaOriginal().getCodigo() : null)
             .precioCobro(item.getPrecioCobro())
             .precioTotalCobro(totalCobro)
-            .comisionMonto(item.getComisionMonto())
             .estadoEntrega(item.getEstadoEntrega())
             .puedeDescargar(descargable)
             .motivoNoDescarga(motivoNoDescarga(item))
@@ -628,25 +719,31 @@ public class CompraService {
     }
 
     private boolean puedeDescargar(CompraItem item) {
-        boolean digital = item.getTipoEntrega() == TipoEntrega.DIGITAL;
-        boolean entregado = item.getEstadoEntrega() == EstadoEntregaItem.ENTREGADO;
-        boolean tieneArchivo = item.getVariante() != null
-            && item.getVariante().getClaveArchivoOriginal() != null
-            && !item.getVariante().getClaveArchivoOriginal().isBlank();
-        return digital && entregado && tieneArchivo;
+        if (item.getEstadoEntrega() != EstadoEntregaItem.ENTREGADO) {
+            return false;
+        }
+        if (item.getTipoEntrega() == TipoEntrega.DIGITAL) {
+            return item.getVariante() != null
+                && item.getVariante().getClaveArchivoOriginal() != null
+                && !item.getVariante().getClaveArchivoOriginal().isBlank();
+        }
+        return imagenItem(item) != null;
     }
 
     private String motivoNoDescarga(CompraItem item) {
-        if (item.getTipoEntrega() != TipoEntrega.DIGITAL) {
-            return "La entrega de esta pieza se coordina con el artista.";
-        }
         if (item.getEstadoEntrega() != EstadoEntregaItem.ENTREGADO) {
             return "El archivo se habilita cuando se acredita el pago.";
         }
-        if (item.getVariante() == null
-                || item.getVariante().getClaveArchivoOriginal() == null
-                || item.getVariante().getClaveArchivoOriginal().isBlank()) {
-            return "El archivo original no está disponible.";
+        if (item.getTipoEntrega() == TipoEntrega.DIGITAL) {
+            if (item.getVariante() == null
+                    || item.getVariante().getClaveArchivoOriginal() == null
+                    || item.getVariante().getClaveArchivoOriginal().isBlank()) {
+                return "El archivo original no está disponible.";
+            }
+            return null;
+        }
+        if (imagenItem(item) == null) {
+            return "La imagen de la pieza no está disponible.";
         }
         return null;
     }

@@ -13,7 +13,7 @@ import com.temipora.backend_springboot.modelo.FiltroProductoRequest;
 import com.temipora.backend_springboot.modelo.OrdenProducto;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.ProductoCatalogoDTO;
-import com.temipora.backend_springboot.modelo.ProductoLedgerDTO;
+import com.temipora.backend_springboot.modelo.ProductoLedgerPublicoDTO;
 import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
 import com.temipora.backend_springboot.servicios.ProductoCatalogoService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
@@ -112,7 +112,7 @@ public class ProductoPublicoController {
     }
 
     @GetMapping("/{idProducto}/ledger")
-    public ProductoLedgerDTO ledger(
+    public ProductoLedgerPublicoDTO ledger(
             @PathVariable Long idProducto,
             @RequestParam(defaultValue = "1") int pagina,
             @RequestParam(defaultValue = "4") int tamano) {

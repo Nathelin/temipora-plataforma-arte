@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { acceptImagenes, validarImagen } from '../servicios/archivos'
 import { formatearPrecio } from '../servicios/moneda'
 import { subirImagenProducto } from '../servicios/productos'
+import { calcularLiquidacionProducto } from '../servicios/liquidacion'
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
@@ -11,9 +12,11 @@ const props = defineProps({
   imagenPortada: { type: String, default: '' },
   imagenesGaleria: { type: Array, default: () => [] },
   erroresVariantes: { type: Object, default: () => ({}) },
+  comisionPorcentaje: { type: Number, default: null },
+  arancelPorcentaje: { type: Number, default: null },
 })
 
-const emit = defineEmits(['update:modelValue', 'agregar-imagen'])
+const emit = defineEmits(['update:modelValue', 'agregar-imagen', 'ver-calculo'])
 
 const MODOS_STOCK = [
   { valor: 'ILIMITADO', texto: 'Ilimitado' },
@@ -34,6 +37,17 @@ const ayudaAbierta = ref(false)
 
 const variantes = computed(() => props.modelValue)
 const esPresentacionUnica = computed(() => variantes.value.length === 1)
+const recibisDe = (variante) => {
+  if (props.comisionPorcentaje == null || props.arancelPorcentaje == null) return null
+  return calcularLiquidacionProducto({
+    precio: variante?.precio,
+    comisionPorcentaje: props.comisionPorcentaje,
+    arancelPorcentaje: props.arancelPorcentaje,
+  })
+}
+const indiceConLiquidacion = computed(
+  () => variantes.value.findIndex((variante) => recibisDe(variante)),
+)
 const hayMasImagenes = computed(() => props.imagenesGaleria.length > 3)
 const imagenesAsignables = computed(
   () => Math.max(0, props.imagenesGaleria.length - 1),
@@ -607,6 +621,19 @@ onBeforeUnmount(() => {
               <p v-if="erroresVariantes[0]?.precio" class="mt-1 text-xs font-medium text-rojizo">
                 {{ erroresVariantes[0].precio }}
               </p>
+              <p
+                v-if="recibisDe(variantes[0])"
+                class="mt-1 text-[11px] text-cafe/50"
+              >
+                Recibís ≈ {{ formatearPrecio(recibisDe(variantes[0]).recibis, moneda) }}
+                <button
+                  type="button"
+                  class="ml-1 font-semibold text-coral underline-offset-2 transition hover:text-rojizo hover:underline"
+                  @click="emit('ver-calculo')"
+                >
+                  ¿Cómo se calcula?
+                </button>
+              </p>
             </div>
 
             <div>
@@ -759,6 +786,20 @@ onBeforeUnmount(() => {
               </div>
               <p v-if="erroresVariantes[indice]?.precio" class="mt-1 text-xs font-medium text-rojizo">
                 {{ erroresVariantes[indice].precio }}
+              </p>
+              <p
+                v-if="recibisDe(variante)"
+                class="mt-1 text-[11px] text-cafe/50"
+              >
+                Recibís ≈ {{ formatearPrecio(recibisDe(variante).recibis, moneda) }}
+                <button
+                  v-if="indice === indiceConLiquidacion"
+                  type="button"
+                  class="ml-1 font-semibold text-coral underline-offset-2 transition hover:text-rojizo hover:underline"
+                  @click="emit('ver-calculo')"
+                >
+                  ¿Cómo se calcula?
+                </button>
               </p>
             </div>
           </div>

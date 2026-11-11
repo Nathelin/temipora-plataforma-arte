@@ -21,7 +21,6 @@ public class CarritoDTO {
     @Builder.Default
     private List<CarritoGrupoDTO> grupos = new ArrayList<>();
     private BigDecimal subtotal;
-    private BigDecimal comisionTotal;
     private BigDecimal total;
     private String moneda;
     private int cantidadItems;

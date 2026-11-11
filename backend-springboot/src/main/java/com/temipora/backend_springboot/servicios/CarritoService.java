@@ -43,7 +43,6 @@ public class CarritoService {
     private final UsuarioService usuarioService;
     private final MonedaService monedaService;
     private final ConversionMonedaService conversionMonedaService;
-    private final ComisionService comisionService;
     private final MercadoPagoOAuthService oauthService;
     private final boolean unArtistaPorCarrito;
     private final String proveedorPago;
@@ -56,7 +55,6 @@ public class CarritoService {
             UsuarioService usuarioService,
             MonedaService monedaService,
             ConversionMonedaService conversionMonedaService,
-            ComisionService comisionService,
             MercadoPagoOAuthService oauthService,
             @Value("${carrito.un-artista:false}") boolean unArtistaPorCarrito,
             @Value("${pagos.proveedor:simulado}") String proveedorPago) {
@@ -67,7 +65,6 @@ public class CarritoService {
         this.usuarioService = usuarioService;
         this.monedaService = monedaService;
         this.conversionMonedaService = conversionMonedaService;
-        this.comisionService = comisionService;
         this.oauthService = oauthService;
         this.unArtistaPorCarrito = unArtistaPorCarrito;
         this.proveedorPago = proveedorPago;
@@ -248,14 +245,12 @@ public class CarritoService {
     private CarritoDTO aDTO(Carrito carrito) {
         Moneda ars = monedaArs();
         String codigoArs = ars != null ? ars.getCodigo() : ARS;
-        BigDecimal porcentaje = comisionService.obtener().getPorcentajeProducto();
 
         if (carrito == null || carrito.getItems().isEmpty()) {
             return CarritoDTO.builder()
                 .idCarrito(carrito != null ? carrito.getIdCarrito() : null)
                 .grupos(new ArrayList<>())
                 .subtotal(cero())
-                .comisionTotal(cero())
                 .total(cero())
                 .moneda(codigoArs)
                 .cantidadItems(0)
@@ -271,7 +266,7 @@ public class CarritoService {
         boolean todosPuedenCobrar = true;
 
         for (CarritoItem item : carrito.getItems()) {
-            CarritoItemDTO dto = aItemDTO(item, ars, porcentaje);
+            CarritoItemDTO dto = aItemDTO(item, ars);
             cantidadItems += dto.getCantidad() != null ? dto.getCantidad() : 0;
             if (!dto.isDisponible()) {
                 todoDisponible = false;
@@ -286,13 +281,9 @@ public class CarritoService {
         }
 
         BigDecimal subtotal = cero();
-        BigDecimal comisionTotal = cero();
         for (CarritoGrupoDTO grupo : grupos.values()) {
-            grupo.setComision(comisionService.calcularComision(
-                grupo.getSubtotal(), porcentaje));
             grupo.setTotal(grupo.getSubtotal());
             subtotal = sumar(subtotal, grupo.getSubtotal());
-            comisionTotal = sumar(comisionTotal, grupo.getComision());
             if (!grupo.isPuedeCobrar()) {
                 todosPuedenCobrar = false;
                 avisos.add(grupo.getMotivoNoCobro());
@@ -306,7 +297,6 @@ public class CarritoService {
             .idCarrito(carrito.getIdCarrito())
             .grupos(new ArrayList<>(grupos.values()))
             .subtotal(subtotal)
-            .comisionTotal(comisionTotal)
             .total(subtotal)
             .moneda(codigoArs)
             .cantidadItems(cantidadItems)
@@ -329,13 +319,12 @@ public class CarritoService {
                 : "El artista todavía no conectó su cuenta de MercadoPago.")
             .items(new ArrayList<>())
             .subtotal(cero())
-            .comision(cero())
             .total(cero())
             .build();
     }
 
     private CarritoItemDTO aItemDTO(
-            CarritoItem item, Moneda ars, BigDecimal porcentaje) {
+            CarritoItem item, Moneda ars) {
         ProductoVariante variante = item.getVariante();
         Producto producto = variante.getProducto();
         Moneda monedaOriginal = producto.getMoneda();

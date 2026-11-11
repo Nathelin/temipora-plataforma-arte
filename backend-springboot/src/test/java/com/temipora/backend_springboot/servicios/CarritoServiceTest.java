@@ -20,7 +20,6 @@ import com.temipora.backend_springboot.modelo.Carrito;
 import com.temipora.backend_springboot.modelo.CarritoDTO;
 import com.temipora.backend_springboot.modelo.CarritoItem;
 import com.temipora.backend_springboot.modelo.CarritoItemRequest;
-import com.temipora.backend_springboot.modelo.ConfiguracionComision;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
 import com.temipora.backend_springboot.modelo.EstadoReserva;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
@@ -46,7 +45,6 @@ class CarritoServiceTest {
     @Mock private UsuarioService usuarioService;
     @Mock private MonedaService monedaService;
     @Mock private ConversionMonedaService conversionMonedaService;
-    @Mock private ComisionService comisionService;
     @Mock private MercadoPagoOAuthService oauthService;
 
     private CarritoService service;
@@ -61,7 +59,6 @@ class CarritoServiceTest {
             usuarioService,
             monedaService,
             conversionMonedaService,
-            comisionService,
             oauthService,
             true,
             "simulado");
@@ -258,7 +255,6 @@ class CarritoServiceTest {
 
     private void stubsDeCalculo() {
         lenient().when(monedaService.obtenerPorCodigo("ARS")).thenReturn(moneda());
-        lenient().when(comisionService.obtener()).thenReturn(configuracion());
         lenient().when(conversionMonedaService.factor(any(), any(), any()))
             .thenReturn(BigDecimal.ONE);
     }
@@ -301,11 +297,5 @@ class CarritoServiceTest {
         moneda.setCodigo("ARS");
         moneda.setNombre("Peso");
         return moneda;
-    }
-
-    private ConfiguracionComision configuracion() {
-        ConfiguracionComision config = new ConfiguracionComision();
-        config.setPorcentajeProducto(new BigDecimal("10.00"));
-        return config;
     }
 }

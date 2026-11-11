@@ -92,6 +92,13 @@ export async function cargarCompra(idCompra) {
   return res.data
 }
 
+export async function cargarLedgerCompraItem(idCompra, idCompraItem) {
+  const res = await api.get(
+    `/compras/${idCompra}/items/${idCompraItem}/ledger`,
+  )
+  return res.data
+}
+
 export async function pagarGrupo(idCompra, idGrupo) {
   const res = await api.post(`/compras/${idCompra}/grupos/${idGrupo}/pagar`)
   return res.data
@@ -112,10 +119,29 @@ export async function rechazarPagoSimulado(idIntento) {
   return res.data
 }
 
-export async function descargarArchivoCompra(idCompra, idItem) {
-  const res = await api.get(
-    `/compras/${idCompra}/items/${idItem}/archivo`,
-    { responseType: 'blob' },
-  )
-  return res.data
+export async function descargarCompra(idCompra) {
+  const res = await api.get(`/compras/${idCompra}/archivo`, {
+    responseType: 'blob',
+  })
+  return {
+    blob: res.data,
+    nombre: nombreDesdeDisposicion(
+      res.headers?.['content-disposition'],
+      `compra-${idCompra}`,
+    ),
+  }
+}
+
+function nombreDesdeDisposicion(header, fallback) {
+  if (!header) return fallback
+  const utf8 = header.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8) {
+    try {
+      return decodeURIComponent(utf8[1])
+    } catch {
+      return fallback
+    }
+  }
+  const simple = header.match(/filename="?([^";]+)"?/i)
+  return simple ? simple[1] : fallback
 }

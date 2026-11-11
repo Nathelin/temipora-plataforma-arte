@@ -25,6 +25,5 @@ public class CarritoGrupoDTO {
     @Builder.Default
     private List<CarritoItemDTO> items = new ArrayList<>();
     private BigDecimal subtotal;
-    private BigDecimal comision;
     private BigDecimal total;
 }

@@ -8,7 +8,7 @@ import { useNotificaciones } from '../composables/useNotificaciones'
 import {
   GRUPOS_COMPRA,
   contarCompras,
-  descargarArchivoCompra,
+  descargarCompra,
   grupoCompraDeQuery,
   listarCompras,
 } from '../servicios/compras'
@@ -29,7 +29,7 @@ const error = ref('')
 const pagina = ref(0)
 const hayMas = ref(false)
 const total = ref(0)
-const descargandoItem = ref(null)
+const descargandoCompra = ref(null)
 
 const emptyState = computed(() => {
   if (grupoActivo.value === 'pagadas') {
@@ -113,17 +113,16 @@ function cargarMas() {
   cargar({ append: true })
 }
 
-async function descargar(preview, compra) {
-  if (descargandoItem.value) return
-  descargandoItem.value = preview.idCompraItem
+async function descargar(compra) {
+  if (descargandoCompra.value) return
+  descargandoCompra.value = compra.idCompra
   try {
-    const blob = await descargarArchivoCompra(compra.idCompra, preview.idCompraItem)
-    const nombre = `${preview.tituloProducto}-${preview.nombreVariante || ''}`.trim()
+    const { blob, nombre } = await descargarCompra(compra.idCompra)
     guardarArchivo(blob, nombre)
   } catch (e) {
-    toastError(e.response?.data?.message || 'No se pudo descargar el archivo.')
+    toastError(e.response?.data?.message || 'No se pudo descargar la compra.')
   } finally {
-    descargandoItem.value = null
+    descargandoCompra.value = null
   }
 }
 
@@ -234,8 +233,8 @@ onMounted(() => {
         v-for="compra in compras"
         :key="compra.idCompra"
         :compra="compra"
-        :descargando="descargandoItem"
-        @descargar="descargar($event, compra)"
+        :descargando="descargandoCompra"
+        @descargar="descargar(compra)"
       />
 
       <div v-if="hayMas" class="pt-2 text-center">

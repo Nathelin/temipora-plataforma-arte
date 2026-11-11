@@ -711,10 +711,10 @@ watch(
                   <p class="mt-1 text-[11px] text-cafe/60">
                     {{ formatearFechaHora(evento.ocurridoEn) }}
                   </p>
-                  <p class="mt-1 text-[11px] text-cafe/55">
+                  <p v-if="evento.nombreOrigen || evento.nombreDestino" class="mt-1 text-[11px] text-cafe/55">
                     @{{ evento.nombreOrigen || '—' }} → @{{ evento.nombreDestino || '—' }}
                   </p>
-                  <p class="mt-1 break-all font-mono text-[10px] text-cafe/35" :title="evento.hashEvento">
+                  <p v-if="evento.hashEvento" class="mt-1 break-all font-mono text-[10px] text-cafe/35" :title="evento.hashEvento">
                     {{ hashCorto(evento.hashEvento) }}
                   </p>
                 </li>

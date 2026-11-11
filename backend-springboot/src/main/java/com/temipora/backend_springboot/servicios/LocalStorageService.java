@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -21,6 +22,8 @@ import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -116,6 +119,19 @@ public class LocalStorageService implements StorageService {
         grafico.drawImage(imagen.getScaledInstance(nuevoAncho, nuevoAlto, Image.SCALE_AREA_AVERAGING), 0, 0, null);
         grafico.dispose();
         return reducida;
+    }
+
+    @Override
+    public Resource abrir(String url) {
+        String nombre = nombreValido(url);
+        if (nombre == null) {
+            throw new NoSuchElementException("Imagen no encontrada.");
+        }
+        Path archivo = directorioRaiz.resolve(nombre).normalize();
+        if (!archivo.startsWith(directorioRaiz) || !Files.isRegularFile(archivo)) {
+            throw new NoSuchElementException("Imagen no encontrada.");
+        }
+        return new FileSystemResource(archivo);
     }
 
     @Override

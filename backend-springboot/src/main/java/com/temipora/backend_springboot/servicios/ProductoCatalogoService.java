@@ -22,6 +22,8 @@ import com.temipora.backend_springboot.modelo.EtiquetaDTO;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
+import com.temipora.backend_springboot.modelo.EventoLedgerDTO;
+import com.temipora.backend_springboot.modelo.EventoLedgerPublicoDTO;
 import com.temipora.backend_springboot.modelo.FiltroProductoRequest;
 import com.temipora.backend_springboot.modelo.LicenciaProducto;
 import com.temipora.backend_springboot.modelo.LicenciaProductoDTO;
@@ -35,9 +37,12 @@ import com.temipora.backend_springboot.modelo.ProductoEtiqueta;
 import com.temipora.backend_springboot.modelo.ProductoImagen;
 import com.temipora.backend_springboot.modelo.ProductoImagenDTO;
 import com.temipora.backend_springboot.modelo.ProductoLedgerDTO;
+import com.temipora.backend_springboot.modelo.ProductoLedgerPublicoDTO;
 import com.temipora.backend_springboot.modelo.ProductoVariante;
 import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.modelo.VarianteLedgerDTO;
+import com.temipora.backend_springboot.modelo.VarianteLedgerPublicoDTO;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
@@ -263,10 +268,49 @@ public class ProductoCatalogoService {
 
     /** Historial de autenticidad del producto público. */
     @Transactional(readOnly = true)
-    public ProductoLedgerDTO obtenerLedger(
+    public ProductoLedgerPublicoDTO obtenerLedger(
             Long idProducto, int pagina, int tamano) {
         Producto producto = obtenerEntidadPublica(idProducto);
-        return ledgerService.verificarProducto(producto, pagina, tamano);
+        ProductoLedgerDTO completo =
+            ledgerService.verificarProducto(producto, pagina, tamano);
+        return ProductoLedgerPublicoDTO.builder()
+            .idProducto(completo.getIdProducto())
+            .titulo(completo.getTitulo())
+            .integridad(completo.isIntegridad())
+            .mensaje(completo.getMensaje())
+            .variantes(completo.getVariantes().stream()
+                .map(this::aVarianteLedgerPublico)
+                .toList())
+            .pagina(completo.getPagina())
+            .tamano(completo.getTamano())
+            .totalElementos(completo.getTotalElementos())
+            .totalPaginas(completo.getTotalPaginas())
+            .build();
+    }
+
+    private VarianteLedgerPublicoDTO aVarianteLedgerPublico(
+            VarianteLedgerDTO variante) {
+        return VarianteLedgerPublicoDTO.builder()
+            .idVariante(variante.getIdVariante())
+            .nombre(variante.getNombre())
+            .tieneLedger(variante.isTieneLedger())
+            .integridad(variante.isIntegridad())
+            .mensaje(variante.getMensaje())
+            .eventos(variante.getEventos().stream()
+                .map(this::aEventoLedgerPublico)
+                .toList())
+            .build();
+    }
+
+    private EventoLedgerPublicoDTO aEventoLedgerPublico(
+            EventoLedgerDTO evento) {
+        return EventoLedgerPublicoDTO.builder()
+            .idEventoLedger(evento.getIdEventoLedger())
+            .secuencia(evento.getSecuencia())
+            .tipo(evento.getTipo())
+            .ocurridoEn(evento.getOcurridoEn())
+            .verificado(evento.isVerificado())
+            .build();
     }
 
     private Producto obtenerEntidadPublica(Long idProducto) {

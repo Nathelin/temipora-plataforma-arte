@@ -23,7 +23,9 @@ import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.CompraItemRepository;
 import com.temipora.backend_springboot.servicios.AccesoDenegadoException;
 import com.temipora.backend_springboot.servicios.AlmacenPrivadoService;
+import com.temipora.backend_springboot.servicios.CompraDescargaService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
+import com.temipora.backend_springboot.servicios.CompraDescargaService.DescargaCompra;
 
 @RestController
 @RequestMapping("/api/compras")
@@ -33,14 +35,35 @@ public class ArchivoCompraController {
     private final CompraItemRepository compraItemRepository;
     private final UsuarioService usuarioService;
     private final AlmacenPrivadoService almacen;
+    private final CompraDescargaService compraDescargaService;
 
     public ArchivoCompraController(
             CompraItemRepository compraItemRepository,
             UsuarioService usuarioService,
-            AlmacenPrivadoService almacen) {
+            AlmacenPrivadoService almacen,
+            CompraDescargaService compraDescargaService) {
         this.compraItemRepository = compraItemRepository;
         this.usuarioService = usuarioService;
         this.almacen = almacen;
+        this.compraDescargaService = compraDescargaService;
+    }
+
+    @GetMapping("/{idCompra}/archivo")
+    public ResponseEntity<Resource> archivoCompra(
+            @PathVariable Long idCompra,
+            Authentication authentication) {
+        DescargaCompra descarga = compraDescargaService.preparar(
+            authentication.getName(), idCompra);
+        ContentDisposition disposition = ContentDisposition.attachment()
+            .filename(descarga.nombreArchivo(), StandardCharsets.UTF_8)
+            .build();
+
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(descarga.contentType()))
+            .cacheControl(CacheControl.noStore())
+            .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+            .header("X-Content-Type-Options", "nosniff")
+            .body(descarga.recurso());
     }
 
     @GetMapping("/{idCompra}/items/{idItem}/archivo")

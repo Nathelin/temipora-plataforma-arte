@@ -1,13 +1,14 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import LedgerCompraItem from '../components/LedgerCompraItem.vue'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import { formatearPrecio } from '../servicios/moneda'
 import { guardarArchivo } from '../servicios/descargas'
 import {
   cargarCompra,
   confirmarPagoSimulado,
-  descargarArchivoCompra,
+  descargarCompra,
   estadoCompraDe,
   estadoGrupoDe,
   pagarGrupo,
@@ -26,7 +27,7 @@ const error = ref('')
 const pagando = ref(null)
 const sincronizando = ref(false)
 const pagoSimulado = ref(null)
-const descargando = ref(null)
+const descargandoTodo = ref(false)
 
 const grupos = computed(() => compra.value?.grupos || [])
 const estado = computed(() => estadoCompraDe(compra.value?.estado))
@@ -126,16 +127,16 @@ async function sincronizar(silencioso = false) {
   }
 }
 
-async function descargar(item) {
-  if (descargando.value) return
-  descargando.value = item.idCompraItem
+async function descargarTodo() {
+  if (descargandoTodo.value) return
+  descargandoTodo.value = true
   try {
-    const blob = await descargarArchivoCompra(idCompra.value, item.idCompraItem)
-    guardarArchivo(blob, `${item.tituloProducto}-${item.nombreVariante || ''}`.trim())
+    const { blob, nombre } = await descargarCompra(idCompra.value)
+    guardarArchivo(blob, nombre)
   } catch (e) {
-    toastError(e.response?.data?.message || 'No se pudo descargar el archivo.')
+    toastError(e.response?.data?.message || 'No se pudo descargar la compra.')
   } finally {
-    descargando.value = null
+    descargandoTodo.value = false
   }
 }
 
@@ -210,14 +211,25 @@ onMounted(cargar)
                 {{ formatearPrecio(compra.total, compra.moneda || 'ARS') }}
               </p>
             </div>
-            <button
-              type="button"
-              class="rounded-lg border border-rosa px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-50"
-              :disabled="sincronizando"
-              @click="sincronizar(false)"
-            >
-              {{ sincronizando ? 'Actualizando...' : 'Sincronizar estado' }}
-            </button>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <button
+                v-if="compra.puedeDescargar"
+                type="button"
+                class="rounded-lg bg-coral px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rojizo disabled:opacity-50"
+                :disabled="descargandoTodo"
+                @click="descargarTodo"
+              >
+                {{ descargandoTodo ? 'Preparando...' : 'Descargar todo' }}
+              </button>
+              <button
+                type="button"
+                class="rounded-lg border border-rosa px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-50"
+                :disabled="sincronizando"
+                @click="sincronizar(false)"
+              >
+                {{ sincronizando ? 'Actualizando...' : 'Sincronizar estado' }}
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -320,15 +332,12 @@ onMounted(cargar)
                   <p v-if="item.cantidad > 1" class="text-[11px] text-cafe/45">
                     {{ formatearPrecio(item.precioCobro, compra.moneda || 'ARS') }} c/u
                   </p>
-                  <button
+                  <span
                     v-if="item.puedeDescargar"
-                    type="button"
-                    class="inline-flex min-h-9 items-center justify-center rounded-lg bg-coral px-4 text-xs font-semibold text-white transition hover:bg-rojizo disabled:opacity-50"
-                    :disabled="descargando === item.idCompraItem"
-                    @click="descargar(item)"
+                    class="inline-flex max-w-48 items-center justify-center rounded-full border border-rosa bg-blanco px-3 py-1 text-[11px] font-semibold text-granate"
                   >
-                    {{ descargando === item.idCompraItem ? 'Descargando...' : 'Descargar archivo' }}
-                  </button>
+                    Incluye {{ item.tipoEntrega === 'DIGITAL' ? 'archivo digital' : 'imagen de la pieza' }}
+                  </span>
                   <span v-else-if="item.motivoNoDescarga" class="max-w-48 text-right text-[11px] text-cafe/45">
                     {{ item.motivoNoDescarga }}
                   </span>
@@ -380,10 +389,15 @@ onMounted(cargar)
                 </div>
 
                 <p v-if="item.tieneLedger" class="mt-4 border-t border-rosa/40 pt-3 text-xs text-cafe/60">
-                  Esta pieza tiene un certificado de procedencia verificado. El historial completo del
-                  ledger se va a poder ver desde acá en la próxima fase.
+                  Esta pieza tiene un certificado de procedencia verificado.
                 </p>
               </details>
+
+              <LedgerCompraItem
+                v-if="item.tieneLedger"
+                :id-compra="compra.idCompra"
+                :item="item"
+              />
             </article>
           </div>
 

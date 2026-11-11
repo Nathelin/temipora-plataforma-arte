@@ -9,11 +9,13 @@ import {
   etiquetaStock,
   subirImagenProducto,
 } from '../servicios/productos'
+import { calcularLiquidacionProducto } from '../servicios/liquidacion'
 import { useMonedas } from '../composables/useMonedas'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
 import SelectorVariantes from '../components/SelectorVariantes.vue'
 import SelectorEtiquetas from '../components/SelectorEtiquetas.vue'
 import VisorImagenes from '../components/VisorImagenes.vue'
+import ModalComoSeCalcula from '../components/ModalComoSeCalcula.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -71,6 +73,9 @@ const arrastrandoImagen = ref(null)
 const visorAbierto = ref(false)
 const visorIndice = ref(0)
 const modalReventaAbierto = ref(false)
+const modalCalculoAbierto = ref(false)
+const porcentajeComision = ref(null)
+const arancelPorcentaje = ref(null)
 
 const tipos = ref([])
 const medios = ref([])
@@ -176,6 +181,31 @@ const precioDesde = computed(() => {
     .filter((precio) => Number.isFinite(precio) && precio > 0)
   return precios.length ? Math.min(...precios) : null
 })
+const hayLiquidacion = computed(
+  () => porcentajeComision.value != null && arancelPorcentaje.value != null,
+)
+
+function liquidacionDe(variante) {
+  if (!hayLiquidacion.value) return null
+  return calcularLiquidacionProducto({
+    precio: variante?.precio,
+    comisionPorcentaje: porcentajeComision.value,
+    arancelPorcentaje: arancelPorcentaje.value,
+  })
+}
+
+const liquidacionEjemplo = computed(
+  () => variantes.value.map((variante) => liquidacionDe(variante)).find(Boolean) || null,
+)
+
+const recibisDesde = computed(() => {
+  const valores = variantes.value
+    .map((variante) => liquidacionDe(variante))
+    .filter(Boolean)
+    .map((liquidacion) => liquidacion.recibis)
+  return valores.length ? Math.min(...valores) : null
+})
+
 const imagenesUrl = computed(() => form.value.imagenes.map((imagen) => imagen.url))
 const tituloPagina = computed(() => {
   if (!esEdicion.value) return 'Crear producto'
@@ -229,15 +259,21 @@ async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    const [tiposRes, mediosRes, derechosRes] = await Promise.all([
+    const [tiposRes, mediosRes, derechosRes, , comisionRes, arancelRes] = await Promise.all([
       api.get('/tipos-producto'),
       api.get('/medios'),
       api.get('/derechos-termino'),
       cargarMonedas(),
+      api.get('/comisiones/vigentes').catch(() => null),
+      api.get('/pagos/arancel-estimado').catch(() => null),
     ])
     tipos.value = tiposRes.data
     medios.value = mediosRes.data
     derechos.value = derechosRes.data
+    const pctComision = comisionRes?.data?.porcentajeProducto
+    porcentajeComision.value = pctComision != null ? Number(pctComision) : null
+    const pctArancel = arancelRes?.data?.porcentajeTotal
+    arancelPorcentaje.value = pctArancel != null ? Number(pctArancel) : null
 
     if (esEdicion.value) {
       const productoRes = await api.get(`/mis-productos/${idProducto.value}`)
@@ -1341,7 +1377,10 @@ onBeforeUnmount(() => {
               :imagen-portada="form.imagenes[0]?.url || ''"
               :imagenes-galeria="form.imagenes"
               :errores-variantes="erroresVariantes"
+              :comision-porcentaje="porcentajeComision"
+              :arancel-porcentaje="arancelPorcentaje"
               @agregar-imagen="agregarImagenDesdeVariante"
+              @ver-calculo="modalCalculoAbierto = true"
             />
           </section>
 
@@ -1556,6 +1595,12 @@ onBeforeUnmount(() => {
                 <span class="font-semibold text-granate">
                   {{ precioDesde !== null ? formatearPrecio(precioDesde, monedaCodigo) : 'sin precio' }}
                 </span>
+                <template v-if="recibisDesde !== null">
+                  · recibís desde
+                  <span class="font-semibold text-granate">
+                    {{ formatearPrecio(recibisDesde, monedaCodigo) }}
+                  </span>
+                </template>
               </p>
               <div class="mt-3 divide-y divide-rosa/40">
                 <div
@@ -1577,6 +1622,12 @@ onBeforeUnmount(() => {
                       {{ formatearPrecio(Number(variante.precio), monedaCodigo) }}
                       · {{ etiquetaStock(variante) }}
                     </p>
+                    <p
+                      v-if="liquidacionDe(variante)"
+                      class="text-[11px] text-cafe/45"
+                    >
+                      Recibís ≈ {{ formatearPrecio(liquidacionDe(variante).recibis, monedaCodigo) }}
+                    </p>
                   </div>
                   <span
                     v-if="!esIlimitada(variante) && Number(variante.stockDisponible) === 1"
@@ -1586,6 +1637,15 @@ onBeforeUnmount(() => {
                     Se registra al publicar
                   </span>
                 </div>
+              </div>
+              <div v-if="hayLiquidacion" class="mt-3">
+                <button
+                  type="button"
+                  class="text-xs font-semibold text-coral underline-offset-2 transition hover:text-rojizo hover:underline"
+                  @click="modalCalculoAbierto = true"
+                >
+                  ¿Cómo se calcula?
+                </button>
               </div>
             </article>
 
@@ -1874,5 +1934,20 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </Teleport>
+
+    <ModalComoSeCalcula
+      contexto="producto"
+      :abierto="modalCalculoAbierto"
+      :moneda="monedaCodigo"
+      :precio="liquidacionEjemplo?.precio"
+      :comision-porcentaje="porcentajeComision"
+      :comision-monto="liquidacionEjemplo?.comision"
+      :arancel-porcentaje="arancelPorcentaje"
+      :arancel-monto="liquidacionEjemplo?.arancel"
+      :neto="liquidacionEjemplo?.neto"
+      :recibis="liquidacionEjemplo?.recibis"
+      :estimado="true"
+      @cerrar="modalCalculoAbierto = false"
+    />
   </div>
 </template>

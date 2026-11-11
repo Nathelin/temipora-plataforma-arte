@@ -27,6 +27,7 @@ import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.CompraItemRepository;
 import com.temipora.backend_springboot.servicios.AccesoDenegadoException;
 import com.temipora.backend_springboot.servicios.AlmacenPrivadoService;
+import com.temipora.backend_springboot.servicios.CompraDescargaService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,9 +36,29 @@ class ArchivoCompraControllerTest {
     @Mock private CompraItemRepository compraItemRepository;
     @Mock private UsuarioService usuarioService;
     @Mock private AlmacenPrivadoService almacen;
+    @Mock private CompraDescargaService compraDescargaService;
     @Mock private Authentication authentication;
 
     @InjectMocks private ArchivoCompraController controller;
+
+    @Test
+    void archivoCompra_devuelveElZipDeTodaLaCompra() {
+        when(authentication.getName()).thenReturn("cliente");
+        when(compraDescargaService.preparar("cliente", 10L))
+            .thenReturn(new CompraDescargaService.DescargaCompra(
+                new ByteArrayResource("zip".getBytes(StandardCharsets.UTF_8)),
+                "compra-10.zip",
+                "application/zip"));
+
+        ResponseEntity<?> respuesta = controller.archivoCompra(10L, authentication);
+
+        assertThat(respuesta.getStatusCode().value()).isEqualTo(200);
+        assertThat(respuesta.getHeaders().getContentType())
+            .isEqualTo(MediaType.parseMediaType("application/zip"));
+        assertThat(respuesta.getHeaders().getFirst("Content-Disposition"))
+            .contains("attachment")
+            .contains("compra-10.zip");
+    }
 
     @Test
     void archivo_compradorConPagoEntregado_devuelveElArchivo() {

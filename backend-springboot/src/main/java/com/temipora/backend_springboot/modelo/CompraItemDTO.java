@@ -27,7 +27,6 @@ public class CompraItemDTO {
     private String monedaOriginal;
     private BigDecimal precioCobro;
     private BigDecimal precioTotalCobro;
-    private BigDecimal comisionMonto;
     private EstadoEntregaItem estadoEntrega;
     private boolean puedeDescargar;
     private String motivoNoDescarga;

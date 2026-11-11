@@ -660,6 +660,23 @@ class ProductoIntegracionTest {
         assertThat(dto.getIdArtista()).isEqualTo(publicado.getIdArtista());
     }
 
+    @Test
+    void catalogoPublico_ledgerMuestraResumenSinActoresNiHashes() {
+        ProductoDTO publicado = crearProductoSimple(
+            "Ledger público " + UUID.randomUUID(), 1);
+
+        var ledger = productoCatalogoService.obtenerLedger(
+            publicado.getIdProducto(), 1, 4);
+
+        assertThat(ledger.getVariantes()).isNotEmpty();
+        var variante = ledger.getVariantes().get(0);
+        assertThat(variante.isTieneLedger()).isTrue();
+        assertThat(variante.getEventos()).isNotEmpty();
+        assertThat(variante.getEventos().get(0).getTipo()).isNotNull();
+        assertThat(variante.getEventos().get(0).getSecuencia()).isNotNull();
+        assertThat(variante.getEventos().get(0).isVerificado()).isTrue();
+    }
+
     private ProductoDTO crearBorradorSimple() {
         Usuario artista = artista();
         String sha = shaAleatorio();
@@ -682,6 +699,11 @@ class ProductoIntegracionTest {
     }
 
     private ProductoDTO crearProductoSimple(String titulo) {
+        return crearProductoSimple(titulo, null);
+    }
+
+    private ProductoDTO crearProductoSimple(
+            String titulo, Integer stockDisponible) {
         Usuario artista = artista();
         TipoProducto tipo = tipoProductoRepository
             .findByActivoTrueOrderByNombreAsc().get(0);
@@ -706,7 +728,7 @@ class ProductoIntegracionTest {
         ProductoVarianteRequest variante = new ProductoVarianteRequest();
         variante.setNombre("Única");
         variante.setPrecio(new BigDecimal("100.00"));
-        variante.setStockDisponible(null);
+        variante.setStockDisponible(stockDisponible);
         variante.setOrden(0);
         variante.setUrlImagen(imagen.getUrl());
         variante.setSha256(sha);
