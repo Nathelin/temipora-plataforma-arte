@@ -11,12 +11,12 @@ import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.Pago;
 import com.temipora.backend_springboot.servicios.pagos.DatosPagoProveedor;
 
-final class MercadoPagoEstados {
+public final class MercadoPagoEstados {
 
     private MercadoPagoEstados() {
     }
 
-    static EstadoPago mapear(String estado) {
+    public static EstadoPago mapear(String estado) {
         if (estado == null) {
             return EstadoPago.PENDIENTE;
         }
@@ -29,7 +29,7 @@ final class MercadoPagoEstados {
         };
     }
 
-    static DatosPagoProveedor datos(MercadoPagoPago pago) {
+    public static DatosPagoProveedor datos(MercadoPagoPago pago) {
         if (pago == null) {
             return null;
         }

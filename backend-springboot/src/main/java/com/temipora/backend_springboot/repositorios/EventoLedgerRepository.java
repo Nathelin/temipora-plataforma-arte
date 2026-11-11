@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.EventoLedger;
+import com.temipora.backend_springboot.modelo.TipoEventoLedger;
 
 public interface EventoLedgerRepository extends JpaRepository<EventoLedger, Long> {
 
@@ -20,6 +21,10 @@ public interface EventoLedgerRepository extends JpaRepository<EventoLedger, Long
     boolean existsByVarianteIdVariante(Long idVariante);
 
     long countByVarianteIdVariante(Long idVariante);
+
+    boolean existsByIdCompraItemAndTipo(Long idCompraItem, TipoEventoLedger tipo);
+
+    List<EventoLedger> findByIdCompraItem(Long idCompraItem);
 
     @Query("""
         SELECT DISTINCT e.variante.idVariante

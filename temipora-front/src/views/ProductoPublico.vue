@@ -12,6 +12,8 @@ import {
   etiquetaDisponibilidad,
 } from '../servicios/productos'
 import ProductoVistaDetalle from '../components/ProductoVistaDetalle.vue'
+import { useCarrito } from '../composables/useCarrito'
+import { useNotificaciones } from '../composables/useNotificaciones'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,6 +34,22 @@ const paginaLedger = ref(1)
 
 const esFavorito = ref(false)
 const actualizandoFavorito = ref(false)
+
+const { cantidad: cantidadCarrito, agregar: agregarAlCarritoStore } = useCarrito()
+const { exito, error: toastError } = useNotificaciones()
+
+async function agregarAlCarrito(variante) {
+  if (!localStorage.getItem('token')) {
+    router.push({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
+  try {
+    await agregarAlCarritoStore(variante.idVariante, 1)
+    exito(`“${variante.nombre}” se agregó al carrito.`)
+  } catch (e) {
+    toastError(e.response?.data?.message || 'No se pudo agregar al carrito.')
+  }
+}
 
 const imagenes = computed(() => {
   const deGaleria = (producto.value?.imagenes || []).map((imagen) => imagen.url)
@@ -205,18 +223,21 @@ onMounted(cargar)
           :precio-desde="precioMostrado"
           @cambiar-pagina-variantes="cambiarPaginaVariantes"
           @cambiar-pagina-ledger="cambiarPaginaLedger"
+          @agregar-carrito="agregarAlCarrito"
         >
           <template #acciones>
-            <button
-              type="button"
-              disabled
-              class="flex w-full cursor-not-allowed items-center justify-center rounded-lg bg-cafe/15 px-4 py-2.5 text-sm font-semibold text-cafe/50"
-              title="La compra todavía no está habilitada"
+            <router-link
+              v-if="cantidadCarrito"
+              to="/carrito"
+              class="flex w-full items-center justify-center gap-2 rounded-lg bg-coral px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-rojizo"
             >
-              Comprar (próximamente)
-            </button>
-            <p class="text-center text-[11px] leading-relaxed text-cafe/45">
-              La compra directa todavía no está habilitada en la plataforma.
+              Ir al carrito
+              <span class="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-bold">
+                {{ cantidadCarrito }}
+              </span>
+            </router-link>
+            <p v-else class="text-center text-[11px] leading-relaxed text-cafe/45">
+              Elegí una variante y tocá “Agregar” para sumarla al carrito.
             </p>
 
             <button

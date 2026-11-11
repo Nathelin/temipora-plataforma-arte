@@ -101,6 +101,92 @@ public class LedgerService {
         return eventoRepository.save(evento);
     }
 
+    /**
+     * Registra la venta primaria de una pieza única. Es idempotente por
+     * `idCompraItem`: un webhook repetido no agrega un segundo evento.
+     * La llamada debe hacerse antes de transferir el propietario de la
+     * variante, para que `actorOrigen` sea el vendedor real.
+     */
+    @Transactional
+    public EventoLedger registrarVenta(
+            ProductoVariante variante,
+            Usuario vendedor,
+            Usuario comprador,
+            Long idCompraItem,
+            Long idCompra,
+            BigDecimal monto,
+            Moneda moneda,
+            String hashLicencia) {
+        if (variante == null || variante.getIdVariante() == null) {
+            throw new IllegalArgumentException(
+                "No se puede registrar la venta de una variante sin guardar.");
+        }
+        if (!variante.esUnica()) {
+            return null;
+        }
+        if (idCompraItem != null
+                && eventoRepository.existsByIdCompraItemAndTipo(
+                    idCompraItem, TipoEventoLedger.VENTA)) {
+            return eventoRepository.findByIdCompraItem(idCompraItem).stream()
+                .filter(evento -> evento.getTipo() == TipoEventoLedger.VENTA)
+                .findFirst()
+                .orElse(null);
+        }
+        EventoLedger anterior = eventoRepository
+            .findTopByVarianteIdVarianteOrderBySecuenciaDesc(
+                variante.getIdVariante())
+            .orElseThrow(() -> new IllegalStateException(
+                "La pieza única no tiene un evento de génesis."));
+
+        Producto producto = variante.getProducto();
+        Usuario origen = vendedor != null ? vendedor
+            : (producto != null ? producto.getArtista() : null);
+        if (origen == null || comprador == null) {
+            throw new IllegalStateException(
+                "La venta necesita un vendedor y un comprador.");
+        }
+        Moneda monedaEvento = moneda != null ? moneda
+            : (producto != null ? producto.getMoneda() : null);
+        LocalDateTime ocurrido = LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
+        long secuencia = anterior.getSecuencia() + 1;
+        String hashPrevio = anterior.getHashEvento();
+        String hashImagen = variante.getSha256();
+        String datos = datosVenta(
+            producto, variante, origen, comprador, idCompraItem, idCompra,
+            monto, monedaEvento, hashLicencia);
+        String hashDatos = sha256Hex(datos);
+
+        EventoLedger evento = new EventoLedger();
+        evento.setVariante(variante);
+        evento.setSecuencia(secuencia);
+        evento.setTipo(TipoEventoLedger.VENTA);
+        evento.setActorOrigen(origen);
+        evento.setActorDestino(comprador);
+        evento.setMoneda(monedaEvento);
+        evento.setOcurridoEn(ocurrido);
+        evento.setHashPrevio(hashPrevio);
+        evento.setHashImagen(hashImagen);
+        evento.setDatos(datos);
+        evento.setVersionHash(EventoLedger.VERSION_ACTUAL);
+        evento.setHashDatos(hashDatos);
+        evento.setIdCompraItem(idCompraItem);
+        evento.setHashEvento(calcularHash(
+            EventoLedger.VERSION_ACTUAL,
+            variante.getIdVariante(),
+            secuencia,
+            TipoEventoLedger.VENTA,
+            null,
+            origen.getIdUsuario(),
+            comprador.getIdUsuario(),
+            monto,
+            monedaEvento != null ? monedaEvento.getCodigo() : null,
+            ocurrido,
+            hashPrevio,
+            hashImagen,
+            hashDatos));
+        return eventoRepository.save(evento);
+    }
+
     @Transactional(readOnly = true)
     public VarianteLedgerDTO verificarVariante(ProductoVariante variante) {
         if (variante == null || variante.getIdVariante() == null) {
@@ -294,6 +380,40 @@ public class LedgerService {
             partes.add(hashDatos != null ? hashDatos : "");
         }
         return sha256Hex(String.join("|", partes));
+    }
+
+    private String datosVenta(
+            Producto producto,
+            ProductoVariante variante,
+            Usuario vendedor,
+            Usuario comprador,
+            Long idCompraItem,
+            Long idCompra,
+            BigDecimal monto,
+            Moneda moneda,
+            String hashLicencia) {
+        return "{\"idCompraItem\":" + idCompraItem
+            + ",\"idCompra\":" + idCompra
+            + ",\"idProducto\":"
+            + (producto != null ? producto.getIdProducto() : null)
+            + ",\"titulo\":" + json(producto != null ? producto.getTitulo() : null)
+            + ",\"idVariante\":" + variante.getIdVariante()
+            + ",\"nombreVariante\":" + json(variante.getNombre())
+            + ",\"artista\":" + json(producto != null && producto.getArtista() != null
+                ? producto.getArtista().getNombreUsuario() : null)
+            + ",\"vendedor\":" + json(vendedor != null
+                ? vendedor.getNombreUsuario() : null)
+            + ",\"comprador\":" + json(comprador != null
+                ? comprador.getNombreUsuario() : null)
+            + ",\"precio\":" + numero(monto)
+            + ",\"moneda\":" + json(moneda != null ? moneda.getCodigo() : null)
+            + ",\"sha256\":" + json(variante.getSha256())
+            + ",\"licencia\":" + json(hashLicencia)
+            + "}";
+    }
+
+    private String numero(BigDecimal valor) {
+        return valor != null ? valor.stripTrailingZeros().toPlainString() : "null";
     }
 
     private String datosGenesis(

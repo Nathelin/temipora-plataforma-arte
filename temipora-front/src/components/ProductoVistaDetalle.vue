@@ -25,7 +25,11 @@ const props = defineProps({
   precioDesde: { type: String, default: '—' },
 })
 
-defineEmits(['cambiar-pagina-variantes', 'cambiar-pagina-ledger'])
+const emit = defineEmits([
+  'cambiar-pagina-variantes',
+  'cambiar-pagina-ledger',
+  'agregar-carrito',
+])
 
 const ETIQUETAS_SENSIBLE = {
   VIOLENCIA: 'Violencia',
@@ -124,6 +128,17 @@ function irAGaleria() {
 function seleccionarVariante(variante) {
   imagenDeVariante(variante)
   irAGaleria()
+}
+
+function varianteDisponible(variante) {
+  const stock = variante?.stockDisponible
+  return variante?.estado === 'DISPONIBLE'
+    && (stock === null || stock === undefined || Number(stock) > 0)
+}
+
+function agregarVariante(variante) {
+  if (!varianteDisponible(variante)) return
+  emit('agregar-carrito', variante)
 }
 
 async function alternarInfoLedger() {
@@ -330,9 +345,20 @@ watch(
               </p>
             </div>
 
-            <p class="shrink-0 font-display text-lg font-extrabold text-coral">
-              {{ formatearPrecio(variante.precio, producto.moneda) }}
-            </p>
+            <div class="flex shrink-0 flex-col items-end gap-2">
+              <p class="font-display text-lg font-extrabold text-coral">
+                {{ formatearPrecio(variante.precio, producto.moneda) }}
+              </p>
+              <button
+                v-if="!esPrevia"
+                type="button"
+                class="rounded-lg bg-coral px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rojizo disabled:cursor-not-allowed disabled:opacity-50"
+                :disabled="!varianteDisponible(variante)"
+                @click.stop="agregarVariante(variante)"
+              >
+                {{ varianteDisponible(variante) ? 'Agregar' : 'Sin stock' }}
+              </button>
+            </div>
           </article>
         </div>
 

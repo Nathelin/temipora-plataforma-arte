@@ -71,6 +71,9 @@ import ProductoForm from '../views/ProductoForm.vue'
 import ProductoDetalle from '../views/ProductoDetalle.vue'
 import ProductoPublico from '../views/ProductoPublico.vue'
 import Productos from '../views/Productos.vue'
+import Carrito from '../views/Carrito.vue'
+import MisCompras from '../views/MisCompras.vue'
+import CompraDetalle from '../views/CompraDetalle.vue'
 import ServiciosArchivados from '../views/ServiciosArchivados.vue'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useConfirmacionSalida } from '../composables/useConfirmacionSalida'
@@ -94,6 +97,36 @@ const routes = [
       { path: 'productos/:id', name: 'producto-publico', component: ProductoPublico,
         props: (route) => ({ id: Number(route.params.id) }),
         meta: { title: 'Detalle del producto' }
+      },
+      {
+        path: 'carrito',
+        name: 'carrito',
+        component: Carrito,
+        meta: {
+          title: 'Carrito',
+          requiresAuth: true,
+          requiresComprador: true,
+        },
+      },
+      {
+        path: 'compras',
+        name: 'compras',
+        component: MisCompras,
+        meta: {
+          title: 'Mis compras',
+          requiresAuth: true,
+          requiresComprador: true,
+        },
+      },
+      {
+        path: 'compras/:id',
+        name: 'compra-detalle',
+        component: CompraDetalle,
+        meta: {
+          title: 'Detalle de compra',
+          requiresAuth: true,
+          requiresComprador: true,
+        },
       },
       { path: 'servicios', name: 'servicios', component: Servicios,
         meta: { title: 'Servicios' }

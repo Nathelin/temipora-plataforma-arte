@@ -88,4 +88,11 @@ public class EventoLedger {
 
     @Column(name = "id_evento_auditoria")
     private Long idEventoAuditoria;
+
+    /**
+     * Trazabilidad de la venta de producto. No forma parte de la fórmula del
+     * hash; el id también se guarda dentro de `datos`, que sí está hasheado.
+     */
+    @Column(name = "id_compra_item")
+    private Long idCompraItem;
 }

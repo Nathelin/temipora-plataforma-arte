@@ -9,6 +9,7 @@ import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
 import { useMensajes } from '../composables/useMensajes'
 import { useMensajeriaSocket } from '../composables/useMensajeriaSocket'
 import { useNotificacionesSistema } from '../composables/useNotificacionesSistema'
+import { useCarrito } from '../composables/useCarrito'
 import { obtenerContacto } from '../servicios/contacto'
 
 const route = useRoute()
@@ -37,6 +38,8 @@ const esArtista = computed(() => rol.value === 'ARTISTA')
 const puedeVerMisCompras = computed(() => estaLogueado.value && !esAdmin.value)
 const enMisCompras = computed(() => route.path.startsWith('/pedidos')
   || route.path.startsWith('/solicitudes'))
+const enCompras = computed(() => route.path.startsWith('/compras'))
+const enCarrito = computed(() => route.path.startsWith('/carrito'))
 const enPanel = computed(() => route.path.startsWith('/panel'))
 const enMensajes = computed(() => route.path.startsWith('/mensajes')
   || route.path.startsWith('/panel/mensajes'))
@@ -58,6 +61,12 @@ const {
   limpiar: limpiarNotificaciones,
   detenerPolling: detenerPollingNotificaciones,
 } = useNotificacionesSistema()
+
+const {
+  cantidad: cantidadCarrito,
+  cargar: cargarCarrito,
+  limpiar: limpiarCarrito,
+} = useCarrito()
 
 const {
   conectar: conectarSocket,
@@ -120,6 +129,7 @@ onMounted(() => {
   }
 
   if (estaLogueado.value && !esAdmin.value) {
+    cargarCarrito()
     conectarSocket()
     quitarSuscripcionSocket = suscribirSocket((evento) => {
       if (evento?.tipo === 'MENSAJE'
@@ -152,6 +162,7 @@ function cerrarSesion() {
   limpiarNotificaciones()
   detenerPollingNotificaciones()
   limpiarMensajes()
+  limpiarCarrito()
   desconectarSocket()
   router.push({ name: 'login' })
 }
@@ -198,10 +209,19 @@ function irAPerfil() {
             </router-link>
             <router-link
               v-if="puedeVerMisCompras"
-              to="/mis-compras"
+              to="/pedidos"
               class="relative inline-flex items-center gap-2 rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-sm font-semibold text-coral transition hover:bg-coral/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
               :class="enMisCompras ? 'ring-2 ring-coral/40' : ''"
               :aria-current="enMisCompras ? 'page' : undefined"
+            >
+              Mis pedidos
+            </router-link>
+            <router-link
+              v-if="puedeVerMisCompras"
+              to="/compras"
+              class="relative inline-flex items-center gap-2 rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-sm font-semibold text-coral transition hover:bg-coral/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+              :class="enCompras ? 'ring-2 ring-coral/40' : ''"
+              :aria-current="enCompras ? 'page' : undefined"
             >
               Mis compras
             </router-link>
@@ -232,6 +252,31 @@ function irAPerfil() {
           </router-link>
 
           <ThemeToggle class="hidden sm:inline-flex" />
+
+          <router-link
+            v-if="estaLogueado && !esAdmin"
+            to="/carrito"
+            class="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-rosa/60 bg-blanco/70 text-granate transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+            :class="enCarrito ? 'ring-2 ring-coral/40' : ''"
+            :aria-current="enCarrito ? 'page' : undefined"
+            :aria-label="cantidadCarrito
+              ? `Carrito, ${cantidadCarrito} producto(s)`
+              : 'Carrito'"
+            title="Carrito"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.5l2.1 10.5a2.25 2.25 0 0 0 2.2 1.8h8.4a2.25 2.25 0 0 0 2.2-1.8L20.25 6H6.75" />
+              <circle cx="9" cy="19.5" r="1.25" />
+              <circle cx="17.25" cy="19.5" r="1.25" />
+            </svg>
+            <span
+              v-if="cantidadCarrito"
+              class="absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-coral px-1 py-0.5 text-[10px] font-bold leading-none text-white ring-2 ring-crema"
+              aria-hidden="true"
+            >
+              {{ cantidadCarrito }}
+            </span>
+          </router-link>
 
           <router-link
             v-if="estaLogueado && !esAdmin"
@@ -406,13 +451,35 @@ function irAPerfil() {
               </router-link>
               <router-link
                 v-if="puedeVerMisCompras"
-                to="/mis-compras"
+                to="/pedidos"
                 class="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/25 bg-coral/10 px-4 py-3 text-sm font-semibold text-coral transition hover:bg-coral/15"
                 :class="enMisCompras ? 'ring-2 ring-coral/40' : ''"
                 :aria-current="enMisCompras ? 'page' : undefined"
                 @click="menuMovilAbierto = false"
               >
+                Mis pedidos
+              </router-link>
+              <router-link
+                v-if="puedeVerMisCompras"
+                to="/compras"
+                class="flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/25 bg-coral/10 px-4 py-3 text-sm font-semibold text-coral transition hover:bg-coral/15"
+                :class="enCompras ? 'ring-2 ring-coral/40' : ''"
+                :aria-current="enCompras ? 'page' : undefined"
+                @click="menuMovilAbierto = false"
+              >
                 Mis compras
+              </router-link>
+              <router-link
+                v-if="puedeVerMisCompras"
+                to="/carrito"
+                class="flex w-full items-center justify-center gap-2 rounded-2xl border border-rosa px-4 py-3 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+                :class="enCarrito ? 'ring-2 ring-coral/40' : ''"
+                @click="menuMovilAbierto = false"
+              >
+                Carrito
+                <span v-if="cantidadCarrito" class="rounded-full bg-coral px-2 py-0.5 text-[10px] font-bold text-white">
+                  {{ cantidadCarrito }}
+                </span>
               </router-link>
               <router-link
                 v-if="estaLogueado && esAdmin"

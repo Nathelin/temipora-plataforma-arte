@@ -1,0 +1,199 @@
+package com.temipora.backend_springboot;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.temipora.backend_springboot.modelo.CarritoItemRequest;
+import com.temipora.backend_springboot.modelo.CheckoutRequest;
+import com.temipora.backend_springboot.modelo.CompraDTO;
+import com.temipora.backend_springboot.modelo.CompraGrupoDTO;
+import com.temipora.backend_springboot.modelo.CompraItemDTO;
+import com.temipora.backend_springboot.modelo.DerechoTermino;
+import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.EstadoCompra;
+import com.temipora.backend_springboot.modelo.EstadoEntregaItem;
+import com.temipora.backend_springboot.modelo.EstadoReserva;
+import com.temipora.backend_springboot.modelo.EstadoVariante;
+import com.temipora.backend_springboot.modelo.LicenciaProductoRequest;
+import com.temipora.backend_springboot.modelo.Medio;
+import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.PagoCompraDTO;
+import com.temipora.backend_springboot.modelo.ProductoDTO;
+import com.temipora.backend_springboot.modelo.ProductoImagenRequest;
+import com.temipora.backend_springboot.modelo.ProductoRequest;
+import com.temipora.backend_springboot.modelo.ProductoVarianteRequest;
+import com.temipora.backend_springboot.modelo.Rol;
+import com.temipora.backend_springboot.modelo.TipoEntrega;
+import com.temipora.backend_springboot.modelo.TipoEventoLedger;
+import com.temipora.backend_springboot.modelo.TipoProducto;
+import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
+import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
+import com.temipora.backend_springboot.repositorios.MedioRepository;
+import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
+import com.temipora.backend_springboot.repositorios.ReservaStockRepository;
+import com.temipora.backend_springboot.repositorios.RolRepository;
+import com.temipora.backend_springboot.repositorios.TipoProductoRepository;
+import com.temipora.backend_springboot.repositorios.UsuarioRepository;
+import com.temipora.backend_springboot.servicios.CarritoService;
+import com.temipora.backend_springboot.servicios.CompraPagoService;
+import com.temipora.backend_springboot.servicios.CompraService;
+import com.temipora.backend_springboot.servicios.MonedaService;
+import com.temipora.backend_springboot.servicios.ProductoService;
+
+@SpringBootTest(properties = "pagos.proveedor=simulado")
+@Transactional
+class CompraProductoIntegracionTest {
+
+    @Autowired private CarritoService carritoService;
+    @Autowired private CompraService compraService;
+    @Autowired private CompraPagoService compraPagoService;
+    @Autowired private ProductoService productoService;
+    @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private RolRepository rolRepository;
+    @Autowired private TipoProductoRepository tipoProductoRepository;
+    @Autowired private MedioRepository medioRepository;
+    @Autowired private DerechoTerminoRepository derechoTerminoRepository;
+    @Autowired private ProductoVarianteRepository varianteRepository;
+    @Autowired private ReservaStockRepository reservaStockRepository;
+    @Autowired private EventoLedgerRepository eventoLedgerRepository;
+    @Autowired private MonedaService monedaService;
+
+    @Test
+    void carritoCheckoutYPagoSimulado_transfierePropiedadYRegistraVenta() {
+        Usuario artista = crearUsuario(ERol.ARTISTA);
+        Usuario cliente = crearUsuario(ERol.CLIENTE);
+        ProductoDTO producto = crearProductoDigitalUnico(artista);
+
+        Long idVariante = producto.getVariantes().get(0).getIdVariante();
+        CarritoItemRequest item = new CarritoItemRequest();
+        item.setIdVariante(idVariante);
+        item.setCantidad(1);
+        carritoService.agregar(cliente.getNombreUsuario(), item);
+
+        CheckoutRequest checkout = new CheckoutRequest();
+        checkout.setClaveIdempotencia("compra-test-" + UUID.randomUUID());
+        CompraDTO compra = compraService.crearDesdeCarrito(
+            cliente.getNombreUsuario(), checkout);
+
+        assertThat(compra.getEstado()).isEqualTo(EstadoCompra.PENDIENTE_PAGO);
+        assertThat(compra.getGrupos()).hasSize(1);
+        CompraGrupoDTO grupo = compra.getGrupos().get(0);
+        assertThat(grupo.getIdArtista()).isEqualTo(artista.getIdUsuario());
+        assertThat(grupo.getItems()).hasSize(1);
+        CompraItemDTO itemComprado = grupo.getItems().get(0);
+        assertThat(itemComprado.getEstadoEntrega()).isEqualTo(EstadoEntregaItem.PENDIENTE);
+
+        var reserva = reservaStockRepository.findByCompraItemIdCompraItem(
+            itemComprado.getIdCompraItem()).orElseThrow();
+        assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.ACTIVA);
+        assertThat(varianteRepository.findByIdVariante(idVariante).orElseThrow()
+            .getStockDisponible()).isEqualTo(1);
+
+        PagoCompraDTO pago = compraPagoService.iniciarPago(
+            cliente.getNombreUsuario(), compra.getIdCompra(), grupo.getIdCompraGrupo());
+        assertThat(pago.getInstruccion()).contains("simulado");
+
+        CompraDTO pagada = compraPagoService.confirmarSimulado(
+            cliente.getNombreUsuario(), pago.getIdIntentoCobro());
+
+        assertThat(pagada.getEstado()).isEqualTo(EstadoCompra.PAGA);
+        assertThat(pagada.getGrupos().get(0).getEstado().name()).isEqualTo("PAGADO");
+        assertThat(pagada.getGrupos().get(0).getItems().get(0)
+            .getEstadoEntrega()).isEqualTo(EstadoEntregaItem.ENTREGADO);
+
+        var variante = varianteRepository.findByIdVariante(idVariante).orElseThrow();
+        assertThat(variante.getStockDisponible()).isZero();
+        assertThat(variante.getEstado()).isEqualTo(EstadoVariante.AGOTADO);
+        assertThat(variante.getPropietarioActual().getIdUsuario())
+            .isEqualTo(cliente.getIdUsuario());
+
+        var eventos = eventoLedgerRepository
+            .findByVarianteIdVarianteOrderBySecuenciaAsc(idVariante);
+        assertThat(eventos).hasSize(2);
+        assertThat(eventos.get(1).getTipo()).isEqualTo(TipoEventoLedger.VENTA);
+        assertThat(eventos.get(1).getActorOrigen().getIdUsuario())
+            .isEqualTo(artista.getIdUsuario());
+        assertThat(eventos.get(1).getActorDestino().getIdUsuario())
+            .isEqualTo(cliente.getIdUsuario());
+        assertThat(eventos.get(1).getHashPrevio())
+            .isEqualTo(eventos.get(0).getHashEvento());
+    }
+
+    private ProductoDTO crearProductoDigitalUnico(Usuario artista) {
+        TipoProducto tipo = tipoProductoRepository
+            .findByActivoTrueOrderByNombreAsc().get(0);
+        Medio medio = medioRepository.findByActivoTrueOrderByNombreAsc().stream()
+            .filter(m -> m.getTipoEntrega() == TipoEntrega.DIGITAL)
+            .findFirst()
+            .orElseThrow();
+        Moneda moneda = monedaService.predeterminada();
+        DerechoTermino personal = derechoTerminoRepository
+            .findByActivoTrueOrderByOrdenAsc().stream()
+            .filter(derecho -> "PERSONAL".equals(derecho.getCodigo()))
+            .findFirst()
+            .orElseThrow();
+
+        String sha = UUID.randomUUID().toString().replace("-", "")
+            + UUID.randomUUID().toString().replace("-", "");
+        ProductoImagenRequest imagen = new ProductoImagenRequest();
+        imagen.setUrl("/uploads/compra-" + UUID.randomUUID() + ".webp");
+        imagen.setSha256(sha);
+        imagen.setClaveArchivoOriginal("productos/compra-" + UUID.randomUUID() + ".jpg");
+        imagen.setOrden(0);
+
+        ProductoVarianteRequest variante = new ProductoVarianteRequest();
+        variante.setNombre("Única");
+        variante.setPrecio(new BigDecimal("150.00"));
+        variante.setStockDisponible(1);
+        variante.setOrden(0);
+        variante.setUrlImagen(imagen.getUrl());
+        variante.setSha256(sha);
+        variante.setClaveArchivoOriginal(imagen.getClaveArchivoOriginal());
+
+        LicenciaProductoRequest licencia = new LicenciaProductoRequest();
+        licencia.setIdsDerechos(Set.of(personal.getIdDerechoTermino()));
+        licencia.setPorcentajeRegalia(BigDecimal.ZERO);
+
+        ProductoRequest request = new ProductoRequest();
+        request.setIdTipoProducto(tipo.getIdTipoProducto());
+        request.setIdMedio(medio.getIdMedio());
+        request.setIdMoneda(moneda.getIdMoneda());
+        request.setTitulo("Compra " + UUID.randomUUID());
+        request.setDescripcion("Producto digital para probar la compra.");
+        request.setImagenes(new ArrayList<>(List.of(imagen)));
+        request.setVariantes(new ArrayList<>(List.of(variante)));
+        request.setIdsEtiquetas(Set.of());
+        request.setContenidosSensibles(Set.of());
+        request.setLicencia(licencia);
+        return productoService.crear(artista.getIdUsuario(), request);
+    }
+
+    private Usuario crearUsuario(ERol rolNombre) {
+        Rol rol = rolRepository.findByNombre(rolNombre)
+            .orElseThrow(() -> new IllegalStateException(
+                "No existe el rol " + rolNombre));
+        String nombre = rolNombre.name().toLowerCase()
+            + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        Usuario usuario = new Usuario();
+        usuario.setNombreUsuario(nombre);
+        usuario.setNombreDisplay(nombre);
+        usuario.setContrasenia("test");
+        usuario.setCorreo(nombre + "@test.local");
+        usuario.setFechaCreacion(LocalDateTime.now());
+        usuario.setMonedaPreferida(monedaService.predeterminada());
+        usuario.setRol(rol);
+        return usuarioRepository.save(usuario);
+    }
+}

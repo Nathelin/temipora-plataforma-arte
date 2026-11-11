@@ -100,6 +100,7 @@ public class SecurityConfig {
                     "/api/ofertas/campana/**",
                     "/api/emails/baja/**",
                     "/api/pagos/mercadopago/webhook",
+                    "/api/pagos/mercadopago/webhook-compras",
                     "/api/pagos/mercadopago/oauth/callback"
                 ).permitAll()
                 .anyRequest().authenticated()
