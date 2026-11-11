@@ -163,6 +163,7 @@ public class LedgerService {
         evento.setActorOrigen(origen);
         evento.setActorDestino(comprador);
         evento.setMoneda(monedaEvento);
+        evento.setMonto(monto);
         evento.setOcurridoEn(ocurrido);
         evento.setHashPrevio(hashPrevio);
         evento.setHashImagen(hashImagen);

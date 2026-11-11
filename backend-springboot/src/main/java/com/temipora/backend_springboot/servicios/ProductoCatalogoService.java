@@ -4,7 +4,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
@@ -60,6 +62,7 @@ public class ProductoCatalogoService {
     private final MonedaService monedaService;
     private final ConversionMonedaService conversionMonedaService;
     private final LedgerService ledgerService;
+    private final RecomendacionProductoService recomendacionProductoService;
 
     public ProductoCatalogoService(
             ProductoRepository productoRepository,
@@ -67,13 +70,15 @@ public class ProductoCatalogoService {
             EventoLedgerRepository eventoLedgerRepository,
             MonedaService monedaService,
             ConversionMonedaService conversionMonedaService,
-            LedgerService ledgerService) {
+            LedgerService ledgerService,
+            RecomendacionProductoService recomendacionProductoService) {
         this.productoRepository = productoRepository;
         this.usuarioRepository = usuarioRepository;
         this.eventoLedgerRepository = eventoLedgerRepository;
         this.monedaService = monedaService;
         this.conversionMonedaService = conversionMonedaService;
         this.ledgerService = ledgerService;
+        this.recomendacionProductoService = recomendacionProductoService;
     }
 
     @Transactional(readOnly = true)
@@ -91,19 +96,54 @@ public class ProductoCatalogoService {
         boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
         Moneda moneda = monedaPreferidaDe(viewerId);
 
-        List<Producto> candidatos = productoRepository
+        List<Producto> filtrados = productoRepository
             .findByEstadoOrderByFechaCreacionDesc(EstadoProducto.DISPONIBLE).stream()
             .filter(producto -> !esDelViewer(producto, viewerId))
             .filter(producto -> !ocultarSensibles || !producto.isContenidoSensible())
             .filter(producto -> cumpleFiltros(producto, filtro, moneda))
-            .sorted(comparador(ordenSeguro, moneda))
             .toList();
 
-        int total = candidatos.size();
+        List<Producto> ordenados = filtrados.stream()
+            .sorted(comparador(ordenSeguro, moneda))
+            .toList();
+        boolean personalizado = false;
+        Map<Long, RecomendacionProductoService.ProductoPuntuado> puntuados =
+            Map.of();
+
+        if (ordenSeguro == OrdenProducto.RELEVANCIA && viewerId != null) {
+            RecomendacionProductoService.ResultadoRankingProducto ranking =
+                recomendacionProductoService.rankear(filtrados, viewerId, moneda);
+            if (ranking.personalizado()) {
+                Map<Long, RecomendacionProductoService.ProductoPuntuado> mapa =
+                    new HashMap<>();
+                for (RecomendacionProductoService.ProductoPuntuado item
+                        : ranking.items()) {
+                    mapa.put(item.producto().getIdProducto(), item);
+                }
+                puntuados = mapa;
+                ordenados = ranking.items().stream()
+                    .map(RecomendacionProductoService.ProductoPuntuado::producto)
+                    .toList();
+                personalizado = true;
+            }
+        }
+
+        int total = ordenados.size();
         int desde = Math.min(paginaSegura * tamanioSeguro, total);
         int hasta = Math.min(desde + tamanioSeguro, total);
-        List<ProductoCatalogoDTO> contenido = candidatos.subList(desde, hasta).stream()
-            .map(producto -> aDTO(producto, moneda, viewerId))
+        Map<Long, RecomendacionProductoService.ProductoPuntuado> puntuadosFinal =
+            puntuados;
+        List<ProductoCatalogoDTO> contenido = ordenados.subList(desde, hasta).stream()
+            .map(producto -> {
+                ProductoCatalogoDTO dto = aDTO(producto, moneda, viewerId);
+                RecomendacionProductoService.ProductoPuntuado item =
+                    puntuadosFinal.get(producto.getIdProducto());
+                if (item != null) {
+                    dto.setScore(item.score());
+                    dto.setMotivo(item.motivo());
+                }
+                return dto;
+            })
             .toList();
 
         int totalPaginas = total == 0
@@ -117,7 +157,7 @@ public class ProductoCatalogoService {
             .totalElementos(total)
             .totalPaginas(totalPaginas)
             .hayMas(hasta < total)
-            .personalizado(false)
+            .personalizado(personalizado)
             .build();
     }
 
@@ -148,6 +188,39 @@ public class ProductoCatalogoService {
         Moneda moneda = monedaPreferidaDe(viewerId);
         ProductoCatalogoDTO dto = aDTO(producto, moneda, viewerId);
         return completarDetalle(dto, producto, moneda);
+    }
+
+    /**
+     * Productos parecidos a uno dado. Reutiliza la misma fórmula de similitud
+     * del recomendador (etiquetas, categorías, tipo, medio, precio y
+     * disponibilidad) y excluye al propio producto y a los del viewer.
+     */
+    @Transactional(readOnly = true)
+    public List<ProductoCatalogoDTO> similares(
+            Long idProducto, Long viewerId, int limite) {
+        Producto origen = obtenerEntidadPublica(idProducto);
+        EPreferenciaContenidoSensible pref = preferenciaDe(viewerId);
+        boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
+        Moneda moneda = monedaPreferidaDe(viewerId);
+
+        List<Producto> candidatos = productoRepository
+            .findByEstadoOrderByFechaCreacionDesc(EstadoProducto.DISPONIBLE).stream()
+            .filter(producto -> !Objects.equals(
+                producto.getIdProducto(), idProducto))
+            .filter(producto -> !esDelViewer(producto, viewerId))
+            .filter(producto -> !ocultarSensibles || !producto.isContenidoSensible())
+            .toList();
+
+        int limiteSeguro = Math.min(Math.max(1, limite), TAMANIO_MAXIMO);
+        return recomendacionProductoService
+            .similares(origen, candidatos, viewerId, moneda, limiteSeguro).stream()
+            .map(item -> {
+                ProductoCatalogoDTO dto = aDTO(item.producto(), moneda, viewerId);
+                dto.setScore(item.score());
+                dto.setMotivo(item.motivo());
+                return dto;
+            })
+            .toList();
     }
 
     /**

@@ -3,6 +3,8 @@ package com.temipora.backend_springboot.modelo;
 import java.math.BigDecimal;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -65,4 +67,11 @@ public class ProductoCatalogoDTO {
     private LicenciaProductoDTO licencia;
     /** Solo en el detalle: etiquetas válidas asignadas. */
     private List<EtiquetaDTO> etiquetas;
+
+    /** Puntaje y motivo del recomendador; null cuando el listado no es personalizado. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Double score;
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String motivo;
 }

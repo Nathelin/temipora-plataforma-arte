@@ -138,6 +138,7 @@ class CompraProductoIntegracionTest {
             .isEqualTo(cliente.getIdUsuario());
         assertThat(eventos.get(1).getHashPrevio())
             .isEqualTo(eventos.get(0).getHashEvento());
+        assertThat(eventos.get(1).getMonto()).isEqualByComparingTo("150.00");
 
         CompraDTO detalle = compraService.obtener(
             cliente.getNombreUsuario(), compra.getIdCompra());

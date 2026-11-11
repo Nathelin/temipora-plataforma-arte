@@ -17,6 +17,7 @@ import com.temipora.backend_springboot.modelo.ProductoLedgerDTO;
 import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
 import com.temipora.backend_springboot.servicios.ProductoCatalogoService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
+import com.temipora.backend_springboot.servicios.VisitaService;
 
 /**
  * Catálogo público de productos. Sin autenticación obligatoria: si hay sesión
@@ -29,12 +30,15 @@ public class ProductoPublicoController {
 
     private final ProductoCatalogoService productoCatalogoService;
     private final UsuarioService usuarioService;
+    private final VisitaService visitaService;
 
     public ProductoPublicoController(
             ProductoCatalogoService productoCatalogoService,
-            UsuarioService usuarioService) {
+            UsuarioService usuarioService,
+            VisitaService visitaService) {
         this.productoCatalogoService = productoCatalogoService;
         this.usuarioService = usuarioService;
+        this.visitaService = visitaService;
     }
 
     @GetMapping
@@ -76,8 +80,25 @@ public class ProductoPublicoController {
     public ProductoCatalogoDTO obtener(
             @PathVariable Long idProducto,
             Authentication authentication) {
-        return productoCatalogoService.obtener(
-            idProducto, idVisor(authentication));
+        Long viewerId = idVisor(authentication);
+        ProductoCatalogoDTO producto =
+            productoCatalogoService.obtener(idProducto, viewerId);
+        if (viewerId != null
+                && producto.getIdArtista() != null
+                && !viewerId.equals(producto.getIdArtista())) {
+            visitaService.registrarProducto(viewerId, idProducto);
+            visitaService.registrarArtista(viewerId, producto.getIdArtista());
+        }
+        return producto;
+    }
+
+    @GetMapping("/{idProducto}/similares")
+    public List<ProductoCatalogoDTO> similares(
+            @PathVariable Long idProducto,
+            @RequestParam(defaultValue = "6") int limite,
+            Authentication authentication) {
+        return productoCatalogoService.similares(
+            idProducto, idVisor(authentication), limite);
     }
 
     @GetMapping("/{idProducto}/variantes")
