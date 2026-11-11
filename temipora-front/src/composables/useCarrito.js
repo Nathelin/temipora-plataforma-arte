@@ -75,10 +75,10 @@ async function quitar(idItem) {
   }
 }
 
-async function vaciar() {
+async function vaciar(idArtista = null) {
   error.value = ''
   try {
-    carrito.value = await vaciarCarrito()
+    carrito.value = await vaciarCarrito(idArtista)
     return carrito.value
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo vaciar el carrito.'

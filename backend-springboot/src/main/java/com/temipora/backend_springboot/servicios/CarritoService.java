@@ -166,6 +166,29 @@ public class CarritoService {
         return aDTO(carrito);
     }
 
+    @Transactional
+    public CarritoDTO vaciarArtista(String nombreUsuario, Long idArtista) {
+        if (idArtista == null) {
+            return vaciar(nombreUsuario);
+        }
+        Usuario usuario = usuarioService.getByNombreUsuario(nombreUsuario);
+        Carrito carrito = carritoRepository
+            .findByUsuarioIdUsuario(usuario.getIdUsuario())
+            .orElse(null);
+        if (carrito == null) {
+            return aDTO(null);
+        }
+        carrito.getItems().removeIf(item -> {
+            Producto producto = item.getVariante().getProducto();
+            return producto != null
+                && producto.getArtista() != null
+                && idArtista.equals(producto.getArtista().getIdUsuario());
+        });
+        carrito.setFechaActualizacion(LocalDateTime.now());
+        carritoRepository.save(carrito);
+        return aDTO(carrito);
+    }
+
     private Carrito carritoDe(Usuario usuario) {
         return carritoRepository.findByUsuarioIdUsuario(usuario.getIdUsuario())
             .orElseGet(() -> {

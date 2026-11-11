@@ -20,8 +20,9 @@ export async function quitarItem(idItem) {
   return res.data
 }
 
-export async function vaciarCarrito() {
-  const res = await api.delete('/carrito')
+export async function vaciarCarrito(idArtista = null) {
+  const config = idArtista != null ? { params: { artista: idArtista } } : undefined
+  const res = await api.delete('/carrito', config)
   return res.data
 }
 

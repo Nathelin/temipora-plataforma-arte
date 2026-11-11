@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.temipora.backend_springboot.modelo.CarritoDTO;
@@ -64,7 +65,13 @@ public class CarritoController {
     }
 
     @DeleteMapping
-    public CarritoDTO vaciar(Authentication authentication) {
+    public CarritoDTO vaciar(
+            @RequestParam(required = false) Long artista,
+            Authentication authentication) {
+        if (artista != null) {
+            return carritoService.vaciarArtista(
+                authentication.getName(), artista);
+        }
         return carritoService.vaciar(authentication.getName());
     }
 

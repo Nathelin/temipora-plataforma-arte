@@ -225,6 +225,37 @@ class CarritoServiceTest {
         assertThat(vaciado.getCantidadItems()).isZero();
     }
 
+    @Test
+    void vaciarArtista_eliminaSoloLosItemsDeEseArtista() {
+        Usuario cliente = usuario(1L, "cliente");
+        Carrito carrito = new Carrito();
+        carrito.setIdCarrito(1L);
+        carrito.setUsuario(cliente);
+
+        CarritoItem itemA = new CarritoItem();
+        itemA.setIdCarritoItem(5L);
+        itemA.setVariante(variante(10L, usuario(2L, "artistaA"), 1, "100.00"));
+        itemA.setCantidad(1);
+        carrito.agregarItem(itemA);
+
+        CarritoItem itemB = new CarritoItem();
+        itemB.setIdCarritoItem(6L);
+        itemB.setVariante(variante(11L, usuario(3L, "artistaB"), 1, "50.00"));
+        itemB.setCantidad(1);
+        carrito.agregarItem(itemB);
+
+        when(usuarioService.getByNombreUsuario("cliente")).thenReturn(cliente);
+        when(carritoRepository.findByUsuarioIdUsuario(1L)).thenReturn(Optional.of(carrito));
+        when(carritoRepository.save(any(Carrito.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubsDeCalculo();
+
+        CarritoDTO dto = service.vaciarArtista("cliente", 2L);
+
+        assertThat(dto.getGrupos()).hasSize(1);
+        assertThat(dto.getGrupos().get(0).getIdArtista()).isEqualTo(3L);
+        assertThat(dto.getCantidadItems()).isEqualTo(1);
+    }
+
     private void stubsDeCalculo() {
         lenient().when(monedaService.obtenerPorCodigo("ARS")).thenReturn(moneda());
         lenient().when(comisionService.obtener()).thenReturn(configuracion());

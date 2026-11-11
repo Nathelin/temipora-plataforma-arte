@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCarrito } from '../composables/useCarrito'
 import { useNotificaciones } from '../composables/useNotificaciones'
@@ -19,6 +19,9 @@ const {
   vaciar,
   confirmarCheckout,
 } = useCarrito()
+
+const artistaVaciado = ref('')
+const carritoVaciado = ref(false)
 
 const idArtistaSeleccionado = computed(() => {
   const valor = route.query.artista
@@ -89,6 +92,7 @@ function verCarrito(grupo) {
 }
 
 function volverAlIndice() {
+  carritoVaciado.value = false
   router.push({ name: 'carrito' })
 }
 
@@ -105,9 +109,21 @@ async function eliminar(item) {
 }
 
 async function limpiar() {
+  const grupo = grupoActivo.value
+  const soloEsteGrupo = Boolean(grupo) && cantidadGrupos.value > 1
   try {
-    await vaciar()
-    exito('Carrito vaciado.')
+    if (soloEsteGrupo) {
+      const nombre = grupo.nombreArtista
+      await vaciar(grupo.idArtista)
+      if (grupos.value.length) {
+        artistaVaciado.value = nombre
+        carritoVaciado.value = true
+      }
+      exito(`Carrito de @${nombre} vaciado.`)
+    } else {
+      await vaciar()
+      exito('Carrito vaciado.')
+    }
   } catch (e) {
     toastError(e.response?.data?.message || 'No se pudo vaciar el carrito.')
   }
@@ -171,7 +187,9 @@ onMounted(cargar)
           class="rounded-lg border border-rosa px-3 py-1.5 text-xs font-medium text-cafe transition hover:bg-rosa/20"
           @click="limpiar"
         >
-          Vaciar carrito
+          {{ !mostrarIndice && cantidadGrupos > 1
+            ? 'Vaciar este carrito'
+            : 'Vaciar carrito' }}
         </button>
       </div>
     </div>
@@ -201,6 +219,35 @@ onMounted(cargar)
       >
         Ver productos
       </router-link>
+    </div>
+
+    <div
+      v-else-if="carritoVaciado"
+      class="mt-10 rounded-[22px] border border-rosa/60 bg-superficie px-6 py-14 text-center"
+    >
+      <p class="font-display text-lg font-bold text-granate">
+        Vaciaste el carrito de @{{ artistaVaciado }}
+      </p>
+      <p class="mt-2 text-sm text-cafe/60">
+        {{ grupos.length === 1
+          ? 'Te queda 1 carrito con productos.'
+          : `Te quedan ${grupos.length} carritos con productos.` }}
+      </p>
+      <div class="mt-5 flex flex-wrap justify-center gap-3">
+        <router-link
+          to="/productos"
+          class="inline-flex rounded-lg bg-coral px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rojizo"
+        >
+          Ver productos
+        </router-link>
+        <button
+          type="button"
+          class="inline-flex rounded-lg border border-rosa px-4 py-2.5 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+          @click="volverAlIndice"
+        >
+          Volver a mis carritos
+        </button>
+      </div>
     </div>
 
     <div v-else class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
