@@ -17,4 +17,8 @@ public interface ProductoVarianteImagenRepository
 
     Optional<ProductoVarianteImagen> findByVarianteIdVarianteAndVigenteTrue(
             Long idVariante);
+
+    Optional<ProductoVarianteImagen>
+        findFirstByVarianteIdVarianteAndSha256OrderByNumeroDesc(
+            Long idVariante, String sha256);
 }

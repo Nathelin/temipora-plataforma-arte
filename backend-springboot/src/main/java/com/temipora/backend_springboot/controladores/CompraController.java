@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.temipora.backend_springboot.modelo.CompraDTO;
 import com.temipora.backend_springboot.modelo.CompraResumenDTO;
+import com.temipora.backend_springboot.modelo.ContadoresComprasDTO;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.servicios.CompraService;
 
@@ -28,9 +29,15 @@ public class CompraController {
     public PaginaDTO<CompraResumenDTO> listar(
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "12") int tamanio,
+            @RequestParam(required = false) String grupo,
             Authentication authentication) {
         return compraService.listar(
-            authentication.getName(), pagina, tamanio);
+            authentication.getName(), pagina, tamanio, grupo);
+    }
+
+    @GetMapping("/contadores")
+    public ContadoresComprasDTO contadores(Authentication authentication) {
+        return compraService.contadores(authentication.getName());
     }
 
     @GetMapping("/{idCompra}")

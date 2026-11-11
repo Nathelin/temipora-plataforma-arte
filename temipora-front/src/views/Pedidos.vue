@@ -9,6 +9,8 @@ import {
   ORDEN_PEDIDO_DEFAULT,
 } from '../servicios/pedidos'
 import FilaPedidoActivo from '../components/FilaPedidoActivo.vue'
+import EmptyState from '../components/EmptyState.vue'
+import PageHeader from '../components/PageHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -222,25 +224,22 @@ onUnmounted(() => {
 
 <template>
   <div class="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
-    <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-coral">Tu actividad</p>
-        <h1 class="mt-1 font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">
-          Pedidos
-        </h1>
-        <p class="mt-2 text-sm text-cafe/65">
-          {{ bandejaActiva === 'recibidos'
-            ? 'Pedidos que recibiste de tus clientes.'
-            : 'Pedidos que hiciste a otros artistas.' }}
-        </p>
-      </div>
-      <span
-        v-if="!cargando && !error"
-        class="inline-flex self-start rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral sm:self-auto"
-      >
-        {{ total }} {{ total === 1 ? 'pedido' : 'pedidos' }}
-      </span>
-    </header>
+    <PageHeader
+      eyebrow="Tu actividad"
+      titulo="Pedidos"
+      :descripcion="bandejaActiva === 'recibidos'
+        ? 'Pedidos que recibiste de tus clientes.'
+        : 'Pedidos que hiciste a otros artistas.'"
+    >
+      <template #acciones>
+        <span
+          v-if="!cargando && !error"
+          class="inline-flex self-start rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral sm:self-auto"
+        >
+          {{ total }} {{ total === 1 ? 'pedido' : 'pedidos' }}
+        </span>
+      </template>
+    </PageHeader>
 
     <div
       class="mt-5 flex gap-1 overflow-x-auto rounded-xl border border-rosa/60 bg-blanco p-1"
@@ -337,30 +336,29 @@ onUnmounted(() => {
       {{ error }}
     </p>
 
-    <div
+    <EmptyState
       v-else-if="!pedidos.length"
-      class="mt-8 rounded-3xl border border-dashed border-rosa/70 bg-blanco px-6 py-16 text-center"
+      :titulo="emptyState.titulo"
+      :detalle="emptyState.detalle"
     >
-      <p class="text-lg font-semibold text-granate">{{ emptyState.titulo }}</p>
-      <p class="mx-auto mt-2 max-w-md text-sm leading-relaxed text-cafe/60">
-        {{ emptyState.detalle }}
-      </p>
-      <button
-        v-if="hayFiltros"
-        type="button"
-        class="mt-5 inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition hover:bg-rojizo"
-        @click="limpiarFiltros"
-      >
-        Limpiar filtros
-      </button>
-      <router-link
-        v-else-if="bandejaActiva === 'enviados'"
-        to="/servicios"
-        class="mt-5 inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition hover:bg-rojizo"
-      >
-        Explorar servicios
-      </router-link>
-    </div>
+      <template #accion>
+        <button
+          v-if="hayFiltros"
+          type="button"
+          class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition hover:bg-rojizo"
+          @click="limpiarFiltros"
+        >
+          Limpiar filtros
+        </button>
+        <router-link
+          v-else-if="bandejaActiva === 'enviados'"
+          to="/servicios"
+          class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition hover:bg-rojizo"
+        >
+          Explorar servicios
+        </router-link>
+      </template>
+    </EmptyState>
 
     <div v-else class="mt-6 space-y-3">
       <FilaPedidoActivo

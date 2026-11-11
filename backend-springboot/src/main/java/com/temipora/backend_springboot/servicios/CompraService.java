@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +29,9 @@ import com.temipora.backend_springboot.modelo.CompraGrupo;
 import com.temipora.backend_springboot.modelo.CompraGrupoDTO;
 import com.temipora.backend_springboot.modelo.CompraItem;
 import com.temipora.backend_springboot.modelo.CompraItemDTO;
+import com.temipora.backend_springboot.modelo.CompraPreviewDTO;
 import com.temipora.backend_springboot.modelo.CompraResumenDTO;
+import com.temipora.backend_springboot.modelo.ContadoresComprasDTO;
 import com.temipora.backend_springboot.modelo.CuentaPagoUsuario;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.EstadoCompra;
@@ -37,10 +41,12 @@ import com.temipora.backend_springboot.modelo.EstadoEntregaItem;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
 import com.temipora.backend_springboot.modelo.EstadoReserva;
 import com.temipora.backend_springboot.modelo.LicenciaProducto;
+import com.temipora.backend_springboot.modelo.LicenciaCompraDTO;
 import com.temipora.backend_springboot.modelo.LicenciaProductoDerecho;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Producto;
+import com.temipora.backend_springboot.modelo.ProductoImagen;
 import com.temipora.backend_springboot.modelo.ProductoVariante;
 import com.temipora.backend_springboot.modelo.ReservaStock;
 import com.temipora.backend_springboot.modelo.TipoEntrega;
@@ -48,9 +54,13 @@ import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.CarritoRepository;
 import com.temipora.backend_springboot.repositorios.CompraRepository;
 import com.temipora.backend_springboot.repositorios.CuentaPagoUsuarioRepository;
+import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
+import com.temipora.backend_springboot.repositorios.ProductoVarianteImagenRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
 import com.temipora.backend_springboot.repositorios.ReservaStockRepository;
 import com.temipora.backend_springboot.servicios.pagos.mercadopago.MercadoPagoOAuthService;
+
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class CompraService {
@@ -58,6 +68,13 @@ public class CompraService {
     private static final String ARS = "ARS";
     private static final String PROVEEDOR_MP = MercadoPagoOAuthService.PROVEEDOR;
     private static final int TAMANIO_MAXIMO = 24;
+    private static final Set<EstadoCompra> ESTADOS_PENDIENTES = Set.of(
+        EstadoCompra.PENDIENTE_PAGO, EstadoCompra.PARCIALMENTE_PAGA);
+    private static final Set<EstadoCompra> ESTADOS_PAGADAS = Set.of(
+        EstadoCompra.PAGA);
+    private static final Set<EstadoCompra> ESTADOS_ARCHIVO = Set.of(
+        EstadoCompra.VENCIDA, EstadoCompra.CANCELADA);
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final CompraRepository compraRepository;
     private final CarritoRepository carritoRepository;
@@ -68,6 +85,8 @@ public class CompraService {
     private final MonedaService monedaService;
     private final ConversionMonedaService conversionMonedaService;
     private final ComisionService comisionService;
+    private final ProductoVarianteImagenRepository varianteImagenRepository;
+    private final EventoLedgerRepository eventoLedgerRepository;
     private final String proveedorPago;
     private final int reservaMinutos;
 
@@ -81,6 +100,8 @@ public class CompraService {
             MonedaService monedaService,
             ConversionMonedaService conversionMonedaService,
             ComisionService comisionService,
+            ProductoVarianteImagenRepository varianteImagenRepository,
+            EventoLedgerRepository eventoLedgerRepository,
             @Value("${pagos.proveedor:simulado}") String proveedorPago,
             @Value("${compra.reserva-minutos:30}") int reservaMinutos) {
         this.compraRepository = compraRepository;
@@ -92,6 +113,8 @@ public class CompraService {
         this.monedaService = monedaService;
         this.conversionMonedaService = conversionMonedaService;
         this.comisionService = comisionService;
+        this.varianteImagenRepository = varianteImagenRepository;
+        this.eventoLedgerRepository = eventoLedgerRepository;
         this.proveedorPago = proveedorPago;
         this.reservaMinutos = reservaMinutos;
     }
@@ -204,14 +227,25 @@ public class CompraService {
     @Transactional(readOnly = true)
     public PaginaDTO<CompraResumenDTO> listar(
             String nombreUsuario, int pagina, int tamanio) {
+        return listar(nombreUsuario, pagina, tamanio, null);
+    }
+
+    @Transactional(readOnly = true)
+    public PaginaDTO<CompraResumenDTO> listar(
+            String nombreUsuario, int pagina, int tamanio, String grupo) {
         Usuario cliente = usuarioService.getByNombreUsuario(nombreUsuario);
         int paginaSegura = Math.max(0, pagina);
         int tamanioSeguro = Math.min(Math.max(1, tamanio), TAMANIO_MAXIMO);
-        Page<Compra> page = compraRepository
-            .findByClienteIdUsuarioOrderByFechaCreacionDesc(
-                cliente.getIdUsuario(),
-                PageRequest.of(paginaSegura, tamanioSeguro,
-                    Sort.by(Sort.Direction.DESC, "fechaCreacion")));
+        PageRequest pageable = PageRequest.of(paginaSegura, tamanioSeguro,
+            Sort.by(Sort.Direction.DESC, "fechaCreacion"));
+
+        Set<EstadoCompra> estados = estadosDeGrupo(grupo);
+        Page<Compra> page = estados == null
+            ? compraRepository.findByClienteIdUsuarioOrderByFechaCreacionDesc(
+                cliente.getIdUsuario(), pageable)
+            : compraRepository
+                .findByClienteIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
+                    cliente.getIdUsuario(), estados, pageable);
 
         List<CompraResumenDTO> contenido = page.getContent().stream()
             .map(this::aResumen)
@@ -224,6 +258,50 @@ public class CompraService {
             .totalPaginas(page.getTotalPages())
             .hayMas(page.hasNext())
             .build();
+    }
+
+    @Transactional(readOnly = true)
+    public ContadoresComprasDTO contadores(String nombreUsuario) {
+        Usuario cliente = usuarioService.getByNombreUsuario(nombreUsuario);
+        long todas = 0;
+        long pendientes = 0;
+        long pagadas = 0;
+        long archivo = 0;
+        for (Object[] fila : compraRepository.contarPorEstado(
+                cliente.getIdUsuario())) {
+            if (fila == null || fila.length < 2 || fila[0] == null) {
+                continue;
+            }
+            EstadoCompra estado = (EstadoCompra) fila[0];
+            long cantidad = ((Number) fila[1]).longValue();
+            todas += cantidad;
+            if (ESTADOS_PENDIENTES.contains(estado)) {
+                pendientes += cantidad;
+            } else if (ESTADOS_PAGADAS.contains(estado)) {
+                pagadas += cantidad;
+            } else if (ESTADOS_ARCHIVO.contains(estado)) {
+                archivo += cantidad;
+            }
+        }
+        return ContadoresComprasDTO.builder()
+            .todas(todas)
+            .pendientes(pendientes)
+            .pagadas(pagadas)
+            .archivo(archivo)
+            .build();
+    }
+
+    private Set<EstadoCompra> estadosDeGrupo(String grupo) {
+        if (grupo == null || grupo.isBlank()
+                || "todas".equalsIgnoreCase(grupo)) {
+            return null;
+        }
+        return switch (grupo.trim().toLowerCase()) {
+            case "pendientes" -> ESTADOS_PENDIENTES;
+            case "pagadas" -> ESTADOS_PAGADAS;
+            case "archivo" -> ESTADOS_ARCHIVO;
+            default -> null;
+        };
     }
 
     @Transactional(readOnly = true)
@@ -393,8 +471,10 @@ public class CompraService {
     }
 
     private CompraResumenDTO aResumen(Compra compra) {
-        int cantidadItems = compra.getGrupos().stream()
+        List<CompraItem> items = compra.getGrupos().stream()
             .flatMap(grupo -> grupo.getItems().stream())
+            .toList();
+        int cantidadItems = items.stream()
             .mapToInt(CompraItem::getCantidad)
             .sum();
         boolean puedePagar = compra.getEstado() != EstadoCompra.VENCIDA
@@ -402,6 +482,36 @@ public class CompraService {
             && compra.getEstado() != EstadoCompra.PAGA
             && compra.getGrupos().stream()
                 .anyMatch(grupo -> grupo.getEstado() == EstadoCompraGrupo.PENDIENTE);
+
+        Set<Long> productos = new HashSet<>();
+        Map<Long, CompraPreviewDTO> previews = new LinkedHashMap<>();
+        boolean puedeDescargar = false;
+        for (CompraItem item : items) {
+            if (item.getProducto() != null) {
+                productos.add(item.getProducto().getIdProducto());
+            }
+            boolean descargable = puedeDescargar(item);
+            puedeDescargar = puedeDescargar || descargable;
+            Long clave = item.getVariante() != null
+                ? item.getVariante().getIdVariante()
+                : item.getIdCompraItem();
+            if (previews.size() < 3 && clave != null
+                    && !previews.containsKey(clave)) {
+                previews.put(clave, CompraPreviewDTO.builder()
+                    .idCompraItem(item.getIdCompraItem())
+                    .idProducto(item.getProducto() != null
+                        ? item.getProducto().getIdProducto() : null)
+                    .idVariante(item.getVariante() != null
+                        ? item.getVariante().getIdVariante() : null)
+                    .tituloProducto(item.getTituloProducto())
+                    .nombreVariante(item.getNombreVariante())
+                    .imagenUrl(imagenItem(item))
+                    .cantidad(item.getCantidad())
+                    .puedeDescargar(descargable)
+                    .motivoNoDescarga(motivoNoDescarga(item))
+                    .build());
+            }
+        }
 
         return CompraResumenDTO.builder()
             .idCompra(compra.getIdCompra())
@@ -412,7 +522,10 @@ public class CompraService {
             .fechaCreacion(compra.getFechaCreacion())
             .cantidadItems(cantidadItems)
             .cantidadGrupos(compra.getGrupos().size())
+            .cantidadProductos(productos.size())
             .puedePagar(puedePagar)
+            .puedeDescargar(puedeDescargar)
+            .itemsPreview(new ArrayList<>(previews.values()))
             .build();
     }
 
@@ -472,20 +585,12 @@ public class CompraService {
     }
 
     private CompraItemDTO aItemDTO(CompraItem item) {
-        boolean digital = item.getTipoEntrega() == TipoEntrega.DIGITAL;
-        boolean entregado = item.getEstadoEntrega() == EstadoEntregaItem.ENTREGADO;
-        boolean tieneArchivo = item.getVariante() != null
-            && item.getVariante().getClaveArchivoOriginal() != null
-            && !item.getVariante().getClaveArchivoOriginal().isBlank();
-        boolean puedeDescargar = digital && entregado && tieneArchivo;
-        String motivo = null;
-        if (!digital) {
-            motivo = "La entrega de esta pieza se coordina con el artista.";
-        } else if (!entregado) {
-            motivo = "El archivo se habilita cuando se acredita el pago.";
-        } else if (!tieneArchivo) {
-            motivo = "El archivo original no está disponible.";
-        }
+        boolean descargable = puedeDescargar(item);
+        Usuario artista = item.getProducto() != null
+            ? item.getProducto().getArtista() : null;
+        BigDecimal totalCobro = item.getPrecioCobro() != null
+            ? item.getPrecioCobro().multiply(BigDecimal.valueOf(item.getCantidad()))
+            : null;
 
         return CompraItemDTO.builder()
             .idCompraItem(item.getIdCompraItem())
@@ -501,11 +606,96 @@ public class CompraService {
             .monedaOriginal(item.getMonedaOriginal() != null
                 ? item.getMonedaOriginal().getCodigo() : null)
             .precioCobro(item.getPrecioCobro())
+            .precioTotalCobro(totalCobro)
             .comisionMonto(item.getComisionMonto())
             .estadoEntrega(item.getEstadoEntrega())
-            .puedeDescargar(puedeDescargar)
-            .motivoNoDescarga(motivo)
+            .puedeDescargar(descargable)
+            .motivoNoDescarga(motivoNoDescarga(item))
+            .idArtistaOriginal(artista != null ? artista.getIdUsuario() : null)
+            .nombreArtistaOriginal(artista != null
+                ? artista.getNombreUsuario() : null)
+            .nombreDisplayArtistaOriginal(artista != null
+                ? artista.getNombreDisplay() : null)
+            .urlFotoArtistaOriginal(artista != null ? fotoArtista(artista) : null)
+            .imagenUrl(imagenItem(item))
+            .sha256Archivo(item.getSha256Archivo())
+            .fechaEntrega(item.getFechaEntrega())
+            .tieneLedger(item.getVariante() != null
+                && eventoLedgerRepository.existsByVarianteIdVariante(
+                    item.getVariante().getIdVariante()))
+            .licencia(parseLicencia(item.getLicenciaSnapshot()))
             .build();
+    }
+
+    private boolean puedeDescargar(CompraItem item) {
+        boolean digital = item.getTipoEntrega() == TipoEntrega.DIGITAL;
+        boolean entregado = item.getEstadoEntrega() == EstadoEntregaItem.ENTREGADO;
+        boolean tieneArchivo = item.getVariante() != null
+            && item.getVariante().getClaveArchivoOriginal() != null
+            && !item.getVariante().getClaveArchivoOriginal().isBlank();
+        return digital && entregado && tieneArchivo;
+    }
+
+    private String motivoNoDescarga(CompraItem item) {
+        if (item.getTipoEntrega() != TipoEntrega.DIGITAL) {
+            return "La entrega de esta pieza se coordina con el artista.";
+        }
+        if (item.getEstadoEntrega() != EstadoEntregaItem.ENTREGADO) {
+            return "El archivo se habilita cuando se acredita el pago.";
+        }
+        if (item.getVariante() == null
+                || item.getVariante().getClaveArchivoOriginal() == null
+                || item.getVariante().getClaveArchivoOriginal().isBlank()) {
+            return "El archivo original no está disponible.";
+        }
+        return null;
+    }
+
+    private String imagenItem(CompraItem item) {
+        ProductoVariante variante = item.getVariante();
+        if (variante != null) {
+            if (item.getSha256Archivo() != null
+                    && !item.getSha256Archivo().isBlank()) {
+                var version = varianteImagenRepository
+                    .findFirstByVarianteIdVarianteAndSha256OrderByNumeroDesc(
+                        variante.getIdVariante(), item.getSha256Archivo());
+                if (version.isPresent() && version.get().getUrl() != null) {
+                    return version.get().getUrl();
+                }
+            }
+            if (variante.getImagenUrl() != null
+                    && !variante.getImagenUrl().isBlank()) {
+                return variante.getImagenUrl();
+            }
+        }
+        Producto producto = item.getProducto();
+        if (producto != null) {
+            if (producto.getImagenPortada() != null
+                    && !producto.getImagenPortada().isBlank()) {
+                return producto.getImagenPortada();
+            }
+            if (producto.getImagenes() != null) {
+                return producto.getImagenes().stream()
+                    .filter(imagen -> imagen != null && imagen.getUrl() != null)
+                    .sorted(Comparator.comparing(ProductoImagen::getOrden,
+                        Comparator.nullsLast(Integer::compareTo)))
+                    .map(ProductoImagen::getUrl)
+                    .findFirst()
+                    .orElse(null);
+            }
+        }
+        return null;
+    }
+
+    private LicenciaCompraDTO parseLicencia(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return JSON.readValue(json, LicenciaCompraDTO.class);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private String licenciaJson(LicenciaProducto licencia) {

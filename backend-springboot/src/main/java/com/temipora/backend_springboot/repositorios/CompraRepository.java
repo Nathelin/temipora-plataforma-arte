@@ -1,5 +1,7 @@
 package com.temipora.backend_springboot.repositorios;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -10,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.Compra;
+import com.temipora.backend_springboot.modelo.EstadoCompra;
 
 import jakarta.persistence.LockModeType;
 
@@ -17,6 +20,17 @@ public interface CompraRepository extends JpaRepository<Compra, Long> {
 
     Page<Compra> findByClienteIdUsuarioOrderByFechaCreacionDesc(
             Long idUsuario, Pageable pageable);
+
+    Page<Compra> findByClienteIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
+            Long idUsuario, Collection<EstadoCompra> estados, Pageable pageable);
+
+    @Query("""
+        SELECT c.estado, COUNT(c)
+        FROM Compra c
+        WHERE c.cliente.idUsuario = :idUsuario
+        GROUP BY c.estado
+        """)
+    List<Object[]> contarPorEstado(@Param("idUsuario") Long idUsuario);
 
     Optional<Compra> findByIdCompraAndClienteIdUsuario(
             Long idCompra, Long idUsuario);

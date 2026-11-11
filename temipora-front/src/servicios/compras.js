@@ -48,6 +48,21 @@ export const ESTADOS_ENTREGA = {
   CANCELADO: 'Cancelado',
 }
 
+export const GRUPOS_COMPRA = [
+  { clave: 'pagadas', texto: 'Pagadas' },
+  { clave: 'pendientes', texto: 'Pendientes' },
+  { clave: 'archivo', texto: 'Archivo' },
+  { clave: 'todas', texto: 'Todas' },
+]
+
+export const GRUPO_COMPRA_DEFAULT = 'pagadas'
+
+export function grupoCompraDeQuery(valor) {
+  return GRUPOS_COMPRA.some((grupo) => grupo.clave === valor)
+    ? valor
+    : GRUPO_COMPRA_DEFAULT
+}
+
 export function estadoCompraDe(estado) {
   return ESTADOS_COMPRA[estado] || {
     texto: estado || 'Sin estado',
@@ -64,6 +79,11 @@ export function estadoGrupoDe(estado) {
 
 export async function listarCompras(params = {}) {
   const res = await api.get('/compras', { params })
+  return res.data
+}
+
+export async function contarCompras() {
+  const res = await api.get('/compras/contadores')
   return res.data
 }
 

@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.modelo;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,8 +26,19 @@ public class CompraItemDTO {
     private BigDecimal precioOriginal;
     private String monedaOriginal;
     private BigDecimal precioCobro;
+    private BigDecimal precioTotalCobro;
     private BigDecimal comisionMonto;
     private EstadoEntregaItem estadoEntrega;
     private boolean puedeDescargar;
     private String motivoNoDescarga;
+
+    private Long idArtistaOriginal;
+    private String nombreArtistaOriginal;
+    private String nombreDisplayArtistaOriginal;
+    private String urlFotoArtistaOriginal;
+    private String imagenUrl;
+    private String sha256Archivo;
+    private LocalDateTime fechaEntrega;
+    private boolean tieneLedger;
+    private LicenciaCompraDTO licencia;
 }

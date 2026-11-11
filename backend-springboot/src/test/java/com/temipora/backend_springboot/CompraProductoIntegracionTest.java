@@ -143,9 +143,41 @@ class CompraProductoIntegracionTest {
         CompraDTO detalle = compraService.obtener(
             cliente.getNombreUsuario(), compra.getIdCompra());
         assertThat(detalle.getGrupos()).hasSize(1);
+
+        var itemDto = detalle.getGrupos().get(0).getItems().get(0);
+        assertThat(itemDto.getNombreArtistaOriginal())
+            .isEqualTo(artista.getNombreUsuario());
+        assertThat(itemDto.getImagenUrl()).isNotBlank();
+        assertThat(itemDto.getLicencia()).isNotNull();
+        assertThat(itemDto.getLicencia().getDerechos()).isNotEmpty();
+        assertThat(itemDto.isTieneLedger()).isTrue();
+        assertThat(itemDto.getPrecioTotalCobro()).isEqualByComparingTo("150.00");
+
         PaginaDTO<CompraResumenDTO> pagina = compraService.listar(
             cliente.getNombreUsuario(), 0, 10);
         assertThat(pagina.getContenido()).isNotEmpty();
+
+        var resumen = pagina.getContenido().get(0);
+        assertThat(resumen.getItemsPreview()).isNotEmpty();
+        assertThat(resumen.getCantidadProductos()).isGreaterThanOrEqualTo(1);
+        assertThat(resumen.isPuedeDescargar()).isTrue();
+
+        PaginaDTO<CompraResumenDTO> pagadas = compraService.listar(
+            cliente.getNombreUsuario(), 0, 10, "pagadas");
+        assertThat(pagadas.getContenido())
+            .extracting(CompraResumenDTO::getIdCompra)
+            .contains(compra.getIdCompra());
+
+        PaginaDTO<CompraResumenDTO> pendientes = compraService.listar(
+            cliente.getNombreUsuario(), 0, 10, "pendientes");
+        assertThat(pendientes.getContenido())
+            .extracting(CompraResumenDTO::getIdCompra)
+            .doesNotContain(compra.getIdCompra());
+
+        var contadores = compraService.contadores(cliente.getNombreUsuario());
+        assertThat(contadores.getTodas()).isGreaterThanOrEqualTo(1);
+        assertThat(contadores.getPagadas()).isGreaterThanOrEqualTo(1);
+
         CompraDTO repetida = compraService.crearDesdeCarrito(
             cliente.getNombreUsuario(), checkout);
         assertThat(repetida.getIdCompra()).isEqualTo(compra.getIdCompra());
