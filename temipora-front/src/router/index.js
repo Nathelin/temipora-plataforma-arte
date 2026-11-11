@@ -109,26 +109,9 @@ const routes = [
         },
       },
       {
-        path: 'compras',
-        name: 'compras',
-        component: MisCompras,
-        meta: {
-          title: 'Mis compras',
-          requiresAuth: true,
-          requiresComprador: true,
-        },
-      },
-      {
-        path: 'compras/:id',
-        name: 'compra-detalle',
-        component: CompraDetalle,
-        meta: {
-          title: 'Detalle de compra',
-          requiresAuth: true,
-          requiresComprador: true,
-        },
-      },
-      { path: 'servicios', name: 'servicios', component: Servicios,
+        path: 'servicios',
+        name: 'servicios',
+        component: Servicios,
         meta: { title: 'Servicios' }
       },
       { path: 'servicios/:id', name: 'servicio-detalle', component: ServicioDetalle,
@@ -197,18 +180,45 @@ const routes = [
         meta: { title: 'Notificaciones', requiresAuth: true },
       },
       {
-        path: 'solicitudes',
+        path: 'mi-actividad',
         component: ClientLayout,
         meta: { requiresAuth: true },
         children: [
+          { path: '', redirect: { name: 'compras' } },
           {
-            path: '',
+            path: '/compras',
+            name: 'compras',
+            component: MisCompras,
+            meta: { title: 'Mis compras', requiresComprador: true },
+          },
+          {
+            path: '/compras/:id',
+            name: 'compra-detalle',
+            component: CompraDetalle,
+            meta: { title: 'Detalle de compra', requiresComprador: true },
+          },
+          {
+            path: '/pedidos',
+            name: 'pedidos',
+            component: Pedidos,
+            meta: { title: 'Mis pedidos' },
+          },
+          {
+            path: '/pedidos/:idPedido',
+            name: 'pedido-detalle',
+            component: PedidoDetalle,
+            meta: {
+              title: (route) => `Pedido #${route.params.idPedido}`,
+            },
+          },
+          {
+            path: '/solicitudes',
             name: 'solicitudes',
             component: Solicitudes,
             meta: { title: 'Mis solicitudes' },
           },
           {
-            path: ':idSolicitud',
+            path: '/solicitudes/:idSolicitud',
             name: 'solicitud-detalle',
             component: SolicitudDetalle,
             meta: {
@@ -228,27 +238,6 @@ const routes = [
         },
       },
       {
-        path: 'pedidos',
-        component: ClientLayout,
-        meta: { requiresAuth: true },
-        children: [
-          {
-            path: '',
-            name: 'pedidos',
-            component: Pedidos,
-            meta: { title: 'Mis pedidos' },
-          },
-          {
-            path: ':idPedido',
-            name: 'pedido-detalle',
-            component: PedidoDetalle,
-            meta: {
-              title: (route) => `Pedido #${route.params.idPedido}`,
-            },
-          },
-        ],
-      },
-      {
         path: 'solicitudes/:idSolicitud/resultado',
         name: 'solicitud-resultado',
         component: CierreDetalle,
@@ -260,7 +249,7 @@ const routes = [
         component: CierreDetalle,
         meta: { title: 'Resultado del pedido' },
       },
-      { path: 'mis-compras', redirect: { name: 'pedidos' } },
+      { path: 'mis-compras', redirect: { name: 'compras' } },
       {
         path: 'mensajes',
         name: 'mensajes',

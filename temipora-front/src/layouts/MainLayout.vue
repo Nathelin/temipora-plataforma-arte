@@ -35,10 +35,10 @@ const contenedorNav = ref(null)
 const estaLogueado = computed(() => !!token.value)
 const esAdmin = computed(() => rol.value === 'ADMIN')
 const esArtista = computed(() => rol.value === 'ARTISTA')
-const puedeVerMisCompras = computed(() => estaLogueado.value && !esAdmin.value)
-const enMisCompras = computed(() => route.path.startsWith('/pedidos')
+const puedeVerActividad = computed(() => estaLogueado.value && !esAdmin.value)
+const enActividad = computed(() => route.path.startsWith('/compras')
+  || route.path.startsWith('/pedidos')
   || route.path.startsWith('/solicitudes'))
-const enCompras = computed(() => route.path.startsWith('/compras'))
 const enCarrito = computed(() => route.path.startsWith('/carrito'))
 const enPanel = computed(() => route.path.startsWith('/panel'))
 const enMensajes = computed(() => route.path.startsWith('/mensajes')
@@ -208,22 +208,13 @@ function irAPerfil() {
               Productos
             </router-link>
             <router-link
-              v-if="puedeVerMisCompras"
-              to="/pedidos"
-              class="relative inline-flex items-center gap-2 rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-sm font-semibold text-coral transition hover:bg-coral/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
-              :class="enMisCompras ? 'ring-2 ring-coral/40' : ''"
-              :aria-current="enMisCompras ? 'page' : undefined"
-            >
-              Mis pedidos
-            </router-link>
-            <router-link
-              v-if="puedeVerMisCompras"
+              v-if="puedeVerActividad"
               to="/compras"
               class="relative inline-flex items-center gap-2 rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-sm font-semibold text-coral transition hover:bg-coral/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
-              :class="enCompras ? 'ring-2 ring-coral/40' : ''"
-              :aria-current="enCompras ? 'page' : undefined"
+              :class="enActividad ? 'ring-2 ring-coral/40' : ''"
+              :aria-current="enActividad ? 'page' : undefined"
             >
-              Mis compras
+              Mi actividad
             </router-link>
             <router-link
               v-if="estaLogueado && esAdmin"
@@ -251,7 +242,7 @@ function irAPerfil() {
             <span class="transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true">→</span>
           </router-link>
 
-          <ThemeToggle class="hidden sm:inline-flex" />
+          <ThemeToggle v-if="!estaLogueado" class="hidden sm:inline-flex" />
 
           <router-link
             v-if="estaLogueado && !esAdmin"
@@ -378,7 +369,7 @@ function irAPerfil() {
                   role="menuitem"
                   @click="menuAbierto = false; router.push({ name: 'configuracion-apariencia' })"
                 >
-                  Preferencias
+                  Apariencia
                 </button>
                 <button
                   class="mt-1 w-full rounded-xl border-t border-rosa/30 px-3.5 py-2.5 text-left text-sm text-rojizo transition hover:bg-rosa/20"
@@ -450,27 +441,17 @@ function irAPerfil() {
                 Productos
               </router-link>
               <router-link
-                v-if="puedeVerMisCompras"
-                to="/pedidos"
-                class="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/25 bg-coral/10 px-4 py-3 text-sm font-semibold text-coral transition hover:bg-coral/15"
-                :class="enMisCompras ? 'ring-2 ring-coral/40' : ''"
-                :aria-current="enMisCompras ? 'page' : undefined"
-                @click="menuMovilAbierto = false"
-              >
-                Mis pedidos
-              </router-link>
-              <router-link
-                v-if="puedeVerMisCompras"
+                v-if="puedeVerActividad"
                 to="/compras"
-                class="flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/25 bg-coral/10 px-4 py-3 text-sm font-semibold text-coral transition hover:bg-coral/15"
-                :class="enCompras ? 'ring-2 ring-coral/40' : ''"
-                :aria-current="enCompras ? 'page' : undefined"
+                class="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/25 bg-coral/10 px-4 py-3 text-sm font-semibold text-coral transition hover:bg-coral/15"
+                :class="enActividad ? 'ring-2 ring-coral/40' : ''"
+                :aria-current="enActividad ? 'page' : undefined"
                 @click="menuMovilAbierto = false"
               >
-                Mis compras
+                Mi actividad
               </router-link>
               <router-link
-                v-if="puedeVerMisCompras"
+                v-if="puedeVerActividad"
                 to="/carrito"
                 class="flex w-full items-center justify-center gap-2 rounded-2xl border border-rosa px-4 py-3 text-sm font-semibold text-granate transition hover:bg-rosa/20"
                 :class="enCarrito ? 'ring-2 ring-coral/40' : ''"

@@ -5,6 +5,7 @@ import AccountLayout from '../components/AccountLayout.vue'
 const nombreUsuario = localStorage.getItem('nombreUsuario') || ''
 
 const ICONOS = {
+  compras: 'M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z',
   pedidos: 'M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H6.911a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661Z',
   solicitudes: 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m5.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z',
   cuenta: 'M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z',
@@ -13,7 +14,13 @@ const ICONOS = {
 
 const secciones = [
   {
-    titulo: 'Mi actividad',
+    titulo: 'Compras',
+    items: [
+      { nombre: 'Mis compras', to: '/compras', base: '/compras', icono: ICONOS.compras },
+    ],
+  },
+  {
+    titulo: 'Servicios',
     items: [
       { nombre: 'Mis pedidos', to: '/pedidos', base: '/pedidos', icono: ICONOS.pedidos },
       { nombre: 'Mis solicitudes', to: '/solicitudes', base: '/solicitudes', icono: ICONOS.solicitudes },
@@ -38,7 +45,7 @@ const inferior = computed(() => {
 
 <template>
   <AccountLayout
-    titulo="Mis compras"
+    titulo="Mi actividad"
     :secciones="secciones"
     :inferior="inferior"
   >

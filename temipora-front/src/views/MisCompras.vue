@@ -5,30 +5,33 @@ import { estadoCompraDe, listarCompras } from '../servicios/compras'
 
 const compras = ref([])
 const cargando = ref(true)
+const cargandoMas = ref(false)
 const error = ref('')
 const pagina = ref(0)
-const totalPaginas = ref(0)
 const hayMas = ref(false)
 
-async function cargar(nuevaPagina = pagina.value) {
-  cargando.value = true
+async function cargar({ append = false } = {}) {
+  const siguiente = append ? pagina.value + 1 : 0
+  if (append) cargandoMas.value = true
+  else cargando.value = true
   error.value = ''
   try {
-    const data = await listarCompras({ pagina: nuevaPagina, tamanio: 12 })
-    compras.value = data.contenido || []
-    pagina.value = data.pagina ?? nuevaPagina
-    totalPaginas.value = data.totalPaginas || 0
+    const data = await listarCompras({ pagina: siguiente, tamanio: 12 })
+    const contenido = data.contenido || []
+    compras.value = append ? [...compras.value, ...contenido] : contenido
+    pagina.value = data.pagina ?? siguiente
     hayMas.value = Boolean(data.hayMas)
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudieron cargar tus compras.'
   } finally {
     cargando.value = false
+    cargandoMas.value = false
   }
 }
 
-function irA(nuevaPagina) {
-  if (nuevaPagina < 0 || nuevaPagina >= totalPaginas.value) return
-  cargar(nuevaPagina)
+function cargarMas() {
+  if (cargandoMas.value || !hayMas.value) return
+  cargar({ append: true })
 }
 
 function fecha(valor) {
@@ -43,17 +46,16 @@ function fecha(valor) {
   }
 }
 
-onMounted(() => cargar(0))
+onMounted(() => cargar())
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-screen-lg px-4 py-8 sm:px-8 sm:py-10">
+  <div class="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
     <div class="flex flex-wrap items-end justify-between gap-3">
       <div>
         <h1 class="font-display text-2xl font-bold text-granate">Mis compras</h1>
         <p class="mt-1 text-sm text-cafe/60">
-          Compras de productos de la tienda. Los pedidos de servicios están en
-          “Mis pedidos”.
+          Tus compras de productos de la tienda.
         </p>
       </div>
       <router-link
@@ -65,7 +67,7 @@ onMounted(() => cargar(0))
     </div>
 
     <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando...</p>
-    <p v-else-if="error" class="mt-8 rounded-xl border border-rojizo/30 bg-rojizo/5 px-4 py-3 text-sm text-rojizo">
+    <p v-else-if="error && !compras.length" class="mt-8 rounded-xl border border-rojizo/30 bg-rojizo/5 px-4 py-3 text-sm text-rojizo">
       {{ error }}
     </p>
 
@@ -87,7 +89,14 @@ onMounted(() => cargar(0))
       </router-link>
     </div>
 
-    <div v-else class="mt-8 space-y-3">
+    <p
+      v-if="error && compras.length"
+      class="mt-6 rounded-xl border border-rojizo/30 bg-rojizo/5 px-4 py-3 text-sm text-rojizo"
+    >
+      {{ error }}
+    </p>
+
+    <div v-if="!cargando && compras.length" class="mt-8 space-y-3">
       <router-link
         v-for="compra in compras"
         :key="compra.idCompra"
@@ -123,25 +132,14 @@ onMounted(() => cargar(0))
         </div>
       </router-link>
 
-      <div v-if="totalPaginas > 1" class="flex items-center justify-between pt-3">
+      <div v-if="hayMas" class="flex justify-center pt-3">
         <button
           type="button"
-          class="rounded-lg border border-rosa/60 px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-40"
-          :disabled="pagina === 0"
-          @click="irA(pagina - 1)"
+          class="inline-flex items-center justify-center rounded-lg border border-rosa/60 px-4 py-2 text-sm font-semibold text-granate transition hover:bg-rosa/20 disabled:opacity-40"
+          :disabled="cargandoMas"
+          @click="cargarMas"
         >
-          ← Anterior
-        </button>
-        <span class="text-xs text-cafe/55">
-          Página {{ pagina + 1 }} de {{ totalPaginas }}
-        </span>
-        <button
-          type="button"
-          class="rounded-lg border border-rosa/60 px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-40"
-          :disabled="!hayMas"
-          @click="irA(pagina + 1)"
-        >
-          Siguiente →
+          {{ cargandoMas ? 'Cargando...' : 'Cargar más' }}
         </button>
       </div>
     </div>

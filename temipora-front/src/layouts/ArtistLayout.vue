@@ -60,7 +60,7 @@ const secciones = [
 
 const inferior = computed(() => {
   const items = [
-    { nombre: 'Mis compras', to: '/pedidos', icono: ICONOS.compras },
+    { nombre: 'Mi actividad', to: '/compras', icono: ICONOS.compras },
     { nombre: 'Configuración de cuenta', to: '/configuracion/perfil', icono: ICONOS.cuenta },
   ]
   if (nombreUsuario) {

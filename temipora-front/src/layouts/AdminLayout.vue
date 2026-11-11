@@ -3,7 +3,6 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BrandLogo from '../components/BrandLogo.vue'
 import { useAdminMenu } from '../composables/useAdminMenu'
-import ThemeToggle from '../components/ThemeToggle.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
 import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
 import { useNotificacionesSistema } from '../composables/useNotificacionesSistema'
@@ -273,8 +272,6 @@ function cerrarSesion() {
         </div>
 
         <div class="flex items-center gap-2.5">
-          <ThemeToggle />
-
           <PanelNotificaciones />
 
           <div ref="contenedorMenu" class="relative">
@@ -321,6 +318,13 @@ function cerrarSesion() {
               @click="menuAbierto = false; router.push({ name: 'inicio' })"
             >
               Ver plataforma
+            </button>
+            <button
+              class="w-full rounded-xl px-3.5 py-2.5 text-left text-sm text-cafe transition hover:bg-rosa/20 hover:text-granate"
+              role="menuitem"
+              @click="menuAbierto = false; router.push({ name: 'configuracion-apariencia' })"
+            >
+              Apariencia
             </button>
             <button
               class="mt-1 w-full rounded-xl border-t border-rosa/30 px-3.5 py-2.5 text-left text-sm text-rojizo transition hover:bg-rosa/20"
