@@ -210,8 +210,15 @@ public class ProveedorPagoProductoMercadoPago implements ProveedorPagoProducto {
     }
 
     private String urlRetorno(Compra compra, String resultado) {
-        return frontendUrl + "/compras/" + compra.getIdCompra()
+        return baseFrontend() + "/compras/" + compra.getIdCompra()
             + "?pago=" + resultado;
+    }
+
+    private String baseFrontend() {
+        if (frontendUrl == null || frontendUrl.isBlank()) {
+            return "http://localhost:5173";
+        }
+        return frontendUrl.replaceAll("/+$", "");
     }
 
     private String urlNotificacion() {

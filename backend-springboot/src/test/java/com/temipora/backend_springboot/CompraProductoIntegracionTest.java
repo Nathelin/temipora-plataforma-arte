@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,16 +21,20 @@ import com.temipora.backend_springboot.modelo.CheckoutRequest;
 import com.temipora.backend_springboot.modelo.CompraDTO;
 import com.temipora.backend_springboot.modelo.CompraGrupoDTO;
 import com.temipora.backend_springboot.modelo.CompraItemDTO;
+import com.temipora.backend_springboot.modelo.CompraResumenDTO;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EstadoCompra;
 import com.temipora.backend_springboot.modelo.EstadoEntregaItem;
+import com.temipora.backend_springboot.modelo.EstadoProducto;
 import com.temipora.backend_springboot.modelo.EstadoReserva;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
 import com.temipora.backend_springboot.modelo.LicenciaProductoRequest;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.PagoCompraDTO;
+import com.temipora.backend_springboot.modelo.Producto;
 import com.temipora.backend_springboot.modelo.ProductoDTO;
 import com.temipora.backend_springboot.modelo.ProductoImagenRequest;
 import com.temipora.backend_springboot.modelo.ProductoRequest;
@@ -42,12 +47,14 @@ import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
+import com.temipora.backend_springboot.repositorios.ProductoRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
 import com.temipora.backend_springboot.repositorios.ReservaStockRepository;
 import com.temipora.backend_springboot.repositorios.RolRepository;
 import com.temipora.backend_springboot.repositorios.TipoProductoRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 import com.temipora.backend_springboot.servicios.CarritoService;
+import com.temipora.backend_springboot.servicios.ConflictoException;
 import com.temipora.backend_springboot.servicios.CompraPagoService;
 import com.temipora.backend_springboot.servicios.CompraService;
 import com.temipora.backend_springboot.servicios.MonedaService;
@@ -66,6 +73,7 @@ class CompraProductoIntegracionTest {
     @Autowired private TipoProductoRepository tipoProductoRepository;
     @Autowired private MedioRepository medioRepository;
     @Autowired private DerechoTerminoRepository derechoTerminoRepository;
+    @Autowired private ProductoRepository productoRepository;
     @Autowired private ProductoVarianteRepository varianteRepository;
     @Autowired private ReservaStockRepository reservaStockRepository;
     @Autowired private EventoLedgerRepository eventoLedgerRepository;
@@ -130,6 +138,16 @@ class CompraProductoIntegracionTest {
             .isEqualTo(cliente.getIdUsuario());
         assertThat(eventos.get(1).getHashPrevio())
             .isEqualTo(eventos.get(0).getHashEvento());
+
+        CompraDTO detalle = compraService.obtener(
+            cliente.getNombreUsuario(), compra.getIdCompra());
+        assertThat(detalle.getGrupos()).hasSize(1);
+        PaginaDTO<CompraResumenDTO> pagina = compraService.listar(
+            cliente.getNombreUsuario(), 0, 10);
+        assertThat(pagina.getContenido()).isNotEmpty();
+        CompraDTO repetida = compraService.crearDesdeCarrito(
+            cliente.getNombreUsuario(), checkout);
+        assertThat(repetida.getIdCompra()).isEqualTo(compra.getIdCompra());
     }
 
     @Test
@@ -169,11 +187,126 @@ class CompraProductoIntegracionTest {
             .isEqualTo(artistaB.getIdUsuario());
     }
 
+    @Test
+    void checkout_artistaSinItems_lanzaConflicto() {
+        Usuario artista = crearUsuario(ERol.ARTISTA);
+        Usuario cliente = crearUsuario(ERol.CLIENTE);
+        ProductoDTO producto = crearProductoDigitalUnico(artista);
+        agregar(cliente, producto);
+
+        CheckoutRequest checkout = new CheckoutRequest();
+        checkout.setClaveIdempotencia("sin-items-" + UUID.randomUUID());
+        checkout.setIdArtista(999L);
+
+        assertThatThrownBy(() -> compraService.crearDesdeCarrito(
+            cliente.getNombreUsuario(), checkout))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("ese artista");
+    }
+
+    @Test
+    void checkout_productoPausado_lanzaConflicto() {
+        Usuario artista = crearUsuario(ERol.ARTISTA);
+        Usuario cliente = crearUsuario(ERol.CLIENTE);
+        ProductoDTO producto = crearProductoDigitalUnico(artista);
+        agregar(cliente, producto);
+        Producto entidad = productoRepository
+            .findByIdProducto(producto.getIdProducto()).orElseThrow();
+        entidad.setEstado(EstadoProducto.PAUSADO);
+        productoRepository.save(entidad);
+
+        CheckoutRequest checkout = new CheckoutRequest();
+        checkout.setClaveIdempotencia("pausado-" + UUID.randomUUID());
+
+        assertThatThrownBy(() -> compraService.crearDesdeCarrito(
+            cliente.getNombreUsuario(), checkout))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("no está disponible");
+    }
+
+    @Test
+    void checkout_varianteAgotada_lanzaConflicto() {
+        Usuario artista = crearUsuario(ERol.ARTISTA);
+        Usuario cliente = crearUsuario(ERol.CLIENTE);
+        ProductoDTO producto = crearProductoDigitalUnico(artista);
+        agregar(cliente, producto);
+        var variante = varianteRepository
+            .findByIdVariante(producto.getVariantes().get(0).getIdVariante())
+            .orElseThrow();
+        variante.setEstado(EstadoVariante.AGOTADO);
+        variante.setStockDisponible(0);
+        varianteRepository.save(variante);
+
+        CheckoutRequest checkout = new CheckoutRequest();
+        checkout.setClaveIdempotencia("agotada-" + UUID.randomUUID());
+
+        assertThatThrownBy(() -> compraService.crearDesdeCarrito(
+            cliente.getNombreUsuario(), checkout))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("no está disponible");
+    }
+
+    @Test
+    void checkout_sinPrecio_lanzaConflicto() {
+        Usuario artista = crearUsuario(ERol.ARTISTA);
+        Usuario cliente = crearUsuario(ERol.CLIENTE);
+        ProductoDTO producto = crearProductoDigitalUnico(artista);
+        agregar(cliente, producto);
+        var variante = varianteRepository
+            .findByIdVariante(producto.getVariantes().get(0).getIdVariante())
+            .orElseThrow();
+        variante.setPrecio(null);
+        varianteRepository.save(variante);
+
+        CheckoutRequest checkout = new CheckoutRequest();
+        checkout.setClaveIdempotencia("sin-precio-" + UUID.randomUUID());
+
+        assertThatThrownBy(() -> compraService.crearDesdeCarrito(
+            cliente.getNombreUsuario(), checkout))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("precio");
+    }
+
+    @Test
+    void compraFisica_pagoSimulado_marcaEntregadoSinDescarga() {
+        Usuario artista = crearUsuario(ERol.ARTISTA);
+        Usuario cliente = crearUsuario(ERol.CLIENTE);
+        ProductoDTO producto = crearProducto(artista, TipoEntrega.FISICA);
+        agregar(cliente, producto);
+
+        CheckoutRequest checkout = new CheckoutRequest();
+        checkout.setClaveIdempotencia("fisica-" + UUID.randomUUID());
+        CompraDTO compra = compraService.crearDesdeCarrito(
+            cliente.getNombreUsuario(), checkout);
+        CompraGrupoDTO grupo = compra.getGrupos().get(0);
+        PagoCompraDTO pago = compraPagoService.iniciarPago(
+            cliente.getNombreUsuario(), compra.getIdCompra(), grupo.getIdCompraGrupo());
+        CompraDTO pagada = compraPagoService.confirmarSimulado(
+            cliente.getNombreUsuario(), pago.getIdIntentoCobro());
+
+        CompraItemDTO item = pagada.getGrupos().get(0).getItems().get(0);
+        assertThat(item.getTipoEntrega()).isEqualTo(TipoEntrega.FISICA);
+        assertThat(item.getEstadoEntrega()).isEqualTo(EstadoEntregaItem.ENTREGADO);
+        assertThat(item.isPuedeDescargar()).isFalse();
+        assertThat(item.getMotivoNoDescarga()).contains("coordina");
+    }
+
+    private void agregar(Usuario cliente, ProductoDTO producto) {
+        CarritoItemRequest item = new CarritoItemRequest();
+        item.setIdVariante(producto.getVariantes().get(0).getIdVariante());
+        item.setCantidad(1);
+        carritoService.agregar(cliente.getNombreUsuario(), item);
+    }
+
     private ProductoDTO crearProductoDigitalUnico(Usuario artista) {
+        return crearProducto(artista, TipoEntrega.DIGITAL);
+    }
+
+    private ProductoDTO crearProducto(Usuario artista, TipoEntrega tipoEntrega) {
         TipoProducto tipo = tipoProductoRepository
             .findByActivoTrueOrderByNombreAsc().get(0);
         Medio medio = medioRepository.findByActivoTrueOrderByNombreAsc().stream()
-            .filter(m -> m.getTipoEntrega() == TipoEntrega.DIGITAL)
+            .filter(m -> m.getTipoEntrega() == tipoEntrega)
             .findFirst()
             .orElseThrow();
         Moneda moneda = monedaService.predeterminada();

@@ -181,8 +181,15 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
     }
 
     private String urlRetorno(Pedido pedido, String resultado) {
-        return frontendUrl + "/pedidos/" + pedido.getIdPedido()
+        return baseFrontend() + "/pedidos/" + pedido.getIdPedido()
             + "?pago=" + resultado;
+    }
+
+    private String baseFrontend() {
+        if (frontendUrl == null || frontendUrl.isBlank()) {
+            return "http://localhost:5173";
+        }
+        return frontendUrl.replaceAll("/+$", "");
     }
 
     private LocalDateTime expiracion(HitoPedido hito) {

@@ -53,7 +53,7 @@ class ProveedorPagoProductoMercadoPagoTest {
             oauthService,
             "https://host/api/pagos/mercadopago/webhook",
             "",
-            "https://front.test",
+            "https://front.test/",
             true,
             true,
             true,
@@ -86,6 +86,11 @@ class ProveedorPagoProductoMercadoPagoTest {
         assertThat(captor.getValue().get("binary_mode")).isEqualTo(true);
         assertThat(String.valueOf(captor.getValue().get("notification_url")))
             .isEqualTo("https://host/api/pagos/mercadopago/webhook-compras");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> backUrls =
+            (Map<String, Object>) captor.getValue().get("back_urls");
+        assertThat(backUrls.get("success"))
+            .isEqualTo("https://front.test/compras/1?pago=success");
     }
 
     @Test

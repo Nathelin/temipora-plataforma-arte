@@ -135,7 +135,8 @@ public class SecurityConfig {
             "http://localhost:5173",
             "https://*.ngrok-free.dev",
             "https://*.ngrok-free.app",
-            "https://*.trycloudflare.com"
+            "https://*.trycloudflare.com",
+            "https://*.devtunnels.ms"
         ));
         config.setAllowedMethods(List.of(
             "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

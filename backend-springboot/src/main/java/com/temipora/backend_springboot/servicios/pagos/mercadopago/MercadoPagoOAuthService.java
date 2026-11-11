@@ -79,7 +79,10 @@ public class MercadoPagoOAuthService {
     }
 
     public String redirectUri() {
-        return frontendUrl + "/api/pagos/mercadopago/oauth/callback";
+        String base = frontendUrl != null && !frontendUrl.isBlank()
+            ? frontendUrl.replaceAll("/+$", "")
+            : "http://localhost:5173";
+        return base + "/api/pagos/mercadopago/oauth/callback";
     }
 
     @Transactional

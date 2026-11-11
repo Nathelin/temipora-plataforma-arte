@@ -21,6 +21,7 @@ export default defineConfig({
       'exploring-slobbery-shrivel.ngrok-free.dev',
       '.ngrok-free.dev',
       '.trycloudflare.com',
+      '.devtunnels.ms',
     ],
     proxy: {
       '/api': {
