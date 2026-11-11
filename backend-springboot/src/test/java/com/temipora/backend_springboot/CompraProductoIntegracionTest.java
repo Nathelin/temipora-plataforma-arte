@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.CarritoDTO;
 import com.temipora.backend_springboot.modelo.CarritoItemRequest;
 import com.temipora.backend_springboot.modelo.CheckoutRequest;
 import com.temipora.backend_springboot.modelo.CompraDTO;
@@ -129,6 +130,43 @@ class CompraProductoIntegracionTest {
             .isEqualTo(cliente.getIdUsuario());
         assertThat(eventos.get(1).getHashPrevio())
             .isEqualTo(eventos.get(0).getHashEvento());
+    }
+
+    @Test
+    void checkoutPorArtista_compraSoloEseGrupoYDejaElRestoEnElCarrito() {
+        Usuario artistaA = crearUsuario(ERol.ARTISTA);
+        Usuario artistaB = crearUsuario(ERol.ARTISTA);
+        Usuario cliente = crearUsuario(ERol.CLIENTE);
+        ProductoDTO productoA = crearProductoDigitalUnico(artistaA);
+        ProductoDTO productoB = crearProductoDigitalUnico(artistaB);
+
+        CarritoItemRequest itemA = new CarritoItemRequest();
+        itemA.setIdVariante(productoA.getVariantes().get(0).getIdVariante());
+        itemA.setCantidad(1);
+        carritoService.agregar(cliente.getNombreUsuario(), itemA);
+
+        CarritoItemRequest itemB = new CarritoItemRequest();
+        itemB.setIdVariante(productoB.getVariantes().get(0).getIdVariante());
+        itemB.setCantidad(1);
+        carritoService.agregar(cliente.getNombreUsuario(), itemB);
+
+        CarritoDTO carrito = carritoService.obtener(cliente.getNombreUsuario());
+        assertThat(carrito.getGrupos()).hasSize(2);
+
+        CheckoutRequest checkout = new CheckoutRequest();
+        checkout.setClaveIdempotencia("compra-artista-" + UUID.randomUUID());
+        checkout.setIdArtista(artistaA.getIdUsuario());
+        CompraDTO compra = compraService.crearDesdeCarrito(
+            cliente.getNombreUsuario(), checkout);
+
+        assertThat(compra.getGrupos()).hasSize(1);
+        assertThat(compra.getGrupos().get(0).getIdArtista())
+            .isEqualTo(artistaA.getIdUsuario());
+
+        CarritoDTO restante = carritoService.obtener(cliente.getNombreUsuario());
+        assertThat(restante.getGrupos()).hasSize(1);
+        assertThat(restante.getGrupos().get(0).getIdArtista())
+            .isEqualTo(artistaB.getIdUsuario());
     }
 
     private ProductoDTO crearProductoDigitalUnico(Usuario artista) {

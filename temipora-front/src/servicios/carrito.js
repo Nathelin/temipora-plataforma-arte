@@ -25,7 +25,10 @@ export async function vaciarCarrito() {
   return res.data
 }
 
-export async function checkout(claveIdempotencia) {
-  const res = await api.post('/carrito/checkout', { claveIdempotencia })
+export async function checkout(claveIdempotencia, idArtista = null) {
+  const res = await api.post('/carrito/checkout', {
+    claveIdempotencia,
+    idArtista,
+  })
   return res.data
 }

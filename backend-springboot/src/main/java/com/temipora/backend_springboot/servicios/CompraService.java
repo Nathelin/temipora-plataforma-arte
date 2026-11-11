@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -120,10 +121,18 @@ public class CompraService {
             throw new ConflictoException("El carrito está vacío.");
         }
 
+        Long idArtista = request != null ? request.getIdArtista() : null;
+        List<CarritoItem> itemsSeleccionados = seleccionarItems(carrito, idArtista);
+        if (itemsSeleccionados.isEmpty()) {
+            throw new ConflictoException(
+                "No hay productos de ese artista en el carrito.");
+        }
+
         Moneda ars = monedaArs();
         BigDecimal porcentaje = comisionService.obtener().getPorcentajeProducto();
         LocalDateTime ahora = LocalDateTime.now();
-        Map<Long, List<CarritoItem>> porArtista = agruparPorArtista(carrito);
+        Map<Long, List<CarritoItem>> porArtista =
+            agruparPorArtista(itemsSeleccionados);
 
         Compra compra = new Compra();
         compra.setCliente(cliente);
@@ -181,7 +190,11 @@ public class CompraService {
         Compra guardada = compraRepository.saveAndFlush(compra);
         crearReservas(guardada, ahora);
 
-        carrito.getItems().clear();
+        Set<Long> idsSeleccionados = itemsSeleccionados.stream()
+            .map(CarritoItem::getIdCarritoItem)
+            .collect(java.util.stream.Collectors.toSet());
+        carrito.getItems().removeIf(item ->
+            idsSeleccionados.contains(item.getIdCarritoItem()));
         carrito.setFechaActualizacion(ahora);
         carritoRepository.save(carrito);
 
@@ -223,9 +236,25 @@ public class CompraService {
         return aDTO(compra);
     }
 
-    private Map<Long, List<CarritoItem>> agruparPorArtista(Carrito carrito) {
+    private List<CarritoItem> seleccionarItems(Carrito carrito, Long idArtista) {
+        List<CarritoItem> items = new ArrayList<>(carrito.getItems());
+        if (idArtista == null) {
+            return items;
+        }
+        return items.stream()
+            .filter(item -> {
+                Producto producto = item.getVariante().getProducto();
+                return producto != null
+                    && producto.getArtista() != null
+                    && idArtista.equals(producto.getArtista().getIdUsuario());
+            })
+            .toList();
+    }
+
+    private Map<Long, List<CarritoItem>> agruparPorArtista(
+            List<CarritoItem> items) {
         Map<Long, List<CarritoItem>> grupos = new LinkedHashMap<>();
-        for (CarritoItem item : carrito.getItems()) {
+        for (CarritoItem item : items) {
             Producto producto = item.getVariante().getProducto();
             Long idArtista = producto.getArtista() != null
                 ? producto.getArtista().getIdUsuario() : null;

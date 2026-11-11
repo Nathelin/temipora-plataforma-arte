@@ -86,11 +86,11 @@ async function vaciar() {
   }
 }
 
-async function confirmarCheckout(claveIdempotencia) {
+async function confirmarCheckout(claveIdempotencia, idArtista = null) {
   error.value = ''
   try {
-    const compra = await checkout(claveIdempotencia)
-    carrito.value = null
+    const compra = await checkout(claveIdempotencia, idArtista)
+    await cargar()
     return compra
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo iniciar la compra.'

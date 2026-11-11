@@ -58,7 +58,7 @@ public class CarritoService {
             ConversionMonedaService conversionMonedaService,
             ComisionService comisionService,
             MercadoPagoOAuthService oauthService,
-            @Value("${carrito.un-artista:true}") boolean unArtistaPorCarrito,
+            @Value("${carrito.un-artista:false}") boolean unArtistaPorCarrito,
             @Value("${pagos.proveedor:simulado}") String proveedorPago) {
         this.carritoRepository = carritoRepository;
         this.carritoItemRepository = carritoItemRepository;
@@ -357,7 +357,7 @@ public class CarritoService {
             .cantidad(item.getCantidad())
             .cantidadEditable(false)
             .motivoCantidadFija(
-                "Por ahora cada producto se agrega de a una unidad.")
+                "") // Por ahora cada producto se agrega de a una unidad.
             .stockDisponible(variante.getStockDisponible())
             .esUnica(variante.esUnica())
             .tipoEntrega(producto.getMedio() != null
