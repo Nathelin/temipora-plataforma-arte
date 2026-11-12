@@ -250,17 +250,23 @@ onMounted(cargar)
               />
               <div>
                 <router-link
-                  v-if="grupo.nombreArtista"
-                  :to="{ name: 'perfil', params: { nombreUsuario: grupo.nombreArtista } }"
+                  v-if="grupo.esReventa ? grupo.nombreVendedor : grupo.nombreArtista"
+                  :to="{ name: 'perfil', params: { nombreUsuario: grupo.esReventa ? grupo.nombreVendedor : grupo.nombreArtista } }"
                   class="text-sm font-semibold text-cafe/75 transition hover:text-coral"
                 >
-                  @{{ grupo.nombreArtista }}
+                  @{{ grupo.esReventa ? grupo.nombreVendedor : grupo.nombreArtista }}
                 </router-link>
                 <p v-else class="text-sm font-semibold text-cafe/75">
-                  Artista original
+                  {{ grupo.esReventa ? 'Revendedor' : 'Artista original' }}
                 </p>
                 <p class="text-xs text-cafe/50">
-                  Artista original · {{ grupo.items.length }} ítem(s)
+                  <span
+                    v-if="grupo.esReventa"
+                    class="mr-1 rounded-full bg-coral/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-coral"
+                  >
+                    Reventa
+                  </span>
+                  {{ grupo.esReventa ? 'Revendedor' : 'Artista original' }} · {{ grupo.items.length }} ítem(s)
                 </p>
               </div>
             </div>
@@ -312,8 +318,15 @@ onMounted(cargar)
                     <p class="mt-0.5 text-sm text-cafe/60">
                       {{ item.nombreVariante }} · {{ item.cantidad }} unidad(es)
                     </p>
+                    <p v-if="item.esReventa && item.nombreArtistaOriginal" class="mt-0.5 text-[11px] text-cafe/45">
+                      Obra original de @{{ item.nombreArtistaOriginal }}
+                    </p>
                     <p class="mt-1 text-[11px] text-cafe/45">
-                      {{ item.tipoEntrega === 'DIGITAL' ? 'Entrega digital' : 'Pieza física · envío coordinado con el artista' }}
+                      {{ item.tipoEntrega === 'DIGITAL'
+                        ? 'Entrega digital'
+                        : (item.esReventa
+                          ? 'Pieza física · envío coordinado con el revendedor'
+                          : 'Pieza física · envío coordinado con el artista') }}
                       · {{ item.estadoEntrega === 'ENTREGADO' ? 'Entregado' : 'Pendiente de entrega' }}
                     </p>
                     <p
@@ -379,9 +392,6 @@ onMounted(cargar)
                   <p class="mt-2 text-xs text-cafe/60">
                     {{ item.licencia.permiteModificaciones ? 'Permite modificaciones' : 'No permite modificaciones' }}
                     · {{ item.licencia.requiereCredito ? 'Requiere crédito' : 'No requiere crédito' }}
-                    <template v-if="item.licencia.porcentajeRegalia != null">
-                      · Regalía {{ item.licencia.porcentajeRegalia }}%
-                    </template>
                   </p>
                   <p v-if="item.licencia.textoAdicional" class="mt-2 whitespace-pre-line text-xs text-cafe/60">
                     {{ item.licencia.textoAdicional }}
@@ -403,7 +413,9 @@ onMounted(cargar)
 
           <div v-if="grupo.puedePagar" class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-rosa/40 pt-4">
             <p class="text-xs text-cafe/55">
-              El pago se acredita directo a la cuenta del artista.
+              {{ grupo.esReventa
+                ? 'El pago se acredita directo a la cuenta del revendedor.'
+                : 'El pago se acredita directo a la cuenta del artista.' }}
             </p>
             <button
               type="button"

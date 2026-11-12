@@ -71,6 +71,9 @@ import ProductoForm from '../views/ProductoForm.vue'
 import ProductoDetalle from '../views/ProductoDetalle.vue'
 import ProductoPublico from '../views/ProductoPublico.vue'
 import Productos from '../views/Productos.vue'
+import Reventas from '../views/Reventas.vue'
+import ReventaPublica from '../views/ReventaPublica.vue'
+import MiReventa from '../views/MiReventa.vue'
 import Carrito from '../views/Carrito.vue'
 import MisCompras from '../views/MisCompras.vue'
 import CompraDetalle from '../views/CompraDetalle.vue'
@@ -97,6 +100,13 @@ const routes = [
       { path: 'productos/:id', name: 'producto-publico', component: ProductoPublico,
         props: (route) => ({ id: Number(route.params.id) }),
         meta: { title: 'Detalle del producto' }
+      },
+      { path: 'reventas', name: 'reventas', component: Reventas,
+        meta: { title: 'Reventas' }
+      },
+      { path: 'reventas/:id', name: 'reventa-publica', component: ReventaPublica,
+        props: (route) => ({ id: Number(route.params.id) }),
+        meta: { title: 'Detalle de la reventa' }
       },
       {
         path: 'carrito',
@@ -196,6 +206,12 @@ const routes = [
             name: 'compra-detalle',
             component: CompraDetalle,
             meta: { title: 'Detalle de compra', requiresComprador: true },
+          },
+          {
+            path: '/reventa',
+            name: 'mi-reventa',
+            component: MiReventa,
+            meta: { title: 'Reventa', requiresComprador: true },
           },
           {
             path: '/pedidos',
@@ -317,7 +333,8 @@ const routes = [
           { path: 'apariencia', name: 'configuracion-apariencia', component: ConfiguracionApariencia, meta: { title: 'Configuración - Apariencia' } },
           { path: 'privacidad', name: 'configuracion-privacidad', component: ConfiguracionPrivacidad, meta: { title: 'Configuración - Privacidad' } },
           { path: 'cuenta', name: 'configuracion-cuenta', component: ConfiguracionCuenta, meta: { title: 'Configuración - Cuenta' } },
-          { path: 'cobros', name: 'configuracion-cobros', component: ConfiguracionCobros, meta: { title: 'Configuración - Formas de cobro', requiresArtist: true } },
+          { path: 'pagos-y-cobros', name: 'configuracion-pagos-y-cobros', component: ConfiguracionCobros, meta: { title: 'Configuración - Pagos y cobros', requiresAuth: true } },
+          { path: 'cobros', redirect: { name: 'configuracion-pagos-y-cobros' } },
         ],
       },
       { path: 'about', redirect: '/' },

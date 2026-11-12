@@ -21,6 +21,8 @@ public class CompraGrupoDTO {
     private Long idCompraGrupo;
     private Long idArtista;
     private String nombreArtista;
+    private String nombreVendedor;
+    private boolean esReventa;
     private String urlFotoArtista;
     private BigDecimal subtotal;
     private String moneda;

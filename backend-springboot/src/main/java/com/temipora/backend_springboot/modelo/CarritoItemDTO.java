@@ -19,6 +19,10 @@ public class CarritoItemDTO {
     private Long idVariante;
     private Long idProducto;
     private Long idArtista;
+    private Long idArtistaOriginal;
+    private String nombreArtistaOriginal;
+    private Long idPublicacionReventa;
+    private boolean esReventa;
     private String titulo;
     private String nombreVariante;
     private String imagenUrl;

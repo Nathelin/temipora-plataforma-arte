@@ -166,10 +166,10 @@ onMounted(cargar)
               : 'Tu carrito') }}
         </h1>
         <p v-if="mostrarIndice" class="mt-1 text-sm text-cafe/60">
-          Tenés productos de {{ cantidadGrupos }} artistas. Cada tienda se paga por separado.
+          Tenés productos de {{ cantidadGrupos }} vendedores. Cada tienda se paga por separado.
         </p>
         <p v-else-if="cantidadGrupos > 1" class="mt-1 text-sm text-cafe/60">
-          Este pago corresponde solo a este artista. Los demás quedan en tu carrito.
+          Este pago corresponde solo a este vendedor. Los demás quedan en tu carrito.
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -280,6 +280,12 @@ onMounted(cargar)
                   @{{ grupo.nombreArtista }}
                 </p>
                 <p class="text-xs text-cafe/55">
+                  <span
+                    v-if="grupo.esReventa"
+                    class="mr-1 rounded-full bg-coral/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-coral"
+                  >
+                    Reventa
+                  </span>
                   {{ grupo.items.length }} producto(s)
                 </p>
               </div>
@@ -345,6 +351,12 @@ onMounted(cargar)
                 </span>
               </router-link>
               <span
+                v-if="grupo.esReventa"
+                class="rounded-full bg-coral/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-coral"
+              >
+                Reventa
+              </span>
+              <span
                 v-if="!grupo.puedeCobrar"
                 class="rounded-full bg-rojizo/10 px-2.5 py-0.5 text-[11px] font-semibold text-rojizo"
               >
@@ -369,12 +381,17 @@ onMounted(cargar)
 
                 <div class="min-w-0 flex-1">
                   <router-link
-                    :to="{ name: 'producto-publico', params: { id: item.idProducto } }"
+                    :to="item.esReventa
+                      ? { name: 'reventa-publica', params: { id: item.idPublicacionReventa } }
+                      : { name: 'producto-publico', params: { id: item.idProducto } }"
                     class="font-display text-base font-bold text-granate transition hover:text-coral"
                   >
                     {{ item.titulo }}
                   </router-link>
                   <p class="mt-1 text-sm text-cafe/60">{{ item.nombreVariante }}</p>
+                  <p v-if="item.esReventa && item.nombreArtistaOriginal" class="mt-0.5 text-[11px] text-cafe/45">
+                    Reventa · Obra original de @{{ item.nombreArtistaOriginal }}
+                  </p>
                   <p v-if="!item.disponible" class="mt-1 text-xs text-rojizo">
                     {{ item.motivoNoDisponible }}
                   </p>
@@ -405,7 +422,7 @@ onMounted(cargar)
             </div>
 
             <div class="mt-3 flex items-center justify-between border-t border-rosa/40 pt-3">
-              <span class="text-xs text-cafe/55">Subtotal del artista</span>
+              <span class="text-xs text-cafe/55">Subtotal del vendedor</span>
               <span class="font-display text-base font-bold text-granate">
                 {{ totalGrupo(grupo) }}
               </span>

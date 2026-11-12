@@ -22,7 +22,8 @@ public class ComisionService {
     private static final String ENTIDAD = "ConfiguracionComision";
     private static final List<CampoAuditado> CAMPOS = List.of(
         CampoAuditado.de("porcentajeServicio", "Comisión de servicios"),
-        CampoAuditado.de("porcentajeProducto", "Comisión de productos"));
+        CampoAuditado.de("porcentajeProducto", "Comisión de productos"),
+        CampoAuditado.de("porcentajeReventa", "Comisión de reventas"));
 
     private final ConfiguracionComisionRepository configuracionRepository;
     private final AuditoriaService auditoria;
@@ -42,6 +43,7 @@ public class ComisionService {
                 config.setIdConfiguracion(ConfiguracionComision.ID_UNICO);
                 config.setPorcentajeServicio(ConfiguracionComision.PORCENTAJE_POR_DEFECTO);
                 config.setPorcentajeProducto(ConfiguracionComision.PORCENTAJE_POR_DEFECTO);
+                config.setPorcentajeReventa(ConfiguracionComision.PORCENTAJE_POR_DEFECTO);
                 return configuracionRepository.save(config);
             });
     }
@@ -55,16 +57,19 @@ public class ComisionService {
     public ComisionConfigDTO actualizar(ComisionConfigRequest request) {
         if (request == null
                 || request.getPorcentajeServicio() == null
-                || request.getPorcentajeProducto() == null) {
+                || request.getPorcentajeProducto() == null
+                || request.getPorcentajeReventa() == null) {
             throw new IllegalArgumentException("Las comisiones son obligatorias.");
         }
         BigDecimal servicio = normalizar(request.getPorcentajeServicio(), "servicios");
         BigDecimal producto = normalizar(request.getPorcentajeProducto(), "productos");
+        BigDecimal reventa = normalizar(request.getPorcentajeReventa(), "reventas");
 
         ConfiguracionComision config = obtener();
         Snapshot antes = Snapshot.de(config, CAMPOS);
         config.setPorcentajeServicio(servicio);
         config.setPorcentajeProducto(producto);
+        config.setPorcentajeReventa(reventa);
         config.setFechaActualizacion(LocalDateTime.now());
         ConfiguracionComision guardada = configuracionRepository.save(config);
         auditoria.registrar(

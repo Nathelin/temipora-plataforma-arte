@@ -21,6 +21,7 @@ import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaDTO;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
+import com.temipora.backend_springboot.modelo.EstadoPublicacionReventa;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
 import com.temipora.backend_springboot.modelo.EventoLedgerDTO;
 import com.temipora.backend_springboot.modelo.EventoLedgerPublicoDTO;
@@ -40,11 +41,13 @@ import com.temipora.backend_springboot.modelo.ProductoLedgerDTO;
 import com.temipora.backend_springboot.modelo.ProductoLedgerPublicoDTO;
 import com.temipora.backend_springboot.modelo.ProductoVariante;
 import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
+import com.temipora.backend_springboot.modelo.PublicacionReventa;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.VarianteLedgerDTO;
 import com.temipora.backend_springboot.modelo.VarianteLedgerPublicoDTO;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
+import com.temipora.backend_springboot.repositorios.PublicacionReventaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 /**
@@ -64,6 +67,7 @@ public class ProductoCatalogoService {
     private final ProductoRepository productoRepository;
     private final UsuarioRepository usuarioRepository;
     private final EventoLedgerRepository eventoLedgerRepository;
+    private final PublicacionReventaRepository publicacionReventaRepository;
     private final MonedaService monedaService;
     private final ConversionMonedaService conversionMonedaService;
     private final LedgerService ledgerService;
@@ -73,6 +77,7 @@ public class ProductoCatalogoService {
             ProductoRepository productoRepository,
             UsuarioRepository usuarioRepository,
             EventoLedgerRepository eventoLedgerRepository,
+            PublicacionReventaRepository publicacionReventaRepository,
             MonedaService monedaService,
             ConversionMonedaService conversionMonedaService,
             LedgerService ledgerService,
@@ -80,6 +85,7 @@ public class ProductoCatalogoService {
         this.productoRepository = productoRepository;
         this.usuarioRepository = usuarioRepository;
         this.eventoLedgerRepository = eventoLedgerRepository;
+        this.publicacionReventaRepository = publicacionReventaRepository;
         this.monedaService = monedaService;
         this.conversionMonedaService = conversionMonedaService;
         this.ledgerService = ledgerService;
@@ -185,6 +191,65 @@ public class ProductoCatalogoService {
             .toList();
     }
 
+    @Transactional(readOnly = true)
+    public PaginaDTO<ProductoCatalogoDTO> listarReventas(
+            Long viewerId, int pagina, int tamanio) {
+        int paginaSegura = Math.max(0, pagina);
+        int tamanioSeguro = Math.min(TAMANIO_MAXIMO, Math.max(1, tamanio));
+        List<ProductoCatalogoDTO> items = publicacionReventaRepository
+            .findByEstadoOrderByFechaPublicacionDesc(
+                EstadoPublicacionReventa.PUBLICADA)
+            .stream()
+            .filter(publicacion -> publicacion.getVariante() != null
+                && publicacion.getVariante().getProducto() != null)
+            .map(publicacion -> aDTOReventa(publicacion, viewerId))
+            .toList();
+        int total = items.size();
+        int desde = Math.min(paginaSegura * tamanioSeguro, total);
+        int hasta = Math.min(desde + tamanioSeguro, total);
+        int totalPaginas = total == 0
+            ? 0
+            : (int) Math.ceil((double) total / tamanioSeguro);
+        return PaginaDTO.<ProductoCatalogoDTO>builder()
+            .contenido(items.subList(desde, hasta))
+            .pagina(paginaSegura)
+            .tamanio(tamanioSeguro)
+            .totalElementos(total)
+            .totalPaginas(totalPaginas)
+            .hayMas(hasta < total)
+            .build();
+    }
+
+    private ProductoCatalogoDTO aDTOReventa(
+            PublicacionReventa publicacion, Long viewerId) {
+        Producto producto = publicacion.getVariante().getProducto();
+        Moneda moneda = monedaPreferidaDe(viewerId);
+        ProductoCatalogoDTO dto = aDTO(producto, moneda, viewerId);
+        dto.setEsReventa(true);
+        dto.setIdPublicacionReventa(publicacion.getIdPublicacionReventa());
+        dto.setNombreVendedor(publicacion.getVendedor() != null
+            ? publicacion.getVendedor().getNombreUsuario() : null);
+        dto.setPrecioDesde(convertir(publicacion.getPrecio(), producto, moneda));
+        dto.setMoneda(moneda != null ? moneda.getCodigo()
+            : (producto.getMoneda() != null
+                ? producto.getMoneda().getCodigo() : null));
+        dto.setDisponible(true);
+        dto.setEsPiezaUnica(true);
+        dto.setCantidadVariantes(1);
+        dto.setCantidadVariantesDisponibles(1);
+        dto.setStockTotal(0);
+        dto.setTieneStockIlimitado(false);
+        String imagen = publicacion.getVariante().getImagenUrl();
+        if (imagen != null && !imagen.isBlank()) {
+            dto.setImagenPortada(imagen);
+        }
+        dto.setVariantes(null);
+        dto.setImagenes(null);
+        dto.setLicencia(null);
+        dto.setEtiquetas(null);
+        return dto;
+    }
+
     /**
      * Detalle público. Solo productos en estado DISPONIBLE: un borrador,
      * pausado o archivado no se expone.
@@ -245,14 +310,18 @@ public class ProductoCatalogoService {
         Set<Long> conLedger = eventoLedgerRepository.findVariantesConLedger(
             List.of(producto.getIdProducto()));
 
-        List<ProductoVarianteDTO> visibles = producto.getVariantes().stream()
+        List<ProductoVariante> visibles = producto.getVariantes().stream()
             .filter(variante -> variante.getEstado() != EstadoVariante.ARCHIVADO)
             .sorted(Comparator.comparing(ProductoVariante::getOrden,
                 Comparator.nullsLast(Integer::compareTo)))
-            .map(variante -> aVarianteDTOPublica(variante, conLedger, producto, moneda))
+            .toList();
+        Map<Long, PublicacionReventa> reventas = mapaReventas(visibles);
+        List<ProductoVarianteDTO> variantes = visibles.stream()
+            .map(variante -> aVarianteDTOPublica(variante, conLedger, producto,
+                moneda, reventas.get(variante.getIdVariante())))
             .toList();
 
-        int total = visibles.size();
+        int total = variantes.size();
         int desde = Math.min((paginaSegura - 1) * tamanoSeguro, total);
         int hasta = Math.min(desde + tamanoSeguro, total);
         int totalPaginas = total == 0
@@ -260,7 +329,7 @@ public class ProductoCatalogoService {
             : (int) Math.ceil((double) total / tamanoSeguro);
 
         return PaginaDTO.<ProductoVarianteDTO>builder()
-            .contenido(visibles.subList(desde, hasta))
+            .contenido(variantes.subList(desde, hasta))
             .pagina(paginaSegura)
             .tamanio(tamanoSeguro)
             .totalElementos(total)
@@ -340,6 +409,7 @@ public class ProductoCatalogoService {
             .toList();
         Set<Long> conLedger = eventoLedgerRepository.findVariantesConLedger(
             List.of(producto.getIdProducto()));
+        Map<Long, PublicacionReventa> reventas = mapaReventas(variantes);
 
         dto.setImagenes(producto.getImagenes().stream()
             .sorted(Comparator.comparing(ProductoImagen::getOrden,
@@ -352,7 +422,8 @@ public class ProductoCatalogoService {
             .toList());
         dto.setVariantes(variantes.stream()
             .map(variante -> aVarianteDTOPublica(
-                variante, conLedger, producto, monedaDestino))
+                variante, conLedger, producto, monedaDestino,
+                reventas.get(variante.getIdVariante())))
             .toList());
         dto.setLicencia(licenciaDTO(producto.licenciaVigente()));
         dto.setEtiquetas(producto.getEtiquetas().stream()
@@ -372,7 +443,8 @@ public class ProductoCatalogoService {
             ProductoVariante variante,
             Set<Long> variantesConLedger,
             Producto producto,
-            Moneda monedaDestino) {
+            Moneda monedaDestino,
+            PublicacionReventa publicacion) {
         return ProductoVarianteDTO.builder()
             .idVariante(variante.getIdVariante())
             .nombre(variante.getNombre())
@@ -388,7 +460,35 @@ public class ProductoCatalogoService {
             .esUnica(variante.esUnica())
             .tieneLedger(variante.getIdVariante() != null
                 && variantesConLedger.contains(variante.getIdVariante()))
+            .idPublicacionReventa(publicacion != null
+                ? publicacion.getIdPublicacionReventa() : null)
+            .precioReventa(publicacion != null
+                ? convertir(publicacion.getPrecio(), producto, monedaDestino)
+                : null)
+            .enReventa(publicacion != null)
             .build();
+    }
+
+    private Map<Long, PublicacionReventa> mapaReventas(
+            List<ProductoVariante> variantes) {
+        Map<Long, PublicacionReventa> reventas = new HashMap<>();
+        List<Long> ids = variantes.stream()
+            .map(ProductoVariante::getIdVariante)
+            .filter(Objects::nonNull)
+            .toList();
+        if (ids.isEmpty()) {
+            return reventas;
+        }
+        for (PublicacionReventa publicacion
+                : publicacionReventaRepository
+                    .findByVarianteIdVarianteInAndEstado(
+                        ids, EstadoPublicacionReventa.PUBLICADA)) {
+            if (publicacion.getVariante() != null) {
+                reventas.put(publicacion.getVariante().getIdVariante(),
+                    publicacion);
+            }
+        }
+        return reventas;
     }
 
     private LicenciaProductoDTO licenciaDTO(LicenciaProducto licencia) {

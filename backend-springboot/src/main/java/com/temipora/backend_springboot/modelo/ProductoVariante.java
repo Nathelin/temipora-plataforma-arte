@@ -82,6 +82,13 @@ public class ProductoVariante {
     @Column(name = "numero_edicion")
     private Integer numeroEdicion;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_tope_reventa", length = 30)
+    private TipoTopeReventa tipoTopeReventa;
+
+    @Column(name = "precio_tope_reventa", precision = 12, scale = 2)
+    private BigDecimal precioTopeReventa;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_propietario_actual")
     private Usuario propietarioActual;

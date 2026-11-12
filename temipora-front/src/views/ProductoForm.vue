@@ -106,7 +106,6 @@ const licencia = ref({
   idsDerechos: [],
   permiteModificaciones: false,
   requiereCredito: false,
-  porcentajeRegalia: 0,
   textoAdicional: '',
 })
 const estadoGuardado = ref(null)
@@ -168,13 +167,9 @@ const resumenUsos = computed(
   () => derechosSeleccionados.value.map((derecho) => derecho.nombre).join(' · ')
     || 'Sin usos definidos',
 )
-const resumenReventa = computed(() => {
-  if (!derechoReventa.value) return 'No permitida'
-  const regalia = Number(licencia.value.porcentajeRegalia || 0)
-  return regalia > 0
-    ? `Permitida con regalía del ${regalia}%`
-    : 'Permitida sin regalía'
-})
+const resumenReventa = computed(
+  () => (derechoReventa.value ? 'Permitida' : 'No permitida'),
+)
 const precioDesde = computed(() => {
   const precios = variantes.value
     .map((variante) => Number(variante.precio))
@@ -338,7 +333,6 @@ function mapearProducto(d) {
     idsDerechos: (lic.derechos || []).map((derecho) => derecho.idDerechoTermino),
     permiteModificaciones: !!lic.permiteModificaciones,
     requiereCredito: !!lic.requiereCredito,
-    porcentajeRegalia: Number(lic.porcentajeRegalia || 0),
     textoAdicional: lic.textoAdicional || '',
   }
   if (!licencia.value.idsDerechos.length) {
@@ -604,14 +598,6 @@ function validarLicencia() {
     errs.push(mensaje)
     erroresCampo.value.licencia = mensaje
   }
-  if (derechoReventa.value) {
-    const regalia = Number(licencia.value.porcentajeRegalia || 0)
-    if (regalia < 0 || regalia > 10) {
-      const mensaje = 'La regalía debe estar entre 0 y 10%.'
-      errs.push(mensaje)
-      erroresCampo.value.porcentajeRegalia = mensaje
-    }
-  }
   return errs
 }
 
@@ -792,9 +778,7 @@ function construirPayload() {
       idsDerechos: licencia.value.idsDerechos,
       permiteModificaciones: licencia.value.permiteModificaciones,
       requiereCredito: licencia.value.requiereCredito,
-      porcentajeRegalia: derechoReventa.value
-        ? Number(licencia.value.porcentajeRegalia || 0)
-        : 0,
+      porcentajeRegalia: 0,
       textoAdicional: licencia.value.textoAdicional?.trim() || null,
     },
   }
@@ -1486,27 +1470,6 @@ onBeforeUnmount(() => {
               {{ erroresCampo.licencia }}
             </p>
 
-            <div v-if="derechoReventa" class="rounded-2xl border border-coral/30 bg-rosa/15 p-5">
-              <label class="mb-2 block text-sm font-medium text-granate">
-                Regalía por reventa (%)
-              </label>
-              <input
-                v-model.number="licencia.porcentajeRegalia"
-                type="number"
-                min="0"
-                max="10"
-                step="0.01"
-                class="w-40 rounded-lg border border-rosa/60 bg-blanco px-3 py-2 text-sm text-cafe focus:border-coral focus:outline-none focus:ring-2 focus:ring-coral/20"
-              />
-              <p class="mt-2 text-xs leading-relaxed text-cafe/55">
-                Porcentaje que recibís cada vez que se revende la pieza única.
-                0% significa reventa sin regalía. Máximo 10%.
-              </p>
-              <p v-if="erroresCampo.porcentajeRegalia" class="mt-1 text-xs font-medium text-rojizo">
-                {{ erroresCampo.porcentajeRegalia }}
-              </p>
-            </div>
-
             <div class="rounded-2xl border border-rosa/60 bg-blanco p-5">
               <label class="mb-2 block text-sm font-medium text-granate">
                 Condiciones adicionales (opcional)
@@ -1904,15 +1867,16 @@ onBeforeUnmount(() => {
                 <li>El comprador actual transfiere la pieza a otra persona.</li>
                 <li>El nuevo comprador queda como propietario y acepta la licencia vigente.</li>
                 <li>El historial de autenticidad registra la transferencia y conserva el origen.</li>
-                <li>La regalía se calcula sobre el precio de reventa y queda registrada en la operación.</li>
+                <li>El precio de reventa no puede superar el precio original de publicación.</li>
               </ul>
             </div>
 
             <div>
-              <p class="font-semibold text-granate">Regalía</p>
+              <p class="font-semibold text-granate">Precio y comisión</p>
               <p class="mt-1">
-                Podés elegir entre 0% y 10% sobre el precio de reventa. Si elegís
-                0%, la reventa se permite sin regalía.
+                El revendedor fija el precio de la pieza hasta el precio original de
+                publicación. Temipora descuenta su comisión de reventa al revendedor.
+                En esta versión la reventa no genera ingresos adicionales para el artista original.
               </p>
             </div>
 

@@ -50,6 +50,7 @@ import com.temipora.backend_springboot.repositorios.ProductoImagenRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteImagenRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
+import com.temipora.backend_springboot.repositorios.PublicacionReventaRepository;
 import com.temipora.backend_springboot.repositorios.TipoProductoRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -63,6 +64,7 @@ class ProductoServiceTest {
     @Mock private ProductoVarianteRepository varianteRepository;
     @Mock private ProductoImagenRepository imagenRepository;
     @Mock private EventoLedgerRepository eventoLedgerRepository;
+    @Mock private PublicacionReventaRepository publicacionReventaRepository;
     @Mock private UsuarioRepository usuarioRepository;
     @Mock private TipoProductoRepository tipoProductoRepository;
     @Mock private MedioRepository medioRepository;
@@ -318,7 +320,7 @@ class ProductoServiceTest {
     }
 
     @Test
-    void crear_reventaConVarianteUnica_guardaRegalia() {
+    void crear_reventaConVarianteUnica_fuerzaRegaliaCero() {
         prepararCreacion();
         when(derechoTerminoRepository.findAllById(any()))
             .thenReturn(List.of(derecho(1L, "REVENTA", true)));
@@ -331,8 +333,8 @@ class ProductoServiceTest {
 
         assertThat(dto.getLicencia().isPermiteReventa()).isTrue();
         assertThat(dto.getLicencia().getPorcentajeRegalia())
-            .isEqualByComparingTo("5.00");
-        assertThat(dto.getPorcentajeRegalia()).isEqualByComparingTo("5.00");
+            .isEqualByComparingTo("0.00");
+        assertThat(dto.getPorcentajeRegalia()).isEqualByComparingTo("0.00");
         assertThat(dto.getLicencia().getDerechos().get(0).getCodigo())
             .isEqualTo("REVENTA");
     }
@@ -358,7 +360,7 @@ class ProductoServiceTest {
         assertThat(dto.getLicencia().getVersion()).isEqualTo(2);
         assertThat(dto.getLicencia().isPermiteReventa()).isTrue();
         assertThat(dto.getLicencia().getPorcentajeRegalia())
-            .isEqualByComparingTo("5.00");
+            .isEqualByComparingTo("0.00");
         assertThat(producto.getLicencias().stream()
             .filter(licencia -> !licencia.isVigente())
             .count()).isEqualTo(1);

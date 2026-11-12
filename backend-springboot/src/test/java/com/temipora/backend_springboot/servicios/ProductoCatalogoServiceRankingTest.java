@@ -32,6 +32,7 @@ import com.temipora.backend_springboot.modelo.TipoProducto;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
+import com.temipora.backend_springboot.repositorios.PublicacionReventaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,6 +46,9 @@ class ProductoCatalogoServiceRankingTest {
 
     @Mock
     private EventoLedgerRepository eventoLedgerRepository;
+
+    @Mock
+    private PublicacionReventaRepository publicacionReventaRepository;
 
     @Mock
     private MonedaService monedaService;

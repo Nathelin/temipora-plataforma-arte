@@ -40,6 +40,9 @@ public class CarritoItem {
     @JoinColumn(name = "id_variante", nullable = false)
     private ProductoVariante variante;
 
+    @Column(name = "id_publicacion_reventa")
+    private Long idPublicacionReventa;
+
     @Column(nullable = false)
     private int cantidad = 1;
 

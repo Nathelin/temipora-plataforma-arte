@@ -314,7 +314,7 @@ const atenciones = computed(() => {
       clave: 'cobros',
       titulo: 'Conectá tu cuenta de cobros',
       detalle: 'Sin MercadoPago no vas a poder cobrar tus pedidos.',
-      to: '/configuracion/cobros',
+      to: '/configuracion/pagos-y-cobros',
       icono: ICONOS.cobros,
       tono: 'alerta',
       meta: 'Acción requerida',

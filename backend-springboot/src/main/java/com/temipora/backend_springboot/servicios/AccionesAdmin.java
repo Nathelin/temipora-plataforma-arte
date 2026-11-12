@@ -43,6 +43,10 @@ public final class AccionesAdmin {
     public static final String PRODUCTO_REACTIVAR = "PRODUCTO_REACTIVAR";
     public static final String PRODUCTO_ARCHIVAR = "PRODUCTO_ARCHIVAR";
     public static final String PRODUCTO_RESTAURAR = "PRODUCTO_RESTAURAR";
+    public static final String REVENTA_PUBLICAR = "REVENTA_PUBLICAR";
+    public static final String REVENTA_EDITAR = "REVENTA_EDITAR";
+    public static final String REVENTA_CANCELAR = "REVENTA_CANCELAR";
+    public static final String REVENTA_SUSPENDER = "REVENTA_SUSPENDER";
     public static final String LEDGER_GENESIS = "LEDGER_GENESIS";
 
     public static final String TIPO_SERVICIO_CREAR = "TIPO_SERVICIO_CREAR";

@@ -32,6 +32,7 @@ import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.CarritoItemRepository;
 import com.temipora.backend_springboot.repositorios.CarritoRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
+import com.temipora.backend_springboot.repositorios.PublicacionReventaRepository;
 import com.temipora.backend_springboot.repositorios.ReservaStockRepository;
 import com.temipora.backend_springboot.servicios.pagos.mercadopago.MercadoPagoOAuthService;
 
@@ -42,6 +43,7 @@ class CarritoServiceTest {
     @Mock private CarritoItemRepository carritoItemRepository;
     @Mock private ProductoVarianteRepository varianteRepository;
     @Mock private ReservaStockRepository reservaStockRepository;
+    @Mock private PublicacionReventaRepository publicacionReventaRepository;
     @Mock private UsuarioService usuarioService;
     @Mock private MonedaService monedaService;
     @Mock private ConversionMonedaService conversionMonedaService;
@@ -56,6 +58,7 @@ class CarritoServiceTest {
             carritoItemRepository,
             varianteRepository,
             reservaStockRepository,
+            publicacionReventaRepository,
             usuarioService,
             monedaService,
             conversionMonedaService,

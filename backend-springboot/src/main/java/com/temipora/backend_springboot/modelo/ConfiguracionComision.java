@@ -31,6 +31,9 @@ public class ConfiguracionComision {
     @Column(name = "porcentaje_producto", nullable = false, precision = 5, scale = 2)
     private BigDecimal porcentajeProducto = PORCENTAJE_POR_DEFECTO;
 
+    @Column(name = "porcentaje_reventa", nullable = false, precision = 5, scale = 2)
+    private BigDecimal porcentajeReventa = PORCENTAJE_POR_DEFECTO;
+
     @Column(name = "fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
 }

@@ -15,6 +15,7 @@ import com.temipora.backend_springboot.modelo.EstadoCompra;
 import com.temipora.backend_springboot.modelo.EstadoCompraGrupo;
 import com.temipora.backend_springboot.modelo.EstadoEntregaItem;
 import com.temipora.backend_springboot.modelo.EstadoIntentoCobro;
+import com.temipora.backend_springboot.modelo.EstadoPublicacionReventa;
 import com.temipora.backend_springboot.modelo.EstadoReserva;
 import com.temipora.backend_springboot.modelo.IntentoCobro;
 import com.temipora.backend_springboot.modelo.IntentoCobroGrupo;
@@ -22,6 +23,7 @@ import com.temipora.backend_springboot.modelo.ReservaStock;
 import com.temipora.backend_springboot.repositorios.CompraRepository;
 import com.temipora.backend_springboot.repositorios.IntentoCobroGrupoRepository;
 import com.temipora.backend_springboot.repositorios.IntentoCobroRepository;
+import com.temipora.backend_springboot.repositorios.PublicacionReventaRepository;
 import com.temipora.backend_springboot.repositorios.ReservaStockRepository;
 
 @Service
@@ -31,16 +33,19 @@ public class ReservaStockService {
     private final CompraRepository compraRepository;
     private final IntentoCobroGrupoRepository intentoCobroGrupoRepository;
     private final IntentoCobroRepository intentoCobroRepository;
+    private final PublicacionReventaRepository publicacionReventaRepository;
 
     public ReservaStockService(
             ReservaStockRepository reservaRepository,
             CompraRepository compraRepository,
             IntentoCobroGrupoRepository intentoCobroGrupoRepository,
-            IntentoCobroRepository intentoCobroRepository) {
+            IntentoCobroRepository intentoCobroRepository,
+            PublicacionReventaRepository publicacionReventaRepository) {
         this.reservaRepository = reservaRepository;
         this.compraRepository = compraRepository;
         this.intentoCobroGrupoRepository = intentoCobroGrupoRepository;
         this.intentoCobroRepository = intentoCobroRepository;
+        this.publicacionReventaRepository = publicacionReventaRepository;
     }
 
     @Transactional
@@ -60,6 +65,7 @@ public class ReservaStockService {
                 continue;
             }
             item.setEstadoEntrega(EstadoEntregaItem.CANCELADO);
+            liberarPublicacion(item, ahora);
             CompraGrupo grupo = item.getGrupo();
             if (grupo == null) {
                 continue;
@@ -77,6 +83,21 @@ public class ReservaStockService {
             actualizarEstadoCompra(compra, ahora);
             compraRepository.save(compra);
         }
+    }
+
+    private void liberarPublicacion(CompraItem item, LocalDateTime ahora) {
+        if (item.getIdPublicacionReventa() == null) {
+            return;
+        }
+        publicacionReventaRepository
+            .findByIdPublicacionReventaForUpdate(item.getIdPublicacionReventa())
+            .filter(publicacion ->
+                publicacion.getEstado() == EstadoPublicacionReventa.RESERVADA)
+            .ifPresent(publicacion -> {
+                publicacion.setEstado(EstadoPublicacionReventa.PUBLICADA);
+                publicacion.setFechaActualizacion(ahora);
+                publicacionReventaRepository.save(publicacion);
+            });
     }
 
     private void expirarIntentos(CompraGrupo grupo, LocalDateTime ahora) {

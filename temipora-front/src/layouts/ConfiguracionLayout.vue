@@ -20,7 +20,7 @@ const secciones = [
   { nombre: 'Apariencia', to: '/configuracion/apariencia', icono: ICONOS.apariencia },
   { nombre: 'Privacidad y contenido', to: '/configuracion/privacidad', icono: ICONOS.privacidad },
   { nombre: 'Cuenta y seguridad', to: '/configuracion/cuenta', icono: ICONOS.cuenta },
-  { nombre: 'Formas de cobro', to: '/configuracion/cobros', icono: ICONOS.cobros, soloArtista: true },
+  { nombre: 'Pagos y cobros', to: '/configuracion/pagos-y-cobros', icono: ICONOS.cobros },
 ]
 
 const seccionesVisibles = computed(

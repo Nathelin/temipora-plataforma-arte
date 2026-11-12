@@ -76,6 +76,7 @@ public class LicenciaProducto {
     public boolean permiteReventa() {
         return derechos.stream()
             .map(LicenciaProductoDerecho::getDerecho)
-            .anyMatch(derecho -> derecho != null && derecho.isRequierePiezaUnica());
+            .anyMatch(derecho -> derecho != null
+                && "REVENTA".equalsIgnoreCase(derecho.getCodigo()));
     }
 }

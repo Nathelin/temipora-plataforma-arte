@@ -35,12 +35,16 @@ const precioMostrado = computed(
   () => formatearPrecio(props.producto.precioDesde, props.producto.moneda || 'ARS'),
 )
 const sinStock = computed(() => props.producto.disponible === false)
-const disponibilidad = computed(() => etiquetaDisponibilidad(props.producto))
+const esReventa = computed(() => !!props.producto.esReventa)
+const disponibilidad = computed(
+  () => (esReventa.value ? 'En reventa' : etiquetaDisponibilidad(props.producto)),
+)
 
-const destino = computed(() => ({
-  name: 'producto-publico',
-  params: { id: props.producto.idProducto },
-}))
+const destino = computed(() => (
+  esReventa.value
+    ? { name: 'reventa-publica', params: { id: props.producto.idPublicacionReventa } }
+    : { name: 'producto-publico', params: { id: props.producto.idProducto } }
+))
 </script>
 
 <template>
@@ -86,9 +90,15 @@ const destino = computed(() => ({
       >
         Sin stock
       </span>
+      <span
+        v-if="esReventa"
+        class="absolute bottom-3 right-3 rounded-full bg-coral px-2.5 py-1 text-[11px] font-bold text-white shadow-sm"
+      >
+        Reventa
+      </span>
 
       <button
-        v-if="mostrarFavorito"
+        v-if="mostrarFavorito && !esReventa"
         type="button"
         class="absolute left-3 top-3 z-20 flex h-8 w-8 items-center justify-center rounded-full border shadow-sm backdrop-blur-sm transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema disabled:cursor-wait disabled:opacity-60"
         :class="esFavorito
@@ -146,10 +156,15 @@ const destino = computed(() => ({
         {{ producto.nombreTipoProducto }}
         <template v-if="producto.nombreMedio"> · {{ producto.nombreMedio }}</template>
       </p>
+      <p v-if="esReventa && producto.nombreVendedor" class="mt-1 text-xs text-cafe/50">
+        En reventa por @{{ producto.nombreVendedor }}
+      </p>
 
       <div class="mt-auto flex items-end justify-between gap-3 pt-4">
         <p class="font-display text-lg font-extrabold text-coral">
-          <span class="mr-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-cafe/45">Desde</span>
+          <span class="mr-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-cafe/45">
+            {{ esReventa ? 'Precio' : 'Desde' }}
+          </span>
           {{ precioMostrado }}
         </p>
         <span class="shrink-0 rounded-full bg-crema px-2.5 py-0.5 text-[11px] font-semibold text-cafe">

@@ -31,6 +31,7 @@ import org.springframework.validation.annotation.Validated;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.DerechoTerminoDTO;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
+import com.temipora.backend_springboot.modelo.EstadoPublicacionReventa;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
 import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaDTO;
@@ -54,6 +55,7 @@ import com.temipora.backend_springboot.modelo.ProductoVariante;
 import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
 import com.temipora.backend_springboot.modelo.ProductoVarianteImagen;
 import com.temipora.backend_springboot.modelo.ProductoVarianteRequest;
+import com.temipora.backend_springboot.modelo.PublicacionReventa;
 import com.temipora.backend_springboot.modelo.TipoProducto;
 import com.temipora.backend_springboot.modelo.TipoEntrega;
 import com.temipora.backend_springboot.modelo.Usuario;
@@ -65,6 +67,7 @@ import com.temipora.backend_springboot.repositorios.ProductoImagenRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteImagenRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
+import com.temipora.backend_springboot.repositorios.PublicacionReventaRepository;
 import com.temipora.backend_springboot.repositorios.TipoProductoRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -90,6 +93,7 @@ public class ProductoService {
     private final ProductoVarianteRepository varianteRepository;
     private final ProductoImagenRepository imagenRepository;
     private final EventoLedgerRepository eventoLedgerRepository;
+    private final PublicacionReventaRepository publicacionReventaRepository;
     private final UsuarioRepository usuarioRepository;
     private final TipoProductoRepository tipoProductoRepository;
     private final MedioRepository medioRepository;
@@ -106,6 +110,7 @@ public class ProductoService {
             ProductoVarianteRepository varianteRepository,
             ProductoImagenRepository imagenRepository,
             EventoLedgerRepository eventoLedgerRepository,
+            PublicacionReventaRepository publicacionReventaRepository,
             UsuarioRepository usuarioRepository,
             TipoProductoRepository tipoProductoRepository,
             MedioRepository medioRepository,
@@ -120,6 +125,7 @@ public class ProductoService {
         this.varianteRepository = varianteRepository;
         this.imagenRepository = imagenRepository;
         this.eventoLedgerRepository = eventoLedgerRepository;
+        this.publicacionReventaRepository = publicacionReventaRepository;
         this.usuarioRepository = usuarioRepository;
         this.tipoProductoRepository = tipoProductoRepository;
         this.medioRepository = medioRepository;
@@ -585,6 +591,13 @@ public class ProductoService {
 
     private ProductoVarianteDTO aVarianteDTO(
             ProductoVariante variante, Set<Long> variantesConLedger) {
+        PublicacionReventa publicacion = variante.getIdVariante() != null
+            ? publicacionReventaRepository
+                .findFirstByVarianteIdVarianteAndEstadoOrderByFechaPublicacionDesc(
+                    variante.getIdVariante(),
+                    EstadoPublicacionReventa.PUBLICADA)
+                .orElse(null)
+            : null;
         return ProductoVarianteDTO.builder()
             .idVariante(variante.getIdVariante())
             .nombre(variante.getNombre())
@@ -603,6 +616,10 @@ public class ProductoService {
             .esUnica(variante.esUnica())
             .tieneLedger(variante.getIdVariante() != null
                 && variantesConLedger.contains(variante.getIdVariante()))
+            .idPublicacionReventa(publicacion != null
+                ? publicacion.getIdPublicacionReventa() : null)
+            .precioReventa(publicacion != null ? publicacion.getPrecio() : null)
+            .enReventa(publicacion != null)
             .build();
     }
 
@@ -1083,9 +1100,10 @@ public class ProductoService {
                 throw new IllegalArgumentException(
                     "El porcentaje de regalía debe estar entre 0 y 10.");
             }
-        } else {
-            regalia = BigDecimal.ZERO;
         }
+        // Reventa v1: las regalías están deshabilitadas. La columna se conserva
+        // para reactivarlas junto con el Split de Pagos 1:N.
+        regalia = BigDecimal.ZERO;
         return new LicenciaContenido(derechos, regalia);
     }
 

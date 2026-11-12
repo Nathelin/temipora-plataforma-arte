@@ -18,12 +18,14 @@ public class ComisionConfigDTO {
 
     private BigDecimal porcentajeServicio;
     private BigDecimal porcentajeProducto;
+    private BigDecimal porcentajeReventa;
     private LocalDateTime fechaActualizacion;
 
     public static ComisionConfigDTO desdeConfiguracion(ConfiguracionComision config) {
         return ComisionConfigDTO.builder()
             .porcentajeServicio(config.getPorcentajeServicio())
             .porcentajeProducto(config.getPorcentajeProducto())
+            .porcentajeReventa(config.getPorcentajeReventa())
             .fechaActualizacion(config.getFechaActualizacion())
             .build();
     }

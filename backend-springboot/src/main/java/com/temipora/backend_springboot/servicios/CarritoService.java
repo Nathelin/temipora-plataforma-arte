@@ -19,15 +19,19 @@ import com.temipora.backend_springboot.modelo.CarritoGrupoDTO;
 import com.temipora.backend_springboot.modelo.CarritoItem;
 import com.temipora.backend_springboot.modelo.CarritoItemDTO;
 import com.temipora.backend_springboot.modelo.CarritoItemRequest;
+import com.temipora.backend_springboot.modelo.CompraItem;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
+import com.temipora.backend_springboot.modelo.EstadoPublicacionReventa;
 import com.temipora.backend_springboot.modelo.EstadoReserva;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.Producto;
 import com.temipora.backend_springboot.modelo.ProductoVariante;
+import com.temipora.backend_springboot.modelo.PublicacionReventa;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.CarritoItemRepository;
 import com.temipora.backend_springboot.repositorios.CarritoRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
+import com.temipora.backend_springboot.repositorios.PublicacionReventaRepository;
 import com.temipora.backend_springboot.repositorios.ReservaStockRepository;
 import com.temipora.backend_springboot.servicios.pagos.mercadopago.MercadoPagoOAuthService;
 
@@ -40,6 +44,7 @@ public class CarritoService {
     private final CarritoItemRepository carritoItemRepository;
     private final ProductoVarianteRepository varianteRepository;
     private final ReservaStockRepository reservaStockRepository;
+    private final PublicacionReventaRepository publicacionReventaRepository;
     private final UsuarioService usuarioService;
     private final MonedaService monedaService;
     private final ConversionMonedaService conversionMonedaService;
@@ -52,6 +57,7 @@ public class CarritoService {
             CarritoItemRepository carritoItemRepository,
             ProductoVarianteRepository varianteRepository,
             ReservaStockRepository reservaStockRepository,
+            PublicacionReventaRepository publicacionReventaRepository,
             UsuarioService usuarioService,
             MonedaService monedaService,
             ConversionMonedaService conversionMonedaService,
@@ -62,6 +68,7 @@ public class CarritoService {
         this.carritoItemRepository = carritoItemRepository;
         this.varianteRepository = varianteRepository;
         this.reservaStockRepository = reservaStockRepository;
+        this.publicacionReventaRepository = publicacionReventaRepository;
         this.usuarioService = usuarioService;
         this.monedaService = monedaService;
         this.conversionMonedaService = conversionMonedaService;
@@ -90,17 +97,27 @@ public class CarritoService {
             .orElseThrow(() -> new NoSuchElementException(
                 "Variante no encontrada: " + request.getIdVariante()));
         Producto producto = variante.getProducto();
-        validarComprable(producto, variante, usuario);
+        PublicacionReventa publicacion = request.getIdPublicacionReventa() != null
+            ? publicacionDe(request.getIdPublicacionReventa())
+            : null;
+        if (publicacion != null) {
+            validarReventa(publicacion, variante, usuario);
+        } else {
+            validarComprable(producto, variante, usuario);
+        }
 
         int cantidad = request.getCantidad() != null ? request.getCantidad() : 1;
         if (cantidad != 1) {
             throw new IllegalArgumentException(
                 "Por ahora cada producto se agrega de a una unidad.");
         }
-        validarStock(variante, cantidad);
+        if (publicacion == null) {
+            validarStock(variante, cantidad);
+        }
 
         Carrito carrito = carritoDe(usuario);
-        validarUnSoloArtista(carrito, producto);
+        validarUnSoloArtista(carrito,
+            publicacion != null ? publicacion.getVendedor() : producto.getArtista());
 
         CarritoItem item = carritoItemRepository
             .findByCarritoIdCarritoAndVarianteIdVariante(
@@ -112,6 +129,8 @@ public class CarritoService {
         }
         item = new CarritoItem();
         item.setVariante(variante);
+        item.setIdPublicacionReventa(
+            publicacion != null ? publicacion.getIdPublicacionReventa() : null);
         item.setCantidad(1);
         carrito.agregarItem(item);
         carrito.setFechaActualizacion(LocalDateTime.now());
@@ -176,10 +195,9 @@ public class CarritoService {
             return aDTO(null);
         }
         carrito.getItems().removeIf(item -> {
-            Producto producto = item.getVariante().getProducto();
-            return producto != null
-                && producto.getArtista() != null
-                && idArtista.equals(producto.getArtista().getIdUsuario());
+            Usuario vendedor = vendedorDe(item);
+            return vendedor != null
+                && idArtista.equals(vendedor.getIdUsuario());
         });
         carrito.setFechaActualizacion(LocalDateTime.now());
         carritoRepository.save(carrito);
@@ -227,15 +245,14 @@ public class CarritoService {
         }
     }
 
-    private void validarUnSoloArtista(Carrito carrito, Producto producto) {
+    private void validarUnSoloArtista(Carrito carrito, Usuario vendedor) {
         if (!unArtistaPorCarrito || carrito.getItems().isEmpty()) {
             return;
         }
-        Long artistaActual = carrito.getItems().get(0)
-            .getVariante().getProducto().getArtista().getIdUsuario();
-        Long artistaNuevo = producto.getArtista() != null
-            ? producto.getArtista().getIdUsuario() : null;
-        if (!artistaActual.equals(artistaNuevo)) {
+        Usuario actual = vendedorDe(carrito.getItems().get(0));
+        Long artistaActual = actual != null ? actual.getIdUsuario() : null;
+        Long artistaNuevo = vendedor != null ? vendedor.getIdUsuario() : null;
+        if (artistaActual != null && !artistaActual.equals(artistaNuevo)) {
             throw new ConflictoException(
                 "Por ahora el carrito permite productos de un solo artista. "
                     + "Terminá esta compra o vaciá el carrito para agregar otro.");
@@ -275,8 +292,9 @@ public class CarritoService {
 
             Long idArtista = dto.getIdArtista();
             CarritoGrupoDTO grupo = grupos.computeIfAbsent(
-                idArtista, clave -> nuevoGrupo(item.getVariante().getProducto()));
+                idArtista, clave -> nuevoGrupo(vendedorDe(item)));
             grupo.getItems().add(dto);
+            grupo.setEsReventa(grupo.isEsReventa() || dto.isEsReventa());
             grupo.setSubtotal(sumar(grupo.getSubtotal(), subtotalItem(dto)));
         }
 
@@ -305,18 +323,17 @@ public class CarritoService {
             .build();
     }
 
-    private CarritoGrupoDTO nuevoGrupo(Producto producto) {
-        Usuario artista = producto.getArtista();
+    private CarritoGrupoDTO nuevoGrupo(Usuario vendedor) {
         boolean requiereCuenta = "mercadopago".equalsIgnoreCase(proveedorPago);
         boolean puedeCobrar = !requiereCuenta
-            || (artista != null && oauthService.estado(artista.getIdUsuario()).conectada());
+            || (vendedor != null && oauthService.estado(vendedor.getIdUsuario()).conectada());
         return CarritoGrupoDTO.builder()
-            .idArtista(artista != null ? artista.getIdUsuario() : null)
-            .nombreArtista(artista != null ? artista.getNombreUsuario() : null)
-            .urlFotoArtista(artista != null ? fotoArtista(artista) : null)
+            .idArtista(vendedor != null ? vendedor.getIdUsuario() : null)
+            .nombreArtista(vendedor != null ? vendedor.getNombreUsuario() : null)
+            .urlFotoArtista(vendedor != null ? fotoArtista(vendedor) : null)
             .puedeCobrar(puedeCobrar)
             .motivoNoCobro(puedeCobrar ? null
-                : "El artista todavía no conectó su cuenta de MercadoPago.")
+                : "El vendedor todavía no conectó su cuenta de MercadoPago.")
             .items(new ArrayList<>())
             .subtotal(cero())
             .total(cero())
@@ -327,12 +344,39 @@ public class CarritoService {
             CarritoItem item, Moneda ars) {
         ProductoVariante variante = item.getVariante();
         Producto producto = variante.getProducto();
-        Moneda monedaOriginal = producto.getMoneda();
+        PublicacionReventa publicacion = item.getIdPublicacionReventa() != null
+            ? publicacionReventaRepository
+                .findByIdPublicacionReventa(item.getIdPublicacionReventa())
+                .orElse(null)
+            : null;
+        boolean reventa = publicacion != null;
+        Moneda monedaOriginal = reventa ? publicacion.getMoneda() : producto.getMoneda();
+        BigDecimal precioOriginal = reventa
+            ? publicacion.getPrecio() : variante.getPrecio();
         BigDecimal precioCobro = null;
         String motivo = null;
         boolean disponible = true;
 
-        if (producto.getEstado() != EstadoProducto.DISPONIBLE
+        if (reventa) {
+            if (publicacion.getEstado() != EstadoPublicacionReventa.PUBLICADA) {
+                disponible = false;
+                motivo = "La publicación de reventa ya no está disponible.";
+            } else if (monedaOriginal == null) {
+                disponible = false;
+                motivo = "La publicación de reventa no tiene una moneda configurada.";
+            } else {
+                BigDecimal factor = conversionMonedaService.factor(
+                    monedaOriginal, ars, LocalDateTime.now());
+                if (factor == null) {
+                    disponible = false;
+                    motivo = "No hay cotización de " + monedaOriginal.getCodigo()
+                        + " a " + ARS + ".";
+                } else {
+                    precioCobro = publicacion.getPrecio().multiply(factor)
+                        .setScale(2, RoundingMode.HALF_UP);
+                }
+            }
+        } else if (producto.getEstado() != EstadoProducto.DISPONIBLE
                 || !variante.estaDisponible()) {
             disponible = false;
             motivo = "“" + producto.getTitulo() + "” ya no está disponible.";
@@ -352,16 +396,28 @@ public class CarritoService {
             }
         }
 
+        Usuario vendedor = reventa ? publicacion.getVendedor() : producto.getArtista();
+        Usuario artistaOriginal = producto.getArtista();
+        CompraItem origen = reventa ? publicacion.getCompraItemOrigen() : null;
+
         return CarritoItemDTO.builder()
             .idCarritoItem(item.getIdCarritoItem())
             .idVariante(variante.getIdVariante())
             .idProducto(producto.getIdProducto())
-            .idArtista(producto.getArtista() != null
-                ? producto.getArtista().getIdUsuario() : null)
-            .titulo(producto.getTitulo())
-            .nombreVariante(variante.getNombre())
+            .idArtista(vendedor != null ? vendedor.getIdUsuario() : null)
+            .idArtistaOriginal(artistaOriginal != null
+                ? artistaOriginal.getIdUsuario() : null)
+            .nombreArtistaOriginal(artistaOriginal != null
+                ? artistaOriginal.getNombreUsuario() : null)
+            .idPublicacionReventa(reventa
+                ? publicacion.getIdPublicacionReventa() : null)
+            .esReventa(reventa)
+            .titulo(reventa && origen != null
+                ? origen.getTituloProducto() : producto.getTitulo())
+            .nombreVariante(reventa && origen != null
+                ? origen.getNombreVariante() : variante.getNombre())
             .imagenUrl(variante.getImagenUrl())
-            .precioOriginal(variante.getPrecio())
+            .precioOriginal(precioOriginal)
             .monedaOriginal(monedaOriginal != null
                 ? monedaOriginal.getCodigo() : null)
             .precioCobro(precioCobro)
@@ -371,12 +427,54 @@ public class CarritoService {
             .motivoCantidadFija(
                 "") // Por ahora cada producto se agrega de a una unidad.
             .stockDisponible(variante.getStockDisponible())
-            .esUnica(variante.esUnica())
-            .tipoEntrega(producto.getMedio() != null
-                ? producto.getMedio().getTipoEntrega() : null)
+            .esUnica(reventa || variante.esUnica())
+            .tipoEntrega(reventa && origen != null
+                ? origen.getTipoEntrega()
+                : (producto.getMedio() != null
+                    ? producto.getMedio().getTipoEntrega() : null))
             .disponible(disponible)
             .motivoNoDisponible(motivo)
             .build();
+    }
+
+    private PublicacionReventa publicacionDe(Long idPublicacion) {
+        return publicacionReventaRepository.findByIdPublicacionReventa(idPublicacion)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Publicación de reventa no encontrada: " + idPublicacion));
+    }
+
+    private void validarReventa(
+            PublicacionReventa publicacion,
+            ProductoVariante variante,
+            Usuario comprador) {
+        if (publicacion.getEstado() != EstadoPublicacionReventa.PUBLICADA) {
+            throw new ConflictoException(
+                "La publicación de reventa ya no está disponible.");
+        }
+        if (publicacion.getVendedor() == null
+                || publicacion.getVendedor().getIdUsuario()
+                    .equals(comprador.getIdUsuario())) {
+            throw new IllegalArgumentException(
+                "No podés comprar tu propia reventa.");
+        }
+        if (publicacion.getVariante() == null
+                || !publicacion.getVariante().getIdVariante()
+                    .equals(variante.getIdVariante())) {
+            throw new IllegalArgumentException(
+                "La publicación de reventa no corresponde a esa variante.");
+        }
+    }
+
+    private Usuario vendedorDe(CarritoItem item) {
+        if (item.getIdPublicacionReventa() != null) {
+            return publicacionReventaRepository
+                .findByIdPublicacionReventa(item.getIdPublicacionReventa())
+                .map(PublicacionReventa::getVendedor)
+                .orElse(null);
+        }
+        Producto producto = item.getVariante() != null
+            ? item.getVariante().getProducto() : null;
+        return producto != null ? producto.getArtista() : null;
     }
 
     private BigDecimal subtotalItem(CarritoItemDTO item) {

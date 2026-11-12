@@ -42,10 +42,10 @@ async function cargar() {
   }
 }
 
-async function agregar(idVariante, cantidadItem = 1) {
+async function agregar(idVariante, cantidadItem = 1, idPublicacionReventa = null) {
   error.value = ''
   try {
-    carrito.value = await agregarItem(idVariante, cantidadItem)
+    carrito.value = await agregarItem(idVariante, cantidadItem, idPublicacionReventa)
     return carrito.value
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo agregar al carrito.'

@@ -387,7 +387,7 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
                   v-if="producto.permiteReventa"
                   class="rounded-full bg-rosa/30 px-2.5 py-0.5 font-semibold text-granate"
                 >
-                  Reventa {{ producto.porcentajeRegalia }}%
+                  Reventa
                 </span>
               </div>
 

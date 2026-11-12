@@ -60,7 +60,8 @@ public final class CatalogoAuditoria {
             AccionesAdmin.RESENIA_REPORTAR,
             AccionesAdmin.RESENIA_OCULTAR,
             AccionesAdmin.RESENIA_RESTAURAR,
-            AccionesAdmin.RESENIA_DESCARTAR_REPORTES);
+            AccionesAdmin.RESENIA_DESCARTAR_REPORTES,
+            AccionesAdmin.REVENTA_SUSPENDER);
 
         registrar(CategoriaAuditoria.CATALOGO,
             AccionesAdmin.ETIQUETA_CREAR,
@@ -98,6 +99,9 @@ public final class CatalogoAuditoria {
             AccionesAdmin.PRODUCTO_REACTIVAR,
             AccionesAdmin.PRODUCTO_ARCHIVAR,
             AccionesAdmin.PRODUCTO_RESTAURAR,
+            AccionesAdmin.REVENTA_PUBLICAR,
+            AccionesAdmin.REVENTA_EDITAR,
+            AccionesAdmin.REVENTA_CANCELAR,
             AccionesAdmin.TIPO_SERVICIO_CREAR,
             AccionesAdmin.TIPO_SERVICIO_MODIFICAR,
             AccionesAdmin.TIPO_SERVICIO_BAJA,

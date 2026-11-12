@@ -117,18 +117,60 @@ public class LedgerService {
             BigDecimal monto,
             Moneda moneda,
             String hashLicencia) {
+        return registrarEvento(
+            TipoEventoLedger.VENTA, variante, vendedor, comprador,
+            idCompraItem, idCompra, monto, moneda, hashLicencia, null, null);
+    }
+
+    /**
+     * Registra la reventa de una pieza única. Se llama antes de transferir el
+     * propietario, igual que la venta primaria, y es idempotente por
+     * `idCompraItem` + tipo `REVENTA`.
+     */
+    @Transactional
+    public EventoLedger registrarReventa(
+            ProductoVariante variante,
+            Usuario vendedor,
+            Usuario comprador,
+            Long idCompraItem,
+            Long idCompra,
+            BigDecimal monto,
+            Moneda moneda,
+            String hashLicencia,
+            Long idPublicacionReventa,
+            Long idCompraItemOrigen) {
+        return registrarEvento(
+            TipoEventoLedger.REVENTA, variante, vendedor, comprador,
+            idCompraItem, idCompra, monto, moneda, hashLicencia,
+            idPublicacionReventa, idCompraItemOrigen);
+    }
+
+    private EventoLedger registrarEvento(
+            TipoEventoLedger tipo,
+            ProductoVariante variante,
+            Usuario vendedor,
+            Usuario comprador,
+            Long idCompraItem,
+            Long idCompra,
+            BigDecimal monto,
+            Moneda moneda,
+            String hashLicencia,
+            Long idPublicacionReventa,
+            Long idCompraItemOrigen) {
+        String nombreEvento = tipo == TipoEventoLedger.REVENTA
+            ? "la reventa" : "la venta";
         if (variante == null || variante.getIdVariante() == null) {
             throw new IllegalArgumentException(
-                "No se puede registrar la venta de una variante sin guardar.");
+                "No se puede registrar " + nombreEvento
+                    + " de una variante sin guardar.");
         }
-        if (!variante.esUnica()) {
+        if (tipo == TipoEventoLedger.VENTA && !variante.esUnica()) {
             return null;
         }
         if (idCompraItem != null
-                && eventoRepository.existsByIdCompraItemAndTipo(
-                    idCompraItem, TipoEventoLedger.VENTA)) {
+                && eventoRepository.existsByIdCompraItemAndTipo(idCompraItem, tipo)) {
             return eventoRepository.findByIdCompraItem(idCompraItem).stream()
-                .filter(evento -> evento.getTipo() == TipoEventoLedger.VENTA)
+                .filter(evento -> evento.getTipo() == tipo)
                 .findFirst()
                 .orElse(null);
         }
@@ -143,7 +185,7 @@ public class LedgerService {
             : (producto != null ? producto.getArtista() : null);
         if (origen == null || comprador == null) {
             throw new IllegalStateException(
-                "La venta necesita un vendedor y un comprador.");
+                "La operación necesita un vendedor y un comprador.");
         }
         Moneda monedaEvento = moneda != null ? moneda
             : (producto != null ? producto.getMoneda() : null);
@@ -151,15 +193,16 @@ public class LedgerService {
         long secuencia = anterior.getSecuencia() + 1;
         String hashPrevio = anterior.getHashEvento();
         String hashImagen = variante.getSha256();
-        String datos = datosVenta(
+        String datos = datosEvento(
             producto, variante, origen, comprador, idCompraItem, idCompra,
-            monto, monedaEvento, hashLicencia);
+            monto, monedaEvento, hashLicencia, idPublicacionReventa,
+            idCompraItemOrigen);
         String hashDatos = sha256Hex(datos);
 
         EventoLedger evento = new EventoLedger();
         evento.setVariante(variante);
         evento.setSecuencia(secuencia);
-        evento.setTipo(TipoEventoLedger.VENTA);
+        evento.setTipo(tipo);
         evento.setActorOrigen(origen);
         evento.setActorDestino(comprador);
         evento.setMoneda(monedaEvento);
@@ -175,7 +218,7 @@ public class LedgerService {
             EventoLedger.VERSION_ACTUAL,
             variante.getIdVariante(),
             secuencia,
-            TipoEventoLedger.VENTA,
+            tipo,
             null,
             origen.getIdUsuario(),
             comprador.getIdUsuario(),
@@ -383,7 +426,7 @@ public class LedgerService {
         return sha256Hex(String.join("|", partes));
     }
 
-    private String datosVenta(
+    private String datosEvento(
             Producto producto,
             ProductoVariante variante,
             Usuario vendedor,
@@ -392,7 +435,9 @@ public class LedgerService {
             Long idCompra,
             BigDecimal monto,
             Moneda moneda,
-            String hashLicencia) {
+            String hashLicencia,
+            Long idPublicacionReventa,
+            Long idCompraItemOrigen) {
         return "{\"idCompraItem\":" + idCompraItem
             + ",\"idCompra\":" + idCompra
             + ",\"idProducto\":"
@@ -410,6 +455,10 @@ public class LedgerService {
             + ",\"moneda\":" + json(moneda != null ? moneda.getCodigo() : null)
             + ",\"sha256\":" + json(variante.getSha256())
             + ",\"licencia\":" + json(hashLicencia)
+            + (idPublicacionReventa != null
+                ? ",\"idPublicacionReventa\":" + idPublicacionReventa : "")
+            + (idCompraItemOrigen != null
+                ? ",\"idCompraItemOrigen\":" + idCompraItemOrigen : "")
             + "}";
     }
 

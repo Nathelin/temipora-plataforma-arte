@@ -22,6 +22,7 @@ public class CarritoGrupoDTO {
     private String urlFotoArtista;
     private boolean puedeCobrar;
     private String motivoNoCobro;
+    private boolean esReventa;
     @Builder.Default
     private List<CarritoItemDTO> items = new ArrayList<>();
     private BigDecimal subtotal;

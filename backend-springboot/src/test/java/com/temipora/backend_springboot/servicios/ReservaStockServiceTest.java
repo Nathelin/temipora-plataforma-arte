@@ -30,6 +30,7 @@ import com.temipora.backend_springboot.modelo.ReservaStock;
 import com.temipora.backend_springboot.repositorios.CompraRepository;
 import com.temipora.backend_springboot.repositorios.IntentoCobroGrupoRepository;
 import com.temipora.backend_springboot.repositorios.IntentoCobroRepository;
+import com.temipora.backend_springboot.repositorios.PublicacionReventaRepository;
 import com.temipora.backend_springboot.repositorios.ReservaStockRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,6 +40,7 @@ class ReservaStockServiceTest {
     @Mock private CompraRepository compraRepository;
     @Mock private IntentoCobroGrupoRepository intentoCobroGrupoRepository;
     @Mock private IntentoCobroRepository intentoCobroRepository;
+    @Mock private PublicacionReventaRepository publicacionReventaRepository;
 
     @InjectMocks private ReservaStockService service;
 

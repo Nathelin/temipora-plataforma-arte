@@ -5,8 +5,12 @@ export async function cargarCarrito() {
   return res.data
 }
 
-export async function agregarItem(idVariante, cantidad = 1) {
-  const res = await api.post('/carrito/items', { idVariante, cantidad })
+export async function agregarItem(idVariante, cantidad = 1, idPublicacionReventa = null) {
+  const body = { idVariante, cantidad }
+  if (idPublicacionReventa != null) {
+    body.idPublicacionReventa = idPublicacionReventa
+  }
+  const res = await api.post('/carrito/items', body)
   return res.data
 }
 

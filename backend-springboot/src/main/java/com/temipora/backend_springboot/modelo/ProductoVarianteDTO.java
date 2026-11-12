@@ -29,4 +29,7 @@ public class ProductoVarianteDTO {
     private String nombrePropietario;
     private boolean esUnica;
     private boolean tieneLedger;
+    private Long idPublicacionReventa;
+    private BigDecimal precioReventa;
+    private boolean enReventa;
 }

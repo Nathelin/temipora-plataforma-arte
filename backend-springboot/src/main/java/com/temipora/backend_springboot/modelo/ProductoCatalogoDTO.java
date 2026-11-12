@@ -53,6 +53,10 @@ public class ProductoCatalogoDTO {
     private int cantidadVariantes;
     private int cantidadVariantesDisponibles;
 
+    private boolean esReventa;
+    private Long idPublicacionReventa;
+    private String nombreVendedor;
+
     private boolean contenidoSensible;
     private List<String> contenidosSensibles;
 

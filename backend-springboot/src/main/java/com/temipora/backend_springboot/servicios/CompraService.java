@@ -34,6 +34,7 @@ import com.temipora.backend_springboot.modelo.CompraItemDTO;
 import com.temipora.backend_springboot.modelo.CompraLedgerDTO;
 import com.temipora.backend_springboot.modelo.CompraPreviewDTO;
 import com.temipora.backend_springboot.modelo.CompraResumenDTO;
+import com.temipora.backend_springboot.modelo.ConfiguracionComision;
 import com.temipora.backend_springboot.modelo.ContadoresComprasDTO;
 import com.temipora.backend_springboot.modelo.CuentaPagoUsuario;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
@@ -42,6 +43,7 @@ import com.temipora.backend_springboot.modelo.EstadoCompraGrupo;
 import com.temipora.backend_springboot.modelo.EstadoCuentaPago;
 import com.temipora.backend_springboot.modelo.EstadoEntregaItem;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
+import com.temipora.backend_springboot.modelo.EstadoPublicacionReventa;
 import com.temipora.backend_springboot.modelo.EstadoReserva;
 import com.temipora.backend_springboot.modelo.EventoLedger;
 import com.temipora.backend_springboot.modelo.EventoLedgerCompraDTO;
@@ -50,10 +52,12 @@ import com.temipora.backend_springboot.modelo.LicenciaProducto;
 import com.temipora.backend_springboot.modelo.LicenciaCompraDTO;
 import com.temipora.backend_springboot.modelo.LicenciaProductoDerecho;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.OrigenCompraItem;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Producto;
 import com.temipora.backend_springboot.modelo.ProductoImagen;
 import com.temipora.backend_springboot.modelo.ProductoVariante;
+import com.temipora.backend_springboot.modelo.PublicacionReventa;
 import com.temipora.backend_springboot.modelo.ReservaStock;
 import com.temipora.backend_springboot.modelo.TipoEntrega;
 import com.temipora.backend_springboot.modelo.Usuario;
@@ -64,6 +68,7 @@ import com.temipora.backend_springboot.repositorios.CuentaPagoUsuarioRepository;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteImagenRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
+import com.temipora.backend_springboot.repositorios.PublicacionReventaRepository;
 import com.temipora.backend_springboot.repositorios.ReservaStockRepository;
 import com.temipora.backend_springboot.servicios.pagos.mercadopago.MercadoPagoOAuthService;
 
@@ -87,6 +92,7 @@ public class CompraService {
     private final CarritoRepository carritoRepository;
     private final ProductoVarianteRepository varianteRepository;
     private final ReservaStockRepository reservaStockRepository;
+    private final PublicacionReventaRepository publicacionReventaRepository;
     private final CuentaPagoUsuarioRepository cuentaPagoRepository;
     private final UsuarioService usuarioService;
     private final MonedaService monedaService;
@@ -103,6 +109,7 @@ public class CompraService {
             CarritoRepository carritoRepository,
             ProductoVarianteRepository varianteRepository,
             ReservaStockRepository reservaStockRepository,
+            PublicacionReventaRepository publicacionReventaRepository,
             CuentaPagoUsuarioRepository cuentaPagoRepository,
             UsuarioService usuarioService,
             MonedaService monedaService,
@@ -117,6 +124,7 @@ public class CompraService {
         this.carritoRepository = carritoRepository;
         this.varianteRepository = varianteRepository;
         this.reservaStockRepository = reservaStockRepository;
+        this.publicacionReventaRepository = publicacionReventaRepository;
         this.cuentaPagoRepository = cuentaPagoRepository;
         this.usuarioService = usuarioService;
         this.monedaService = monedaService;
@@ -162,10 +170,10 @@ public class CompraService {
         }
 
         Moneda ars = monedaArs();
-        BigDecimal porcentaje = comisionService.obtener().getPorcentajeProducto();
+        ConfiguracionComision comisionConfig = comisionService.obtener();
         LocalDateTime ahora = LocalDateTime.now();
-        Map<Long, List<CarritoItem>> porArtista =
-            agruparPorArtista(itemsSeleccionados);
+        Map<Long, List<CarritoItem>> porVendedor =
+            agruparPorVendedor(itemsSeleccionados);
 
         Compra compra = new Compra();
         compra.setCliente(cliente);
@@ -178,17 +186,16 @@ public class CompraService {
         BigDecimal subtotalCompra = cero();
         BigDecimal comisionCompra = cero();
 
-        for (Map.Entry<Long, List<CarritoItem>> entry : porArtista.entrySet()) {
+        for (Map.Entry<Long, List<CarritoItem>> entry : porVendedor.entrySet()) {
             List<CarritoItem> items = entry.getValue();
-            Producto primerProducto = items.get(0).getVariante().getProducto();
-            Usuario artista = primerProducto.getArtista();
-            if (artista == null) {
-                throw new IllegalStateException("El producto no tiene artista.");
+            Usuario vendedor = vendedorDe(items.get(0));
+            if (vendedor == null) {
+                throw new IllegalStateException("El producto no tiene vendedor.");
             }
 
-            CuentaPagoUsuario cuenta = validarCuentaPago(artista);
+            CuentaPagoUsuario cuenta = validarCuentaPago(vendedor);
             CompraGrupo grupo = new CompraGrupo();
-            grupo.setArtista(artista);
+            grupo.setArtista(vendedor);
             grupo.setMoneda(ars);
             grupo.setEstado(EstadoCompraGrupo.PENDIENTE);
             grupo.setCuentaPago(cuenta);
@@ -200,7 +207,7 @@ public class CompraService {
 
             for (CarritoItem item : items) {
                 CompraItem comprado = crearItem(
-                    item, grupo, ars, porcentaje, ahora);
+                    item, grupo, ars, comisionConfig, ahora);
                 BigDecimal linea = comprado.getPrecioCobro()
                     .multiply(BigDecimal.valueOf(comprado.getCantidad()))
                     .setScale(2, RoundingMode.HALF_UP);
@@ -413,47 +420,57 @@ public class CompraService {
         }
         return items.stream()
             .filter(item -> {
-                Producto producto = item.getVariante().getProducto();
-                return producto != null
-                    && producto.getArtista() != null
-                    && idArtista.equals(producto.getArtista().getIdUsuario());
+                Usuario vendedor = vendedorDe(item);
+                return vendedor != null
+                    && idArtista.equals(vendedor.getIdUsuario());
             })
             .toList();
     }
 
-    private Map<Long, List<CarritoItem>> agruparPorArtista(
+    private Map<Long, List<CarritoItem>> agruparPorVendedor(
             List<CarritoItem> items) {
         Map<Long, List<CarritoItem>> grupos = new LinkedHashMap<>();
         for (CarritoItem item : items) {
-            Producto producto = item.getVariante().getProducto();
-            Long idArtista = producto.getArtista() != null
-                ? producto.getArtista().getIdUsuario() : null;
-            if (idArtista == null) {
-                throw new IllegalStateException("El producto no tiene artista.");
+            Usuario vendedor = vendedorDe(item);
+            if (vendedor == null) {
+                throw new IllegalStateException("El producto no tiene vendedor.");
             }
-            grupos.computeIfAbsent(idArtista, clave -> new ArrayList<>()).add(item);
+            grupos.computeIfAbsent(vendedor.getIdUsuario(),
+                clave -> new ArrayList<>()).add(item);
         }
         return grupos;
     }
 
-    private CuentaPagoUsuario validarCuentaPago(Usuario artista) {
+    private Usuario vendedorDe(CarritoItem item) {
+        if (item.getIdPublicacionReventa() != null) {
+            return publicacionReventaRepository
+                .findByIdPublicacionReventa(item.getIdPublicacionReventa())
+                .map(PublicacionReventa::getVendedor)
+                .orElse(null);
+        }
+        Producto producto = item.getVariante() != null
+            ? item.getVariante().getProducto() : null;
+        return producto != null ? producto.getArtista() : null;
+    }
+
+    private CuentaPagoUsuario validarCuentaPago(Usuario vendedor) {
         if (!"mercadopago".equalsIgnoreCase(proveedorPago)) {
             return null;
         }
         CuentaPagoUsuario cuenta = cuentaPagoRepository
-            .findByUsuarioIdUsuarioAndProveedor(artista.getIdUsuario(), PROVEEDOR_MP)
+            .findByUsuarioIdUsuarioAndProveedor(vendedor.getIdUsuario(), PROVEEDOR_MP)
             .orElseThrow(() -> new ConflictoException(
-                "El artista @" + artista.getNombreUsuario()
+                "El vendedor @" + vendedor.getNombreUsuario()
                     + " todavía no conectó su cuenta de MercadoPago."));
         if (cuenta.getEstado() != EstadoCuentaPago.ACTIVA) {
             throw new ConflictoException(
-                "La cuenta de MercadoPago del artista @"
-                    + artista.getNombreUsuario() + " no está activa.");
+                "La cuenta de MercadoPago del vendedor @"
+                    + vendedor.getNombreUsuario() + " no está activa.");
         }
         if (cuenta.getAccessToken() == null || cuenta.getAccessToken().isBlank()) {
             throw new ConflictoException(
-                "La cuenta de MercadoPago del artista @"
-                    + artista.getNombreUsuario() + " no tiene un token válido.");
+                "La cuenta de MercadoPago del vendedor @"
+                    + vendedor.getNombreUsuario() + " no tiene un token válido.");
         }
         return cuenta;
     }
@@ -462,7 +479,7 @@ public class CompraService {
             CarritoItem item,
             CompraGrupo grupo,
             Moneda ars,
-            BigDecimal porcentaje,
+            ConfiguracionComision comisionConfig,
             LocalDateTime ahora) {
         if (item.getCantidad() != 1) {
             throw new ConflictoException(
@@ -473,62 +490,119 @@ public class CompraService {
             .orElseThrow(() -> new NoSuchElementException(
                 "Variante no encontrada: " + item.getVariante().getIdVariante()));
         Producto producto = variante.getProducto();
+        PublicacionReventa publicacion = item.getIdPublicacionReventa() != null
+            ? publicacionReventaRepository
+                .findByIdPublicacionReventaForUpdate(item.getIdPublicacionReventa())
+                .orElseThrow(() -> new ConflictoException(
+                    "La publicación de reventa ya no existe."))
+            : null;
+        boolean reventa = publicacion != null;
 
-        if (producto.getEstado() != EstadoProducto.DISPONIBLE) {
-            throw new ConflictoException(
-                "El producto “" + producto.getTitulo() + "” ya no está disponible.");
+        if (!reventa) {
+            if (producto.getEstado() != EstadoProducto.DISPONIBLE) {
+                throw new ConflictoException(
+                    "El producto “" + producto.getTitulo()
+                        + "” ya no está disponible.");
+            }
+            if (!variante.estaDisponible()) {
+                throw new ConflictoException(
+                    "La variante “" + variante.getNombre()
+                        + "” ya no está disponible.");
+            }
+            validarStock(variante, item.getCantidad());
+        } else {
+            if (publicacion.getEstado() != EstadoPublicacionReventa.PUBLICADA) {
+                throw new ConflictoException(
+                    "La publicación de reventa ya no está disponible.");
+            }
+            if (publicacion.getVendedor() == null
+                    || grupo.getArtista() == null
+                    || !publicacion.getVendedor().getIdUsuario()
+                        .equals(grupo.getArtista().getIdUsuario())) {
+                throw new ConflictoException(
+                    "La publicación de reventa no pertenece a ese vendedor.");
+            }
+            if (publicacion.getVariante() == null
+                    || !publicacion.getVariante().getIdVariante()
+                        .equals(variante.getIdVariante())) {
+                throw new ConflictoException(
+                    "La publicación de reventa no corresponde a esa variante.");
+            }
         }
-        if (!variante.estaDisponible()) {
-            throw new ConflictoException(
-                "La variante “" + variante.getNombre() + "” ya no está disponible.");
-        }
-        validarStock(variante, item.getCantidad());
 
-        Moneda monedaOriginal = producto.getMoneda();
+        CompraItem origenReventa = reventa
+            ? publicacion.getCompraItemOrigen() : null;
+        Moneda monedaOriginal = reventa
+            ? publicacion.getMoneda() : producto.getMoneda();
         if (monedaOriginal == null) {
             throw new ConflictoException(
-                "El producto “" + producto.getTitulo() + "” no tiene moneda.");
+                "La pieza no tiene una moneda configurada.");
         }
         BigDecimal factor = conversionMonedaService.factor(
             monedaOriginal, ars, ahora);
         if (factor == null) {
             throw new ConflictoException(
                 "No hay cotización de " + monedaOriginal.getCodigo()
-                    + " a " + ARS + " para “" + producto.getTitulo() + "”.");
+                    + " a " + ARS + ".");
         }
-        if (variante.getPrecio() == null) {
+        BigDecimal precioBase = reventa
+            ? publicacion.getPrecio() : variante.getPrecio();
+        if (precioBase == null) {
             throw new ConflictoException(
-                "La variante “" + variante.getNombre() + "” no tiene precio.");
+                "La pieza no tiene precio.");
         }
-
-        if (producto.getMedio() == null) {
-            throw new ConflictoException(
-                "El producto “" + producto.getTitulo()
-                    + "” no tiene un medio de entrega configurado.");
-        }
-        BigDecimal precioCobro = variante.getPrecio().multiply(factor)
+        BigDecimal porcentaje = reventa
+            ? comisionConfig.getPorcentajeReventa()
+            : comisionConfig.getPorcentajeProducto();
+        BigDecimal precioCobro = precioBase.multiply(factor)
             .setScale(2, RoundingMode.HALF_UP);
         BigDecimal comision = comisionService.calcularComision(
             precioCobro.multiply(BigDecimal.valueOf(item.getCantidad())), porcentaje);
-        TipoEntrega tipoEntrega = producto.getMedio().getTipoEntrega();
+        TipoEntrega tipoEntrega = reventa
+            ? (origenReventa != null
+                ? origenReventa.getTipoEntrega()
+                : (producto.getMedio() != null
+                    ? producto.getMedio().getTipoEntrega() : null))
+            : (producto.getMedio() != null
+                ? producto.getMedio().getTipoEntrega() : null);
+        if (tipoEntrega == null) {
+            throw new ConflictoException(
+                "La pieza no tiene un medio de entrega configurado.");
+        }
+        String titulo = reventa && origenReventa != null
+            ? origenReventa.getTituloProducto() : producto.getTitulo();
+        String nombreVariante = reventa && origenReventa != null
+            ? origenReventa.getNombreVariante() : variante.getNombre();
+        String licencia = reventa && origenReventa != null
+            ? origenReventa.getLicenciaSnapshot()
+            : licenciaJson(producto.licenciaVigente());
 
         CompraItem comprado = new CompraItem();
         comprado.setProducto(producto);
         comprado.setVariante(variante);
-        comprado.setTituloProducto(producto.getTitulo());
-        comprado.setNombreVariante(variante.getNombre());
+        comprado.setTituloProducto(titulo);
+        comprado.setNombreVariante(nombreVariante);
         comprado.setTipoEntrega(tipoEntrega);
         comprado.setCantidad(item.getCantidad());
-        comprado.setPrecioOriginal(variante.getPrecio());
+        comprado.setPrecioOriginal(precioBase);
         comprado.setMonedaOriginal(monedaOriginal);
         comprado.setCotizacion(factor);
         comprado.setPrecioCobro(precioCobro);
         comprado.setComisionPorcentaje(porcentaje);
         comprado.setComisionMonto(comision);
         comprado.setSha256Archivo(variante.getSha256());
-        comprado.setLicenciaSnapshot(licenciaJson(producto.licenciaVigente()));
+        comprado.setLicenciaSnapshot(licencia);
         comprado.setEstadoEntrega(EstadoEntregaItem.PENDIENTE);
         comprado.setGrupo(grupo);
+        comprado.setOrigen(reventa
+            ? OrigenCompraItem.REVENTA : OrigenCompraItem.PRIMERA_VENTA);
+        comprado.setIdPublicacionReventa(reventa
+            ? publicacion.getIdPublicacionReventa() : null);
+        if (reventa) {
+            publicacion.setEstado(EstadoPublicacionReventa.RESERVADA);
+            publicacion.setFechaActualizacion(ahora);
+            publicacionReventaRepository.save(publicacion);
+        }
         return comprado;
     }
 
@@ -664,6 +738,9 @@ public class CompraService {
             .idCompraGrupo(grupo.getIdCompraGrupo())
             .idArtista(artista != null ? artista.getIdUsuario() : null)
             .nombreArtista(artista != null ? artista.getNombreUsuario() : null)
+            .nombreVendedor(artista != null ? artista.getNombreUsuario() : null)
+            .esReventa(items.stream()
+                .anyMatch(i -> i.getOrigen() == OrigenCompraItem.REVENTA))
             .urlFotoArtista(artista != null ? fotoArtista(artista) : null)
             .subtotal(grupo.getSubtotal())
             .moneda(grupo.getMoneda() != null
@@ -693,6 +770,8 @@ public class CompraService {
             .tituloProducto(item.getTituloProducto())
             .nombreVariante(item.getNombreVariante())
             .tipoEntrega(item.getTipoEntrega())
+            .origen(item.getOrigen())
+            .idPublicacionReventa(item.getIdPublicacionReventa())
             .cantidad(item.getCantidad())
             .precioOriginal(item.getPrecioOriginal())
             .monedaOriginal(item.getMonedaOriginal() != null

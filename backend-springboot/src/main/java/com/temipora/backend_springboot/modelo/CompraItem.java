@@ -84,6 +84,13 @@ public class CompraItem {
     private LocalDateTime licenciaAceptadaEn;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private OrigenCompraItem origen = OrigenCompraItem.PRIMERA_VENTA;
+
+    @Column(name = "id_publicacion_reventa")
+    private Long idPublicacionReventa;
+
+    @Enumerated(EnumType.STRING)
     @Column(name = "estado_entrega", nullable = false, length = 20)
     private EstadoEntregaItem estadoEntrega = EstadoEntregaItem.PENDIENTE;
 

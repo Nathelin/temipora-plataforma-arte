@@ -10,6 +10,7 @@ const mensaje = ref('')
 const config = ref(null)
 const porcentajeServicio = ref('10')
 const porcentajeProducto = ref('10')
+const porcentajeReventa = ref('10')
 
 async function cargar() {
   cargando.value = true
@@ -19,6 +20,7 @@ async function cargar() {
     config.value = res.data
     porcentajeServicio.value = res.data?.porcentajeServicio ?? '10'
     porcentajeProducto.value = res.data?.porcentajeProducto ?? '10'
+    porcentajeReventa.value = res.data?.porcentajeReventa ?? '10'
   } catch (e) {
     error.value = e.response?.data?.message
       || 'No se pudo cargar la configuración de comisiones.'
@@ -55,8 +57,9 @@ async function guardar() {
   mensaje.value = ''
   const errorServicio = validar(porcentajeServicio.value, 'servicios')
   const errorProducto = validar(porcentajeProducto.value, 'productos')
-  if (errorServicio || errorProducto) {
-    errorAccion.value = errorServicio || errorProducto
+  const errorReventa = validar(porcentajeReventa.value, 'reventas')
+  if (errorServicio || errorProducto || errorReventa) {
+    errorAccion.value = errorServicio || errorProducto || errorReventa
     return
   }
 
@@ -65,10 +68,12 @@ async function guardar() {
     const res = await api.put('/admin/configuracion-comision', {
       porcentajeServicio: Number(String(porcentajeServicio.value).replace(',', '.')),
       porcentajeProducto: Number(String(porcentajeProducto.value).replace(',', '.')),
+      porcentajeReventa: Number(String(porcentajeReventa.value).replace(',', '.')),
     })
     config.value = res.data
     porcentajeServicio.value = res.data.porcentajeServicio
     porcentajeProducto.value = res.data.porcentajeProducto
+    porcentajeReventa.value = res.data.porcentajeReventa
     mensaje.value = 'Comisiones guardadas.'
   } catch (e) {
     errorAccion.value = e.response?.data?.message
@@ -135,6 +140,25 @@ onMounted(cargar)
           <p class="mt-2 text-xs leading-relaxed text-cafe/50">
             Reservada para la venta de productos. La comisión de productos y la de servicios son independientes.
           </p>
+
+          <label for="comision-reventa" class="mb-2 mt-6 block text-sm text-cafe">
+            Comisión de reventas <span class="text-rojizo">*</span>
+          </label>
+          <div class="flex items-center gap-2">
+            <input
+              id="comision-reventa"
+              v-model="porcentajeReventa"
+              type="number"
+              min="0"
+              max="50"
+              step="0.01"
+              class="block w-40 rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+            />
+            <span class="text-sm text-cafe/60">%</span>
+          </div>
+          <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+            Se descuenta al revendedor sobre el precio de reventa. En esta versión la reventa no paga al artista original.
+          </p>
         </div>
 
         <p v-if="errorAccion" class="text-sm text-rojizo">{{ errorAccion }}</p>
@@ -167,6 +191,10 @@ onMounted(cargar)
           <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Productos</dt>
             <dd class="text-cafe">{{ config.porcentajeProducto }}%</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Reventas</dt>
+            <dd class="text-cafe">{{ config.porcentajeReventa }}%</dd>
           </div>
           <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Última modificación</dt>

@@ -22,6 +22,8 @@ public class CompraItemDTO {
     private String tituloProducto;
     private String nombreVariante;
     private TipoEntrega tipoEntrega;
+    private OrigenCompraItem origen;
+    private Long idPublicacionReventa;
     private int cantidad;
     private BigDecimal precioOriginal;
     private String monedaOriginal;
