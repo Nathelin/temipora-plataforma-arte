@@ -62,6 +62,9 @@ class ProductoCatalogoServiceRankingTest {
     @Mock
     private RecomendacionProductoService recomendacionProductoService;
 
+    @Mock
+    private ReseniaPublicaService reseniaPublicaService;
+
     @InjectMocks
     private ProductoCatalogoService catalogoService;
 
@@ -77,6 +80,9 @@ class ProductoCatalogoServiceRankingTest {
             .monedaPreferida(ars)
             .build();
         when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(viewer));
+        org.mockito.Mockito.lenient()
+            .when(reseniaPublicaService.promediosPorProductos(anyList()))
+            .thenReturn(java.util.Map.of());
     }
 
     @Test

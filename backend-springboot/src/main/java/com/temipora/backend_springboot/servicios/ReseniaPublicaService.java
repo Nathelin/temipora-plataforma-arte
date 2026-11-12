@@ -22,6 +22,7 @@ import com.temipora.backend_springboot.modelo.DistribucionEstrellasDTO;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.EstadoResenia;
 import com.temipora.backend_springboot.modelo.EtiquetaReputacion;
+import com.temipora.backend_springboot.modelo.FiltroReseniaProductoDTO;
 import com.temipora.backend_springboot.modelo.FiltroReseniaServicioDTO;
 import com.temipora.backend_springboot.modelo.OpcionDestacadaDTO;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
@@ -138,6 +139,7 @@ public class ReseniaPublicaService {
             .resumen(resumenServicio(idServicio))
             .pagina(aPagina(page))
             .servicios(List.of())
+            .productos(List.of())
             .build();
     }
 
@@ -145,15 +147,32 @@ public class ReseniaPublicaService {
     public PaginaReseniasDTO listarArtista(
             Long idArtista,
             Long idServicio,
+            Long idProducto,
+            String tipo,
             Integer calificacion,
             String orden,
             int pagina,
             int tamanio) {
         validarCalificacion(calificacion);
+        String tipoSeguro = normalizarTipo(tipo);
+        boolean incluirServicios = !"PRODUCTO".equals(tipoSeguro);
+        boolean incluirProductos = !"SERVICIO".equals(tipoSeguro);
+        if (idServicio != null) {
+            incluirServicios = true;
+            incluirProductos = false;
+        }
+        if (idProducto != null) {
+            incluirServicios = false;
+            incluirProductos = true;
+        }
+
         Pageable pageable = pagina(pagina, tamanio);
         Page<Resenia> page = reseniaRepository.findPublicasPorArtista(
             idArtista,
             idServicio,
+            idProducto,
+            incluirServicios,
+            incluirProductos,
             calificacion,
             normalizarOrden(orden),
             EstadoResenia.PUBLICADA,
@@ -164,6 +183,7 @@ public class ReseniaPublicaService {
             .resumen(resumenArtista(idArtista))
             .pagina(aPagina(page))
             .servicios(serviciosConResenias(idArtista))
+            .productos(productosConResenias(idArtista))
             .build();
     }
 
@@ -189,6 +209,7 @@ public class ReseniaPublicaService {
             .resumen(resumenProducto(idProducto))
             .pagina(aPagina(page))
             .servicios(List.of())
+            .productos(List.of())
             .build();
     }
 
@@ -235,6 +256,17 @@ public class ReseniaPublicaService {
     }
 
     @Transactional(readOnly = true)
+    public List<FiltroReseniaProductoDTO> productosConResenias(Long idArtista) {
+        return reseniaRepository
+            .productosConResenias(idArtista, EstadoResenia.PUBLICADA).stream()
+            .map(fila -> FiltroReseniaProductoDTO.builder()
+                .idProducto(((Number) fila[0]).longValue())
+                .titulo((String) fila[1])
+                .build())
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
     public Map<Long, PromedioReseniasDTO> promediosPorServicios(
             Collection<Long> idsServicio) {
         if (idsServicio == null || idsServicio.isEmpty()) {
@@ -243,6 +275,28 @@ public class ReseniaPublicaService {
         Map<Long, PromedioReseniasDTO> mapa = new HashMap<>();
         for (Object[] fila : reseniaRepository.promediosPorServicios(
                 idsServicio, EstadoResenia.PUBLICADA, EstadoPedido.FINALIZADO)) {
+            Long id = ((Number) fila[0]).longValue();
+            long cantidad = ((Number) fila[1]).longValue();
+            Double promedioCrudo = fila[2] != null
+                ? ((Number) fila[2]).doubleValue()
+                : null;
+            mapa.put(id, PromedioReseniasDTO.builder()
+                .cantidad(cantidad)
+                .promedio(decimal(promedioCrudo))
+                .build());
+        }
+        return mapa;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, PromedioReseniasDTO> promediosPorProductos(
+            Collection<Long> idsProducto) {
+        if (idsProducto == null || idsProducto.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, PromedioReseniasDTO> mapa = new HashMap<>();
+        for (Object[] fila : reseniaRepository.promediosPorProductos(
+                idsProducto, EstadoResenia.PUBLICADA)) {
             Long id = ((Number) fila[0]).longValue();
             long cantidad = ((Number) fila[1]).longValue();
             Double promedioCrudo = fila[2] != null
@@ -586,6 +640,24 @@ public class ReseniaPublicaService {
         return PageRequest.of(
             Math.max(0, pagina),
             Math.min(Math.max(1, tamanio), TAMANIO_MAXIMO));
+    }
+
+    private String normalizarTipo(String tipo) {
+        if (tipo == null || tipo.isBlank()) {
+            return "TODOS";
+        }
+        String limpio = tipo.trim().toUpperCase();
+        if ("SERVICIOS".equals(limpio)) {
+            return "SERVICIO";
+        }
+        if ("PRODUCTOS".equals(limpio)) {
+            return "PRODUCTO";
+        }
+        if ("TODOS".equals(limpio) || "SERVICIO".equals(limpio)
+                || "PRODUCTO".equals(limpio)) {
+            return limpio;
+        }
+        throw new IllegalArgumentException("Tipo de reseña inválido: " + tipo);
     }
 
     private String normalizarOrden(String orden) {

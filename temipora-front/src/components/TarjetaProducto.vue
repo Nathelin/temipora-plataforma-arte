@@ -2,6 +2,8 @@
 import { ref, computed } from 'vue'
 import { formatearPrecio } from '../servicios/moneda'
 import { etiquetaDisponibilidad } from '../servicios/productos'
+import { formatearPromedio } from '../servicios/resenias'
+import ValoracionEstrellas from './ValoracionEstrellas.vue'
 
 const props = defineProps({
   producto: { type: Object, required: true },
@@ -38,6 +40,12 @@ const sinStock = computed(() => props.producto.disponible === false)
 const esReventa = computed(() => !!props.producto.esReventa)
 const disponibilidad = computed(
   () => (esReventa.value ? 'En reventa' : etiquetaDisponibilidad(props.producto)),
+)
+const tieneResenias = computed(
+  () => Number(props.producto.cantidadResenias || 0) > 0,
+)
+const estrellasPromedio = computed(
+  () => Math.round(Number(props.producto.calificacionPromedio || 0)),
 )
 
 const destino = computed(() => (
@@ -165,6 +173,41 @@ const destino = computed(() => (
         {{ producto.nombreTipoProducto }}
         <template v-if="producto.nombreMedio"> · {{ producto.nombreMedio }}</template>
       </p>
+
+      <router-link
+        v-if="esReventa"
+        :to="destino"
+        class="relative z-20 mt-2 inline-flex w-fit items-center gap-1 text-[11px] font-semibold text-coral transition hover:text-rojizo"
+        @click.stop
+      >
+        Ver publicación de reventa →
+      </router-link>
+
+      <div
+        v-if="tieneResenias"
+        class="mt-1.5 flex items-center justify-between gap-2 text-xs text-cafe/60"
+      >
+        <span class="flex items-center gap-1.5">
+          <ValoracionEstrellas
+            :model-value="estrellasPromedio"
+            readonly
+            tamano="sm"
+            etiqueta="Calificación del producto"
+          />
+          <span class="font-semibold text-granate">
+            {{ formatearPromedio(producto.calificacionPromedio) }}
+          </span>
+          <span>({{ producto.cantidadResenias }})</span>
+        </span>
+        <router-link
+          v-if="!esReventa"
+          :to="{ name: 'producto-publico', params: { id: producto.idProducto }, hash: '#resenias' }"
+          class="relative z-20 shrink-0 font-semibold text-coral transition hover:text-rojizo"
+          @click.stop
+        >
+          Ver reseñas
+        </router-link>
+      </div>
 
       <div class="mt-auto flex items-end justify-between gap-3 pt-4">
         <p class="font-display text-lg font-extrabold text-coral">

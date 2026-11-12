@@ -304,14 +304,24 @@ public interface ReseniaRepository extends JpaRepository<Resenia, Long> {
     @Query(value = """
         SELECT r FROM Resenia r
         JOIN r.versiones v
-        JOIN FETCH r.pedido p
-        JOIN FETCH p.servicio s
+        LEFT JOIN FETCH r.pedido p
+        LEFT JOIN FETCH p.servicio s
+        LEFT JOIN FETCH r.producto prod
         JOIN FETCH r.autor a
-        WHERE s.artista.idUsuario = :idArtista
+        WHERE (
+            (:incluirServicios = true
+             AND r.pedido IS NOT NULL
+             AND s.artista.idUsuario = :idArtista
+             AND p.estado = :estadoPedido
+             AND r.autor.idUsuario = p.cliente.idUsuario)
+            OR
+            (:incluirProductos = true
+             AND r.producto IS NOT NULL
+             AND prod.artista.idUsuario = :idArtista)
+        )
           AND (:idServicio IS NULL OR s.idServicio = :idServicio)
+          AND (:idProducto IS NULL OR prod.idProducto = :idProducto)
           AND r.estado = :estado
-          AND p.estado = :estadoPedido
-          AND r.autor.idUsuario = p.cliente.idUsuario
           AND v.numero = (
               SELECT MAX(v2.numero) FROM ReseniaVersion v2 WHERE v2.resenia = r
           )
@@ -324,13 +334,23 @@ public interface ReseniaRepository extends JpaRepository<Resenia, Long> {
         countQuery = """
         SELECT COUNT(r) FROM Resenia r
         JOIN r.versiones v
-        JOIN r.pedido p
-        JOIN p.servicio s
-        WHERE s.artista.idUsuario = :idArtista
+        LEFT JOIN r.pedido p
+        LEFT JOIN p.servicio s
+        LEFT JOIN r.producto prod
+        WHERE (
+            (:incluirServicios = true
+             AND r.pedido IS NOT NULL
+             AND s.artista.idUsuario = :idArtista
+             AND p.estado = :estadoPedido
+             AND r.autor.idUsuario = p.cliente.idUsuario)
+            OR
+            (:incluirProductos = true
+             AND r.producto IS NOT NULL
+             AND prod.artista.idUsuario = :idArtista)
+        )
           AND (:idServicio IS NULL OR s.idServicio = :idServicio)
+          AND (:idProducto IS NULL OR prod.idProducto = :idProducto)
           AND r.estado = :estado
-          AND p.estado = :estadoPedido
-          AND r.autor.idUsuario = p.cliente.idUsuario
           AND v.numero = (
               SELECT MAX(v2.numero) FROM ReseniaVersion v2 WHERE v2.resenia = r
           )
@@ -339,6 +359,9 @@ public interface ReseniaRepository extends JpaRepository<Resenia, Long> {
     Page<Resenia> findPublicasPorArtista(
         @Param("idArtista") Long idArtista,
         @Param("idServicio") Long idServicio,
+        @Param("idProducto") Long idProducto,
+        @Param("incluirServicios") boolean incluirServicios,
+        @Param("incluirProductos") boolean incluirProductos,
         @Param("calificacion") Integer calificacion,
         @Param("orden") String orden,
         @Param("estado") EstadoResenia estado,
@@ -380,6 +403,22 @@ public interface ReseniaRepository extends JpaRepository<Resenia, Long> {
         @Param("estado") EstadoResenia estado,
         @Param("estadoPedido") EstadoPedido estadoPedido);
 
+    @Query("""
+        SELECT prod.idProducto, COUNT(r), AVG(v.calificacionGeneral)
+        FROM Resenia r
+        JOIN r.versiones v
+        JOIN r.producto prod
+        WHERE prod.idProducto IN :ids
+          AND r.estado = :estado
+          AND v.numero = (
+              SELECT MAX(v2.numero) FROM ReseniaVersion v2 WHERE v2.resenia = r
+          )
+        GROUP BY prod.idProducto
+        """)
+    List<Object[]> promediosPorProductos(
+        @Param("ids") Collection<Long> ids,
+        @Param("estado") EstadoResenia estado);
+
     // -----------------------------------------------------------------
     // Agregados del resumen público
     // -----------------------------------------------------------------
@@ -388,16 +427,23 @@ public interface ReseniaRepository extends JpaRepository<Resenia, Long> {
         SELECT COUNT(r), AVG(v.calificacionGeneral)
         FROM Resenia r
         JOIN r.versiones v
-        JOIN r.pedido p
-        JOIN p.servicio s
+        LEFT JOIN r.pedido p
+        LEFT JOIN p.servicio s
+        LEFT JOIN r.producto prod
         WHERE r.estado = :estado
-          AND p.estado = :estadoPedido
-          AND r.autor.idUsuario = p.cliente.idUsuario
           AND v.numero = (
               SELECT MAX(v2.numero) FROM ReseniaVersion v2 WHERE v2.resenia = r
           )
+          AND (
+              (r.pedido IS NOT NULL
+               AND p.estado = :estadoPedido
+               AND r.autor.idUsuario = p.cliente.idUsuario)
+              OR r.producto IS NOT NULL
+          )
           AND (:idServicio IS NULL OR s.idServicio = :idServicio)
-          AND (:idArtista IS NULL OR s.artista.idUsuario = :idArtista)
+          AND (:idArtista IS NULL
+               OR s.artista.idUsuario = :idArtista
+               OR prod.artista.idUsuario = :idArtista)
         """)
     List<Object[]> resumenConteoPromedio(
         @Param("idServicio") Long idServicio,
@@ -409,16 +455,23 @@ public interface ReseniaRepository extends JpaRepository<Resenia, Long> {
         SELECT v.calificacionGeneral, COUNT(r)
         FROM Resenia r
         JOIN r.versiones v
-        JOIN r.pedido p
-        JOIN p.servicio s
+        LEFT JOIN r.pedido p
+        LEFT JOIN p.servicio s
+        LEFT JOIN r.producto prod
         WHERE r.estado = :estado
-          AND p.estado = :estadoPedido
-          AND r.autor.idUsuario = p.cliente.idUsuario
           AND v.numero = (
               SELECT MAX(v2.numero) FROM ReseniaVersion v2 WHERE v2.resenia = r
           )
+          AND (
+              (r.pedido IS NOT NULL
+               AND p.estado = :estadoPedido
+               AND r.autor.idUsuario = p.cliente.idUsuario)
+              OR r.producto IS NOT NULL
+          )
           AND (:idServicio IS NULL OR s.idServicio = :idServicio)
-          AND (:idArtista IS NULL OR s.artista.idUsuario = :idArtista)
+          AND (:idArtista IS NULL
+               OR s.artista.idUsuario = :idArtista
+               OR prod.artista.idUsuario = :idArtista)
         GROUP BY v.calificacionGeneral
         """)
     List<Object[]> distribucionPublica(
@@ -488,6 +541,18 @@ public interface ReseniaRepository extends JpaRepository<Resenia, Long> {
         ORDER BY s.nombre ASC
         """)
     List<Object[]> serviciosConResenias(
+        @Param("idArtista") Long idArtista,
+        @Param("estado") EstadoResenia estado);
+
+    @Query("""
+        SELECT DISTINCT prod.idProducto, prod.titulo
+        FROM Resenia r
+        JOIN r.producto prod
+        WHERE prod.artista.idUsuario = :idArtista
+          AND r.estado = :estado
+        ORDER BY prod.titulo ASC
+        """)
+    List<Object[]> productosConResenias(
         @Param("idArtista") Long idArtista,
         @Param("estado") EstadoResenia estado);
 

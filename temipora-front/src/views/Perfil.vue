@@ -10,12 +10,12 @@ import TarjetaServicio from '../components/TarjetaServicio.vue'
 import TarjetaProducto from '../components/TarjetaProducto.vue'
 import { cargarProductosDeArtista } from '../servicios/productos'
 import ImagenGaleria from '../components/ImagenGaleria.vue'
-import ResumenResenias from '../components/ResumenResenias.vue'
 import ListaResenias from '../components/ListaResenias.vue'
 import ValoracionEstrellas from '../components/ValoracionEstrellas.vue'
 import {
   cargarReseniasArtista as cargarReseniasArtistaApi,
   cargarResumenReseniasArtista as cargarResumenReseniasArtistaApi,
+  formatearPromedio,
 } from '../servicios/resenias'
 import ModalSolicitudMensaje from '../components/ModalSolicitudMensaje.vue'
 import {
@@ -68,8 +68,11 @@ const paginaReseniasArtista = ref(null)
 const cargandoReseniasArtista = ref(false)
 const errorReseniasArtista = ref('')
 const serviciosResenias = ref([])
+const productosResenias = ref([])
 const filtrosReseniasArtista = reactive({
+  tipo: 'TODOS',
   idServicio: '',
+  idProducto: '',
   calificacion: '',
   orden: 'RECIENTES',
 })
@@ -83,6 +86,8 @@ async function cargarPerfil() {
   resumenReseniasArtista.value = null
   reseniasArtista.value = []
   paginaReseniasArtista.value = null
+  serviciosResenias.value = []
+  productosResenias.value = []
   try {
     const nombreUsuario = route.params.nombreUsuario
     const res = await api.get(`/perfil/${nombreUsuario}`)
@@ -463,9 +468,13 @@ async function cargarReseniasDeArtista(pagina = 0) {
       pagina,
       tamanio: 10,
       orden: filtrosReseniasArtista.orden || 'RECIENTES',
+      tipo: filtrosReseniasArtista.tipo || 'TODOS',
     }
     if (filtrosReseniasArtista.idServicio) {
       params.idServicio = Number(filtrosReseniasArtista.idServicio)
+    }
+    if (filtrosReseniasArtista.idProducto) {
+      params.idProducto = Number(filtrosReseniasArtista.idProducto)
     }
     if (filtrosReseniasArtista.calificacion) {
       params.calificacion = Number(filtrosReseniasArtista.calificacion)
@@ -478,6 +487,7 @@ async function cargarReseniasDeArtista(pagina = 0) {
     paginaReseniasArtista.value = data.pagina || null
     resumenReseniasArtista.value = data.resumen || null
     serviciosResenias.value = data.servicios || []
+    productosResenias.value = data.productos || []
   } catch (e) {
     errorReseniasArtista.value = e.response?.data?.message
       || 'No se pudieron cargar las reseñas.'
@@ -495,7 +505,9 @@ function irAResenias() {
 }
 
 function cambiarFiltrosResenias(filtros) {
+  filtrosReseniasArtista.tipo = filtros.tipo || 'TODOS'
   filtrosReseniasArtista.idServicio = filtros.idServicio ?? ''
+  filtrosReseniasArtista.idProducto = filtros.idProducto ?? ''
   filtrosReseniasArtista.calificacion = filtros.calificacion ?? ''
   filtrosReseniasArtista.orden = filtros.orden || 'RECIENTES'
   void cargarReseniasDeArtista(0)
@@ -1002,6 +1014,19 @@ function irASubirImagen(imagen = null) {
               @click="irAResenias"
             >
               Reseñas
+              <span
+                v-if="resumenReseniasArtista?.hayDatos"
+                class="ml-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
+                :class="tabActiva === 'resenas'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-rosa/40 text-granate'"
+              >
+                <span aria-hidden="true">★</span>
+                {{ formatearPromedio(resumenReseniasArtista.promedio) }}
+                <span class="font-normal opacity-80">
+                  ({{ resumenReseniasArtista.cantidad }})
+                </span>
+              </span>
             </button>
           </div>
 
@@ -1182,17 +1207,6 @@ function irASubirImagen(imagen = null) {
             </div>
 
             <div v-if="tabActiva === 'servicios'" class="mt-6">
-              <div
-                v-if="resumenReseniasArtista?.hayDatos"
-                class="mb-6 rounded-2xl border border-rosa/50 bg-blanco p-5"
-              >
-                <ResumenResenias
-                  :resumen="resumenReseniasArtista"
-                  compacto
-                  clickable
-                  @ver-todas="irAResenias"
-                />
-              </div>
               <p v-if="cargandoServicios && !perfil.servicios.length" class="text-sm text-cafe/60 py-8 text-center">
                 Cargando servicios...
               </p>
@@ -1228,7 +1242,34 @@ function irASubirImagen(imagen = null) {
             </div>
           </div>
           <div v-if="tabActiva === 'resenas'" class="mt-6">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 class="font-display text-2xl font-bold text-granate">Reseñas</h2>
+                <p class="mt-1 text-sm text-cafe/55">
+                  Servicios y productos de este artista.
+                </p>
+              </div>
+              <div
+                v-if="resumenReseniasArtista?.hayDatos"
+                class="flex items-center gap-2"
+              >
+                <ValoracionEstrellas
+                  :model-value="Math.round(Number(resumenReseniasArtista.promedio || 0))"
+                  readonly
+                  tamano="sm"
+                  etiqueta="Promedio del artista"
+                />
+                <span class="font-display text-3xl font-extrabold text-granate">
+                  {{ formatearPromedio(resumenReseniasArtista.promedio) }}
+                </span>
+                <span class="text-sm text-cafe/55">
+                  ({{ resumenReseniasArtista.cantidad }})
+                </span>
+              </div>
+            </div>
+
             <ListaResenias
+              class="mt-5"
               :resenias="reseniasArtista"
               :resumen="resumenReseniasArtista"
               :pagina="paginaReseniasArtista"
@@ -1236,8 +1277,11 @@ function irASubirImagen(imagen = null) {
               :error="errorReseniasArtista"
               :filtros="filtrosReseniasArtista"
               :servicios="serviciosResenias"
+              :productos="productosResenias"
               mostrar-filtro-servicio
+              mostrar-filtro-producto
               mostrar-servicio
+              :mostrar-resumen="false"
               @cambiar-filtros="cambiarFiltrosResenias"
               @cambiar-pagina="cambiarPaginaResenias"
             />

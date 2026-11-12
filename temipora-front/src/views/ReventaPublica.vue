@@ -7,6 +7,8 @@ import { useCarrito } from '../composables/useCarrito'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import ResumenPropiedad from '../components/ResumenPropiedad.vue'
 import HistorialLedgerModal from '../components/HistorialLedgerModal.vue'
+import ListaResenias from '../components/ListaResenias.vue'
+import { cargarReseniasProducto } from '../servicios/resenias'
 
 const props = defineProps({
   id: { type: Number, required: true },
@@ -23,6 +25,12 @@ const error = ref('')
 const agregando = ref(false)
 const revelado = ref(false)
 const historialAbierto = ref(null)
+const reseniasProducto = ref([])
+const resumenReseniasProducto = ref(null)
+const paginaReseniasProducto = ref(null)
+const cargandoReseniasProducto = ref(false)
+const errorReseniasProducto = ref('')
+const filtrosReseniasProducto = ref({ calificacion: '', orden: 'RECIENTES' })
 
 const ETIQUETAS_SENSIBLE = {
   VIOLENCIA: 'Violencia',
@@ -69,12 +77,46 @@ function formatear(valor) {
     : '—'
 }
 
+async function cargarResenias() {
+  const idProducto = reventa.value?.idProducto
+  if (!idProducto) {
+    reseniasProducto.value = []
+    resumenReseniasProducto.value = null
+    paginaReseniasProducto.value = null
+    return
+  }
+  cargandoReseniasProducto.value = true
+  errorReseniasProducto.value = ''
+  try {
+    const { data } = await cargarReseniasProducto(idProducto, {
+      calificacion: filtrosReseniasProducto.value.calificacion || undefined,
+      orden: filtrosReseniasProducto.value.orden || 'RECIENTES',
+      pagina: 0,
+      tamanio: 5,
+    })
+    reseniasProducto.value = data?.pagina?.contenido || []
+    paginaReseniasProducto.value = data?.pagina || null
+    resumenReseniasProducto.value = data?.resumen || null
+  } catch (e) {
+    errorReseniasProducto.value = e.response?.data?.message
+      || 'No se pudieron cargar las reseñas del producto.'
+  } finally {
+    cargandoReseniasProducto.value = false
+  }
+}
+
+function cambiarFiltrosResenias(nuevos) {
+  filtrosReseniasProducto.value = nuevos
+  void cargarResenias()
+}
+
 async function cargar() {
   cargando.value = true
   error.value = ''
   revelado.value = false
   try {
     reventa.value = await cargarReventa(props.id)
+    await cargarResenias()
   } catch (e) {
     error.value = e.response?.data?.message
       || 'No se pudo cargar la publicación de reventa.'
@@ -331,6 +373,26 @@ watch(() => props.id, cargar)
         </div>
       </section>
     </div>
+
+    <section v-if="reventa" id="resenias" class="mt-8 border-t border-borde/50 pt-6">
+      <h2 class="font-display text-2xl font-bold text-granate">
+        Reseñas del producto
+      </h2>
+      <p class="mt-1 text-sm text-cafe/55">
+        Opiniones de personas que compraron esta pieza.
+      </p>
+      <div class="mt-5">
+        <ListaResenias
+          :resenias="reseniasProducto"
+          :resumen="resumenReseniasProducto"
+          :pagina="paginaReseniasProducto"
+          :cargando="cargandoReseniasProducto"
+          :error="errorReseniasProducto"
+          :filtros="filtrosReseniasProducto"
+          @cambiar-filtros="cambiarFiltrosResenias"
+        />
+      </div>
+    </section>
 
     <HistorialLedgerModal
       :abierto="!!historialAbierto"

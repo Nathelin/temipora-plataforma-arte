@@ -44,6 +44,7 @@ import com.temipora.backend_springboot.modelo.ProductoLedgerDTO;
 import com.temipora.backend_springboot.modelo.ProductoLedgerPublicoDTO;
 import com.temipora.backend_springboot.modelo.ProductoVariante;
 import com.temipora.backend_springboot.modelo.ProductoVarianteDTO;
+import com.temipora.backend_springboot.modelo.PromedioReseniasDTO;
 import com.temipora.backend_springboot.modelo.PublicacionReventa;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.VarianteLedgerDTO;
@@ -75,6 +76,7 @@ public class ProductoCatalogoService {
     private final ConversionMonedaService conversionMonedaService;
     private final LedgerService ledgerService;
     private final RecomendacionProductoService recomendacionProductoService;
+    private final ReseniaPublicaService reseniaPublicaService;
 
     public ProductoCatalogoService(
             ProductoRepository productoRepository,
@@ -84,7 +86,8 @@ public class ProductoCatalogoService {
             MonedaService monedaService,
             ConversionMonedaService conversionMonedaService,
             LedgerService ledgerService,
-            RecomendacionProductoService recomendacionProductoService) {
+            RecomendacionProductoService recomendacionProductoService,
+            ReseniaPublicaService reseniaPublicaService) {
         this.productoRepository = productoRepository;
         this.usuarioRepository = usuarioRepository;
         this.eventoLedgerRepository = eventoLedgerRepository;
@@ -93,6 +96,7 @@ public class ProductoCatalogoService {
         this.conversionMonedaService = conversionMonedaService;
         this.ledgerService = ledgerService;
         this.recomendacionProductoService = recomendacionProductoService;
+        this.reseniaPublicaService = reseniaPublicaService;
     }
 
     @Transactional(readOnly = true)
@@ -232,6 +236,7 @@ public class ProductoCatalogoService {
                 return dto;
             })
             .toList();
+        aplicarCalificaciones(contenido);
 
         int totalPaginas = total == 0
             ? 0
@@ -257,13 +262,15 @@ public class ProductoCatalogoService {
         boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
         Moneda moneda = monedaPreferidaDe(viewerId);
 
-        return productoRepository
+        List<ProductoCatalogoDTO> productos = productoRepository
             .findByArtistaIdUsuarioAndEstadoOrderByTituloAsc(
                 artista.getIdUsuario(), EstadoProducto.DISPONIBLE).stream()
             .filter(this::tieneStock)
             .filter(producto -> !ocultarSensibles || !producto.isContenidoSensible())
             .map(producto -> aDTO(producto, moneda, viewerId))
             .toList();
+        aplicarCalificaciones(productos);
+        return productos;
     }
 
     @Transactional(readOnly = true)
@@ -279,6 +286,7 @@ public class ProductoCatalogoService {
                 && publicacion.getVariante().getProducto() != null)
             .map(publicacion -> aDTOReventa(publicacion, viewerId))
             .toList();
+        aplicarCalificaciones(items);
         int total = items.size();
         int desde = Math.min(paginaSegura * tamanioSeguro, total);
         int hasta = Math.min(desde + tamanioSeguro, total);
@@ -346,6 +354,7 @@ public class ProductoCatalogoService {
         Producto producto = obtenerEntidadPublica(idProducto);
         Moneda moneda = monedaPreferidaDe(viewerId);
         ProductoCatalogoDTO dto = aDTO(producto, moneda, viewerId);
+        aplicarCalificaciones(List.of(dto));
         return completarDetalle(dto, producto, moneda);
     }
 
@@ -372,7 +381,7 @@ public class ProductoCatalogoService {
             .toList();
 
         int limiteSeguro = Math.min(Math.max(1, limite), TAMANIO_MAXIMO);
-        return recomendacionProductoService
+        List<ProductoCatalogoDTO> similares = recomendacionProductoService
             .similares(origen, candidatos, viewerId, moneda, limiteSeguro).stream()
             .map(item -> {
                 ProductoCatalogoDTO dto = aDTO(item.producto(), moneda, viewerId);
@@ -381,6 +390,8 @@ public class ProductoCatalogoService {
                 return dto;
             })
             .toList();
+        aplicarCalificaciones(similares);
+        return similares;
     }
 
     /**
@@ -778,8 +789,28 @@ public class ProductoCatalogoService {
             .contenidosSensibles(producto.getContenidosSensibles().stream()
                 .map(Enum::name)
                 .toList())
-            .cantidadResenias(0)
             .build();
+    }
+
+    private void aplicarCalificaciones(List<ProductoCatalogoDTO> dtos) {
+        if (dtos == null || dtos.isEmpty()) {
+            return;
+        }
+        List<Long> ids = dtos.stream()
+            .map(ProductoCatalogoDTO::getIdProducto)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+        Map<Long, PromedioReseniasDTO> promedios =
+            reseniaPublicaService.promediosPorProductos(ids);
+        for (ProductoCatalogoDTO dto : dtos) {
+            PromedioReseniasDTO promedio = promedios.get(dto.getIdProducto());
+            if (promedio != null && promedio.getCantidad() > 0
+                    && promedio.getPromedio() != null) {
+                dto.setCalificacionPromedio(promedio.getPromedio());
+                dto.setCantidadResenias((int) promedio.getCantidad());
+            }
+        }
     }
 
     private String imagenPortada(Producto producto) {
