@@ -3,7 +3,7 @@ import api from './api'
 const ESTADOS_PRODUCTO = {
   BORRADOR: {
     texto: 'Borrador',
-    clase: 'border-cafe/20 bg-cafe/10 text-cafe/70',
+    clase: 'border-cafe/20 bg-cafe/10 text-cafe',
   },
   DISPONIBLE: {
     texto: 'Disponible',
@@ -15,7 +15,7 @@ const ESTADOS_PRODUCTO = {
   },
   ARCHIVADO: {
     texto: 'Archivado',
-    clase: 'border-cafe/15 bg-cafe/10 text-cafe/60',
+    clase: 'border-cafe/15 bg-cafe/10 text-cafe',
   },
 }
 
@@ -30,7 +30,7 @@ const ESTADOS_VARIANTE = {
   },
   AGOTADO: {
     texto: 'Agotado',
-    clase: 'border-cafe/15 bg-cafe/10 text-cafe/60',
+    clase: 'border-cafe/15 bg-cafe/10 text-cafe',
   },
   PAUSADO: {
     texto: 'Pausado',
@@ -38,7 +38,7 @@ const ESTADOS_VARIANTE = {
   },
   ARCHIVADO: {
     texto: 'Archivado',
-    clase: 'border-cafe/15 bg-cafe/10 text-cafe/60',
+    clase: 'border-cafe/15 bg-cafe/10 text-cafe',
   },
   EN_REVENTA: {
     texto: 'En reventa',
@@ -48,7 +48,7 @@ const ESTADOS_VARIANTE = {
 
 const FALLBACK = {
   texto: 'Sin estado',
-  clase: 'border-cafe/15 bg-cafe/10 text-cafe/60',
+  clase: 'border-cafe/15 bg-cafe/10 text-cafe',
 }
 
 export function estadoProductoDe(estado) {

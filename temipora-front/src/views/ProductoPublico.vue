@@ -58,6 +58,28 @@ async function agregarAlCarrito(variante) {
   }
 }
 
+async function comprarVariante(variante) {
+  if (!localStorage.getItem('token')) {
+    router.push({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
+  const yaEnCarrito = (itemsCarrito.value || []).some(
+    (item) => Number(item.idVariante) === Number(variante.idVariante),
+  )
+  if (!yaEnCarrito) {
+    try {
+      await agregarAlCarritoStore(variante.idVariante, 1)
+    } catch (e) {
+      toastError(e.response?.data?.message || 'No se pudo agregar al carrito.')
+      return
+    }
+  }
+  router.push({
+    name: 'carrito',
+    query: { artista: producto.value?.idArtista },
+  })
+}
+
 const imagenes = computed(() => {
   const deGaleria = (producto.value?.imagenes || []).map((imagen) => imagen.url)
   const deVariantes = (producto.value?.variantes || [])
@@ -229,25 +251,13 @@ onMounted(cargar)
           :disponibilidad="disponibilidad"
           :precio-desde="precioMostrado"
           :ids-en-carrito="idsEnCarrito"
+          :cantidad-carrito="cantidadCarrito"
           @cambiar-pagina-variantes="cambiarPaginaVariantes"
           @cambiar-pagina-ledger="cambiarPaginaLedger"
           @agregar-carrito="agregarAlCarrito"
+          @comprar="comprarVariante"
         >
           <template #acciones>
-            <router-link
-              v-if="cantidadCarrito"
-              to="/carrito"
-              class="flex w-full items-center justify-center gap-2 rounded-lg bg-coral px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-rojizo"
-            >
-              Ir al carrito
-              <span class="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-bold">
-                {{ cantidadCarrito }}
-              </span>
-            </router-link>
-            <p v-else class="text-center text-[11px] leading-relaxed text-cafe/45">
-              Elegí una variante y tocá “Agregar” para sumarla al carrito.
-            </p>
-
             <button
               type="button"
               class="flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60"

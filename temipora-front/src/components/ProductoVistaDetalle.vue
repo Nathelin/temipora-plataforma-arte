@@ -24,12 +24,14 @@ const props = defineProps({
   disponibilidad: { type: String, default: '' },
   precioDesde: { type: String, default: '—' },
   idsEnCarrito: { type: Array, default: () => [] },
+  cantidadCarrito: { type: Number, default: 0 },
 })
 
 const emit = defineEmits([
   'cambiar-pagina-variantes',
   'cambiar-pagina-ledger',
   'agregar-carrito',
+  'comprar',
 ])
 
 const ETIQUETAS_SENSIBLE = {
@@ -39,6 +41,8 @@ const ETIQUETAS_SENSIBLE = {
 }
 
 const galeria = ref(null)
+const seccionVariantes = ref(null)
+const seccionLicencia = ref(null)
 const indiceImagen = ref(0)
 const visorAbierto = ref(false)
 const visorIndice = ref(0)
@@ -72,6 +76,15 @@ const inicialArtista = computed(
 )
 const ledgerPagina = computed(() => props.ledger?.variantes || [])
 const tieneAlgunLedger = computed(() => props.totalLedger > 0)
+const cantidadVariantesTotal = computed(() => Math.max(
+  props.totalVariantes,
+  (props.producto?.variantes || []).length,
+))
+const hayVariasVariantes = computed(() => cantidadVariantesTotal.value > 1)
+const varianteUnica = computed(() => {
+  if (hayVariasVariantes.value) return null
+  return props.variantesPagina[0] || props.producto?.variantes?.[0] || null
+})
 
 function hashCorto(hash) {
   if (!hash) return '—'
@@ -129,6 +142,20 @@ function irAGaleria() {
   window.scrollTo({ top, behavior: 'smooth' })
 }
 
+function irAVariantes() {
+  const el = seccionVariantes.value
+  if (!el) return
+  const top = el.getBoundingClientRect().top + window.scrollY - 88
+  window.scrollTo({ top, behavior: 'smooth' })
+}
+
+function irALicencia() {
+  const el = seccionLicencia.value
+  if (!el) return
+  const top = el.getBoundingClientRect().top + window.scrollY - 88
+  window.scrollTo({ top, behavior: 'smooth' })
+}
+
 function seleccionarVariante(variante) {
   imagenDeVariante(variante)
   irAGaleria()
@@ -147,6 +174,11 @@ function varianteEnCarrito(variante) {
 function agregarVariante(variante) {
   if (!varianteDisponible(variante) || varianteEnCarrito(variante)) return
   emit('agregar-carrito', variante)
+}
+
+function comprarVariante(variante) {
+  if (!varianteDisponible(variante)) return
+  emit('comprar', variante)
 }
 
 async function alternarInfoLedger() {
@@ -288,13 +320,16 @@ watch(
         </div>
       </section>
 
-      <section class="rounded-[22px] border border-borde/60 bg-superficie p-6 shadow-sm">
+      <section
+        ref="seccionVariantes"
+        class="rounded-[22px] border border-borde/60 bg-superficie p-6 shadow-sm"
+      >
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h2 class="font-display text-lg font-bold text-granate">
-            {{ totalVariantes === 1 ? 'Presentación' : 'Variantes' }}
-            ({{ totalVariantes }})
+            {{ hayVariasVariantes ? 'Variantes' : 'Presentación' }}
+            ({{ cantidadVariantesTotal }})
           </h2>
-          <span class="text-xs text-cafe/45">
+          <span class="text-xs text-cafe/60">
             Cada variante es un ítem vendible.
           </span>
         </div>
@@ -357,17 +392,29 @@ watch(
               <p class="font-display text-lg font-extrabold text-coral">
                 {{ formatearPrecio(variante.precio, producto.moneda) }}
               </p>
-              <button
-                v-if="!esPrevia"
-                type="button"
-                class="rounded-lg bg-coral px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rojizo disabled:cursor-not-allowed disabled:opacity-50"
-                :disabled="!varianteDisponible(variante) || varianteEnCarrito(variante)"
-                @click.stop="agregarVariante(variante)"
-              >
-                {{ varianteEnCarrito(variante)
-                  ? 'En el carrito'
-                  : (varianteDisponible(variante) ? 'Agregar' : 'Sin stock') }}
-              </button>
+              <div v-if="!esPrevia && hayVariasVariantes" class="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-coral/40 bg-blanco px-3 py-1.5 text-xs font-semibold text-granate transition hover:bg-rosa/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  :disabled="!varianteDisponible(variante) || varianteEnCarrito(variante)"
+                  @click.stop="agregarVariante(variante)"
+                >
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.5l1.5 12h12l2.25-8.25H5.25M9 19.5a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm8.25 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+                  </svg>
+                  {{ varianteEnCarrito(variante)
+                    ? 'En el carrito'
+                    : (varianteDisponible(variante) ? 'Agregar' : 'Sin stock') }}
+                </button>
+                <button
+                  v-if="varianteDisponible(variante)"
+                  type="button"
+                  class="rounded-lg bg-coral px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rojizo"
+                  @click.stop="comprarVariante(variante)"
+                >
+                  Comprar
+                </button>
+              </div>
             </div>
           </article>
         </div>
@@ -400,12 +447,13 @@ watch(
 
       <section
         v-if="licencia"
+        ref="seccionLicencia"
         class="rounded-[22px] border border-borde/60 bg-superficie p-6 shadow-sm"
       >
         <h2 class="font-display text-lg font-bold text-granate">
           Licencia de uso
         </h2>
-        <p class="mt-1 text-[11px] text-cafe/45">
+        <p class="mt-1 text-[11px] text-cafe/70">
           Versión {{ licencia.version }}
         </p>
         <p class="mt-3 text-sm leading-relaxed text-cafe/75">
@@ -502,13 +550,13 @@ watch(
               </span>
               <span
                 v-else-if="producto.estado !== 'BORRADOR'"
-                class="rounded-full bg-cafe/10 px-2.5 py-0.5 text-[11px] font-semibold text-cafe/60"
+                class="rounded-full bg-cafe/10 px-2.5 py-0.5 text-[11px] font-semibold text-cafe"
               >
                 Sin stock
               </span>
               <span
                 v-else
-                class="rounded-full bg-cafe/10 px-2.5 py-0.5 text-[11px] font-semibold text-cafe/60"
+                class="rounded-full bg-cafe/10 px-2.5 py-0.5 text-[11px] font-semibold text-cafe"
               >
                 Todavía no publicado
               </span>
@@ -518,13 +566,13 @@ watch(
                 class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
                 :class="producto.disponible
                   ? 'bg-green-500/10 text-green-700'
-                  : 'bg-cafe/10 text-cafe/60'"
+                  : 'bg-cafe/10 text-cafe'"
               >
                 {{ producto.disponible ? 'Disponible' : 'Sin stock' }}
               </span>
               <span
                 v-if="producto.esPiezaUnica"
-                class="rounded-full bg-mantequilla/70 px-2.5 py-0.5 text-[11px] font-bold text-granate"
+                class="rounded-full bg-mantequilla px-2.5 py-0.5 text-[11px] font-bold text-tinta"
               >
                 Pieza única
               </span>
@@ -561,15 +609,24 @@ watch(
           </router-link>
 
           <p class="mt-5 font-display text-3xl font-extrabold text-coral">
+            <span
+              v-if="hayVariasVariantes"
+              class="mr-1 align-middle text-[10px] font-semibold uppercase tracking-[0.12em] text-cafe/70"
+            >
+              Desde
+            </span>
             {{ precioDesde }}
-            <span class="text-xs font-semibold text-cafe/45">desde</span>
           </p>
 
-          <p class="mt-2 text-xs text-cafe/50">
-            {{ producto.cantidadVariantes }} variante(s) ·
-            {{ producto.cantidadVariantesDisponibles }} disponible(s)
+          <p v-if="hayVariasVariantes" class="mt-2 text-xs text-cafe/70">
+            {{ producto.cantidadVariantes }} variantes ·
+            {{ producto.cantidadVariantesDisponibles }}
+            {{ producto.cantidadVariantesDisponibles === 1 ? 'disponible' : 'disponibles' }}
           </p>
-          <p v-if="!esPrevia && disponibilidad" class="mt-1 text-xs text-cafe/50">
+          <p
+            v-else-if="!esPrevia && disponibilidad"
+            class="mt-1 text-xs text-cafe/70"
+          >
             {{ disponibilidad }}
           </p>
 
@@ -583,22 +640,112 @@ watch(
             </p>
           </div>
 
-          <div
+          <button
             v-if="licencia"
-            class="mt-4 rounded-xl border border-coral/20 bg-rosa/20 px-3 py-2 text-xs leading-relaxed text-granate"
+            type="button"
+            class="mt-4 flex w-full items-center justify-between gap-3 rounded-xl border border-coral/25 bg-rosa/20 px-3 py-2 text-left text-xs transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/50"
+            @click="irALicencia"
           >
-            <p class="font-semibold">Licencia</p>
-            <p class="mt-1">{{ resumenDerechos || 'Sin usos definidos' }}</p>
-            <p v-if="licencia.permiteReventa" class="mt-1">
-              Reventa de piezas únicas
-              <span v-if="Number(licencia.porcentajeRegalia) > 0">
-                con regalía del {{ licencia.porcentajeRegalia }}%.
-              </span>
-              <span v-else>sin regalía.</span>
-            </p>
-          </div>
+            <span class="font-semibold text-granate">Licencia de uso</span>
+            <span class="flex items-center gap-1 font-medium text-cafe">
+              Ver condiciones
+              <svg
+                class="h-3 w-3"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+              </svg>
+            </span>
+          </button>
 
           <div class="mt-5 space-y-3">
+            <template v-if="!esPrevia && varianteUnica">
+              <button
+                v-if="!varianteDisponible(varianteUnica)"
+                type="button"
+                disabled
+                class="flex w-full items-center justify-center rounded-lg bg-cafe/10 px-4 py-2.5 text-sm font-semibold text-cafe"
+              >
+                Sin stock
+              </button>
+              <template v-else>
+                <button
+                  type="button"
+                  class="flex w-full items-center justify-center gap-2 rounded-lg bg-coral px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-rojizo"
+                  @click="comprarVariante(varianteUnica)"
+                >
+                  Comprar
+                </button>
+
+                <router-link
+                  v-if="varianteEnCarrito(varianteUnica)"
+                  to="/carrito"
+                  class="flex w-full items-center justify-center gap-2 rounded-lg border border-coral/40 bg-blanco px-4 py-2.5 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+                >
+                  Ir al carrito
+                  <span
+                    v-if="cantidadCarrito"
+                    class="rounded-full bg-coral px-2 py-0.5 text-[11px] font-bold text-white"
+                  >
+                    {{ cantidadCarrito }}
+                  </span>
+                </router-link>
+                <button
+                  v-else
+                  type="button"
+                  class="flex w-full items-center justify-center gap-2 rounded-lg border border-coral/40 bg-blanco px-4 py-2.5 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+                  @click="agregarVariante(varianteUnica)"
+                >
+                  <svg
+                    class="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    aria-hidden="true"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.5l1.5 12h12l2.25-8.25H5.25M9 19.5a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm8.25 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+                  </svg>
+                  Agregar al carrito
+                </button>
+              </template>
+            </template>
+
+            <template v-else-if="!esPrevia && hayVariasVariantes">
+              <button
+                type="button"
+                class="flex w-full items-center justify-center gap-2 rounded-lg bg-coral px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-rojizo"
+                @click="irAVariantes"
+              >
+                Ver las {{ cantidadVariantesTotal }} variantes
+                <svg
+                  class="h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+
+              <router-link
+                v-if="cantidadCarrito"
+                to="/carrito"
+                class="flex w-full items-center justify-center gap-2 rounded-lg border border-coral/40 bg-blanco px-4 py-2.5 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+              >
+                Ir al carrito
+                <span class="rounded-full bg-coral px-2 py-0.5 text-[11px] font-bold text-white">
+                  {{ cantidadCarrito }}
+                </span>
+              </router-link>
+            </template>
+
             <slot name="acciones" />
           </div>
         </section>

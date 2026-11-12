@@ -18,7 +18,14 @@ const procesandoDialogo = ref(false)
 let temporizadorAviso = null
 
 const disponibles = computed(
-  () => productos.value.filter((producto) => producto.estado === 'DISPONIBLE'),
+  () => productos.value.filter(
+    (producto) => producto.estado === 'DISPONIBLE' && producto.disponible,
+  ),
+)
+const agotados = computed(
+  () => productos.value.filter(
+    (producto) => producto.estado === 'DISPONIBLE' && !producto.disponible,
+  ),
 )
 const pausados = computed(
   () => productos.value.filter((producto) => producto.estado === 'PAUSADO'),
@@ -29,10 +36,12 @@ const borradores = computed(
 const productosFiltrados = computed(() => {
   if (filtro.value === 'pausados') return pausados.value
   if (filtro.value === 'borradores') return borradores.value
+  if (filtro.value === 'agotados') return agotados.value
   return disponibles.value
 })
 const opcionesFiltro = computed(() => [
   { valor: 'disponibles', texto: 'Disponibles', cantidad: disponibles.value.length },
+  { valor: 'agotados', texto: 'Sin stock', cantidad: agotados.value.length },
   { valor: 'borradores', texto: 'Borradores', cantidad: borradores.value.length },
   { valor: 'pausados', texto: 'Pausados', cantidad: pausados.value.length },
 ])
@@ -43,6 +52,15 @@ const estadoVacio = computed(() => {
       titulo: 'No tenés borradores.',
       detalle: 'Los productos que guardes sin publicar aparecen acá.',
       accion: null,
+    }
+  }
+  if (filtro.value === 'agotados') {
+    return {
+      titulo: 'No tenés productos sin stock.',
+      detalle: 'Tus publicaciones disponibles todavía tienen unidades para vender.',
+      accion: disponibles.value.length
+        ? { texto: 'Ver disponibles', tipo: 'disponibles' }
+        : null,
     }
   }
   if (filtro.value === 'pausados') {
@@ -56,12 +74,16 @@ const estadoVacio = computed(() => {
   }
   return {
     titulo: 'No tenés productos disponibles.',
-    detalle: productos.value.some((p) => p.estado === 'PAUSADO')
-      ? 'Revisá los que pausaste o creá uno nuevo.'
-      : 'Creá tu primer producto para empezar a venderlo.',
-    accion: productos.value.some((p) => p.estado === 'PAUSADO')
-      ? { texto: 'Ver pausados', tipo: 'pausados' }
-      : null,
+    detalle: agotados.value.length
+      ? 'Revisá los que quedaron sin stock o los que pausaste.'
+      : (pausados.value.length
+        ? 'Revisá los que pausaste o creá uno nuevo.'
+        : 'Creá tu primer producto para empezar a venderlo.'),
+    accion: agotados.value.length
+      ? { texto: 'Ver sin stock', tipo: 'agotados' }
+      : (pausados.value.length
+        ? { texto: 'Ver pausados', tipo: 'pausados' }
+        : null),
   }
 })
 
@@ -351,7 +373,7 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
               </p>
 
               <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                <span class="rounded-full bg-crema px-2.5 py-0.5 font-semibold text-cafe/65">
+                <span class="rounded-full bg-crema px-2.5 py-0.5 font-semibold text-cafe">
                   {{ resumenVariantes(producto) }}
                 </span>
                 <span

@@ -76,7 +76,7 @@ const destino = computed(() => ({
       </span>
       <span
         v-if="producto.esPiezaUnica && !sinStock"
-        class="absolute bottom-3 left-3 rounded-full bg-mantequilla px-2.5 py-1 text-[11px] font-bold text-granate shadow-sm"
+        class="absolute bottom-3 left-3 rounded-full bg-mantequilla px-2.5 py-1 text-[11px] font-bold text-tinta shadow-sm"
       >
         Pieza única
       </span>
@@ -152,7 +152,7 @@ const destino = computed(() => ({
           <span class="mr-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-cafe/45">Desde</span>
           {{ precioMostrado }}
         </p>
-        <span class="shrink-0 rounded-full bg-crema px-2.5 py-0.5 text-[11px] font-semibold text-cafe/65">
+        <span class="shrink-0 rounded-full bg-crema px-2.5 py-0.5 text-[11px] font-semibold text-cafe">
           {{ disponibilidad }}
         </span>
       </div>

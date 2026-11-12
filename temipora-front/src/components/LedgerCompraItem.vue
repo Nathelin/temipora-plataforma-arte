@@ -142,10 +142,6 @@ function fecha(valor) {
                 <span class="font-semibold">Hash de imagen:</span>
                 <span class="font-mono">{{ evento.hashImagen }}</span>
               </p>
-              <p>
-                <span class="font-semibold">Versión de hash:</span>
-                {{ evento.versionHash }}
-              </p>
             </div>
           </li>
         </ol>

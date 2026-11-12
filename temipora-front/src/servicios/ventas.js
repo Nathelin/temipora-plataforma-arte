@@ -37,6 +37,32 @@ export function estadoVentaDe(estado) {
   }
 }
 
+export const ESTADOS_VENTA_PRODUCTO = {
+  PAGADO: {
+    etiqueta: 'Pagado',
+    clase: 'border-green-700/30 bg-green-700/10 text-green-700',
+  },
+  PENDIENTE: {
+    etiqueta: 'Pendiente',
+    clase: 'border-durazno bg-durazno/30 text-cafe',
+  },
+  VENCIDO: {
+    etiqueta: 'Vencido',
+    clase: 'border-cafe/25 bg-cafe/5 text-cafe/70',
+  },
+  CANCELADO: {
+    etiqueta: 'Cancelado',
+    clase: 'border-rojizo/30 bg-rojizo/10 text-rojizo',
+  },
+}
+
+export function estadoVentaProductoDe(estado) {
+  return ESTADOS_VENTA_PRODUCTO[estado] || {
+    etiqueta: estado || 'Sin estado',
+    clase: 'border-rosa bg-blanco text-cafe/60',
+  }
+}
+
 const TIPOS_MEDIO_PAGO = {
   credit_card: 'Tarjeta de crédito',
   debit_card: 'Tarjeta de débito',

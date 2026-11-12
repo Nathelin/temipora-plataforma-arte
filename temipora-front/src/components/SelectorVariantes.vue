@@ -260,12 +260,17 @@ function onStockInput(indice, event) {
   actualizar(indice, 'stockDisponible', Number.isFinite(valor) && valor >= 0 ? valor : 0)
 }
 
+function imagenElegida(variante) {
+  if (variante?.urlImagen) return variante.urlImagen
+  return esPresentacionUnica.value ? props.imagenPortada : ''
+}
+
 function imagenActual(variante) {
-  return variante.urlImagen || ''
+  return imagenElegida(variante)
 }
 
 function imagenSeleccionada(variante, imagen) {
-  return variante.urlImagen === imagen.url
+  return imagenElegida(variante) === imagen.url
 }
 
 function imagenesVisibles(variante) {
@@ -290,7 +295,7 @@ function cerrarGaleria() {
 
 function imagenSeleccionadaEnGaleria(imagen) {
   if (indiceGaleria.value === null) return false
-  return props.modelValue[indiceGaleria.value]?.urlImagen === imagen.url
+  return imagenSeleccionada(props.modelValue[indiceGaleria.value], imagen)
 }
 
 function seleccionarDesdeGaleria(imagen) {
@@ -594,7 +599,7 @@ onBeforeUnmount(() => {
       v-if="esPresentacionUnica"
       class="rounded-2xl border border-rosa/60 bg-blanco p-4 shadow-sm"
     >
-      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_14rem]">
+      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
         <div class="space-y-4">
           <div class="grid gap-3 sm:grid-cols-2">
             <div>
@@ -676,8 +681,9 @@ onBeforeUnmount(() => {
           </div>
 
           <p class="rounded-xl bg-crema/60 px-3 py-2 text-xs leading-relaxed text-cafe/60">
-            La imagen de la presentación será la portada de la publicación.
-            Si querés una imagen distinta, agregá una segunda presentación.
+            Elegí qué imagen de la galería representa esta presentación. En productos
+            digitales es el archivo que recibe el comprador. Si no elegís ninguna,
+            se usa la portada de la publicación.
           </p>
           <p v-if="erroresVariantes[0]?.imagen" class="text-xs font-medium text-rojizo">
             {{ erroresVariantes[0].imagen }}
@@ -685,12 +691,12 @@ onBeforeUnmount(() => {
         </div>
 
         <div>
-          <p class="mb-1.5 text-xs font-medium text-cafe/70">Imagen de portada</p>
+          <p class="mb-1.5 text-xs font-medium text-cafe/70">Imagen de la presentación</p>
           <div class="overflow-hidden rounded-xl border border-rosa/60 bg-rosa/10">
             <img
-              v-if="imagenPortada"
-              :src="imagenPortada"
-              alt="Portada de la publicación"
+              v-if="imagenActual(variantes[0])"
+              :src="imagenActual(variantes[0])"
+              alt="Imagen de la presentación"
               class="aspect-square w-full object-cover"
             />
             <div
@@ -698,9 +704,56 @@ onBeforeUnmount(() => {
               class="flex aspect-square flex-col items-center justify-center gap-2 px-4 text-center text-xs text-cafe/45"
             >
               <span class="text-2xl" aria-hidden="true">＋</span>
-              Subí la portada en el paso de imágenes
+              Subí una imagen en el paso 1
             </div>
           </div>
+
+          <div v-if="imagenesGaleria.length" class="mt-1.5">
+            <div class="mb-1 flex items-center justify-between gap-2">
+              <p class="text-[11px] text-cafe/50">Elegí de la galería:</p>
+              <button
+                v-if="hayMasImagenes"
+                type="button"
+                class="text-[11px] font-medium text-coral transition hover:text-rojizo"
+                @click="abrirGaleria(0)"
+              >
+                Ver todas ({{ imagenesGaleria.length }})
+              </button>
+            </div>
+            <div class="flex gap-1.5 overflow-x-auto pb-1">
+              <button
+                v-for="imagen in imagenesVisibles(variantes[0])"
+                :key="imagen.url"
+                type="button"
+                class="h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 transition"
+                :class="imagenSeleccionada(variantes[0], imagen)
+                  ? 'border-coral ring-2 ring-coral/30'
+                  : 'border-rosa/60 hover:border-coral/50'"
+                :aria-label="`Usar imagen ${imagen.url}`"
+                @click="seleccionarImagen(0, imagen)"
+              >
+                <img :src="imagen.url" alt="" class="h-full w-full object-cover" />
+              </button>
+            </div>
+          </div>
+          <p v-else class="mt-1.5 text-[11px] leading-relaxed text-cafe/50">
+            No hay imágenes en la galería. Subí una acá o volvé al paso 1.
+          </p>
+
+          <label
+            class="mt-1.5 flex cursor-pointer items-center justify-center rounded-lg border border-coral/40 bg-blanco px-3 py-2 text-xs font-medium text-granate transition hover:bg-rosa/20"
+            :class="subiendo === 0 ? 'pointer-events-none opacity-50' : ''"
+          >
+            {{ subiendo === 0
+              ? 'Subiendo...'
+              : (imagenActual(variantes[0]) ? 'Cambiar imagen' : 'Subir nueva imagen') }}
+            <input
+              type="file"
+              class="sr-only"
+              :accept="acceptImagenes"
+              @change="subirImagen($event, 0)"
+            />
+          </label>
         </div>
       </div>
     </article>

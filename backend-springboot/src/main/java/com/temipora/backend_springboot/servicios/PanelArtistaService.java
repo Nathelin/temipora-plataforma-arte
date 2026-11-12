@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.servicios;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.Comparator;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.ContadorMensajesDTO;
 import com.temipora.backend_springboot.modelo.DineroPanelDTO;
+import com.temipora.backend_springboot.modelo.EstadoCompraGrupo;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.HitoPedido;
@@ -18,6 +20,7 @@ import com.temipora.backend_springboot.modelo.MetricasPanelDTO;
 import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.PanelArtistaResumenDTO;
 import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
+import com.temipora.backend_springboot.repositorios.CompraGrupoRepository;
 import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
 import com.temipora.backend_springboot.servicios.pagos.mercadopago.MercadoPagoOAuthService;
 
@@ -35,6 +38,7 @@ public class PanelArtistaService {
     private final SolicitudServicioService solicitudServicioService;
     private final PedidoService pedidoService;
     private final HitoPedidoRepository hitoPedidoRepository;
+    private final CompraGrupoRepository compraGrupoRepository;
     private final ConversacionService conversacionService;
     private final MercadoPagoOAuthService mercadoPagoOAuthService;
     private final MonedaVistaService monedaVistaService;
@@ -43,12 +47,14 @@ public class PanelArtistaService {
             SolicitudServicioService solicitudServicioService,
             PedidoService pedidoService,
             HitoPedidoRepository hitoPedidoRepository,
+            CompraGrupoRepository compraGrupoRepository,
             ConversacionService conversacionService,
             MercadoPagoOAuthService mercadoPagoOAuthService,
             MonedaVistaService monedaVistaService) {
         this.solicitudServicioService = solicitudServicioService;
         this.pedidoService = pedidoService;
         this.hitoPedidoRepository = hitoPedidoRepository;
+        this.compraGrupoRepository = compraGrupoRepository;
         this.conversacionService = conversacionService;
         this.mercadoPagoOAuthService = mercadoPagoOAuthService;
         this.monedaVistaService = monedaVistaService;
@@ -152,11 +158,42 @@ public class PanelArtistaService {
             }
         }
 
+        for (Object[] fila : compraGrupoRepository.netosPagadosDeArtista(
+                idArtista, EstadoCompraGrupo.PAGADO)) {
+            if (fila == null || fila.length < 2 || fila[1] == null) {
+                continue;
+            }
+            BigDecimal neto = (BigDecimal) fila[1];
+            LocalDateTime fecha = (LocalDateTime) fila[0];
+            LocalDateTime referencia = fecha != null ? fecha : ahora;
+            BigDecimal netoMostrado = convertir(neto, mostrada, referencia);
+            if (netoMostrado == null) {
+                continue;
+            }
+            total = total.add(netoMostrado);
+            if (fecha != null && YearMonth.from(fecha).equals(mes)) {
+                delMes = delMes.add(netoMostrado);
+            }
+        }
+
         return DineroPanelDTO.builder()
             .porCobrar(actividad.porCobrar())
             .cobradoMes(delMes)
             .cobradoTotal(total)
             .monedaMostrada(mostrada != null ? mostrada.getCodigo() : null)
             .build();
+    }
+
+    private BigDecimal convertir(
+            BigDecimal monto, Moneda mostrada, LocalDateTime fecha) {
+        if (monto == null || mostrada == null) {
+            return monto;
+        }
+        BigDecimal factor = monedaVistaService
+            .factorCobroAMostrada(mostrada, fecha);
+        if (factor == null) {
+            return monto;
+        }
+        return monto.multiply(factor).setScale(2, RoundingMode.HALF_UP);
     }
 }

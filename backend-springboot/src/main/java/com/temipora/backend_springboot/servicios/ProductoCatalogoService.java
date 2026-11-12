@@ -103,6 +103,7 @@ public class ProductoCatalogoService {
 
         List<Producto> filtrados = productoRepository
             .findByEstadoOrderByFechaCreacionDesc(EstadoProducto.DISPONIBLE).stream()
+            .filter(this::tieneStock)
             .filter(producto -> !esDelViewer(producto, viewerId))
             .filter(producto -> !ocultarSensibles || !producto.isContenidoSensible())
             .filter(producto -> cumpleFiltros(producto, filtro, moneda))
@@ -178,6 +179,7 @@ public class ProductoCatalogoService {
         return productoRepository
             .findByArtistaIdUsuarioAndEstadoOrderByTituloAsc(
                 artista.getIdUsuario(), EstadoProducto.DISPONIBLE).stream()
+            .filter(this::tieneStock)
             .filter(producto -> !ocultarSensibles || !producto.isContenidoSensible())
             .map(producto -> aDTO(producto, moneda, viewerId))
             .toList();
@@ -210,6 +212,7 @@ public class ProductoCatalogoService {
 
         List<Producto> candidatos = productoRepository
             .findByEstadoOrderByFechaCreacionDesc(EstadoProducto.DISPONIBLE).stream()
+            .filter(this::tieneStock)
             .filter(producto -> !Objects.equals(
                 producto.getIdProducto(), idProducto))
             .filter(producto -> !esDelViewer(producto, viewerId))

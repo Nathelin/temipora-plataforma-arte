@@ -615,13 +615,22 @@ function validarLicencia() {
   return errs
 }
 
+function shaEntregable(variante) {
+  const propio = String(variante?.sha256 || '').trim().toLowerCase()
+  if (propio) return propio
+  if (presentacionUnica.value) {
+    return String(form.value.imagenes[0]?.sha256 || '').trim().toLowerCase()
+  }
+  return ''
+}
+
 function validarEntregables() {
   const errs = []
   if (esEntregaFisica.value) return errs
 
   const vistos = new Set()
   variantes.value.forEach((variante, indice) => {
-    const sha = String(variante.sha256 || '').trim().toLowerCase()
+    const sha = shaEntregable(variante)
     if (!sha) {
       const mensaje = presentacionUnica.value
         ? 'Cada presentación necesita su imagen: es el archivo que recibe el comprador.'

@@ -420,10 +420,7 @@ onMounted(cargar)
       <section class="mt-6 rounded-[22px] border border-dashed border-rosa/70 bg-blanco p-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p class="font-display text-base font-bold text-granate">Reseñas</p>
-            <p class="mt-1 text-sm text-cafe/60">
-              Todavía no habilitamos reseñas de productos. Va a estar disponible próximamente.
-            </p>
+            <p class="font-display text-base font-bold text-granate">Reseña</p>
           </div>
           <button
             type="button"

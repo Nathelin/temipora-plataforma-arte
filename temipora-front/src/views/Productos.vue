@@ -24,7 +24,6 @@ const favoritos = ref(new Set())
 const actualizandoFavorito = ref(new Set())
 
 const orden = ref('RELEVANCIA')
-const soloConStock = ref(false)
 const filtrosAbiertos = ref(false)
 const pagina = ref(0)
 const tamanio = 24
@@ -52,7 +51,6 @@ const cantidadFiltrosActivos = computed(() => {
   if (filtros.value.sensible) total++
   if (filtros.value.precioMin) total++
   if (filtros.value.precioMax) total++
-  if (soloConStock.value) total++
   return total
 })
 
@@ -84,7 +82,6 @@ function params() {
   if (filtros.value.sensible) salida.sensible = filtros.value.sensible === 'con'
   if (filtros.value.precioMin) salida.precioMin = filtros.value.precioMin
   if (filtros.value.precioMax) salida.precioMax = filtros.value.precioMax
-  if (soloConStock.value) salida.soloConStock = true
   return salida
 }
 
@@ -133,7 +130,6 @@ function limpiarFiltros() {
     precioMin: '',
     precioMax: '',
   }
-  soloConStock.value = false
 }
 
 watch(
@@ -145,7 +141,7 @@ watch(
   { deep: true },
 )
 
-watch([orden, soloConStock], () => cargar())
+watch(orden, () => cargar())
 
 async function cargarFavoritos() {
   if (!localStorage.getItem('token')) return
@@ -247,15 +243,6 @@ onMounted(async () => {
           <option value="PRECIO_ASC">Menor precio</option>
           <option value="PRECIO_DESC">Mayor precio</option>
         </select>
-
-        <label class="flex cursor-pointer items-center gap-2 text-sm text-cafe/70">
-          <input
-            v-model="soloConStock"
-            type="checkbox"
-            class="h-4 w-4 rounded border-rosa text-coral focus:ring-coral"
-          />
-          Solo con stock
-        </label>
 
         <button
           type="button"
