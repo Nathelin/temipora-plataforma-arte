@@ -111,9 +111,10 @@ public class ReseniaModeracionService {
             throw new IllegalArgumentException(
                 "No podés reportar tu propia reseña.");
         }
-        if (!resenia.getAutor().getIdUsuario()
-                .equals(resenia.getPedido().getCliente().getIdUsuario())
-                || resenia.getPedido().getEstado() != EstadoPedido.FINALIZADO) {
+        if (resenia.getPedido() != null
+                && (!resenia.getAutor().getIdUsuario()
+                        .equals(resenia.getPedido().getCliente().getIdUsuario())
+                    || resenia.getPedido().getEstado() != EstadoPedido.FINALIZADO)) {
             throw new IllegalArgumentException(
                 "Solo podés reportar reseñas públicas de pedidos finalizados.");
         }
@@ -200,9 +201,18 @@ public class ReseniaModeracionService {
         return ReporteReseniaHistorialDTO.builder()
             .idReporte(reporte.getIdReporte())
             .idResenia(resenia.getIdResenia())
-            .idPedido(resenia.getPedido().getIdPedido())
-            .nombreServicio(resenia.getPedido().getServicio() != null
+            .idPedido(resenia.getPedido() != null
+                ? resenia.getPedido().getIdPedido()
+                : null)
+            .nombreServicio(resenia.getPedido() != null
+                    && resenia.getPedido().getServicio() != null
                 ? resenia.getPedido().getServicio().getNombre()
+                : null)
+            .idProducto(resenia.getProducto() != null
+                ? resenia.getProducto().getIdProducto()
+                : null)
+            .nombreProducto(resenia.getProducto() != null
+                ? resenia.getProducto().getTitulo()
                 : null)
             .autorResenia(resenia.getAutor() != null
                 ? resenia.getAutor().getNombreUsuario()
@@ -381,9 +391,18 @@ public class ReseniaModeracionService {
 
         return ReseniaReportadaDTO.builder()
             .idResenia(resenia.getIdResenia())
-            .idPedido(resenia.getPedido().getIdPedido())
-            .nombreServicio(resenia.getPedido().getServicio() != null
+            .idPedido(resenia.getPedido() != null
+                ? resenia.getPedido().getIdPedido()
+                : null)
+            .nombreServicio(resenia.getPedido() != null
+                    && resenia.getPedido().getServicio() != null
                 ? resenia.getPedido().getServicio().getNombre()
+                : null)
+            .idProducto(resenia.getProducto() != null
+                ? resenia.getProducto().getIdProducto()
+                : null)
+            .nombreProducto(resenia.getProducto() != null
+                ? resenia.getProducto().getTitulo()
                 : null)
             .autor(UsuarioResumenDTO.desdeUsuario(resenia.getAutor()))
             .mostrarNombre(resenia.isMostrarNombre())
@@ -479,13 +498,16 @@ public class ReseniaModeracionService {
 
     private void notificarAutor(
             Resenia resenia, String codigo, String nombre, String descripcion) {
+        boolean esProducto = resenia.getProducto() != null;
         notificacionService.crearParaUsuario(
             resenia.getAutor().getIdUsuario(),
             codigo,
             nombre,
             descripcion,
-            resenia.getPedido().getIdPedido(),
-            REFERENCIA_PEDIDO);
+            esProducto
+                ? resenia.getProducto().getIdProducto()
+                : resenia.getPedido().getIdPedido(),
+            esProducto ? "PRODUCTO" : REFERENCIA_PEDIDO);
     }
 
     private void resolverPendientes(
@@ -515,6 +537,12 @@ public class ReseniaModeracionService {
     }
 
     private String nombreServicio(Resenia resenia) {
+        if (resenia.getProducto() != null) {
+            String titulo = resenia.getProducto().getTitulo();
+            return titulo != null && !titulo.isBlank()
+                ? "'" + titulo + "'"
+                : "un producto";
+        }
         Pedido pedido = resenia.getPedido();
         if (pedido == null
                 || pedido.getServicio() == null

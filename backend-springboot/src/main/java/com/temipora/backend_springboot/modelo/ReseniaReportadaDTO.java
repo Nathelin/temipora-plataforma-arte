@@ -22,6 +22,8 @@ public class ReseniaReportadaDTO {
     private Long idResenia;
     private Long idPedido;
     private String nombreServicio;
+    private Long idProducto;
+    private String nombreProducto;
     private UsuarioResumenDTO autor;
     private boolean mostrarNombre;
     private EstadoResenia estado;

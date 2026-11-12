@@ -22,6 +22,10 @@ public class ReseniaDTO {
     private Long idResenia;
     private Long idPedido;
     private String nombreServicio;
+    private Long idProducto;
+    private String nombreProducto;
+    private String nombreVariante;
+    private boolean compraVerificada;
     private AmbitoResenia direccion;
     private UsuarioResumenDTO autor;
     private EstadoResenia estado;
@@ -41,16 +45,21 @@ public class ReseniaDTO {
 
     public static ReseniaDTO desde(Resenia resenia, boolean incluirHistorial) {
         ReseniaVersion actual = resenia.versionActual();
-        boolean esCliente = resenia.getAutor().getIdUsuario()
-            .equals(resenia.getPedido().getCliente().getIdUsuario());
+        Pedido pedido = resenia.getPedido();
+        Producto producto = resenia.getProducto();
+        CompraItem compra = resenia.getCompraItem();
 
         ReseniaDTOBuilder builder = ReseniaDTO.builder()
             .idResenia(resenia.getIdResenia())
-            .idPedido(resenia.getPedido().getIdPedido())
-            .nombreServicio(resenia.getPedido().getServicio() != null
-                ? resenia.getPedido().getServicio().getNombre()
+            .idPedido(pedido != null ? pedido.getIdPedido() : null)
+            .nombreServicio(pedido != null && pedido.getServicio() != null
+                ? pedido.getServicio().getNombre()
                 : null)
-            .direccion(esCliente ? AmbitoResenia.SERVICIO : AmbitoResenia.CLIENTE)
+            .idProducto(producto != null ? producto.getIdProducto() : null)
+            .nombreProducto(producto != null ? producto.getTitulo() : null)
+            .nombreVariante(compra != null ? compra.getNombreVariante() : null)
+            .compraVerificada(producto != null)
+            .direccion(resenia.getAmbito())
             .autor(UsuarioResumenDTO.desdeUsuario(resenia.getAutor()))
             .estado(resenia.getEstado())
             .mostrarNombre(resenia.isMostrarNombre())

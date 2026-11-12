@@ -69,13 +69,18 @@ function claseOpcion(opcion) {
         </span>
         <div class="min-w-0">
           <p class="truncate text-sm font-semibold text-granate">
-            {{ resenia.anonima ? 'Cliente verificado' : (autor || resenia.autorMostrado) }}
+            {{ resenia.anonima
+              ? (resenia.autorMostrado || 'Cliente verificado')
+              : (autor || resenia.autorMostrado) }}
           </p>
           <p class="text-xs text-cafe/50">
             {{ formatearFechaHora(resenia.fechaVersion) }}
-            <span v-if="mostrarServicio && resenia.nombreServicio">
-              · {{ resenia.nombreServicio }}
+            <span v-if="mostrarServicio && (resenia.nombreProducto || resenia.nombreServicio)">
+              · {{ resenia.nombreProducto || resenia.nombreServicio }}
             </span>
+          </p>
+          <p v-if="resenia.nombreVariante" class="text-xs text-cafe/45">
+            Variante: {{ resenia.nombreVariante }}
           </p>
         </div>
       </div>
@@ -91,6 +96,12 @@ function claseOpcion(opcion) {
           {{ resenia.calificacionGeneral }}/5
         </span>
         <span
+          v-if="resenia.compraVerificada"
+          class="rounded-full border border-green-700/25 bg-green-500/10 px-2 py-0.5 text-[11px] font-semibold text-green-700"
+        >
+          Compra verificada
+        </span>
+        <span
           v-if="resenia.editada"
           class="rounded-full border border-durazno bg-durazno/40 px-2 py-0.5 text-[11px] font-semibold text-granate"
         >
@@ -100,7 +111,7 @@ function claseOpcion(opcion) {
           v-if="puedeReportar && !reportada"
           type="button"
           class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold text-cafe/45 transition hover:bg-rojizo/5 hover:text-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/50"
-          :aria-label="`Reportar reseña de ${resenia.nombreServicio || 'este servicio'}`"
+          :aria-label="`Reportar reseña de ${resenia.nombreProducto || resenia.nombreServicio || 'esta pieza'}`"
           @click="modalAbierto = true"
         >
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

@@ -153,8 +153,13 @@ function claseAccion(accion) {
             </div>
             <p class="mt-1 text-xs text-cafe/60">
               {{ formatearFecha(reporte.fechaCreacion) }}
-              · {{ reporte.nombreServicio || 'Servicio' }}
-              · Pedido #{{ reporte.idPedido }}
+              · {{ reporte.nombreProducto || reporte.nombreServicio || 'Reseña' }}
+              <template v-if="reporte.idProducto">
+                · Producto #{{ reporte.idProducto }}
+              </template>
+              <template v-else>
+                · Pedido #{{ reporte.idPedido }}
+              </template>
             </p>
             <p class="mt-1 text-xs text-cafe/60">
               Reseña de

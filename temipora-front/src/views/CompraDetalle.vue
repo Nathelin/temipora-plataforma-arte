@@ -2,10 +2,19 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LedgerCompraItem from '../components/LedgerCompraItem.vue'
+import FormularioResenia from '../components/FormularioResenia.vue'
+import TarjetaResenia from '../components/TarjetaResenia.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import { formatearPrecio } from '../servicios/moneda'
 import { guardarArchivo } from '../servicios/descargas'
+import {
+  cargarCriterios,
+  cargarEstadoReseniaProducto,
+  crearReseniaProducto,
+  editarReseniaProducto,
+  eliminarReseniaProducto,
+} from '../servicios/resenias'
 import {
   cancelarGrupo,
   cargarCompra,
@@ -33,6 +42,12 @@ const descargandoTodo = ref(false)
 const ahora = ref(Date.now())
 const grupoCancelar = ref(null)
 const cancelando = ref(false)
+const criteriosProducto = ref([])
+const estadosResenia = ref({})
+const reseniaEnEdicion = ref(null)
+const guardandoResenia = ref(false)
+const reseniaAEliminar = ref(null)
+const eliminandoResenia = ref(false)
 let intervaloPago = null
 
 const grupos = computed(() => compra.value?.grupos || [])
@@ -55,6 +70,104 @@ const totalProductos = computed(() => {
   return productos.size
 })
 
+const itemsReseniables = computed(() => {
+  const ids = new Set()
+  for (const grupo of grupos.value) {
+    if (grupo.estado !== 'PAGADO') continue
+    for (const item of grupo.items || []) {
+      if (item.idProducto) ids.add(item.idProducto)
+    }
+  }
+  return [...ids]
+})
+
+function estadoDeProducto(idProducto) {
+  return estadosResenia.value[idProducto] || null
+}
+
+async function cargarResenias() {
+  const ids = itemsReseniables.value
+  if (!ids.length) {
+    estadosResenia.value = {}
+    return
+  }
+  const [criteriosRes, estadosRes] = await Promise.all([
+    cargarCriterios('PRODUCTO').catch(() => null),
+    Promise.all(ids.map((id) => cargarEstadoReseniaProducto(id).catch(() => null))),
+  ])
+  criteriosProducto.value = criteriosRes?.data || []
+  const mapa = {}
+  ids.forEach((id, indice) => {
+    mapa[id] = estadosRes[indice]?.data || null
+  })
+  estadosResenia.value = mapa
+}
+
+async function recargarEstadoProducto(idProducto) {
+  try {
+    const res = await cargarEstadoReseniaProducto(idProducto)
+    estadosResenia.value = {
+      ...estadosResenia.value,
+      [idProducto]: res.data,
+    }
+  } catch {
+    // Se conserva el estado anterior si la recarga falla.
+  }
+}
+
+function abrirFormulario(idProducto) {
+  reseniaEnEdicion.value = idProducto
+}
+
+function cerrarFormulario() {
+  if (guardandoResenia.value) return
+  reseniaEnEdicion.value = null
+}
+
+async function guardarResenia(idProducto, payload) {
+  if (guardandoResenia.value) return
+  guardandoResenia.value = true
+  const eraEdicion = Boolean(estadoDeProducto(idProducto)?.miResenia)
+  try {
+    if (eraEdicion) {
+      await editarReseniaProducto(idProducto, payload)
+    } else {
+      await crearReseniaProducto(idProducto, payload)
+    }
+    exito(eraEdicion ? 'Reseña actualizada.' : 'Reseña publicada.')
+    reseniaEnEdicion.value = null
+    await recargarEstadoProducto(idProducto)
+  } catch (e) {
+    toastError(e.response?.data?.message || 'No se pudo guardar la reseña.')
+  } finally {
+    guardandoResenia.value = false
+  }
+}
+
+function pedirEliminarResenia(idProducto, titulo) {
+  reseniaAEliminar.value = { idProducto, titulo }
+}
+
+function cerrarEliminarResenia() {
+  if (!eliminandoResenia.value) reseniaAEliminar.value = null
+}
+
+async function confirmarEliminarResenia() {
+  if (!reseniaAEliminar.value || eliminandoResenia.value) return
+  eliminandoResenia.value = true
+  const { idProducto } = reseniaAEliminar.value
+  try {
+    await eliminarReseniaProducto(idProducto)
+    reseniaAEliminar.value = null
+    exito('Eliminaste tu reseña.')
+    await recargarEstadoProducto(idProducto)
+  } catch (e) {
+    toastError(e.response?.data?.message || 'No se pudo eliminar la reseña.')
+  } finally {
+    eliminandoResenia.value = false
+  }
+}
+
 async function cargar() {
   cargando.value = true
   error.value = ''
@@ -69,6 +182,7 @@ async function cargar() {
         exito('Pago acreditado. La compra ya está completa.')
       }
     }
+    await cargarResenias()
   } catch (e) {
     error.value = e.response?.status === 403
       ? 'No tenés acceso a esta compra.'
@@ -102,6 +216,7 @@ async function confirmarSimulado() {
     compra.value = await confirmarPagoSimulado(pagoSimulado.value.idIntentoCobro)
     pagoSimulado.value = null
     exito('Pago simulado confirmado.')
+    await cargarResenias()
   } catch (e) {
     toastError(e.response?.data?.message || 'No se pudo confirmar el pago.')
   }
@@ -123,6 +238,7 @@ async function sincronizar(silencioso = false) {
   sincronizando.value = true
   try {
     compra.value = await sincronizarCompra(idCompra.value)
+    await cargarResenias()
     if (!silencioso) exito('Estado actualizado.')
   } catch (e) {
     if (!silencioso) {
@@ -464,6 +580,72 @@ onBeforeUnmount(() => {
                 :id-compra="compra.idCompra"
                 :item="item"
               />
+
+              <div
+                v-if="grupo.estado === 'PAGADO' && item.idProducto && estadoDeProducto(item.idProducto)"
+                class="mt-4 border-t border-rosa/40 pt-4"
+              >
+                <FormularioResenia
+                  v-if="reseniaEnEdicion === item.idProducto"
+                  :criterios="criteriosProducto"
+                  :resenia="estadoDeProducto(item.idProducto).miResenia"
+                  :guardando="guardandoResenia"
+                  :titulo="estadoDeProducto(item.idProducto).miResenia
+                    ? 'Editar tu reseña'
+                    : 'Reseñar este producto'"
+                  descripcion-ayuda="Solo evaluás la pieza: calidad, fidelidad a lo publicado y presentación. No se evalúa al artista ni al comprador."
+                  :texto-guardar="estadoDeProducto(item.idProducto).miResenia
+                    ? 'Guardar la única edición'
+                    : 'Publicar reseña'"
+                  :anonimo-forzado="estadoDeProducto(item.idProducto).anonimoForzado"
+                  etiqueta-anonima="Comprador verificado"
+                  placeholder-descripcion="Contá cómo es la pieza, su calidad y si coincide con lo publicado"
+                  @guardar="guardarResenia(item.idProducto, $event)"
+                  @cancelar="cerrarFormulario"
+                />
+
+                <template v-else>
+                  <TarjetaResenia
+                    v-if="estadoDeProducto(item.idProducto).miResenia"
+                    :resenia="estadoDeProducto(item.idProducto).miResenia"
+                    titulo="Tu reseña del producto"
+                    :puede-editar="estadoDeProducto(item.idProducto).puedeEditar"
+                    :puede-eliminar="estadoDeProducto(item.idProducto).puedeEliminar"
+                    :fecha-limite-edicion="estadoDeProducto(item.idProducto).fechaLimiteEdicion"
+                    @editar="abrirFormulario(item.idProducto)"
+                    @eliminar="pedirEliminarResenia(item.idProducto, item.tituloProducto)"
+                  />
+
+                  <div
+                    v-if="!estadoDeProducto(item.idProducto).miResenia
+                      && estadoDeProducto(item.idProducto).puedeCrear"
+                    class="flex flex-wrap items-center justify-between gap-3"
+                  >
+                    <div>
+                      <p class="text-sm font-semibold text-granate">
+                        Reseñá este producto
+                      </p>
+                      <p class="text-xs text-cafe/55">
+                        La reseña queda vinculada a tu compra. Podés elegir si mostrás tu nombre.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      class="rounded-lg bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-rojizo"
+                      @click="abrirFormulario(item.idProducto)"
+                    >
+                      Escribir reseña
+                    </button>
+                  </div>
+
+                  <p
+                    v-if="estadoDeProducto(item.idProducto).motivoNoDisponible"
+                    class="mt-2 text-xs text-cafe/50"
+                  >
+                    {{ estadoDeProducto(item.idProducto).motivoNoDisponible }}
+                  </p>
+                </template>
+              </div>
             </article>
           </div>
 
@@ -510,21 +692,6 @@ onBeforeUnmount(() => {
         </section>
       </div>
 
-      <section class="mt-6 rounded-[22px] border border-dashed border-rosa/70 bg-blanco p-5">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p class="font-display text-base font-bold text-granate">Reseña</p>
-          </div>
-          <button
-            type="button"
-            disabled
-            class="cursor-not-allowed rounded-lg border border-rosa px-4 py-2 text-sm font-semibold text-cafe/40"
-          >
-            Escribir reseña
-          </button>
-        </div>
-      </section>
-
       <div
         v-if="pagoSimulado"
         class="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-xl rounded-2xl border border-coral/40 bg-superficie p-5 shadow-2xl sm:inset-x-auto sm:right-6"
@@ -566,6 +733,23 @@ onBeforeUnmount(() => {
     >
       <p v-if="cancelando" class="mt-3 text-sm text-cafe/60">
         Cancelando...
+      </p>
+    </ModalConfirmacion>
+
+    <ModalConfirmacion
+      :abierto="!!reseniaAEliminar"
+      titulo="Eliminar tu reseña"
+      :mensaje="reseniaAEliminar
+        ? `La reseña de “${reseniaAEliminar.titulo}” dejará de ser visible. El historial se conserva y no vas a poder volver a reseñar este producto.`
+        : ''"
+      texto-confirmar="Eliminar reseña"
+      texto-cancelar="Volver"
+      destructivo
+      @confirmar="confirmarEliminarResenia"
+      @cerrar="cerrarEliminarResenia"
+    >
+      <p v-if="eliminandoResenia" class="mt-3 text-sm text-cafe/60">
+        Eliminando...
       </p>
     </ModalConfirmacion>
   </div>

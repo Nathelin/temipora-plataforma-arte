@@ -12,6 +12,8 @@ import {
   etiquetaDisponibilidad,
 } from '../servicios/productos'
 import ProductoVistaDetalle from '../components/ProductoVistaDetalle.vue'
+import ListaResenias from '../components/ListaResenias.vue'
+import { cargarReseniasProducto as cargarReseniasProductoApi } from '../servicios/resenias'
 import { useCarrito } from '../composables/useCarrito'
 import { useNotificaciones } from '../composables/useNotificaciones'
 
@@ -31,6 +33,14 @@ const totalPaginasVariantes = ref(1)
 const totalVariantes = ref(0)
 const ledger = ref(null)
 const paginaLedger = ref(1)
+
+const RESENIAS_POR_PAGINA = 5
+const reseniasProducto = ref([])
+const resumenReseniasProducto = ref(null)
+const paginaReseniasProducto = ref(null)
+const cargandoReseniasProducto = ref(false)
+const errorReseniasProducto = ref('')
+const filtrosReseniasProducto = ref({ calificacion: '', orden: 'RECIENTES' })
 
 const esFavorito = ref(false)
 const actualizandoFavorito = ref(false)
@@ -111,6 +121,36 @@ function aplicarLedger(data) {
   paginaLedger.value = data?.pagina || 1
 }
 
+async function cargarResenias(pagina = 0) {
+  cargandoReseniasProducto.value = true
+  errorReseniasProducto.value = ''
+  try {
+    const data = await cargarReseniasProductoApi(idProducto.value, {
+      calificacion: filtrosReseniasProducto.value.calificacion || undefined,
+      orden: filtrosReseniasProducto.value.orden || 'RECIENTES',
+      pagina,
+      tamanio: RESENIAS_POR_PAGINA,
+    })
+    reseniasProducto.value = data?.pagina?.contenido || []
+    paginaReseniasProducto.value = data?.pagina || null
+    resumenReseniasProducto.value = data?.resumen || null
+  } catch (e) {
+    errorReseniasProducto.value = e.response?.data?.message
+      || 'No se pudieron cargar las reseñas del producto.'
+  } finally {
+    cargandoReseniasProducto.value = false
+  }
+}
+
+function cambiarFiltrosResenias(nuevos) {
+  filtrosReseniasProducto.value = nuevos
+  cargarResenias(0)
+}
+
+function cambiarPaginaResenias(pagina) {
+  cargarResenias(pagina)
+}
+
 async function cargar() {
   cargando.value = true
   error.value = ''
@@ -130,6 +170,7 @@ async function cargar() {
     aplicarVariantes(variantesRes)
     aplicarLedger(ledgerRes)
     await cargarFavorito()
+    await cargarResenias(0)
   } catch (e) {
     error.value = e.response?.status === 404
       ? 'Este producto no está disponible.'
@@ -283,6 +324,27 @@ onMounted(cargar)
           </template>
         </ProductoVistaDetalle>
       </div>
+
+      <section class="mt-10 border-t border-rosa/40 pt-8">
+        <h2 class="font-display text-2xl font-bold text-granate">
+          Reseñas del producto
+        </h2>
+        <p class="mt-1 text-sm text-cafe/60">
+          Opiniones de personas que compraron esta pieza.
+        </p>
+        <div class="mt-5">
+          <ListaResenias
+            :resenias="reseniasProducto"
+            :resumen="resumenReseniasProducto"
+            :pagina="paginaReseniasProducto"
+            :cargando="cargandoReseniasProducto"
+            :error="errorReseniasProducto"
+            :filtros="filtrosReseniasProducto"
+            @cambiar-filtros="cambiarFiltrosResenias"
+            @cambiar-pagina="cambiarPaginaResenias"
+          />
+        </div>
+      </section>
     </template>
   </div>
 </template>

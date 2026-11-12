@@ -43,13 +43,149 @@ public interface ReseniaRepository extends JpaRepository<Resenia, Long> {
         @Param("idResenia") Long idResenia);
 
     // -----------------------------------------------------------------
+    // Reseñas de producto
+    // -----------------------------------------------------------------
+
+    Optional<Resenia> findByProductoIdProductoAndAutorIdUsuario(
+        Long idProducto, Long idAutor);
+
+    boolean existsByProductoIdProductoAndAutorIdUsuario(
+        Long idProducto, Long idAutor);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT r FROM Resenia r
+        WHERE r.producto.idProducto = :idProducto
+          AND r.autor.idUsuario = :idAutor
+        """)
+    Optional<Resenia> findForUpdateByProductoAndAutor(
+        @Param("idProducto") Long idProducto,
+        @Param("idAutor") Long idAutor);
+
+    @Query(value = """
+        SELECT r FROM Resenia r
+        JOIN r.versiones v
+        JOIN FETCH r.producto prod
+        LEFT JOIN FETCH r.compraItem ci
+        JOIN FETCH r.autor a
+        WHERE prod.idProducto = :idProducto
+          AND r.estado = :estado
+          AND v.numero = (
+              SELECT MAX(v2.numero) FROM ReseniaVersion v2 WHERE v2.resenia = r
+          )
+          AND (:calificacion IS NULL OR v.calificacionGeneral = :calificacion)
+          AND (:idOpcion IS NULL OR EXISTS (
+              SELECT 1 FROM ReseniaOpcion ro
+              WHERE ro.version = v
+                AND ro.opcion.idOpcionCriterio = :idOpcion
+          ))
+        ORDER BY
+          CASE WHEN :orden = 'MEJOR' THEN v.calificacionGeneral END DESC,
+          CASE WHEN :orden = 'PEOR' THEN v.calificacionGeneral END ASC,
+          r.fechaCreacion DESC
+        """,
+        countQuery = """
+        SELECT COUNT(r) FROM Resenia r
+        JOIN r.versiones v
+        JOIN r.producto prod
+        WHERE prod.idProducto = :idProducto
+          AND r.estado = :estado
+          AND v.numero = (
+              SELECT MAX(v2.numero) FROM ReseniaVersion v2 WHERE v2.resenia = r
+          )
+          AND (:calificacion IS NULL OR v.calificacionGeneral = :calificacion)
+          AND (:idOpcion IS NULL OR EXISTS (
+              SELECT 1 FROM ReseniaOpcion ro
+              WHERE ro.version = v
+                AND ro.opcion.idOpcionCriterio = :idOpcion
+          ))
+        """)
+    Page<Resenia> findPublicasPorProducto(
+        @Param("idProducto") Long idProducto,
+        @Param("idOpcion") Long idOpcion,
+        @Param("calificacion") Integer calificacion,
+        @Param("orden") String orden,
+        @Param("estado") EstadoResenia estado,
+        Pageable pageable);
+
+    @Query("""
+        SELECT COUNT(r), AVG(v.calificacionGeneral)
+        FROM Resenia r
+        JOIN r.versiones v
+        JOIN r.producto prod
+        WHERE r.estado = :estado
+          AND prod.idProducto = :idProducto
+          AND v.numero = (
+              SELECT MAX(v2.numero) FROM ReseniaVersion v2 WHERE v2.resenia = r
+          )
+        """)
+    List<Object[]> resumenConteoPromedioProducto(
+        @Param("idProducto") Long idProducto,
+        @Param("estado") EstadoResenia estado);
+
+    @Query("""
+        SELECT v.calificacionGeneral, COUNT(r)
+        FROM Resenia r
+        JOIN r.versiones v
+        JOIN r.producto prod
+        WHERE r.estado = :estado
+          AND prod.idProducto = :idProducto
+          AND v.numero = (
+              SELECT MAX(v2.numero) FROM ReseniaVersion v2 WHERE v2.resenia = r
+          )
+        GROUP BY v.calificacionGeneral
+        """)
+    List<Object[]> distribucionPublicaProducto(
+        @Param("idProducto") Long idProducto,
+        @Param("estado") EstadoResenia estado);
+
+    @Query("""
+        SELECT rv.criterio.idCriterioResenia, rv.criterio.nombre,
+               rv.criterio.orden, AVG(rv.valor), COUNT(DISTINCT r)
+        FROM Resenia r
+        JOIN r.versiones v
+        JOIN v.valores rv
+        JOIN r.producto prod
+        WHERE r.estado = :estado
+          AND prod.idProducto = :idProducto
+          AND v.numero = (
+              SELECT MAX(v2.numero) FROM ReseniaVersion v2 WHERE v2.resenia = r
+          )
+        GROUP BY rv.criterio.idCriterioResenia, rv.criterio.nombre, rv.criterio.orden
+        ORDER BY rv.criterio.orden ASC, rv.criterio.nombre ASC
+        """)
+    List<Object[]> criteriosPublicosProducto(
+        @Param("idProducto") Long idProducto,
+        @Param("estado") EstadoResenia estado);
+
+    @Query("""
+        SELECT ro.opcion.idOpcionCriterio, ro.opcion.etiqueta, ro.opcion.polaridad,
+               COUNT(DISTINCT r)
+        FROM Resenia r
+        JOIN r.versiones v
+        JOIN v.opciones ro
+        JOIN r.producto prod
+        WHERE r.estado = :estado
+          AND prod.idProducto = :idProducto
+          AND v.numero = (
+              SELECT MAX(v2.numero) FROM ReseniaVersion v2 WHERE v2.resenia = r
+          )
+        GROUP BY ro.opcion.idOpcionCriterio, ro.opcion.etiqueta, ro.opcion.polaridad
+        ORDER BY COUNT(DISTINCT r) DESC, ro.opcion.etiqueta ASC
+        """)
+    List<Object[]> opcionesDestacadasPublicasProducto(
+        @Param("idProducto") Long idProducto,
+        @Param("estado") EstadoResenia estado);
+
+    // -----------------------------------------------------------------
     // Moderación
     // -----------------------------------------------------------------
 
     @Query(value = """
         SELECT r FROM Resenia r
-        JOIN FETCH r.pedido p
+        LEFT JOIN FETCH r.pedido p
         LEFT JOIN FETCH p.servicio s
+        LEFT JOIN FETCH r.producto prod
         JOIN FETCH r.autor a
         WHERE EXISTS (
             SELECT 1 FROM ReporteResenia rr
@@ -70,8 +206,9 @@ public interface ReseniaRepository extends JpaRepository<Resenia, Long> {
 
     @Query(value = """
         SELECT r FROM Resenia r
-        JOIN FETCH r.pedido p
+        LEFT JOIN FETCH r.pedido p
         LEFT JOIN FETCH p.servicio s
+        LEFT JOIN FETCH r.producto prod
         JOIN FETCH r.autor a
         WHERE r.estado = :estado
         ORDER BY COALESCE(r.moderadaEn, r.fechaCreacion) DESC

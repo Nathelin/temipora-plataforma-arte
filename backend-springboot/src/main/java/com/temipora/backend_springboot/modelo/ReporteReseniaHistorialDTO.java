@@ -22,6 +22,8 @@ public class ReporteReseniaHistorialDTO {
     private Long idResenia;
     private Long idPedido;
     private String nombreServicio;
+    private Long idProducto;
+    private String nombreProducto;
     private String autorResenia;
     private boolean reseniaAnonima;
     private EstadoResenia estadoResenia;

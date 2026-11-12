@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import com.temipora.backend_springboot.modelo.CompraItem;
 import com.temipora.backend_springboot.modelo.ConfiguracionResenia;
 import com.temipora.backend_springboot.modelo.CriterioPromedioDTO;
 import com.temipora.backend_springboot.modelo.DistribucionEstrellasDTO;
@@ -25,7 +26,9 @@ import com.temipora.backend_springboot.modelo.FiltroReseniaServicioDTO;
 import com.temipora.backend_springboot.modelo.OpcionDestacadaDTO;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.PaginaReseniasDTO;
+import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.PolaridadOpcion;
+import com.temipora.backend_springboot.modelo.Producto;
 import com.temipora.backend_springboot.modelo.PromedioReseniasDTO;
 import com.temipora.backend_springboot.modelo.ReputacionClienteDTO;
 import com.temipora.backend_springboot.modelo.Resenia;
@@ -55,6 +58,7 @@ public class ReseniaPublicaService {
     private static final String ORDEN_MEJOR = "MEJOR";
     private static final String ORDEN_PEOR = "PEOR";
     private static final String AUTOR_ANONIMO = "Cliente verificado";
+    private static final String COMPRADOR_ANONIMO = "Comprador verificado";
 
     private final ReseniaRepository reseniaRepository;
     private final ReseniaVersionRepository versionRepository;
@@ -160,6 +164,62 @@ public class ReseniaPublicaService {
             .resumen(resumenArtista(idArtista))
             .pagina(aPagina(page))
             .servicios(serviciosConResenias(idArtista))
+            .build();
+    }
+
+    @Transactional(readOnly = true)
+    public PaginaReseniasDTO listarProducto(
+            Long idProducto,
+            Long idOpcion,
+            Integer calificacion,
+            String orden,
+            int pagina,
+            int tamanio) {
+        validarCalificacion(calificacion);
+        Pageable pageable = pagina(pagina, tamanio);
+        Page<Resenia> page = reseniaRepository.findPublicasPorProducto(
+            idProducto,
+            idOpcion,
+            calificacion,
+            normalizarOrden(orden),
+            EstadoResenia.PUBLICADA,
+            pageable);
+
+        return PaginaReseniasDTO.builder()
+            .resumen(resumenProducto(idProducto))
+            .pagina(aPagina(page))
+            .servicios(List.of())
+            .build();
+    }
+
+    @Transactional(readOnly = true)
+    public ResumenReseniasDTO resumenProducto(Long idProducto) {
+        List<Object[]> filas = reseniaRepository.resumenConteoPromedioProducto(
+            idProducto, EstadoResenia.PUBLICADA);
+        Object[] fila = filas == null || filas.isEmpty() ? null : filas.get(0);
+
+        long cantidad = fila != null && fila.length > 0 && fila[0] != null
+            ? ((Number) fila[0]).longValue()
+            : 0L;
+        BigDecimal promedio = fila != null && fila.length > 1 && fila[1] != null
+            ? decimal(((Number) fila[1]).doubleValue())
+            : null;
+
+        if (cantidad == 0 || promedio == null) {
+            return ResumenReseniasDTO.vacio();
+        }
+
+        return ResumenReseniasDTO.builder()
+            .promedio(promedio)
+            .cantidad(cantidad)
+            .hayDatos(true)
+            .distribucion(distribucionProducto(idProducto, cantidad))
+            .criterios(cantidad >= MINIMO_DESGLOSE
+                ? criteriosProducto(idProducto)
+                : List.of())
+            .destacados(cantidad >= MINIMO_DESTACADOS
+                ? destacadosProducto(idProducto, cantidad)
+                : List.of())
             .build();
     }
 
@@ -313,6 +373,55 @@ public class ReseniaPublicaService {
             .toList();
     }
 
+    private List<DistribucionEstrellasDTO> distribucionProducto(
+            Long idProducto, long total) {
+        Map<Integer, Long> conteos = new HashMap<>();
+        for (Object[] fila : reseniaRepository.distribucionPublicaProducto(
+                idProducto, EstadoResenia.PUBLICADA)) {
+            conteos.put(
+                ((Number) fila[0]).intValue(),
+                ((Number) fila[1]).longValue());
+        }
+
+        java.util.List<DistribucionEstrellasDTO> distribucion =
+            new java.util.ArrayList<>();
+        for (int estrellas = 5; estrellas >= 1; estrellas--) {
+            long cantidad = conteos.getOrDefault(estrellas, 0L);
+            distribucion.add(DistribucionEstrellasDTO.builder()
+                .estrellas(estrellas)
+                .cantidad(cantidad)
+                .porcentaje(porcentaje(cantidad, total))
+                .build());
+        }
+        return distribucion;
+    }
+
+    private List<CriterioPromedioDTO> criteriosProducto(Long idProducto) {
+        return reseniaRepository.criteriosPublicosProducto(
+            idProducto, EstadoResenia.PUBLICADA).stream()
+            .map(fila -> CriterioPromedioDTO.builder()
+                .idCriterio(((Number) fila[0]).longValue())
+                .nombre((String) fila[1])
+                .promedio(decimal(((Number) fila[3]).doubleValue()))
+                .cantidad(((Number) fila[4]).longValue())
+                .build())
+            .toList();
+    }
+
+    private List<OpcionDestacadaDTO> destacadosProducto(
+            Long idProducto, long total) {
+        return reseniaRepository.opcionesDestacadasPublicasProducto(
+            idProducto, EstadoResenia.PUBLICADA).stream()
+            .map(fila -> OpcionDestacadaDTO.builder()
+                .idOpcion(((Number) fila[0]).longValue())
+                .etiqueta((String) fila[1])
+                .polaridad((PolaridadOpcion) fila[2])
+                .cantidad(((Number) fila[3]).longValue())
+                .porcentaje(porcentaje(((Number) fila[3]).longValue(), total))
+                .build())
+            .toList();
+    }
+
     // -----------------------------------------------------------------
     // armado de la página
     // -----------------------------------------------------------------
@@ -392,11 +501,20 @@ public class ReseniaPublicaService {
             Map<Long, List<ReseniaOpcion>> opciones) {
         boolean anonima = esAnonima(resenia);
         Long idVersion = version != null ? version.getIdVersion() : null;
+        Pedido pedido = resenia.getPedido();
+        Producto producto = resenia.getProducto();
+        CompraItem compra = resenia.getCompraItem();
 
         ReseniaPublicaDTO.ReseniaPublicaDTOBuilder builder =
             ReseniaPublicaDTO.builder()
                 .idResenia(resenia.getIdResenia())
-                .nombreServicio(resenia.getPedido().getServicio().getNombre())
+                .nombreServicio(pedido != null && pedido.getServicio() != null
+                    ? pedido.getServicio().getNombre()
+                    : null)
+                .idProducto(producto != null ? producto.getIdProducto() : null)
+                .nombreProducto(producto != null ? producto.getTitulo() : null)
+                .nombreVariante(compra != null ? compra.getNombreVariante() : null)
+                .compraVerificada(producto != null)
                 .calificacionGeneral(version != null
                     ? version.getCalificacionGeneral()
                     : 0)
@@ -404,7 +522,7 @@ public class ReseniaPublicaService {
                 .fechaVersion(version != null ? version.getFechaVersion() : null)
                 .editada(resenia.estaEditada())
                 .autorMostrado(anonima
-                    ? AUTOR_ANONIMO
+                    ? etiquetaAnonima(resenia)
                     : nombreMostrado(resenia.getAutor()))
                 .anonima(anonima)
                 .valores(idVersion != null
@@ -434,7 +552,7 @@ public class ReseniaPublicaService {
             .descripcion(version != null ? version.getDescripcion() : null)
             .fechaVersion(version != null ? version.getFechaVersion() : null)
             .autorMostrado(anonima
-                ? AUTOR_ANONIMO
+                ? etiquetaAnonima(resenia)
                 : nombreMostrado(resenia.getAutor()))
             .anonima(anonima)
             .build();
@@ -445,11 +563,13 @@ public class ReseniaPublicaService {
     // -----------------------------------------------------------------
 
     private boolean esAnonima(Resenia resenia) {
-        if (!resenia.isMostrarNombre()) {
-            return true;
-        }
-        return resenia.getPedido().getServicio() != null
-            && resenia.getPedido().getServicio().isContenidoSensible();
+        return !resenia.isMostrarNombre();
+    }
+
+    private String etiquetaAnonima(Resenia resenia) {
+        return resenia.getProducto() != null
+            ? COMPRADOR_ANONIMO
+            : AUTOR_ANONIMO;
     }
 
     private String nombreMostrado(Usuario usuario) {

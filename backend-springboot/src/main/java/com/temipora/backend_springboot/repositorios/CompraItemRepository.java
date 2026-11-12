@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.CompraItem;
+import com.temipora.backend_springboot.modelo.EstadoCompraGrupo;
 import com.temipora.backend_springboot.modelo.EstadoEntregaItem;
 
 public interface CompraItemRepository extends JpaRepository<CompraItem, Long> {
@@ -24,6 +25,13 @@ public interface CompraItemRepository extends JpaRepository<CompraItem, Long> {
     List<CompraItem> buscarPorGrupos(@Param("ids") Collection<Long> ids);
 
     List<CompraItem> findByGrupoCompraIdCompra(Long idCompra);
+
+    /**
+     * Compra pagada más reciente de un usuario para un producto. Habilita la
+     * reseña y define desde cuándo corre la ventana de creación.
+     */
+    Optional<CompraItem> findFirstByProductoIdProductoAndGrupoCompraClienteIdUsuarioAndGrupoEstadoOrderByGrupoFechaPagoDesc(
+            Long idProducto, Long idUsuario, EstadoCompraGrupo estado);
 
     Optional<CompraItem> findByIdCompraItemAndGrupoCompraClienteIdUsuario(
             Long idCompraItem, Long idUsuario);

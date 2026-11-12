@@ -24,6 +24,26 @@ export function cargarReputacionCliente(idCliente) {
   return api.get(`/clientes/${idCliente}/reputacion`)
 }
 
+export function cargarEstadoReseniaProducto(idProducto) {
+  return api.get(`/productos/${idProducto}/resenia`)
+}
+
+export function crearReseniaProducto(idProducto, payload) {
+  return api.post(`/productos/${idProducto}/resenia`, payload)
+}
+
+export function editarReseniaProducto(idProducto, payload) {
+  return api.put(`/productos/${idProducto}/resenia`, payload)
+}
+
+export function eliminarReseniaProducto(idProducto) {
+  return api.delete(`/productos/${idProducto}/resenia`)
+}
+
+export function cargarReseniasProducto(idProducto, params = {}) {
+  return api.get(`/productos/${idProducto}/resenias`, { params })
+}
+
 export function cargarReseniasServicio(idServicio, params = {}) {
   return api.get(`/servicios/${idServicio}/resenias`, { params })
 }
@@ -49,7 +69,7 @@ export function etiquetaOrden(codigo) {
 export const AMBITOS_RESENIA = [
   { valor: 'SERVICIO', etiqueta: 'Servicio (cliente → artista)' },
   { valor: 'CLIENTE', etiqueta: 'Cliente (artista → cliente)' },
-  { valor: 'PRODUCTO', etiqueta: 'Producto (sin flujo todavía)' },
+  { valor: 'PRODUCTO', etiqueta: 'Producto (comprador → pieza)' },
 ]
 
 export const ESCALAS_CRITERIO = [

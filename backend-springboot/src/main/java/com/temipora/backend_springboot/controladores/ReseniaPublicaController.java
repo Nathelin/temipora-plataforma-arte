@@ -51,6 +51,18 @@ public class ReseniaPublicaController {
             idArtista, idServicio, calificacion, orden, pagina, tamanio);
     }
 
+    @GetMapping("/productos/{idProducto}/resenias")
+    public PaginaReseniasDTO listarProducto(
+            @PathVariable Long idProducto,
+            @RequestParam(required = false) Long idOpcion,
+            @RequestParam(required = false) Integer calificacion,
+            @RequestParam(defaultValue = "RECIENTES") String orden,
+            @RequestParam(defaultValue = "0") int pagina,
+            @RequestParam(defaultValue = "10") int tamanio) {
+        return reseniaPublicaService.listarProducto(
+            idProducto, idOpcion, calificacion, orden, pagina, tamanio);
+    }
+
     @GetMapping("/perfil/{nombreUsuario}/resumen-resenias")
     public ResumenReseniasDTO resumenArtista(
             @PathVariable String nombreUsuario) {
