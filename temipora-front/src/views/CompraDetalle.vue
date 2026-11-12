@@ -1,11 +1,13 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LedgerCompraItem from '../components/LedgerCompraItem.vue'
+import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import { formatearPrecio } from '../servicios/moneda'
 import { guardarArchivo } from '../servicios/descargas'
 import {
+  cancelarGrupo,
   cargarCompra,
   confirmarPagoSimulado,
   descargarCompra,
@@ -28,6 +30,10 @@ const pagando = ref(null)
 const sincronizando = ref(false)
 const pagoSimulado = ref(null)
 const descargandoTodo = ref(false)
+const ahora = ref(Date.now())
+const grupoCancelar = ref(null)
+const cancelando = ref(false)
+let intervaloPago = null
 
 const grupos = computed(() => compra.value?.grupos || [])
 const estado = computed(() => estadoCompraDe(compra.value?.estado))
@@ -140,6 +146,41 @@ async function descargarTodo() {
   }
 }
 
+function tiempoRestante(grupo) {
+  if (!grupo?.reservaExpiraEn) return ''
+  const fin = new Date(grupo.reservaExpiraEn).getTime()
+  if (!Number.isFinite(fin)) return ''
+  const restante = Math.max(0, fin - ahora.value)
+  const totalSegundos = Math.floor(restante / 1000)
+  const minutos = Math.floor(totalSegundos / 60)
+  const segundos = totalSegundos % 60
+  return `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`
+}
+
+function pedirCancelar(grupo) {
+  if (!grupo?.puedeCancelar) return
+  grupoCancelar.value = grupo
+}
+
+function cerrarCancelar() {
+  if (!cancelando.value) grupoCancelar.value = null
+}
+
+async function confirmarCancelar() {
+  if (!grupoCancelar.value || cancelando.value) return
+  cancelando.value = true
+  try {
+    compra.value = await cancelarGrupo(
+      idCompra.value, grupoCancelar.value.idCompraGrupo)
+    grupoCancelar.value = null
+    exito('Compra cancelada. La reserva quedó liberada.')
+  } catch (e) {
+    toastError(e.response?.data?.message || 'No se pudo cancelar la compra.')
+  } finally {
+    cancelando.value = false
+  }
+}
+
 function fecha(valor) {
   if (!valor) return '—'
   try {
@@ -155,7 +196,18 @@ function fecha(valor) {
   }
 }
 
-onMounted(cargar)
+onMounted(() => {
+  cargar()
+  intervaloPago = window.setInterval(() => {
+    ahora.value = Date.now()
+  }, 1000)
+})
+
+onBeforeUnmount(() => {
+  if (intervaloPago) {
+    window.clearInterval(intervaloPago)
+  }
+})
 </script>
 
 <template>
@@ -364,6 +416,10 @@ onMounted(cargar)
                 <div class="mt-3 grid gap-2 text-xs text-cafe/65 sm:grid-cols-2">
                   <p><span class="font-semibold text-cafe/80">ID de compra:</span> {{ compra.idCompra }}</p>
                   <p><span class="font-semibold text-cafe/80">ID de ítem:</span> {{ item.idCompraItem }}</p>
+                  <p v-if="item.sha256Archivo" class="break-all sm:col-span-2">
+                    <span class="font-semibold text-cafe/80">Huella SHA-256 del archivo:</span>
+                    <span class="font-mono">{{ item.sha256Archivo }}</span>
+                  </p>
                   <p><span class="font-semibold text-cafe/80">Producto:</span> #{{ item.idProducto }}</p>
                   <p><span class="font-semibold text-cafe/80">Variante:</span> #{{ item.idVariante }}</p>
                   <p v-if="item.fechaEntrega">
@@ -409,6 +465,31 @@ onMounted(cargar)
                 :item="item"
               />
             </article>
+          </div>
+
+          <div
+            v-if="grupo.estado === 'PENDIENTE'"
+            class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rosa/50 bg-rosa/10 px-4 py-3"
+          >
+            <p v-if="grupo.reservaExpiraEn" class="text-xs text-cafe/70">
+              Te quedan
+              <strong class="text-granate">{{ tiempoRestante(grupo) }}</strong>
+              para completar el pago.
+            </p>
+            <p v-else class="text-xs text-cafe/60">
+              Reserva pendiente de confirmación.
+            </p>
+            <button
+              v-if="grupo.puedeCancelar"
+              type="button"
+              class="rounded-lg border border-rojizo/40 px-3 py-1.5 text-xs font-semibold text-rojizo transition hover:bg-rojizo/10"
+              @click="pedirCancelar(grupo)"
+            >
+              Cancelar compra
+            </button>
+            <p v-else-if="grupo.motivoNoCancelar" class="text-xs text-cafe/55">
+              {{ grupo.motivoNoCancelar }}
+            </p>
           </div>
 
           <div v-if="grupo.puedePagar" class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-rosa/40 pt-4">
@@ -472,5 +553,20 @@ onMounted(cargar)
         </div>
       </div>
     </template>
+
+    <ModalConfirmacion
+      :abierto="!!grupoCancelar"
+      titulo="Cancelar compra"
+      mensaje="Se libera la reserva y el producto vuelve a estar disponible. No se puede deshacer."
+      texto-confirmar="Cancelar compra"
+      texto-cancelar="Volver"
+      destructivo
+      @confirmar="confirmarCancelar"
+      @cerrar="cerrarCancelar"
+    >
+      <p v-if="cancelando" class="mt-3 text-sm text-cafe/60">
+        Cancelando...
+      </p>
+    </ModalConfirmacion>
   </div>
 </template>

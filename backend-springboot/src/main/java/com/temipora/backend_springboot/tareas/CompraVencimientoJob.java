@@ -14,7 +14,7 @@ public class CompraVencimientoJob {
         this.reservaStockService = reservaStockService;
     }
 
-    @Scheduled(initialDelayString = "PT1M", fixedDelayString = "PT2M")
+    @Scheduled(initialDelayString = "PT1M", fixedDelayString = "PT30S")
     public void ejecutar() {
         reservaStockService.expirarVencidas();
     }

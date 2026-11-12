@@ -20,10 +20,10 @@ public class ReventaDetalleDTO {
     private Long idProducto;
     private Long idVariante;
     private String titulo;
+    private String tituloOriginal;
     private String nombreVariante;
     private String descripcion;
     private String imagenUrl;
-    private String sha256;
     private String moneda;
     private BigDecimal precio;
     private EstadoPublicacionReventa estado;

@@ -18,4 +18,6 @@ public class FiltroProductoRequest {
     private BigDecimal precioMax;
     /** Deja fuera los productos sin stock disponible. */
     private Boolean soloConStock;
+    /** Incluye las publicaciones de reventa activas en el catálogo. */
+    private Boolean incluirReventas;
 }

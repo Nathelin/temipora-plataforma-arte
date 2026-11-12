@@ -68,6 +68,14 @@ async function cargar() {
   }
 }
 
+function volver() {
+  if (window.history.state && window.history.state.back) {
+    router.back()
+    return
+  }
+  router.push('/productos')
+}
+
 async function comprar() {
   if (!localStorage.getItem('token')) {
     router.push({ name: 'login', query: { redirect: route.fullPath } })
@@ -96,12 +104,13 @@ watch(() => props.id, cargar)
 
 <template>
   <div class="mx-auto w-full max-w-screen-xl px-4 py-8 sm:px-8">
-    <router-link
-      to="/reventas"
+    <button
+      type="button"
       class="inline-flex items-center gap-1.5 text-sm font-medium text-cafe/60 transition hover:text-granate"
+      @click="volver"
     >
-      ← Volver a reventas
-    </router-link>
+      ← Volver
+    </button>
 
     <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando publicación...</p>
     <p v-else-if="error" role="alert" class="py-16 text-center text-rojizo">{{ error }}</p>
@@ -139,16 +148,6 @@ watch(() => props.id, cargar)
             </button>
           </span>
         </div>
-
-        <p
-          v-if="reventa.sha256"
-          class="rounded-xl border border-borde/50 bg-superficie px-4 py-3 text-[11px] leading-relaxed text-cafe/55"
-        >
-          <span class="font-semibold uppercase tracking-[0.12em] text-cafe/40">
-            Huella de la pieza (SHA-256)
-          </span>
-          <span class="mt-1 block break-all font-mono">{{ reventa.sha256 }}</span>
-        </p>
       </section>
 
       <section class="space-y-5">
@@ -156,6 +155,9 @@ watch(() => props.id, cargar)
           <div class="flex flex-wrap items-center gap-2">
             <span class="rounded-full bg-coral px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white">
               Reventa
+            </span>
+            <span class="rounded-full bg-mantequilla/60 px-3 py-1 text-[11px] font-bold text-granate">
+              Origen registrado
             </span>
             <span
               v-if="estado !== 'PUBLICADA'"
@@ -168,8 +170,8 @@ watch(() => props.id, cargar)
           <h1 class="mt-3 font-display text-3xl font-extrabold text-granate">
             {{ titulo }}
           </h1>
-          <p v-if="reventa.nombreVariante" class="mt-1 text-sm text-cafe/60">
-            {{ reventa.nombreVariante }}
+          <p v-if="reventa.tituloOriginal" class="mt-1 text-sm text-cafe/60">
+            Publicación original: {{ reventa.tituloOriginal }}
           </p>
         </div>
 

@@ -22,12 +22,17 @@ import com.temipora.backend_springboot.modelo.CompraItem;
 import com.temipora.backend_springboot.modelo.CompraItemDTO;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.EstadoCompra;
+import com.temipora.backend_springboot.modelo.EstadoCompraGrupo;
 import com.temipora.backend_springboot.modelo.EstadoEntregaItem;
 import com.temipora.backend_springboot.modelo.EstadoPublicacionReventa;
+import com.temipora.backend_springboot.modelo.EstadoReserva;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
+import com.temipora.backend_springboot.modelo.FiltroProductoRequest;
 import com.temipora.backend_springboot.modelo.LicenciaProductoRequest;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.OrdenProducto;
 import com.temipora.backend_springboot.modelo.OrigenCompraItem;
 import com.temipora.backend_springboot.modelo.PagoCompraDTO;
 import com.temipora.backend_springboot.modelo.ProductoDTO;
@@ -48,6 +53,7 @@ import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
 import com.temipora.backend_springboot.repositorios.MedioRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
 import com.temipora.backend_springboot.repositorios.PublicacionReventaRepository;
+import com.temipora.backend_springboot.repositorios.ReservaStockRepository;
 import com.temipora.backend_springboot.repositorios.RolRepository;
 import com.temipora.backend_springboot.repositorios.TipoProductoRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
@@ -79,6 +85,7 @@ class ReventaIntegracionTest {
     @Autowired private CompraItemRepository compraItemRepository;
     @Autowired private EventoLedgerRepository eventoLedgerRepository;
     @Autowired private PublicacionReventaRepository publicacionReventaRepository;
+    @Autowired private ReservaStockRepository reservaStockRepository;
     @Autowired private MonedaService monedaService;
 
     @Test
@@ -144,7 +151,10 @@ class ReventaIntegracionTest {
 
         var detallePublico = reventaService.detallePublico(
             publicacion.getIdPublicacionReventa(), null);
-        assertThat(detallePublico.getTitulo()).isEqualTo(producto.getTitulo());
+        assertThat(detallePublico.getTitulo())
+            .isEqualTo(producto.getVariantes().get(0).getNombre());
+        assertThat(detallePublico.getTituloOriginal())
+            .isEqualTo(producto.getTitulo());
         assertThat(detallePublico.getNombreVendedor())
             .isEqualTo(vendedor.getNombreUsuario());
         assertThat(detallePublico.getNombreArtista())
@@ -152,10 +162,32 @@ class ReventaIntegracionTest {
         assertThat(detallePublico.isPuedeComprar()).isTrue();
 
         var reventasPublicas = productoCatalogoService.listarReventas(null, 0, 10);
-        assertThat(reventasPublicas.getContenido()).hasSize(1);
-        assertThat(reventasPublicas.getContenido().get(0).isEsReventa()).isTrue();
-        assertThat(reventasPublicas.getContenido().get(0).getPrecioDesde())
-            .isEqualByComparingTo("150.00");
+        var publica = reventasPublicas.getContenido().stream()
+            .filter(item -> publicacion.getIdPublicacionReventa()
+                .equals(item.getIdPublicacionReventa()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(publica.isEsReventa()).isTrue();
+        assertThat(publica.getTitulo())
+            .isEqualTo(producto.getVariantes().get(0).getNombre());
+        assertThat(publica.getTituloOriginal()).isEqualTo(producto.getTitulo());
+        assertThat(publica.getPrecioDesde()).isEqualByComparingTo("150.00");
+
+        var catalogoMixto = productoCatalogoService.listar(
+            new FiltroProductoRequest(), null, 0, 100,
+            OrdenProducto.RECIENTES);
+        assertThat(catalogoMixto.getContenido())
+            .anyMatch(catalogo -> catalogo.isEsReventa()
+                && publicacion.getIdPublicacionReventa()
+                    .equals(catalogo.getIdPublicacionReventa()));
+
+        FiltroProductoRequest soloProductos = new FiltroProductoRequest();
+        soloProductos.setIncluirReventas(false);
+        var catalogoSoloProductos = productoCatalogoService.listar(
+            soloProductos, null, 0, 100, OrdenProducto.RECIENTES);
+        assertThat(catalogoSoloProductos.getContenido())
+            .noneMatch(catalogo -> publicacion.getIdPublicacionReventa()
+                .equals(catalogo.getIdPublicacionReventa()));
 
         CarritoItemRequest item = new CarritoItemRequest();
         item.setIdVariante(idVariante);
@@ -234,7 +266,59 @@ class ReventaIntegracionTest {
         assertThat(publicaVendida.isPuedeComprar()).isFalse();
         assertThat(publicaVendida.isEsPropia()).isFalse();
         assertThat(productoCatalogoService.listarReventas(null, 0, 10).getContenido())
-            .isEmpty();
+            .noneMatch(catalogo -> publicacion.getIdPublicacionReventa()
+                .equals(catalogo.getIdPublicacionReventa()));
+    }
+
+    @Test
+    void cancelarCompraPendienteLiberaLaReservaYLaPublicacion() {
+        Usuario artista = crearUsuario(ERol.ARTISTA);
+        Usuario vendedor = crearUsuario(ERol.CLIENTE);
+        Usuario comprador = crearUsuario(ERol.CLIENTE);
+        ProductoDTO producto = crearProductoConReventa(artista);
+        Long idVariante = producto.getVariantes().get(0).getIdVariante();
+
+        CompraItem primeraCompra = comprarYConfirmar(vendedor, idVariante);
+        PublicacionReventaDTO publicacion = reventaService.publicar(
+            vendedor.getNombreUsuario(),
+            request(primeraCompra.getIdCompraItem(), "150.00"));
+
+        CarritoItemRequest item = new CarritoItemRequest();
+        item.setIdVariante(idVariante);
+        item.setIdPublicacionReventa(publicacion.getIdPublicacionReventa());
+        item.setCantidad(1);
+        carritoService.agregar(comprador.getNombreUsuario(), item);
+
+        CheckoutRequest checkout = new CheckoutRequest();
+        checkout.setClaveIdempotencia("reventa-cancelar-" + UUID.randomUUID());
+        CompraDTO compra = compraService.crearDesdeCarrito(
+            comprador.getNombreUsuario(), checkout);
+        var grupo = compra.getGrupos().get(0);
+        assertThat(grupo.isPuedeCancelar()).isTrue();
+        assertThat(grupo.getReservaExpiraEn()).isNotNull();
+        assertThat(publicacionReventaRepository
+            .findByIdPublicacionReventa(publicacion.getIdPublicacionReventa())
+            .orElseThrow().getEstado())
+            .isEqualTo(EstadoPublicacionReventa.RESERVADA);
+
+        CompraDTO cancelada = compraService.cancelarGrupo(
+            comprador.getNombreUsuario(), compra.getIdCompra(),
+            grupo.getIdCompraGrupo());
+
+        assertThat(cancelada.getEstado()).isEqualTo(EstadoCompra.CANCELADA);
+        assertThat(cancelada.getGrupos().get(0).getEstado())
+            .isEqualTo(EstadoCompraGrupo.CANCELADO);
+        assertThat(cancelada.getGrupos().get(0).isPuedePagar()).isFalse();
+        assertThat(publicacionReventaRepository
+            .findByIdPublicacionReventa(publicacion.getIdPublicacionReventa())
+            .orElseThrow().getEstado())
+            .isEqualTo(EstadoPublicacionReventa.PUBLICADA);
+        var reserva = reservaStockRepository.findByCompraItemIdCompraItem(
+            grupo.getItems().get(0).getIdCompraItem()).orElseThrow();
+        assertThat(reserva.getEstado()).isEqualTo(EstadoReserva.VENCIDA);
+        assertThat(varianteRepository.findByIdVariante(idVariante).orElseThrow()
+            .getPropietarioActual().getIdUsuario())
+            .isEqualTo(vendedor.getIdUsuario());
     }
 
     private CompraItem comprarYConfirmar(Usuario comprador, Long idVariante) {

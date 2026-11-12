@@ -21,6 +21,9 @@ public interface ReservaStockRepository extends JpaRepository<ReservaStock, Long
     List<ReservaStock> findByEstadoAndExpiraEnBefore(
             EstadoReserva estado, LocalDateTime limite);
 
+    List<ReservaStock> findByCompraItemGrupoIdCompraGrupoAndEstado(
+            Long idCompraGrupo, EstadoReserva estado);
+
     @Query("""
         SELECT COALESCE(SUM(r.cantidad), 0)
           FROM ReservaStock r

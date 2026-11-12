@@ -21,6 +21,7 @@ public class PublicacionReventaDTO {
     private String nombreVariante;
     private Long idProducto;
     private String titulo;
+    private String tituloOriginal;
     private String imagenUrl;
     private Long idArtistaOriginal;
     private String nombreArtistaOriginal;
@@ -51,7 +52,9 @@ public class PublicacionReventaDTO {
             .nombreVariante(origen != null ? origen.getNombreVariante()
                 : (variante != null ? variante.getNombre() : null))
             .idProducto(producto != null ? producto.getIdProducto() : null)
-            .titulo(origen != null ? origen.getTituloProducto()
+            .titulo(origen != null ? origen.getNombreVariante()
+                : (variante != null ? variante.getNombre() : null))
+            .tituloOriginal(origen != null ? origen.getTituloProducto()
                 : (producto != null ? producto.getTitulo() : null))
             .imagenUrl(variante != null ? variante.getImagenUrl() : null)
             .idArtistaOriginal(artista != null ? artista.getIdUsuario() : null)

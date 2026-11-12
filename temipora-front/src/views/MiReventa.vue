@@ -309,7 +309,9 @@ onMounted(cargar)
                   {{ estadoTexto(publicacion.estado) }}
                 </span>
               </div>
-              <p class="text-sm text-cafe/60">{{ publicacion.nombreVariante }}</p>
+              <p class="text-sm text-cafe/60">
+                {{ publicacion.tituloOriginal || publicacion.nombreVariante }}
+              </p>
               <p class="mt-1 font-semibold text-coral">
                 {{ formatear(publicacion.precio, publicacion.moneda) }}
               </p>
@@ -380,7 +382,9 @@ onMounted(cargar)
                       {{ estadoTexto(publicacion.estado) }}
                     </span>
                   </div>
-                  <p class="text-xs text-cafe/55">{{ publicacion.nombreVariante }}</p>
+                  <p class="text-xs text-cafe/55">
+                    {{ publicacion.tituloOriginal || publicacion.nombreVariante }}
+                  </p>
                 </div>
                 <p class="text-sm font-semibold text-granate">
                   {{ formatear(publicacion.precio, publicacion.moneda) }}

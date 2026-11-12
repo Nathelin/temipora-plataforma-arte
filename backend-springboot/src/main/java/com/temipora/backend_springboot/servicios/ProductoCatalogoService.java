@@ -3,8 +3,10 @@ package com.temipora.backend_springboot.servicios;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -14,6 +16,7 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.CompraItem;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.DerechoTerminoDTO;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
@@ -115,8 +118,42 @@ public class ProductoCatalogoService {
             .filter(producto -> cumpleFiltros(producto, filtro, moneda))
             .toList();
 
-        List<Producto> ordenados = filtrados.stream()
-            .sorted(comparador(ordenSeguro, moneda))
+        boolean incluirReventas = filtro == null
+            || filtro.getIncluirReventas() == null
+            || Boolean.TRUE.equals(filtro.getIncluirReventas());
+        List<ItemCatalogo> items = new ArrayList<>();
+        for (Producto producto : filtrados) {
+            items.add(itemProducto(producto, moneda));
+        }
+        if (incluirReventas) {
+            for (PublicacionReventa publicacion
+                    : publicacionReventaRepository
+                        .findByEstadoOrderByFechaPublicacionDesc(
+                            EstadoPublicacionReventa.PUBLICADA)) {
+                ProductoVariante variante = publicacion.getVariante();
+                if (variante == null || variante.getProducto() == null) {
+                    continue;
+                }
+                Producto producto = variante.getProducto();
+                if (viewerId != null && publicacion.getVendedor() != null
+                        && viewerId.equals(
+                            publicacion.getVendedor().getIdUsuario())) {
+                    continue;
+                }
+                if (ocultarSensibles && producto.isContenidoSensible()) {
+                    continue;
+                }
+                BigDecimal precio = convertir(
+                    publicacion.getPrecio(), producto, moneda);
+                if (!cumpleFiltros(producto, filtro, precio)) {
+                    continue;
+                }
+                items.add(itemReventa(publicacion, producto, precio));
+            }
+        }
+
+        List<ItemCatalogo> ordenados = items.stream()
+            .sorted(comparadorCatalogo(ordenSeguro))
             .toList();
         boolean personalizado = false;
         Map<Long, RecomendacionProductoService.ProductoPuntuado> puntuados =
@@ -133,9 +170,44 @@ public class ProductoCatalogoService {
                     mapa.put(item.producto().getIdProducto(), item);
                 }
                 puntuados = mapa;
-                ordenados = ranking.items().stream()
-                    .map(RecomendacionProductoService.ProductoPuntuado::producto)
-                    .toList();
+
+                Map<Long, List<ItemCatalogo>> reventasPorProducto =
+                    new HashMap<>();
+                for (ItemCatalogo item : items) {
+                    if (item.esReventa()) {
+                        reventasPorProducto
+                            .computeIfAbsent(item.producto().getIdProducto(),
+                                clave -> new ArrayList<>())
+                            .add(item);
+                    }
+                }
+                List<ItemCatalogo> mezclados = new ArrayList<>();
+                Set<Long> yaIncluidos = new HashSet<>();
+                for (RecomendacionProductoService.ProductoPuntuado puntuado
+                        : ranking.items()) {
+                    Long idProducto = puntuado.producto().getIdProducto();
+                    yaIncluidos.add(idProducto);
+                    for (ItemCatalogo item : items) {
+                        if (!item.esReventa()
+                                && idProducto.equals(
+                                    item.producto().getIdProducto())) {
+                            mezclados.add(item);
+                            break;
+                        }
+                    }
+                    List<ItemCatalogo> reventasProducto =
+                        reventasPorProducto.get(idProducto);
+                    if (reventasProducto != null) {
+                        mezclados.addAll(reventasProducto);
+                    }
+                }
+                for (ItemCatalogo item : items) {
+                    if (!yaIncluidos.contains(
+                            item.producto().getIdProducto())) {
+                        mezclados.add(item);
+                    }
+                }
+                ordenados = mezclados;
                 personalizado = true;
             }
         }
@@ -145,14 +217,17 @@ public class ProductoCatalogoService {
         int hasta = Math.min(desde + tamanioSeguro, total);
         Map<Long, RecomendacionProductoService.ProductoPuntuado> puntuadosFinal =
             puntuados;
-        List<ProductoCatalogoDTO> contenido = ordenados.subList(desde, hasta).stream()
-            .map(producto -> {
-                ProductoCatalogoDTO dto = aDTO(producto, moneda, viewerId);
-                RecomendacionProductoService.ProductoPuntuado item =
-                    puntuadosFinal.get(producto.getIdProducto());
-                if (item != null) {
-                    dto.setScore(item.score());
-                    dto.setMotivo(item.motivo());
+        List<ProductoCatalogoDTO> contenido = ordenados.subList(desde, hasta)
+            .stream()
+            .map(item -> {
+                ProductoCatalogoDTO dto = item.esReventa()
+                    ? aDTOReventa(item.reventa(), viewerId)
+                    : aDTO(item.producto(), moneda, viewerId);
+                RecomendacionProductoService.ProductoPuntuado puntuado =
+                    puntuadosFinal.get(item.producto().getIdProducto());
+                if (puntuado != null) {
+                    dto.setScore(puntuado.score());
+                    dto.setMotivo(puntuado.motivo());
                 }
                 return dto;
             })
@@ -229,6 +304,18 @@ public class ProductoCatalogoService {
         dto.setIdPublicacionReventa(publicacion.getIdPublicacionReventa());
         dto.setNombreVendedor(publicacion.getVendedor() != null
             ? publicacion.getVendedor().getNombreUsuario() : null);
+        CompraItem origen = publicacion.getCompraItemOrigen();
+        String titulo = origen != null && hayTexto(origen.getNombreVariante())
+            ? origen.getNombreVariante()
+            : publicacion.getVariante().getNombre();
+        String tituloOriginal = origen != null
+            && hayTexto(origen.getTituloProducto())
+                ? origen.getTituloProducto()
+                : producto.getTitulo();
+        if (hayTexto(titulo)) {
+            dto.setTitulo(titulo);
+        }
+        dto.setTituloOriginal(tituloOriginal);
         dto.setPrecioDesde(convertir(publicacion.getPrecio(), producto, moneda));
         dto.setMoneda(moneda != null ? moneda.getCodigo()
             : (producto.getMoneda() != null
@@ -527,6 +614,11 @@ public class ProductoCatalogoService {
 
     private boolean cumpleFiltros(
             Producto producto, FiltroProductoRequest filtro, Moneda moneda) {
+        return cumpleFiltros(producto, filtro, precioDesde(producto, moneda));
+    }
+
+    private boolean cumpleFiltros(
+            Producto producto, FiltroProductoRequest filtro, BigDecimal precio) {
         if (filtro == null) {
             return true;
         }
@@ -565,7 +657,6 @@ public class ProductoCatalogoService {
         if (Boolean.TRUE.equals(filtro.getSoloConStock()) && !tieneStock(producto)) {
             return false;
         }
-        BigDecimal precio = precioDesde(producto, moneda);
         if (filtro.getPrecioMin() != null
                 && (precio == null || precio.compareTo(filtro.getPrecioMin()) < 0)) {
             return false;
@@ -577,25 +668,49 @@ public class ProductoCatalogoService {
         return true;
     }
 
-    private Comparator<Producto> comparador(OrdenProducto orden, Moneda moneda) {
-        Comparator<Producto> porTitulo = Comparator.comparing(
-            producto -> producto.getTitulo() != null
-                ? producto.getTitulo().toLowerCase() : "",
+    private Comparator<ItemCatalogo> comparadorCatalogo(OrdenProducto orden) {
+        Comparator<ItemCatalogo> porTitulo = Comparator.comparing(
+            item -> item.titulo() != null ? item.titulo().toLowerCase() : "",
             String.CASE_INSENSITIVE_ORDER);
         return switch (orden) {
             case PRECIO_ASC -> Comparator.comparing(
-                (Producto producto) -> precioDesde(producto, moneda),
-                Comparator.nullsLast(BigDecimal::compareTo)).thenComparing(porTitulo);
+                (ItemCatalogo item) -> item.precio(),
+                Comparator.nullsLast(BigDecimal::compareTo))
+                .thenComparing(porTitulo);
             case PRECIO_DESC -> Comparator.comparing(
-                (Producto producto) -> precioDesde(producto, moneda),
-                Comparator.nullsLast(Comparator.reverseOrder())).thenComparing(porTitulo);
+                (ItemCatalogo item) -> item.precio(),
+                Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(porTitulo);
             case TITULO -> porTitulo;
             // RELEVANCIA y RECIENTES comparten orden hasta que exista ranking
             // de productos: el listado base ya viene por fecha descendente.
             default -> Comparator.comparing(
-                (Producto producto) -> producto.getFechaCreacion(),
+                (ItemCatalogo item) -> item.fecha(),
                 Comparator.nullsLast(Comparator.reverseOrder()));
         };
+    }
+
+    private ItemCatalogo itemProducto(Producto producto, Moneda moneda) {
+        return new ItemCatalogo(
+            producto,
+            null,
+            precioDesde(producto, moneda),
+            producto.getTitulo(),
+            producto.getFechaCreacion());
+    }
+
+    private ItemCatalogo itemReventa(
+            PublicacionReventa publicacion, Producto producto, BigDecimal precio) {
+        CompraItem origen = publicacion.getCompraItemOrigen();
+        String titulo = origen != null && hayTexto(origen.getNombreVariante())
+            ? origen.getNombreVariante()
+            : publicacion.getVariante().getNombre();
+        return new ItemCatalogo(
+            producto,
+            publicacion,
+            precio,
+            titulo,
+            publicacion.getFechaPublicacion());
     }
 
     // ------------------------------------------------------------------
@@ -750,5 +865,17 @@ public class ProductoCatalogoService {
 
     private boolean hayTexto(String valor) {
         return valor != null && !valor.isBlank();
+    }
+
+    private record ItemCatalogo(
+            Producto producto,
+            PublicacionReventa reventa,
+            BigDecimal precio,
+            String titulo,
+            LocalDateTime fecha) {
+
+        boolean esReventa() {
+            return reventa != null;
+        }
     }
 }

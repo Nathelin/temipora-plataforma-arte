@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useCarrito } from '../composables/useCarrito'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import { formatearPrecio } from '../servicios/moneda'
+import { pagarGrupo } from '../servicios/compras'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,6 +23,8 @@ const {
 
 const artistaVaciado = ref('')
 const carritoVaciado = ref(false)
+const procesandoPago = ref(false)
+const grupoPagando = ref(null)
 
 const idArtistaSeleccionado = computed(() => {
   const valor = route.query.artista
@@ -130,18 +133,44 @@ async function limpiar() {
 }
 
 async function continuar() {
-  if (!puedePagarActivo.value || !grupoActivo.value) return
+  if (!puedePagarActivo.value || !grupoActivo.value || procesandoPago.value) return
+  const grupo = grupoActivo.value
   const clave = globalThis.crypto?.randomUUID
     ? globalThis.crypto.randomUUID()
     : `compra-${Date.now()}-${Math.random()}`
+  grupoPagando.value = grupo
+  procesandoPago.value = true
+  let compra = null
+  let redirigiendo = false
   try {
-    const compra = await confirmarCheckout(
-      clave,
-      grupoActivo.value.idArtista,
-    )
+    compra = await confirmarCheckout(clave, grupo.idArtista)
+    const grupoCompra = (compra.grupos || []).find(
+      (item) => Number(item.idArtista) === Number(grupo.idArtista),
+    ) || (compra.grupos || [])[0]
+    if (!grupoCompra) {
+      router.push({ name: 'compra-detalle', params: { id: compra.idCompra } })
+      return
+    }
+    const pago = await pagarGrupo(compra.idCompra, grupoCompra.idCompraGrupo)
+    if (pago.instruccion && /^https?:\/\//.test(pago.instruccion)) {
+      redirigiendo = true
+      window.location.href = pago.instruccion
+      return
+    }
     router.push({ name: 'compra-detalle', params: { id: compra.idCompra } })
   } catch (e) {
-    toastError(e.response?.data?.message || 'No se pudo iniciar la compra.')
+    if (compra?.idCompra) {
+      toastError(e.response?.data?.message
+        || 'No se pudo iniciar el pago. Reintentalo desde el detalle de la compra.')
+      router.push({ name: 'compra-detalle', params: { id: compra.idCompra } })
+    } else {
+      toastError(e.response?.data?.message || 'No se pudo iniciar la compra.')
+    }
+  } finally {
+    if (!redirigiendo) {
+      procesandoPago.value = false
+      grupoPagando.value = null
+    }
   }
 }
 
@@ -479,10 +508,12 @@ onMounted(cargar)
             <button
               type="button"
               class="mt-5 flex w-full items-center justify-center rounded-lg bg-coral px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-rojizo disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="!puedePagarActivo"
+              :disabled="!puedePagarActivo || procesandoPago"
               @click="continuar"
             >
-              Pagar a @{{ grupoActivo.nombreArtista }}
+              {{ procesandoPago
+                ? 'Redirigiendo a MercadoPago...'
+                : 'Pagar a @' + grupoActivo.nombreArtista }}
             </button>
             <p v-if="!puedePagarActivo" class="mt-2 text-center text-[11px] leading-relaxed text-cafe/50">
               Revisá los avisos antes de continuar.
@@ -496,6 +527,29 @@ onMounted(cargar)
           </template>
         </section>
       </aside>
+    </div>
+    <div
+      v-if="procesandoPago"
+      class="fixed inset-0 z-[100] flex items-center justify-center bg-granate/40 p-4 backdrop-blur-sm"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="w-full max-w-sm rounded-2xl border border-rosa bg-blanco p-6 text-center shadow-2xl">
+        <div
+          class="mx-auto h-9 w-9 animate-spin rounded-full border-[3px] border-rosa border-t-coral"
+          aria-hidden="true"
+        ></div>
+        <p class="mt-4 font-display text-base font-bold text-granate">
+          Te estamos redirigiendo a MercadoPago...
+        </p>
+        <p class="mt-1 text-sm leading-relaxed text-cafe/65">
+          No cierres esta ventana.
+          <template v-if="grupoPagando">
+            Estamos preparando el pago de @{{ grupoPagando.nombreArtista }}
+            ({{ totalGrupo(grupoPagando) }}).
+          </template>
+        </p>
+      </div>
     </div>
   </div>
 </template>

@@ -30,6 +30,10 @@ public class CompraGrupoDTO {
     private LocalDateTime fechaPago;
     private boolean puedePagar;
     private String mensajePago;
+    private LocalDateTime reservaExpiraEn;
+    private boolean pagoIniciado;
+    private boolean puedeCancelar;
+    private String motivoNoCancelar;
     @Builder.Default
     private List<CompraItemDTO> items = new ArrayList<>();
 }

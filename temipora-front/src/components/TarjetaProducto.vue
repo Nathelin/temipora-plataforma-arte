@@ -128,6 +128,12 @@ const destino = computed(() => (
     <div class="flex flex-1 flex-col p-4">
       <h3 class="line-clamp-1 font-display text-base font-bold leading-snug text-granate">
         {{ producto.titulo }}
+        <span
+          v-if="esReventa && producto.tituloOriginal"
+          class="font-sans text-[11px] font-normal text-cafe/45"
+        >
+          · {{ producto.tituloOriginal }}
+        </span>
       </h3>
 
       <router-link
@@ -152,12 +158,12 @@ const destino = computed(() => (
         </span>
       </router-link>
 
-      <p class="mt-2 text-xs text-cafe/55">
+      <p v-if="esReventa && producto.nombreVendedor" class="mt-2 line-clamp-1 text-xs text-cafe/55">
+        En reventa por @{{ producto.nombreVendedor }}
+      </p>
+      <p v-else class="mt-2 line-clamp-1 text-xs text-cafe/55">
         {{ producto.nombreTipoProducto }}
         <template v-if="producto.nombreMedio"> · {{ producto.nombreMedio }}</template>
-      </p>
-      <p v-if="esReventa && producto.nombreVendedor" class="mt-1 text-xs text-cafe/50">
-        En reventa por @{{ producto.nombreVendedor }}
       </p>
 
       <div class="mt-auto flex items-end justify-between gap-3 pt-4">

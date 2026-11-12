@@ -26,6 +26,8 @@ public class ProductoCatalogoDTO {
 
     private Long idProducto;
     private String titulo;
+    /** En reventa, el título original de la publicación. */
+    private String tituloOriginal;
     private String descripcion;
     private String imagenPortada;
 

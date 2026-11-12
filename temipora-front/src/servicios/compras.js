@@ -92,6 +92,13 @@ export async function cargarCompra(idCompra) {
   return res.data
 }
 
+export async function cancelarGrupo(idCompra, idGrupo) {
+  const res = await api.post(
+    `/compras/${idCompra}/grupos/${idGrupo}/cancelar`,
+  )
+  return res.data
+}
+
 export async function cargarLedgerCompraItem(idCompra, idCompraItem) {
   const res = await api.get(
     `/compras/${idCompra}/items/${idCompraItem}/ledger`,

@@ -20,9 +20,12 @@ const error = ref('')
 
 const esEdicion = computed(() => !!props.publicacion)
 const titulo = computed(() => props.pieza?.titulo || props.publicacion?.titulo || '')
-const variante = computed(
-  () => props.pieza?.nombreVariante || props.publicacion?.nombreVariante || '',
-)
+const variante = computed(() => {
+  if (props.pieza) return props.pieza.nombreVariante || ''
+  return props.publicacion?.tituloOriginal
+    || props.publicacion?.nombreVariante
+    || ''
+})
 const imagen = computed(() => props.pieza?.imagenUrl || props.publicacion?.imagenUrl || '')
 const moneda = computed(() => props.pieza?.moneda || props.publicacion?.moneda || 'ARS')
 const nombreArtista = computed(

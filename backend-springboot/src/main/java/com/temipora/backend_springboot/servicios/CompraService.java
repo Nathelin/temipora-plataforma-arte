@@ -42,6 +42,7 @@ import com.temipora.backend_springboot.modelo.EstadoCompra;
 import com.temipora.backend_springboot.modelo.EstadoCompraGrupo;
 import com.temipora.backend_springboot.modelo.EstadoCuentaPago;
 import com.temipora.backend_springboot.modelo.EstadoEntregaItem;
+import com.temipora.backend_springboot.modelo.EstadoIntentoCobro;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
 import com.temipora.backend_springboot.modelo.EstadoPublicacionReventa;
 import com.temipora.backend_springboot.modelo.EstadoReserva;
@@ -66,6 +67,7 @@ import com.temipora.backend_springboot.repositorios.CarritoRepository;
 import com.temipora.backend_springboot.repositorios.CompraRepository;
 import com.temipora.backend_springboot.repositorios.CuentaPagoUsuarioRepository;
 import com.temipora.backend_springboot.repositorios.EventoLedgerRepository;
+import com.temipora.backend_springboot.repositorios.IntentoCobroGrupoRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteImagenRepository;
 import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
 import com.temipora.backend_springboot.repositorios.PublicacionReventaRepository;
@@ -92,6 +94,7 @@ public class CompraService {
     private final CarritoRepository carritoRepository;
     private final ProductoVarianteRepository varianteRepository;
     private final ReservaStockRepository reservaStockRepository;
+    private final IntentoCobroGrupoRepository intentoCobroGrupoRepository;
     private final PublicacionReventaRepository publicacionReventaRepository;
     private final CuentaPagoUsuarioRepository cuentaPagoRepository;
     private final UsuarioService usuarioService;
@@ -109,6 +112,7 @@ public class CompraService {
             CarritoRepository carritoRepository,
             ProductoVarianteRepository varianteRepository,
             ReservaStockRepository reservaStockRepository,
+            IntentoCobroGrupoRepository intentoCobroGrupoRepository,
             PublicacionReventaRepository publicacionReventaRepository,
             CuentaPagoUsuarioRepository cuentaPagoRepository,
             UsuarioService usuarioService,
@@ -124,6 +128,7 @@ public class CompraService {
         this.carritoRepository = carritoRepository;
         this.varianteRepository = varianteRepository;
         this.reservaStockRepository = reservaStockRepository;
+        this.intentoCobroGrupoRepository = intentoCobroGrupoRepository;
         this.publicacionReventaRepository = publicacionReventaRepository;
         this.cuentaPagoRepository = cuentaPagoRepository;
         this.usuarioService = usuarioService;
@@ -411,6 +416,85 @@ public class CompraService {
             .orElseThrow(() -> new NoSuchElementException(
                 "Compra no encontrada: " + idCompra));
         return aDTO(compra);
+    }
+
+    @Transactional
+    public CompraDTO cancelarGrupo(
+            String nombreUsuario, Long idCompra, Long idGrupo) {
+        Usuario cliente = usuarioService.getByNombreUsuario(nombreUsuario);
+        Compra compra = compraRepository
+            .findByIdCompraAndClienteIdUsuario(idCompra, cliente.getIdUsuario())
+            .orElseThrow(() -> new NoSuchElementException(
+                "Compra no encontrada: " + idCompra));
+        CompraGrupo grupo = compra.getGrupos().stream()
+            .filter(item -> item.getIdCompraGrupo() != null
+                && item.getIdCompraGrupo().equals(idGrupo))
+            .findFirst()
+            .orElseThrow(() -> new NoSuchElementException(
+                "Grupo no encontrado: " + idGrupo));
+        if (grupo.getEstado() != EstadoCompraGrupo.PENDIENTE) {
+            throw new ConflictoException("Este grupo ya no se puede cancelar.");
+        }
+        boolean pagoIniciado = intentoCobroGrupoRepository
+            .findFirstByGrupoIdCompraGrupoAndEstadoOrderByIntentoCobroFechaCreacionDesc(
+                idGrupo, EstadoIntentoCobro.PENDIENTE)
+            .isPresent();
+        if (pagoIniciado) {
+            throw new ConflictoException(
+                "El pago ya fue iniciado. La reserva se libera automáticamente cuando vence.");
+        }
+
+        LocalDateTime ahora = LocalDateTime.now();
+        grupo.setEstado(EstadoCompraGrupo.CANCELADO);
+        grupo.setFechaActualizacion(ahora);
+        for (CompraItem item : grupo.getItems()) {
+            item.setEstadoEntrega(EstadoEntregaItem.CANCELADO);
+            liberarPublicacionReventa(item, ahora);
+            reservaStockRepository
+                .findByCompraItemIdCompraItem(item.getIdCompraItem())
+                .filter(reserva -> reserva.getEstado() == EstadoReserva.ACTIVA)
+                .ifPresent(reserva -> {
+                    reserva.setEstado(EstadoReserva.VENCIDA);
+                    reserva.setFechaActualizacion(ahora);
+                    reservaStockRepository.save(reserva);
+                });
+        }
+
+        boolean hayPendientes = compra.getGrupos().stream()
+            .anyMatch(item -> item.getEstado() == EstadoCompraGrupo.PENDIENTE);
+        boolean hayPagados = compra.getGrupos().stream()
+            .anyMatch(item -> item.getEstado() == EstadoCompraGrupo.PAGADO);
+        if (hayPendientes) {
+            compra.setEstado(hayPagados
+                ? EstadoCompra.PARCIALMENTE_PAGA
+                : EstadoCompra.PENDIENTE_PAGO);
+        } else if (hayPagados && compra.getGrupos().stream()
+                .allMatch(item -> item.getEstado() == EstadoCompraGrupo.PAGADO)) {
+            compra.setEstado(EstadoCompra.PAGA);
+        } else if (hayPagados) {
+            compra.setEstado(EstadoCompra.PARCIALMENTE_PAGA);
+        } else {
+            compra.setEstado(EstadoCompra.CANCELADA);
+        }
+        compra.setFechaActualizacion(ahora);
+        compraRepository.save(compra);
+        return aDTO(compra);
+    }
+
+    private void liberarPublicacionReventa(
+            CompraItem item, LocalDateTime ahora) {
+        if (item.getIdPublicacionReventa() == null) {
+            return;
+        }
+        publicacionReventaRepository
+            .findByIdPublicacionReventaForUpdate(item.getIdPublicacionReventa())
+            .filter(publicacion ->
+                publicacion.getEstado() == EstadoPublicacionReventa.RESERVADA)
+            .ifPresent(publicacion -> {
+                publicacion.setEstado(EstadoPublicacionReventa.PUBLICADA);
+                publicacion.setFechaActualizacion(ahora);
+                publicacionReventaRepository.save(publicacion);
+            });
     }
 
     private List<CarritoItem> seleccionarItems(Carrito carrito, Long idArtista) {
@@ -734,6 +818,28 @@ public class CompraService {
             .map(this::aItemDTO)
             .toList();
 
+        List<ReservaStock> reservasActivas = reservaStockRepository
+            .findByCompraItemGrupoIdCompraGrupoAndEstado(
+                grupo.getIdCompraGrupo(), EstadoReserva.ACTIVA);
+        LocalDateTime reservaExpiraEn = reservasActivas.stream()
+            .map(ReservaStock::getExpiraEn)
+            .filter(fecha -> fecha != null)
+            .min(LocalDateTime::compareTo)
+            .orElse(null);
+        boolean pagoIniciado = intentoCobroGrupoRepository
+            .findFirstByGrupoIdCompraGrupoAndEstadoOrderByIntentoCobroFechaCreacionDesc(
+                grupo.getIdCompraGrupo(), EstadoIntentoCobro.PENDIENTE)
+            .isPresent();
+        boolean puedeCancelar = grupo.getEstado() == EstadoCompraGrupo.PENDIENTE
+            && !pagoIniciado
+            && grupo.getCompra().getEstado() != EstadoCompra.VENCIDA
+            && grupo.getCompra().getEstado() != EstadoCompra.CANCELADA
+            && grupo.getCompra().getEstado() != EstadoCompra.PAGA;
+        String motivoNoCancelar = grupo.getEstado() == EstadoCompraGrupo.PENDIENTE
+            && pagoIniciado
+                ? "El pago ya fue iniciado. La reserva se libera automáticamente cuando vence."
+                : null;
+
         return CompraGrupoDTO.builder()
             .idCompraGrupo(grupo.getIdCompraGrupo())
             .idArtista(artista != null ? artista.getIdUsuario() : null)
@@ -749,6 +855,10 @@ public class CompraService {
             .fechaPago(grupo.getFechaPago())
             .puedePagar(puedePagar)
             .mensajePago(mensaje)
+            .reservaExpiraEn(reservaExpiraEn)
+            .pagoIniciado(pagoIniciado)
+            .puedeCancelar(puedeCancelar)
+            .motivoNoCancelar(motivoNoCancelar)
             .items(items)
             .build();
     }
