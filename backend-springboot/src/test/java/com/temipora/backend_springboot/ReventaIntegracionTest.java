@@ -160,6 +160,9 @@ class ReventaIntegracionTest {
         assertThat(detallePublico.getNombreArtista())
             .isEqualTo(artista.getNombreUsuario());
         assertThat(detallePublico.isPuedeComprar()).isTrue();
+        assertThat(detallePublico.getLedger()).isNotNull();
+        assertThat(detallePublico.getLedger().isTieneLedger()).isTrue();
+        assertThat(detallePublico.getLedger().getEventos()).isNotEmpty();
 
         var reventasPublicas = productoCatalogoService.listarReventas(null, 0, 10);
         var publica = reventasPublicas.getContenido().stream()
@@ -228,6 +231,16 @@ class ReventaIntegracionTest {
             .findByIdPublicacionReventa(publicacion.getIdPublicacionReventa())
             .orElseThrow().getEstado())
             .isEqualTo(EstadoPublicacionReventa.VENDIDA);
+
+        comprador.setMostrarPropietario(false);
+        usuarioRepository.save(comprador);
+        var variantesPublicas = productoCatalogoService.obtenerVariantes(
+            producto.getIdProducto(), null, 1, 10);
+        var variantePublica = variantesPublicas.getContenido().stream()
+            .filter(varianteDto -> varianteDto.getIdVariante().equals(idVariante))
+            .toList();
+        assertThat(variantePublica).hasSize(1);
+        assertThat(variantePublica.get(0).getNombrePropietario()).isNull();
 
         var eventos = eventoLedgerRepository
             .findByVarianteIdVarianteOrderBySecuenciaAsc(idVariante);

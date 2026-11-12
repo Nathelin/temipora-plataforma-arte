@@ -1,12 +1,13 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { formatearPrecio } from '../servicios/moneda'
-import { formatearFechaHora } from '../servicios/fechas'
 import {
   estadoProductoDe,
   estadoVarianteDe,
   etiquetaStock,
 } from '../servicios/productos'
+import ResumenPropiedad from './ResumenPropiedad.vue'
+import HistorialLedgerModal from './HistorialLedgerModal.vue'
 import VisorImagenes from './VisorImagenes.vue'
 
 const props = defineProps({
@@ -51,6 +52,7 @@ const mostrarInfoLedger = ref(false)
 const abrirInfoArriba = ref(false)
 const contenedorInfoLedger = ref(null)
 const tooltipLedger = ref(null)
+const historialAbierto = ref(null)
 
 const idsCarrito = computed(
   () => new Set((props.idsEnCarrito || []).map((id) => Number(id))),
@@ -85,22 +87,6 @@ const varianteUnica = computed(() => {
   if (hayVariasVariantes.value) return null
   return props.variantesPagina[0] || props.producto?.variantes?.[0] || null
 })
-
-function hashCorto(hash) {
-  if (!hash) return '—'
-  return `${hash.slice(0, 10)}…${hash.slice(-6)}`
-}
-
-function etiquetaEvento(tipo) {
-  const etiquetas = {
-    GENESIS: 'Origen',
-    VENTA: 'Venta',
-    TRANSFERENCIA: 'Transferencia',
-    REVENTA: 'Reventa',
-    ANULACION: 'Anulación',
-  }
-  return etiquetas[tipo] || tipo
-}
 
 function seleccionarImagen(indice) {
   if (!props.imagenes.length) return
@@ -159,6 +145,26 @@ function irALicencia() {
 function seleccionarVariante(variante) {
   imagenDeVariante(variante)
   irAGaleria()
+}
+
+function varianteDe(idVariante) {
+  const id = Number(idVariante)
+  return props.variantesPagina.find(
+    (variante) => Number(variante.idVariante) === id,
+  ) || (props.producto?.variantes || []).find(
+    (variante) => Number(variante.idVariante) === id,
+  ) || null
+}
+
+function estadoDeVariante(idVariante) {
+  const variante = varianteDe(idVariante)
+  if (!variante) return ''
+  if (variante.enReventa) return 'En reventa'
+  return etiquetaStock(variante)
+}
+
+function abrirHistorial(varianteLedger) {
+  historialAbierto.value = varianteLedger
 }
 
 function varianteDisponible(variante) {
@@ -827,58 +833,17 @@ watch(
             licencia y no tienen registro de propiedad individual.
           </div>
 
-          <div v-else class="mt-4 space-y-4">
-            <article
+          <div v-else class="mt-4 space-y-3">
+            <ResumenPropiedad
               v-for="varianteLedger in ledgerPagina"
               :key="varianteLedger.idVariante"
-              class="rounded-xl border border-rosa/50 bg-crema/40 p-3"
-            >
-              <div class="flex items-center justify-between gap-2">
-                <p class="text-sm font-semibold text-granate">
-                  {{ varianteLedger.nombre }}
-                </p>
-                <span
-                  class="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                  :class="varianteLedger.integridad
-                    ? 'bg-green-500/10 text-green-700'
-                    : 'bg-rojizo/10 text-rojizo'"
-                >
-                  {{ varianteLedger.integridad ? 'Verificado' : 'Con diferencias' }}
-                </span>
-              </div>
-              <p class="mt-1 text-[11px] text-cafe/55">
-                {{ varianteLedger.mensaje }}
-              </p>
-
-              <ol class="mt-3 space-y-2">
-                <li
-                  v-for="evento in varianteLedger.eventos"
-                  :key="evento.idEventoLedger"
-                  class="rounded-lg bg-blanco px-3 py-2 ring-1 ring-rosa/40"
-                >
-                  <div class="flex items-center justify-between gap-2">
-                    <p class="text-[11px] font-bold uppercase tracking-wide text-coral">
-                      #{{ evento.secuencia }} · {{ etiquetaEvento(evento.tipo) }}
-                    </p>
-                    <span
-                      class="text-[10px] font-semibold"
-                      :class="evento.verificado ? 'text-green-700' : 'text-rojizo'"
-                    >
-                      {{ evento.verificado ? '✓ verificado' : '✗ no coincide' }}
-                    </span>
-                  </div>
-                  <p class="mt-1 text-[11px] text-cafe/60">
-                    {{ formatearFechaHora(evento.ocurridoEn) }}
-                  </p>
-                  <p v-if="evento.nombreOrigen || evento.nombreDestino" class="mt-1 text-[11px] text-cafe/55">
-                    @{{ evento.nombreOrigen || '—' }} → @{{ evento.nombreDestino || '—' }}
-                  </p>
-                  <p v-if="evento.hashEvento" class="mt-1 break-all font-mono text-[10px] text-cafe/35" :title="evento.hashEvento">
-                    {{ hashCorto(evento.hashEvento) }}
-                  </p>
-                </li>
-              </ol>
-            </article>
+              :nombre="varianteLedger.nombre"
+              :propietario="varianteDe(varianteLedger.idVariante)?.nombrePropietario || null"
+              :estado="estadoDeVariante(varianteLedger.idVariante)"
+              :eventos="varianteLedger.eventos"
+              :integridad="varianteLedger.integridad"
+              @ver-historial="abrirHistorial(varianteLedger)"
+            />
           </div>
 
           <div
@@ -924,6 +889,15 @@ watch(
       :etiqueta="producto?.titulo || 'Producto'"
       @cerrar="visorAbierto = false"
       @actualizar:indice="seleccionarImagen"
+    />
+
+    <HistorialLedgerModal
+      :abierto="!!historialAbierto"
+      :titulo="historialAbierto?.nombre || 'Historial de la pieza'"
+      :eventos="historialAbierto?.eventos || []"
+      :integridad="historialAbierto?.integridad"
+      :mensaje="historialAbierto?.mensaje"
+      @cerrar="historialAbierto = null"
     />
   </div>
 </template>

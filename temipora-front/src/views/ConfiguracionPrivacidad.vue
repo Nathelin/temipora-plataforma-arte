@@ -17,6 +17,7 @@ const errorEdicion = ref('')
 const form = ref({
   preferenciaSensible: 'ADVERTIR',
   pedidosPublicos: false,
+  mostrarPropietario: true,
   recibirEmailsPromocionales: true,
 })
 
@@ -27,6 +28,7 @@ const hayCambios = computed(
   () => estadoGuardado.value !== null
     && (estadoGuardado.value.preferenciaSensible !== form.value.preferenciaSensible
       || estadoGuardado.value.pedidosPublicos !== form.value.pedidosPublicos
+      || estadoGuardado.value.mostrarPropietario !== form.value.mostrarPropietario
       || estadoGuardado.value.recibirEmailsPromocionales !== form.value.recibirEmailsPromocionales),
 )
 
@@ -51,6 +53,7 @@ async function cargar() {
     idUsuario.value = d.idUsuario
     form.value.preferenciaSensible = d.preferenciaSensible || 'ADVERTIR'
     form.value.pedidosPublicos = Boolean(d.pedidosPublicos)
+    form.value.mostrarPropietario = d.mostrarPropietario ?? true
     form.value.recibirEmailsPromocionales =
       d.recibirEmailsPromocionales ?? true
     estadoGuardado.value = { ...form.value }
@@ -69,6 +72,7 @@ async function guardar() {
     const payload = {
       preferenciaSensible: form.value.preferenciaSensible,
       pedidosPublicos: form.value.pedidosPublicos,
+      mostrarPropietario: form.value.mostrarPropietario,
       recibirEmailsPromocionales: form.value.recibirEmailsPromocionales,
     }
 
@@ -76,6 +80,7 @@ async function guardar() {
 
     form.value.preferenciaSensible = r.data.preferenciaSensible
     form.value.pedidosPublicos = Boolean(r.data.pedidosPublicos)
+    form.value.mostrarPropietario = Boolean(r.data.mostrarPropietario)
     form.value.recibirEmailsPromocionales =
       Boolean(r.data.recibirEmailsPromocionales)
     estadoGuardado.value = { ...form.value }
@@ -179,6 +184,49 @@ onBeforeUnmount(limpiarCambios)
               >
                 Ver mi galería →
               </router-link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="text-base text-granate pt-2">Propiedad de las piezas</h3>
+        <p class="text-sm text-cafe/70">
+          Elegí si tu nombre aparece como propietario actual de las piezas que compraste.
+        </p>
+
+        <div
+          class="mt-3 rounded-xl border-2 p-4 transition"
+          :class="form.mostrarPropietario ? 'border-coral bg-coral/10' : 'border-rosa/30'"
+        >
+          <div class="flex items-start gap-3">
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="form.mostrarPropietario"
+              class="relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema"
+              :class="form.mostrarPropietario ? 'bg-coral' : 'bg-rosa/70'"
+              @click="form.mostrarPropietario = !form.mostrarPropietario"
+            >
+              <span
+                class="inline-block h-4 w-4 rounded-full bg-white shadow transition"
+                :class="form.mostrarPropietario ? 'translate-x-6' : 'translate-x-1'"
+              ></span>
+            </button>
+            <div class="min-w-0">
+              <p class="text-base font-medium text-granate">
+                {{ form.mostrarPropietario
+                  ? 'Mostrar mi nombre como propietario actual'
+                  : 'Ocultar mi nombre como propietario actual' }}
+              </p>
+              <p class="mt-1 text-sm leading-relaxed text-cafe/70">
+                Si lo ocultás, la pieza conserva su historial de autenticidad y su
+                disponibilidad, pero no se muestra quién la tiene hoy.
+              </p>
+              <p class="mt-1 text-sm leading-relaxed text-cafe/70">
+                Si ponés una pieza en reventa, tu nombre aparecerá como vendedor
+                en la publicación de reventa.
+              </p>
             </div>
           </div>
         </div>

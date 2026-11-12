@@ -8,14 +8,12 @@ import {
   eliminarProductoFavorito,
 } from '../servicios/productos'
 import api from '../servicios/api'
-import { listarReventas } from '../servicios/reventas'
 import TarjetaProducto from '../components/TarjetaProducto.vue'
 
 const route = useRoute()
 const router = useRouter()
 
 const productos = ref([])
-const reventas = ref([])
 const tipos = ref([])
 const medios = ref([])
 const cargando = ref(true)
@@ -33,6 +31,7 @@ const totalElementos = ref(0)
 const hayMas = ref(false)
 
 const filtros = ref({
+  tipoPublicacion: 'TODAS',
   titulo: '',
   nombreArtista: '',
   idTipoProducto: '',
@@ -53,6 +52,7 @@ const cantidadFiltrosActivos = computed(() => {
   if (filtros.value.sensible) total++
   if (filtros.value.precioMin) total++
   if (filtros.value.precioMax) total++
+  if (filtros.value.tipoPublicacion !== 'TODAS') total++
   return total
 })
 
@@ -72,6 +72,7 @@ function params() {
     orden: orden.value,
     pagina: pagina.value,
     tamanio,
+    incluirReventas: filtros.value.tipoPublicacion !== 'PRODUCTOS',
   }
   if (filtros.value.titulo.trim()) salida.titulo = filtros.value.titulo.trim()
   if (filtros.value.nombreArtista.trim()) {
@@ -124,6 +125,7 @@ function cargarMas() {
 
 function limpiarFiltros() {
   filtros.value = {
+    tipoPublicacion: 'TODAS',
     titulo: '',
     nombreArtista: '',
     idTipoProducto: '',
@@ -137,6 +139,10 @@ function limpiarFiltros() {
 watch(
   filtros,
   () => {
+    if (filtros.value.tipoPublicacion === 'REVENTAS') {
+      router.push('/reventas')
+      return
+    }
     clearTimeout(temporizador)
     temporizador = setTimeout(() => cargar(), 350)
   },
@@ -178,15 +184,6 @@ async function alternarFavorito(producto) {
   }
 }
 
-async function cargarReventas() {
-  try {
-    const data = await listarReventas({ pagina: 0, tamanio: 6 })
-    reventas.value = data.contenido || []
-  } catch {
-    reventas.value = []
-  }
-}
-
 onMounted(async () => {
   // Los chips de Explorar llegan como query para abrir el catálogo filtrado.
   const tipoInicial = route.query.idTipoProducto
@@ -195,7 +192,6 @@ onMounted(async () => {
   if (medioInicial) filtros.value.idMedio = String(medioInicial)
 
   cargarFavoritos()
-  cargarReventas()
   try {
     const [tiposRes, mediosRes] = await Promise.all([
       api.get('/tipos-producto'),
@@ -222,7 +218,7 @@ onMounted(async () => {
           Arte listo para llevar
         </h1>
         <p class="mt-1 text-sm text-cafe/60">
-          Piezas, adoptables y recursos digitales de artistas de la plataforma.
+          Piezas, adoptables, recursos digitales y reventas de artistas de la plataforma.
         </p>
       </div>
       <router-link
@@ -232,35 +228,6 @@ onMounted(async () => {
         Buscar un servicio a medida →
       </router-link>
     </div>
-
-    <section v-if="reventas.length" class="mt-6">
-      <div class="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p class="text-xs font-bold uppercase tracking-[0.18em] text-coral">
-            Reventa
-          </p>
-          <h2 class="mt-1 font-display text-2xl font-extrabold text-granate">
-            Piezas que vuelven a estar disponibles
-          </h2>
-          <p class="mt-1 text-sm text-cafe/60">
-            Piezas únicas que sus dueños ponen en venta. El pago se acredita al revendedor.
-          </p>
-        </div>
-        <router-link
-          to="/reventas"
-          class="text-sm font-bold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
-        >
-          Ver todas →
-        </router-link>
-      </div>
-      <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        <TarjetaProducto
-          v-for="publicacion in reventas"
-          :key="publicacion.idPublicacionReventa"
-          :producto="publicacion"
-        />
-      </div>
-    </section>
 
     <div class="mt-6 rounded-[22px] border border-borde/60 bg-superficie p-4 shadow-sm">
       <div class="flex flex-wrap items-center gap-3">
@@ -310,6 +277,18 @@ onMounted(async () => {
       </div>
 
       <div v-if="filtrosAbiertos" class="mt-4 grid gap-4 border-t border-rosa/40 pt-4 sm:grid-cols-2 lg:grid-cols-3">
+        <label class="block text-xs font-medium text-cafe/70">
+          Publicación
+          <select
+            v-model="filtros.tipoPublicacion"
+            class="mt-1 w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+          >
+            <option value="TODAS">Productos y reventas</option>
+            <option value="PRODUCTOS">Solo productos</option>
+            <option value="REVENTAS">Solo reventas</option>
+          </select>
+        </label>
+
         <label class="block text-xs font-medium text-cafe/70">
           Artista
           <input
@@ -396,7 +375,7 @@ onMounted(async () => {
       <div class="mt-6 flex items-center justify-between gap-3">
         <p class="text-xs text-cafe/55">
           {{ totalElementos }}
-          {{ totalElementos === 1 ? 'producto' : 'productos' }}
+          {{ totalElementos === 1 ? 'publicación' : 'publicaciones' }}
         </p>
       </div>
 
@@ -405,7 +384,7 @@ onMounted(async () => {
         class="mt-6 rounded-2xl border border-dashed border-rosa/60 px-4 py-16 text-center"
       >
         <p class="text-sm font-medium text-granate">
-          {{ hayFiltros ? 'Ningún producto coincide con los filtros.' : 'Todavía no hay productos publicados.' }}
+          {{ hayFiltros ? 'Ninguna publicación coincide con los filtros.' : 'Todavía no hay publicaciones.' }}
         </p>
         <p class="mt-1 text-sm text-cafe/50">
           {{ hayFiltros ? 'Probá quitando algún filtro.' : 'Volvé pronto: los artistas están preparando piezas.' }}
@@ -423,7 +402,9 @@ onMounted(async () => {
       <div v-else class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
         <TarjetaProducto
           v-for="producto in productos"
-          :key="producto.idProducto"
+          :key="producto.esReventa
+            ? `r-${producto.idPublicacionReventa}`
+            : `p-${producto.idProducto}`"
           :producto="producto"
           mostrar-favorito
           :es-favorito="favoritos.has(producto.idProducto)"

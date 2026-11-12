@@ -1,7 +1,9 @@
 <script setup>
 import { ref } from 'vue'
 import { formatearPrecio } from '../servicios/moneda'
+import { etiquetaEvento } from '../servicios/ledger'
 import { cargarLedgerCompraItem } from '../servicios/compras'
+import BurbujaInfo from './BurbujaInfo.vue'
 
 const props = defineProps({
   idCompra: { type: Number, required: true },
@@ -51,6 +53,25 @@ function fecha(valor) {
     <div class="flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <p class="text-xs font-semibold text-granate">Certificado de procedencia</p>
+        <BurbujaInfo etiqueta="Qué significan los datos del certificado">
+          <strong class="block">Cómo leer el certificado</strong>
+          <span class="mt-1 block">
+            <b>Hash de imagen (SHA-256):</b> huella única del archivo original;
+            si cambia un pixel, cambia.
+          </span>
+          <span class="mt-1 block">
+            <b>Hash del evento y hash previo:</b> sellos que encadenan cada
+            movimiento con el anterior; si alguien altera el historial, dejan
+            de coincidir.
+          </span>
+          <span class="mt-1 block">
+            <b>Hash de datos:</b> huella de los datos de ese movimiento.
+          </span>
+          <span class="mt-1 block">
+            <b>Verificado:</b> el servidor recalculó la cadena y coincide.
+            Los IDs son referencias internas.
+          </span>
+        </BurbujaInfo>
         <span
           v-if="ledger"
           class="rounded-full px-2 py-0.5 text-[10px] font-bold"
@@ -88,7 +109,7 @@ function fecha(valor) {
           >
             <div class="flex flex-wrap items-center justify-between gap-2">
               <p class="text-[11px] font-bold uppercase tracking-wide text-coral">
-                #{{ evento.secuencia }} · {{ evento.tipo }}
+                #{{ evento.secuencia }} · {{ etiquetaEvento(evento.tipo) }}
                 <span
                   v-if="evento.esEventoDeEstaCompra"
                   class="ml-1 rounded-full bg-coral/10 px-1.5 py-0.5 text-[9px] font-semibold text-coral"
@@ -119,30 +140,35 @@ function fecha(valor) {
               Monto no disponible
             </p>
 
-            <div class="mt-2 grid gap-1 text-[10px] text-cafe/50 sm:grid-cols-2">
-              <p class="break-all">
-                <span class="font-semibold">ID de evento:</span> {{ evento.idEventoLedger }}
-              </p>
-              <p v-if="evento.idCompraItem" class="break-all">
-                <span class="font-semibold">ID de ítem:</span> {{ evento.idCompraItem }}
-              </p>
-              <p class="break-all sm:col-span-2">
-                <span class="font-semibold">Hash del evento:</span>
-                <span class="font-mono">{{ evento.hashEvento }}</span>
-              </p>
-              <p v-if="evento.hashPrevio" class="break-all sm:col-span-2">
-                <span class="font-semibold">Hash previo:</span>
-                <span class="font-mono">{{ evento.hashPrevio }}</span>
-              </p>
-              <p v-if="evento.hashDatos" class="break-all sm:col-span-2">
-                <span class="font-semibold">Hash de datos:</span>
-                <span class="font-mono">{{ evento.hashDatos }}</span>
-              </p>
-              <p v-if="evento.hashImagen" class="break-all sm:col-span-2">
-                <span class="font-semibold">Hash de imagen:</span>
-                <span class="font-mono">{{ evento.hashImagen }}</span>
-              </p>
-            </div>
+            <details class="mt-2 text-[10px] text-cafe/50">
+              <summary class="cursor-pointer font-semibold text-cafe/50">
+                Ver detalles técnicos
+              </summary>
+              <div class="mt-1 grid gap-1 sm:grid-cols-2">
+                <p class="break-all">
+                  <span class="font-semibold">ID de evento:</span> {{ evento.idEventoLedger }}
+                </p>
+                <p v-if="evento.idCompraItem" class="break-all">
+                  <span class="font-semibold">ID de ítem:</span> {{ evento.idCompraItem }}
+                </p>
+                <p class="break-all sm:col-span-2">
+                  <span class="font-semibold">Hash del evento:</span>
+                  <span class="font-mono">{{ evento.hashEvento }}</span>
+                </p>
+                <p v-if="evento.hashPrevio" class="break-all sm:col-span-2">
+                  <span class="font-semibold">Hash previo:</span>
+                  <span class="font-mono">{{ evento.hashPrevio }}</span>
+                </p>
+                <p v-if="evento.hashDatos" class="break-all sm:col-span-2">
+                  <span class="font-semibold">Hash de datos:</span>
+                  <span class="font-mono">{{ evento.hashDatos }}</span>
+                </p>
+                <p v-if="evento.hashImagen" class="break-all sm:col-span-2">
+                  <span class="font-semibold">Hash de imagen:</span>
+                  <span class="font-mono">{{ evento.hashImagen }}</span>
+                </p>
+              </div>
+            </details>
           </li>
         </ol>
       </template>

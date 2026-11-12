@@ -598,6 +598,9 @@ public class ProductoService {
                     EstadoPublicacionReventa.PUBLICADA)
                 .orElse(null)
             : null;
+        Usuario propietario = variante.getPropietarioActual();
+        boolean mostrarPropietario = propietario != null
+            && propietario.isMostrarPropietario();
         return ProductoVarianteDTO.builder()
             .idVariante(variante.getIdVariante())
             .nombre(variante.getNombre())
@@ -609,10 +612,10 @@ public class ProductoService {
             .imagenUrl(variante.getImagenUrl())
             .sha256(variante.getSha256())
             .numeroEdicion(variante.getNumeroEdicion())
-            .idPropietarioActual(variante.getPropietarioActual() != null
-                ? variante.getPropietarioActual().getIdUsuario() : null)
-            .nombrePropietario(variante.getPropietarioActual() != null
-                ? variante.getPropietarioActual().getNombreUsuario() : null)
+            .idPropietarioActual(mostrarPropietario
+                ? propietario.getIdUsuario() : null)
+            .nombrePropietario(mostrarPropietario
+                ? propietario.getNombreUsuario() : null)
             .esUnica(variante.esUnica())
             .tieneLedger(variante.getIdVariante() != null
                 && variantesConLedger.contains(variante.getIdVariante()))

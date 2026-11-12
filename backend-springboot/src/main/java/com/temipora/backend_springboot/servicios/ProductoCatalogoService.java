@@ -447,6 +447,11 @@ public class ProductoCatalogoService {
             .build();
     }
 
+    public VarianteLedgerPublicoDTO ledgerPublicoDeVariante(
+            ProductoVariante variante) {
+        return aVarianteLedgerPublico(ledgerService.verificarVariante(variante));
+    }
+
     private VarianteLedgerPublicoDTO aVarianteLedgerPublico(
             VarianteLedgerDTO variante) {
         return VarianteLedgerPublicoDTO.builder()
@@ -532,6 +537,9 @@ public class ProductoCatalogoService {
             Producto producto,
             Moneda monedaDestino,
             PublicacionReventa publicacion) {
+        Usuario propietario = variante.getPropietarioActual();
+        boolean mostrarPropietario = propietario != null
+            && propietario.isMostrarPropietario();
         return ProductoVarianteDTO.builder()
             .idVariante(variante.getIdVariante())
             .nombre(variante.getNombre())
@@ -542,8 +550,8 @@ public class ProductoCatalogoService {
             .estado(variante.getEstado())
             .imagenUrl(variante.getImagenUrl())
             .numeroEdicion(variante.getNumeroEdicion())
-            .nombrePropietario(variante.getPropietarioActual() != null
-                ? variante.getPropietarioActual().getNombreUsuario() : null)
+            .nombrePropietario(mostrarPropietario
+                ? propietario.getNombreUsuario() : null)
             .esUnica(variante.esUnica())
             .tieneLedger(variante.getIdVariante() != null
                 && variantesConLedger.contains(variante.getIdVariante()))

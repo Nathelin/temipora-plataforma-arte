@@ -53,6 +53,7 @@ public class ReventaService {
     private final EventoLedgerRepository eventoLedgerRepository;
     private final UsuarioRepository usuarioRepository;
     private final CobroCapacidadService cobroCapacidadService;
+    private final ProductoCatalogoService productoCatalogoService;
     private final AuditoriaService auditoria;
 
     public ReventaService(
@@ -62,6 +63,7 @@ public class ReventaService {
             EventoLedgerRepository eventoLedgerRepository,
             UsuarioRepository usuarioRepository,
             CobroCapacidadService cobroCapacidadService,
+            ProductoCatalogoService productoCatalogoService,
             AuditoriaService auditoria) {
         this.publicacionRepository = publicacionRepository;
         this.compraItemRepository = compraItemRepository;
@@ -69,6 +71,7 @@ public class ReventaService {
         this.eventoLedgerRepository = eventoLedgerRepository;
         this.usuarioRepository = usuarioRepository;
         this.cobroCapacidadService = cobroCapacidadService;
+        this.productoCatalogoService = productoCatalogoService;
         this.auditoria = auditoria;
     }
 
@@ -333,6 +336,9 @@ public class ReventaService {
                     ? producto.getMedio().getTipoEntrega() : null))
             .licencia(parseLicencia(origen != null
                 ? origen.getLicenciaSnapshot() : null))
+            .ledger(variante != null
+                ? productoCatalogoService.ledgerPublicoDeVariante(variante)
+                : null)
             .build();
     }
 

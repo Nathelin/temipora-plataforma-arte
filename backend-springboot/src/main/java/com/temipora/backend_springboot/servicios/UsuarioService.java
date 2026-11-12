@@ -176,6 +176,9 @@ public class UsuarioService {
         if (dto.getPedidosPublicos() != null) {
             usuario.setPedidosPublicos(dto.getPedidosPublicos());
         }
+        if (dto.getMostrarPropietario() != null) {
+            usuario.setMostrarPropietario(dto.getMostrarPropietario());
+        }
         if (dto.getRecibirEmailsPromocionales() != null) {
             usuario.setRecibirEmailsPromocionales(
                 dto.getRecibirEmailsPromocionales());

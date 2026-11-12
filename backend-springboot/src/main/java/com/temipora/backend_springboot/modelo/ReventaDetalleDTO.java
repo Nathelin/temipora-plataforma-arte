@@ -42,4 +42,5 @@ public class ReventaDetalleDTO {
     private List<String> contenidosSensibles;
     private TipoEntrega tipoEntrega;
     private LicenciaCompraDTO licencia;
+    private VarianteLedgerPublicoDTO ledger;
 }

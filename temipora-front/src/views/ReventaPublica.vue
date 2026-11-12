@@ -5,6 +5,8 @@ import { cargarReventa } from '../servicios/reventas'
 import { formatearPrecio } from '../servicios/moneda'
 import { useCarrito } from '../composables/useCarrito'
 import { useNotificaciones } from '../composables/useNotificaciones'
+import ResumenPropiedad from '../components/ResumenPropiedad.vue'
+import HistorialLedgerModal from '../components/HistorialLedgerModal.vue'
 
 const props = defineProps({
   id: { type: Number, required: true },
@@ -20,6 +22,7 @@ const cargando = ref(true)
 const error = ref('')
 const agregando = ref(false)
 const revelado = ref(false)
+const historialAbierto = ref(null)
 
 const ETIQUETAS_SENSIBLE = {
   VIOLENCIA: 'Violencia',
@@ -47,6 +50,18 @@ const estadoMensaje = computed(() => {
   if (estado.value === 'PUBLICADA') return ''
   return 'Esta publicación ya no está disponible.'
 })
+
+const ESTADOS_REVENTA = {
+  PUBLICADA: 'En reventa',
+  RESERVADA: 'Compra en curso',
+  VENDIDA: 'Vendida',
+  ARCHIVADA: 'No disponible',
+  SUSPENDIDA: 'Suspendida',
+  VENCIDA: 'Vencida',
+}
+const estadoReventa = computed(
+  () => ESTADOS_REVENTA[estado.value] || estado.value,
+)
 
 function formatear(valor) {
   return valor != null
@@ -226,6 +241,16 @@ watch(() => props.id, cargar)
           </p>
         </div>
 
+        <ResumenPropiedad
+          v-if="reventa.ledger?.tieneLedger"
+          :nombre="reventa.ledger.nombre || reventa.nombreVariante"
+          :propietario="reventa.nombreVendedor"
+          :estado="estadoReventa"
+          :eventos="reventa.ledger.eventos"
+          :integridad="reventa.ledger.integridad"
+          @ver-historial="historialAbierto = reventa.ledger"
+        />
+
         <div class="rounded-[22px] border border-borde/60 bg-superficie p-5 shadow-sm">
           <h2 class="font-display text-base font-bold text-granate">Autoría</h2>
           <router-link
@@ -306,5 +331,14 @@ watch(() => props.id, cargar)
         </div>
       </section>
     </div>
+
+    <HistorialLedgerModal
+      :abierto="!!historialAbierto"
+      :titulo="historialAbierto?.nombre || reventa?.nombreVariante || 'Historial de la pieza'"
+      :eventos="historialAbierto?.eventos || []"
+      :integridad="historialAbierto?.integridad"
+      :mensaje="historialAbierto?.mensaje"
+      @cerrar="historialAbierto = null"
+    />
   </div>
 </template>

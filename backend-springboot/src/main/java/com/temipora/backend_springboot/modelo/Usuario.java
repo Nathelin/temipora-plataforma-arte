@@ -80,6 +80,10 @@ public class Usuario {
     @Builder.Default
     private boolean pedidosPublicos = false;
 
+    @Column(name = "mostrar_propietario", nullable = false)
+    @Builder.Default
+    private boolean mostrarPropietario = true;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "id_moneda_preferida")
     private Moneda monedaPreferida;

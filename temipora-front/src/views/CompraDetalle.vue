@@ -504,7 +504,7 @@ onBeforeUnmount(() => {
               :disabled="pagando === grupo.idCompraGrupo"
               @click="pagar(grupo)"
             >
-              {{ pagando === grupo.idCompraGrupo ? 'Iniciando...' : 'Pagar este grupo' }}
+              {{ pagando === grupo.idCompraGrupo ? 'Iniciando...' : 'Pagar' }}
             </button>
           </div>
         </section>
