@@ -125,7 +125,7 @@ onBeforeUnmount(() => {
   <div ref="contenedor" class="relative">
     <button
       type="button"
-      class="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-rosa/60 bg-blanco/70 text-granate transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+      class="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-rosa/60 bg-blanco/70 text-granate transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
       aria-haspopup="true"
       :aria-expanded="abierto"
       :aria-label="hayNoLeidas ? `Notificaciones, ${noLeidas} sin leer` : 'Notificaciones'"

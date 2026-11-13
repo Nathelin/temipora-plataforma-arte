@@ -6,6 +6,7 @@
 export const CATEGORIAS_NOTIFICACION = [
   { clave: 'SOLICITUDES', texto: 'Solicitudes' },
   { clave: 'PEDIDOS', texto: 'Pedidos y pagos' },
+  { clave: 'PRODUCTOS', texto: 'Productos' },
   { clave: 'MENSAJES', texto: 'Mensajes' },
   { clave: 'RESENIAS', texto: 'Reseñas' },
   { clave: 'PROMOCIONES', texto: 'Promociones' },
@@ -24,7 +25,8 @@ export function esCierre(notificacion) {
 export function destinoDe(notificacion, { rol, pathActual = '' } = {}) {
   const tipo = notificacion?.tipoReferencia
   if (tipo !== 'SOLICITUD' && tipo !== 'PEDIDO' && tipo !== 'RESENIA'
-    && tipo !== 'CONVERSACION' && tipo !== 'OFERTA_REACTIVACION') return null
+    && tipo !== 'CONVERSACION' && tipo !== 'OFERTA_REACTIVACION'
+    && tipo !== 'PRODUCTO') return null
 
   if (rol !== 'ARTISTA' && rol !== 'CLIENTE' && rol !== 'ADMIN') return null
 
@@ -47,6 +49,12 @@ export function destinoDe(notificacion, { rol, pathActual = '' } = {}) {
 
   const id = Number(notificacion.idReferencia)
   if (!Number.isInteger(id) || id <= 0) return null
+
+  if (tipo === 'PRODUCTO') {
+    if (rol === 'ARTISTA') return { name: 'producto-previa', params: { id } }
+    if (rol === 'CLIENTE') return { name: 'producto-publico', params: { id } }
+    return null
+  }
 
   if (tipo === 'SOLICITUD') {
     if (rol === 'ADMIN') return null
@@ -72,6 +80,7 @@ export function destinoDe(notificacion, { rol, pathActual = '' } = {}) {
 export function textoDestino(notificacion, rol) {
   if (rol === 'CLIENTE' && esCierre(notificacion)) return 'Ver alternativas →'
   if (notificacion?.tipoReferencia === 'PEDIDO') return 'Ver pedido →'
+  if (notificacion?.tipoReferencia === 'PRODUCTO') return 'Ver pieza →'
   if (notificacion?.tipoReferencia === 'SOLICITUD') return 'Ver solicitud →'
   if (notificacion?.tipoReferencia === 'RESENIA') return 'Ver reportes →'
   if (notificacion?.tipoReferencia === 'CONVERSACION') return 'Ver conversación →'

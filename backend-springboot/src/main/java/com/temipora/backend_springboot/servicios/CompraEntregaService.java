@@ -41,6 +41,7 @@ public class CompraEntregaService {
     private final ReservaStockRepository reservaStockRepository;
     private final PublicacionReventaRepository publicacionReventaRepository;
     private final LedgerService ledgerService;
+    private final NotificacionService notificacionService;
 
     public CompraEntregaService(
             CompraRepository compraRepository,
@@ -48,13 +49,15 @@ public class CompraEntregaService {
             ProductoVarianteRepository varianteRepository,
             ReservaStockRepository reservaStockRepository,
             PublicacionReventaRepository publicacionReventaRepository,
-            LedgerService ledgerService) {
+            LedgerService ledgerService,
+            NotificacionService notificacionService) {
         this.compraRepository = compraRepository;
         this.compraGrupoRepository = compraGrupoRepository;
         this.varianteRepository = varianteRepository;
         this.reservaStockRepository = reservaStockRepository;
         this.publicacionReventaRepository = publicacionReventaRepository;
         this.ledgerService = ledgerService;
+        this.notificacionService = notificacionService;
     }
 
     @Transactional
@@ -118,6 +121,7 @@ public class CompraEntregaService {
                     publicacion.setFechaCierre(ahora);
                     publicacion.setFechaActualizacion(ahora);
                     publicacionReventaRepository.save(publicacion);
+                    notificarReventaAlArtista(variante, vendedor, compra, item);
                 } else if (variante.esUnica()) {
                     Usuario vendedor = variante.getPropietarioActual();
                     if (vendedor == null && variante.getProducto() != null) {
@@ -170,6 +174,53 @@ public class CompraEntregaService {
         }
         compra.setFechaActualizacion(ahora);
         compraRepository.save(compra);
+    }
+
+    private void notificarReventaAlArtista(
+            ProductoVariante variante,
+            Usuario vendedor,
+            Compra compra,
+            CompraItem item) {
+        if (variante.getProducto() == null
+                || variante.getProducto().getArtista() == null
+                || compra.getCliente() == null) {
+            return;
+        }
+        Usuario artista = variante.getProducto().getArtista();
+        Long idArtista = artista.getIdUsuario();
+        if (idArtista.equals(compra.getCliente().getIdUsuario())
+                || (vendedor != null
+                    && idArtista.equals(vendedor.getIdUsuario()))) {
+            return;
+        }
+
+        String monto = item.getPrecioOriginal() != null
+            ? item.getPrecioOriginal().stripTrailingZeros().toPlainString()
+            : "";
+        String moneda = item.getMonedaOriginal() != null
+            && item.getMonedaOriginal().getCodigo() != null
+            ? item.getMonedaOriginal().getCodigo()
+            : "";
+        StringBuilder descripcion = new StringBuilder()
+            .append("«").append(variante.getProducto().getTitulo())
+            .append("» · ").append(variante.getNombre())
+            .append(" se revendió por ").append(monto);
+        if (!moneda.isBlank()) {
+            descripcion.append(" ").append(moneda);
+        }
+        descripcion.append(".");
+        if (vendedor != null) {
+            descripcion.append(" Vendedor: @")
+                .append(vendedor.getNombreUsuario()).append(".");
+        }
+
+        notificacionService.crearParaUsuario(
+            idArtista,
+            "REVENTA_PRODUCTO",
+            "Tu obra fue revendida",
+            descripcion.toString(),
+            variante.getProducto().getIdProducto(),
+            "PRODUCTO");
     }
 
     private void confirmarReserva(CompraItem item, ProductoVariante variante) {

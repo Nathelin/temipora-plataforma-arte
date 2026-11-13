@@ -44,6 +44,10 @@ const enPanel = computed(() => route.path.startsWith('/panel'))
 const enMensajes = computed(() => route.path.startsWith('/mensajes')
   || route.path.startsWith('/panel/mensajes'))
 const enFavoritos = computed(() => route.path.startsWith('/favoritos'))
+const enExplorar = computed(() => route.path.startsWith('/explorar'))
+const enServicios = computed(() => route.path.startsWith('/servicios'))
+const enProductos = computed(() => route.path.startsWith('/productos'))
+const enAdmin = computed(() => route.path.startsWith('/admin'))
 // Con sesión el logo lleva a Explorar; sin sesión, a la landing pública.
 // No se redirige `/` para no dejar la landing inalcanzable.
 const destinoLogo = computed(() => (estaLogueado.value ? '/explorar' : '/'))
@@ -184,7 +188,7 @@ function irAPerfil() {
             class="group inline-flex items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-4 focus-visible:ring-offset-crema"
             :aria-label="estaLogueado ? 'Temipora, ir a explorar' : 'Temipora, ir al inicio'"
           >
-            <BrandLogo />
+            <BrandLogo solo-nombre />
           </router-link>
 
           <nav class="hidden items-center gap-6 lg:flex" aria-label="Navegación principal">
@@ -192,18 +196,24 @@ function irAPerfil() {
               v-if="estaLogueado"
               to="/explorar"
               class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+              :class="enExplorar ? 'text-coral after:w-full' : ''"
+              :aria-current="enExplorar ? 'page' : undefined"
             >
               Explorar
             </router-link>
             <router-link
               to="/servicios"
               class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+              :class="enServicios ? 'text-coral after:w-full' : ''"
+              :aria-current="enServicios ? 'page' : undefined"
             >
               Servicios
             </router-link>
             <router-link
               to="/productos"
               class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+              :class="enProductos ? 'text-coral after:w-full' : ''"
+              :aria-current="enProductos ? 'page' : undefined"
             >
               Productos
             </router-link>
@@ -218,10 +228,17 @@ function irAPerfil() {
             </router-link>
             <router-link
               v-if="estaLogueado && esAdmin"
-              :to="{ name: 'usuarios' }"
-              class="relative text-sm font-medium text-cafe transition hover:text-coral after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-coral-vivo after:transition-all after:duration-200 hover:after:w-full focus-visible:text-coral focus-visible:outline-none"
+              :to="{ name: 'admin-resumen' }"
+              class="group inline-flex min-h-10 items-center gap-2 rounded-full bg-coral px-4 text-sm font-bold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:-translate-y-0.5 hover:bg-rojizo focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 focus-visible:ring-offset-2 focus-visible:ring-offset-crema"
+              :class="enAdmin ? 'ring-2 ring-granate/30 ring-offset-2 ring-offset-crema' : ''"
+              :aria-current="enAdmin ? 'page' : undefined"
+              aria-label="Ir al panel de administración"
             >
-              Panel
+              <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
+              </svg>
+              <span>Panel</span>
+              <span class="transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true">→</span>
             </router-link>
           </nav>
         </div>
@@ -247,7 +264,7 @@ function irAPerfil() {
           <router-link
             v-if="estaLogueado && !esAdmin"
             to="/carrito"
-            class="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-rosa/60 bg-blanco/70 text-granate transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+            class="relative hidden h-11 w-11 items-center justify-center rounded-full border border-rosa/60 bg-blanco/70 text-granate transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60 sm:inline-flex"
             :class="enCarrito ? 'ring-2 ring-coral/40' : ''"
             :aria-current="enCarrito ? 'page' : undefined"
             :aria-label="cantidadCarrito
@@ -272,7 +289,7 @@ function irAPerfil() {
           <router-link
             v-if="estaLogueado && !esAdmin"
             to="/mensajes"
-            class="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-rosa/60 bg-blanco/70 text-granate transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+            class="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-rosa/60 bg-blanco/70 text-granate transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
             :class="enMensajes ? 'ring-2 ring-coral/40' : ''"
             :aria-current="enMensajes ? 'page' : undefined"
             :aria-label="totalMensajes
@@ -312,7 +329,7 @@ function irAPerfil() {
           <template v-else>
             <div ref="contenedorMenu" class="relative">
               <button
-                class="group flex min-h-10 items-center gap-2 rounded-full p-0.5 pr-1.5 transition hover:bg-rosa/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+                class="group flex min-h-11 items-center gap-2 rounded-full p-0.5 pr-1.5 transition hover:bg-rosa/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
                 aria-haspopup="menu"
                 :aria-expanded="menuAbierto"
                 aria-label="Abrir menú de usuario"
@@ -386,9 +403,11 @@ function irAPerfil() {
           <div ref="contenedorNav" class="relative lg:hidden">
             <button
               type="button"
-              class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rosa/60 bg-blanco/70 text-granate transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
+              class="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-rosa/60 bg-blanco/70 text-granate transition hover:bg-rosa/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
               :aria-expanded="menuMovilAbierto"
-              aria-label="Abrir menú de navegación"
+              :aria-label="cantidadCarrito
+                ? `Abrir menú de navegación, ${cantidadCarrito} producto(s) en el carrito`
+                : 'Abrir menú de navegación'"
               @click="alternarMenuMovil"
             >
               <svg v-if="!menuMovilAbierto" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -397,6 +416,13 @@ function irAPerfil() {
               <svg v-else class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
                 <path d="m6 6 12 12M18 6 6 18" />
               </svg>
+              <span
+                v-if="cantidadCarrito"
+                class="absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-coral px-1 py-0.5 text-[10px] font-bold leading-none text-white ring-2 ring-crema sm:hidden"
+                aria-hidden="true"
+              >
+                {{ cantidadCarrito }}
+              </span>
             </button>
 
             <div
@@ -418,60 +444,80 @@ function irAPerfil() {
                 </span>
                 <span aria-hidden="true">→</span>
               </router-link>
-              <router-link
-                v-if="estaLogueado"
-                to="/explorar"
-                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                @click="menuMovilAbierto = false"
-              >
-                Explorar
-              </router-link>
-              <router-link
-                to="/servicios"
-                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                @click="menuMovilAbierto = false"
-              >
-                Servicios
-              </router-link>
-              <router-link
-                to="/productos"
-                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                @click="menuMovilAbierto = false"
-              >
-                Productos
-              </router-link>
-              <router-link
-                v-if="puedeVerActividad"
-                to="/compras"
-                class="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/25 bg-coral/10 px-4 py-3 text-sm font-semibold text-coral transition hover:bg-coral/15"
-                :class="enActividad ? 'ring-2 ring-coral/40' : ''"
-                :aria-current="enActividad ? 'page' : undefined"
-                @click="menuMovilAbierto = false"
-              >
-                Mi actividad
-              </router-link>
-              <router-link
-                v-if="puedeVerActividad"
-                to="/carrito"
-                class="flex w-full items-center justify-center gap-2 rounded-2xl border border-rosa px-4 py-3 text-sm font-semibold text-granate transition hover:bg-rosa/20"
-                :class="enCarrito ? 'ring-2 ring-coral/40' : ''"
-                @click="menuMovilAbierto = false"
-              >
-                Carrito
-                <span v-if="cantidadCarrito" class="rounded-full bg-coral px-2 py-0.5 text-[10px] font-bold text-white">
-                  {{ cantidadCarrito }}
-                </span>
-              </router-link>
-              <router-link
-                v-if="estaLogueado && esAdmin"
-                :to="{ name: 'admin-resumen' }"
-                class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                @click="menuMovilAbierto = false"
-              >
-                Panel de administración
-              </router-link>
+              <div class="pt-1">
+                <p class="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/40">
+                  Catálogo
+                </p>
+                <router-link
+                  v-if="estaLogueado"
+                  to="/explorar"
+                  class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  :class="enExplorar ? 'bg-rosa/40 text-granate' : ''"
+                  :aria-current="enExplorar ? 'page' : undefined"
+                  @click="menuMovilAbierto = false"
+                >
+                  Explorar
+                </router-link>
+                <router-link
+                  to="/servicios"
+                  class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  :class="enServicios ? 'bg-rosa/40 text-granate' : ''"
+                  :aria-current="enServicios ? 'page' : undefined"
+                  @click="menuMovilAbierto = false"
+                >
+                  Servicios
+                </router-link>
+                <router-link
+                  to="/productos"
+                  class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  :class="enProductos ? 'bg-rosa/40 text-granate' : ''"
+                  :aria-current="enProductos ? 'page' : undefined"
+                  @click="menuMovilAbierto = false"
+                >
+                  Productos
+                </router-link>
+              </div>
 
-              <div v-if="!estaLogueado" class="mt-1 border-t border-rosa/40 pt-1">
+              <div v-if="puedeVerActividad" class="mt-1 border-t border-rosa/40 pt-2">
+                <router-link
+                  to="/compras"
+                  class="flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/25 bg-coral/10 px-4 py-3 text-sm font-semibold text-coral transition hover:bg-coral/15"
+                  :class="enActividad ? 'ring-2 ring-coral/40' : ''"
+                  :aria-current="enActividad ? 'page' : undefined"
+                  @click="menuMovilAbierto = false"
+                >
+                  Mi actividad
+                </router-link>
+                <router-link
+                  to="/carrito"
+                  class="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl border border-rosa px-4 py-3 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+                  :class="enCarrito ? 'ring-2 ring-coral/40' : ''"
+                  :aria-current="enCarrito ? 'page' : undefined"
+                  @click="menuMovilAbierto = false"
+                >
+                  Carrito
+                  <span v-if="cantidadCarrito" class="rounded-full bg-coral px-2 py-0.5 text-[10px] font-bold text-white">
+                    {{ cantidadCarrito }}
+                  </span>
+                </router-link>
+              </div>
+
+              <div v-if="estaLogueado && esAdmin" class="mt-1 border-t border-rosa/40 pt-2">
+                <router-link
+                  :to="{ name: 'admin-resumen' }"
+                  class="flex w-full items-center rounded-2xl px-4 py-3 text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
+                  :class="enAdmin ? 'bg-rosa/40 text-granate' : ''"
+                  :aria-current="enAdmin ? 'page' : undefined"
+                  @click="menuMovilAbierto = false"
+                >
+                  Panel de administración
+                </router-link>
+              </div>
+
+              <div v-if="!estaLogueado" class="mt-1 border-t border-rosa/40 pt-2">
+                <p class="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/40">
+                  Acceso
+                </p>
                 <MenuTemaMovil
                   id-panel="selector-tema-movil-invitado"
                   :abierto="temaMovilAbierto"
@@ -494,11 +540,14 @@ function irAPerfil() {
                 </router-link>
               </div>
 
-              <div v-else class="mt-1 border-t border-rosa/40 pt-1">
+              <div v-else class="mt-1 border-t border-rosa/40 pt-2">
+                <p class="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/40">
+                  Cuenta
+                </p>
                 <button
                   type="button"
                   class="flex w-full items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold text-cafe transition hover:bg-rosa/20 hover:text-granate"
-                  :class="enFavoritos ? 'bg-rosa/20 font-semibold text-granate' : ''"
+                  :class="enFavoritos ? 'bg-rosa/40 text-granate' : ''"
                   :aria-current="enFavoritos ? 'page' : undefined"
                   @click="menuMovilAbierto = false; router.push({ name: 'favoritos' })"
                 >

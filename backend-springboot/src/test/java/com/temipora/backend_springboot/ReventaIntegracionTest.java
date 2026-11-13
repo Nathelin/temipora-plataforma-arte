@@ -62,6 +62,7 @@ import com.temipora.backend_springboot.servicios.CarritoService;
 import com.temipora.backend_springboot.servicios.CompraPagoService;
 import com.temipora.backend_springboot.servicios.CompraService;
 import com.temipora.backend_springboot.servicios.MonedaService;
+import com.temipora.backend_springboot.servicios.NotificacionService;
 import com.temipora.backend_springboot.servicios.ProductoService;
 import com.temipora.backend_springboot.servicios.ProductoCatalogoService;
 import com.temipora.backend_springboot.servicios.ReventaService;
@@ -76,6 +77,7 @@ class ReventaIntegracionTest {
     @Autowired private ProductoService productoService;
     @Autowired private ProductoCatalogoService productoCatalogoService;
     @Autowired private ReventaService reventaService;
+    @Autowired private NotificacionService notificacionService;
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private RolRepository rolRepository;
     @Autowired private TipoProductoRepository tipoProductoRepository;
@@ -271,6 +273,21 @@ class ReventaIntegracionTest {
         assertThat(mias.get(0).getMontoComision())
             .isEqualByComparingTo("15.00");
         assertThat(mias.get(0).getMontoNeto()).isEqualByComparingTo("135.00");
+
+        var avisoArtista = notificacionService
+            .recientes(artista.getIdUsuario(), 20).stream()
+            .filter(notificacion -> "REVENTA_PRODUCTO"
+                .equals(notificacion.getCodigoTipo()))
+            .findFirst()
+            .orElseThrow();
+        assertThat(avisoArtista.getCategoria()).isEqualTo("PRODUCTOS");
+        assertThat(avisoArtista.getTipoReferencia()).isEqualTo("PRODUCTO");
+        assertThat(avisoArtista.getIdReferencia())
+            .isEqualTo(producto.getIdProducto());
+        assertThat(avisoArtista.getNombre()).isEqualTo("Tu obra fue revendida");
+        assertThat(avisoArtista.getDescripcion())
+            .contains(vendedor.getNombreUsuario())
+            .contains("150");
 
         assertThat(reventaService.elegibles(vendedor.getNombreUsuario())).isEmpty();
         assertThat(reventaService.elegibles(comprador.getNombreUsuario())).hasSize(1);
