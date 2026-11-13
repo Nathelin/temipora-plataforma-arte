@@ -40,7 +40,8 @@ public final class CatalogoAuditoria {
             AccionesAdmin.SOLICITUD_CREAR,
             AccionesAdmin.SOLICITUD_RECHAZAR,
             AccionesAdmin.SOLICITUD_CANCELAR,
-            AccionesAdmin.SOLICITUD_RETIRAR_PRESUPUESTO);
+            AccionesAdmin.SOLICITUD_RETIRAR_PRESUPUESTO,
+            AccionesAdmin.COMPRA_CONFIRMAR);
 
         registrar(CategoriaAuditoria.USUARIOS,
             AccionesAdmin.CUENTA_SANCIONAR,
@@ -60,8 +61,7 @@ public final class CatalogoAuditoria {
             AccionesAdmin.RESENIA_REPORTAR,
             AccionesAdmin.RESENIA_OCULTAR,
             AccionesAdmin.RESENIA_RESTAURAR,
-            AccionesAdmin.RESENIA_DESCARTAR_REPORTES,
-            AccionesAdmin.REVENTA_SUSPENDER);
+            AccionesAdmin.RESENIA_DESCARTAR_REPORTES);
 
         registrar(CategoriaAuditoria.CATALOGO,
             AccionesAdmin.ETIQUETA_CREAR,
@@ -102,6 +102,7 @@ public final class CatalogoAuditoria {
             AccionesAdmin.REVENTA_PUBLICAR,
             AccionesAdmin.REVENTA_EDITAR,
             AccionesAdmin.REVENTA_CANCELAR,
+            AccionesAdmin.REVENTA_SUSPENDER,
             AccionesAdmin.TIPO_SERVICIO_CREAR,
             AccionesAdmin.TIPO_SERVICIO_MODIFICAR,
             AccionesAdmin.TIPO_SERVICIO_BAJA,
@@ -147,8 +148,7 @@ public final class CatalogoAuditoria {
             AccionesAdmin.TERMINOS_ACEPTAR);
 
         registrar(CategoriaAuditoria.SISTEMA,
-            AccionesAdmin.COTIZACION_REFRESCAR,
-            AccionesAdmin.LEDGER_GENESIS);
+            AccionesAdmin.COTIZACION_REFRESCAR);
 
         criticas(
             AccionesAdmin.PRESUPUESTO_CREAR,
@@ -173,6 +173,7 @@ public final class CatalogoAuditoria {
             AccionesAdmin.SOLICITUD_RECHAZAR,
             AccionesAdmin.SOLICITUD_CANCELAR,
             AccionesAdmin.SOLICITUD_RETIRAR_PRESUPUESTO,
+            AccionesAdmin.COMPRA_CONFIRMAR,
             AccionesAdmin.TERMINOS_PUBLICAR,
             AccionesAdmin.TERMINOS_ACEPTAR,
             AccionesAdmin.CUENTA_SANCIONAR,

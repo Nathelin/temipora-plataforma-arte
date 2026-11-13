@@ -1,13 +1,18 @@
 package com.temipora.backend_springboot.servicios;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.CambioAuditoriaDTO;
 import com.temipora.backend_springboot.modelo.Compra;
 import com.temipora.backend_springboot.modelo.CompraGrupo;
 import com.temipora.backend_springboot.modelo.CompraItem;
@@ -20,6 +25,7 @@ import com.temipora.backend_springboot.modelo.EstadoReserva;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
 import com.temipora.backend_springboot.modelo.IntentoCobro;
 import com.temipora.backend_springboot.modelo.IntentoCobroGrupo;
+import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.OrigenCompraItem;
 import com.temipora.backend_springboot.modelo.ProductoVariante;
 import com.temipora.backend_springboot.modelo.PublicacionReventa;
@@ -42,6 +48,7 @@ public class CompraEntregaService {
     private final PublicacionReventaRepository publicacionReventaRepository;
     private final LedgerService ledgerService;
     private final NotificacionService notificacionService;
+    private final AuditoriaService auditoria;
 
     public CompraEntregaService(
             CompraRepository compraRepository,
@@ -50,7 +57,8 @@ public class CompraEntregaService {
             ReservaStockRepository reservaStockRepository,
             PublicacionReventaRepository publicacionReventaRepository,
             LedgerService ledgerService,
-            NotificacionService notificacionService) {
+            NotificacionService notificacionService,
+            AuditoriaService auditoria) {
         this.compraRepository = compraRepository;
         this.compraGrupoRepository = compraGrupoRepository;
         this.varianteRepository = varianteRepository;
@@ -58,6 +66,7 @@ public class CompraEntregaService {
         this.publicacionReventaRepository = publicacionReventaRepository;
         this.ledgerService = ledgerService;
         this.notificacionService = notificacionService;
+        this.auditoria = auditoria;
     }
 
     @Transactional
@@ -73,11 +82,15 @@ public class CompraEntregaService {
             if (grupo.getEstado() == EstadoCompraGrupo.PAGADO) {
                 continue;
             }
+            EstadoCompraGrupo estadoAnterior = grupo.getEstado();
+            List<CambioAuditoriaDTO> itemsAuditados = new ArrayList<>();
+            int numeroItem = 1;
 
             for (CompraItem item : grupo.getItems()) {
                 ProductoVariante variante = varianteRepository
                     .findByIdVarianteForUpdate(item.getVariante().getIdVariante())
                     .orElseThrow();
+                String vendedorItem = vendedorDeItem(variante);
                 confirmarReserva(item, variante);
 
                 if (item.getOrigen() == OrigenCompraItem.REVENTA) {
@@ -156,12 +169,18 @@ public class CompraEntregaService {
 
                 item.setEstadoEntrega(EstadoEntregaItem.ENTREGADO);
                 item.setFechaEntrega(ahora);
+
+                itemsAuditados.add(new CambioAuditoriaDTO(
+                    "item" + numeroItem, "Producto " + numeroItem, null,
+                    describirItem(item, vendedorItem)));
+                numeroItem++;
             }
 
             grupo.setEstado(EstadoCompraGrupo.PAGADO);
             grupo.setFechaPago(ahora);
             grupo.setFechaActualizacion(ahora);
             compraGrupoRepository.save(grupo);
+            registrarAuditoriaCompra(compra, grupo, estadoAnterior, itemsAuditados);
         }
 
         long pagados = compra.getGrupos().stream()
@@ -174,6 +193,107 @@ public class CompraEntregaService {
         }
         compra.setFechaActualizacion(ahora);
         compraRepository.save(compra);
+    }
+
+    /**
+     * Una compra puede tener un grupo por artista y cada grupo se cobra aparte,
+     * así que el evento se registra por grupo pagado. El origen de cada ítem
+     * (primera venta o reventa) viaja como dato, no como una acción distinta.
+     */
+    private void registrarAuditoriaCompra(
+            Compra compra,
+            CompraGrupo grupo,
+            EstadoCompraGrupo estadoAnterior,
+            List<CambioAuditoriaDTO> items) {
+        String artista = grupo.getArtista() != null
+            ? grupo.getArtista().getNombreUsuario() : null;
+        int total = grupo.getItems().size();
+        String origenes = resumenOrigenes(grupo.getItems());
+
+        String resumen = "Confirmó el pago de la compra #" + compra.getIdCompra()
+            + (artista != null ? " de @" + artista : "")
+            + " por " + montoTexto(grupo.getSubtotal())
+            + " " + codigoMoneda(grupo.getMoneda())
+            + " (" + total + (total == 1 ? " ítem" : " ítems")
+            + (origenes.isBlank() ? "" : ": " + origenes) + ")";
+
+        List<CambioAuditoriaDTO> cambios = new ArrayList<>();
+        cambios.add(new CambioAuditoriaDTO("estado", "Estado",
+            estadoAnterior != null ? estadoAnterior.name() : null,
+            EstadoCompraGrupo.PAGADO.name()));
+        cambios.add(new CambioAuditoriaDTO("monto", "Monto", null,
+            montoTexto(grupo.getSubtotal()) + " " + codigoMoneda(grupo.getMoneda())));
+        if (artista != null) {
+            cambios.add(new CambioAuditoriaDTO("artista", "Artista", null, "@" + artista));
+        }
+        cambios.add(new CambioAuditoriaDTO("grupo", "Grupo de compra", null,
+            "#" + grupo.getIdCompraGrupo()));
+        cambios.add(new CambioAuditoriaDTO("items", "Ítems", null, String.valueOf(total)));
+        cambios.addAll(items);
+
+        auditoria.registrarCambios(
+            AccionesAdmin.COMPRA_CONFIRMAR, "Compra", compra.getIdCompra(),
+            resumen, cambios);
+    }
+
+    private String resumenOrigenes(List<CompraItem> items) {
+        long reventas = items.stream()
+            .filter(item -> item.getOrigen() == OrigenCompraItem.REVENTA)
+            .count();
+        long primeras = items.size() - reventas;
+        List<String> partes = new ArrayList<>();
+        if (primeras > 0) {
+            partes.add(primeras + (primeras == 1 ? " primera venta" : " primeras ventas"));
+        }
+        if (reventas > 0) {
+            partes.add(reventas + (reventas == 1 ? " reventa" : " reventas"));
+        }
+        return String.join(", ", partes);
+    }
+
+    private String describirItem(CompraItem item, String vendedor) {
+        StringBuilder texto = new StringBuilder()
+            .append("«").append(item.getTituloProducto()).append("»");
+        if (item.getNombreVariante() != null) {
+            texto.append(" · variante «").append(item.getNombreVariante()).append("»");
+        }
+        texto.append(" · ").append(montoTexto(item.getPrecioCobro()))
+            .append(" ").append(codigoMoneda(item.getMonedaOriginal()));
+        if (item.getCantidad() > 1) {
+            texto.append(" × ").append(item.getCantidad());
+        }
+        if (item.getOrigen() == OrigenCompraItem.REVENTA) {
+            texto.append(" · reventa");
+            if (vendedor != null) {
+                texto.append(" (vendida por @").append(vendedor).append(")");
+            }
+        } else {
+            texto.append(" · primera venta");
+        }
+        return texto.toString();
+    }
+
+    private String vendedorDeItem(ProductoVariante variante) {
+        if (variante.getPropietarioActual() != null
+                && variante.getPropietarioActual().getNombreUsuario() != null) {
+            return variante.getPropietarioActual().getNombreUsuario();
+        }
+        if (variante.getProducto() != null
+                && variante.getProducto().getArtista() != null) {
+            return variante.getProducto().getArtista().getNombreUsuario();
+        }
+        return null;
+    }
+
+    private String montoTexto(BigDecimal valor) {
+        return valor != null
+            ? valor.setScale(2, RoundingMode.HALF_UP).toPlainString()
+            : "—";
+    }
+
+    private String codigoMoneda(Moneda moneda) {
+        return moneda != null && moneda.getCodigo() != null
+            ? moneda.getCodigo() : "";
     }
 
     private void notificarReventaAlArtista(

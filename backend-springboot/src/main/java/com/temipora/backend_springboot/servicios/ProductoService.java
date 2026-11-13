@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import com.temipora.backend_springboot.modelo.CambioAuditoriaDTO;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.DerechoTerminoDTO;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
@@ -288,6 +289,7 @@ public class ProductoService {
             }
         }
 
+        SnapshotProducto antes = esNuevo ? null : SnapshotProducto.de(producto);
         aplicarProducto(producto, request, true);
         actualizarVariantes(producto, producto.getArtista(),
             request.getVariantes(), true);
@@ -301,14 +303,19 @@ public class ProductoService {
         Producto guardado = productoRepository.saveAndFlush(producto);
         registrarVersionesDeImagen(guardado, guardado.getArtista());
 
-        auditoria.registrar(
-            esNuevo ? AccionesAdmin.PRODUCTO_BORRADOR_CREAR
-                : AccionesAdmin.PRODUCTO_BORRADOR_MODIFICAR,
-            ENTIDAD, guardado.getIdProducto(),
-            (esNuevo ? "Creó" : "Actualizó") + " el borrador de producto “"
-                + (guardado.getTitulo() != null ? guardado.getTitulo() : "Sin título")
-                + "”",
-            null, guardado, CAMPOS);
+        String resumen = (esNuevo ? "Creó" : "Actualizó")
+            + " el borrador de producto “"
+            + (guardado.getTitulo() != null ? guardado.getTitulo() : "Sin título")
+            + "”";
+        if (esNuevo) {
+            auditoria.registrar(
+                AccionesAdmin.PRODUCTO_BORRADOR_CREAR, ENTIDAD,
+                guardado.getIdProducto(), resumen, null, guardado, CAMPOS);
+        } else {
+            auditoria.registrarCambios(
+                AccionesAdmin.PRODUCTO_BORRADOR_MODIFICAR, ENTIDAD,
+                guardado.getIdProducto(), resumen, antes.diferencias(guardado));
+        }
         return aDTO(guardado);
     }
 
@@ -331,6 +338,7 @@ public class ProductoService {
             throw new ConflictoException("El producto ya está publicado.");
         }
 
+        SnapshotProducto antes = SnapshotProducto.de(producto);
         validarParaPublicar(idArtista, request, idProducto);
 
         aplicarProducto(producto, request, false);
@@ -359,12 +367,12 @@ public class ProductoService {
         }
         productoRepository.flush();
 
-        auditoria.registrar(
+        auditoria.registrarCambios(
             AccionesAdmin.PRODUCTO_PUBLICAR, ENTIDAD, guardado.getIdProducto(),
             "Publicó el borrador “" + guardado.getTitulo() + "” con "
                 + guardado.getVariantes().size() + " variante(s) y licencia v"
                 + versionLicencia(guardado),
-            null, guardado, CAMPOS);
+            antes.diferencias(guardado));
         return aDTO(guardado);
     }
 
@@ -383,7 +391,7 @@ public class ProductoService {
                 "El producto es un borrador. Guardalo como borrador o publicalo.");
         }
 
-        Snapshot antes = Snapshot.de(producto, CAMPOS);
+        SnapshotProducto antes = SnapshotProducto.de(producto);
         validarParaPublicar(idArtista, request, idProducto);
 
         aplicarProducto(producto, request, false);
@@ -410,11 +418,11 @@ public class ProductoService {
         }
         productoRepository.flush();
 
-        auditoria.registrar(
+        auditoria.registrarCambios(
             AccionesAdmin.PRODUCTO_MODIFICAR, ENTIDAD, guardado.getIdProducto(),
             "Modificó el producto “" + guardado.getTitulo() + "” (licencia v"
                 + versionLicencia(guardado) + ")",
-            antes, guardado, CAMPOS);
+            antes.diferencias(guardado));
         return aDTO(guardado);
     }
 

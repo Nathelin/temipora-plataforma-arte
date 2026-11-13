@@ -95,6 +95,21 @@ public class AuditoriaService {
     }
 
     /**
+     * Para hechos cuyos cambios no salen de comparar propiedades de una entidad
+     * (colecciones, varios registros o datos tomados antes de una transferencia).
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void registrarCambios(
+            String accion,
+            String entidad,
+            Object entidadId,
+            String resumen,
+            List<CambioAuditoriaDTO> cambios) {
+        guardar(accion, entidad, entidadId, resumen,
+            cambios != null ? cambios : List.of(), null);
+    }
+
+    /**
      * Para tareas de sistema que no corren dentro de una transacción de negocio.
      * Fail-open: si la auditoría falla, la tarea ya ejecutada no se revierte.
      */

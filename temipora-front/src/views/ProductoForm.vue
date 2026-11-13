@@ -1079,9 +1079,6 @@ onBeforeUnmount(() => {
                     class="mt-2 rounded-lg bg-crema/60 px-3 py-2 text-xs leading-relaxed text-cafe/65"
                   >
                     <p>{{ medioSeleccionado.descripcion }}</p>
-                    <p v-if="medioSeleccionado.observaciones" class="mt-1 text-cafe/50">
-                      {{ medioSeleccionado.observaciones }}
-                    </p>
                   </div>
                   <div
                     v-if="esEntregaFisica"

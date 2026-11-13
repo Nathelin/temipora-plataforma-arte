@@ -22,10 +22,12 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.temipora.backend_springboot.modelo.CambioAuditoriaDTO;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
@@ -195,6 +197,35 @@ class ProductoServiceTest {
         assertThat(dto.getTitulo()).isEqualTo("Plancha nueva");
         assertThat(dto.getVariantes().get(0).getIdVariante()).isEqualTo(20L);
         verify(ledgerService, never()).registrarGenesis(any(), anyString());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void modificar_soloElPrecioDeLaVariante_registraElCambio() {
+        Producto producto = productoConVariante(10L, 5L, 20L, SHA_VARIANTE);
+        prepararModificacion(producto);
+
+        ProductoRequest request = request();
+        request.setTitulo("Plancha nueva");
+        ProductoVarianteRequest variante = request.getVariantes().get(0);
+        variante.setIdVariante(20L);
+        variante.setSha256(SHA_VARIANTE);
+        variante.setClaveArchivoOriginal(null);
+        variante.setPrecio(new BigDecimal("1500.00"));
+
+        productoService.modificar(10L, 5L, request);
+
+        ArgumentCaptor<List<CambioAuditoriaDTO>> captor =
+            ArgumentCaptor.forClass(List.class);
+        verify(auditoriaService).registrarCambios(
+            eq(AccionesAdmin.PRODUCTO_MODIFICAR), eq("Producto"), eq(10L),
+            anyString(), captor.capture());
+        assertThat(captor.getValue())
+            .anySatisfy(cambio -> {
+                assertThat(cambio.etiqueta()).isEqualTo("Precio · «Única»");
+                assertThat(cambio.anterior()).isEqualTo("100.00 ARS");
+                assertThat(cambio.nuevo()).isEqualTo("1500.00 ARS");
+            });
     }
 
     @Test
@@ -543,9 +574,9 @@ class ProductoServiceTest {
         assertThat(dto.getEstado()).isEqualTo(EstadoProducto.DISPONIBLE);
         verify(ledgerService).registrarGenesis(
             any(ProductoVariante.class), anyString());
-        verify(auditoriaService).registrar(
+        verify(auditoriaService).registrarCambios(
             eq(AccionesAdmin.PRODUCTO_PUBLICAR), eq("Producto"), eq(10L),
-            anyString(), isNull(), any(Producto.class), anyList());
+            anyString(), anyList());
     }
 
     @Test
