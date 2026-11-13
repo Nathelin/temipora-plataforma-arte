@@ -845,7 +845,6 @@ watch(
               :anclado="varianteLedger.anclado"
               :bitcoin-altura="varianteLedger.bitcoinAltura"
               :fecha-anclaje="varianteLedger.fechaAnclaje"
-              :codigo-certificado="varianteLedger.codigoCertificado"
               @ver-historial="abrirHistorial(varianteLedger)"
             />
           </div>

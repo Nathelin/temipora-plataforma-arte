@@ -293,7 +293,6 @@ watch(() => props.id, cargar)
           :anclado="reventa.ledger.anclado"
           :bitcoin-altura="reventa.ledger.bitcoinAltura"
           :fecha-anclaje="reventa.ledger.fechaAnclaje"
-          :codigo-certificado="reventa.ledger.codigoCertificado"
           @ver-historial="historialAbierto = reventa.ledger"
         />
 

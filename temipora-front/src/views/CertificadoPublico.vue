@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import QrcodeVue from 'qrcode.vue'
 import { cargarCertificado } from '../servicios/certificados'
 import { etiquetaEvento, hashCorto, infoAnclaje } from '../servicios/ledger'
@@ -41,12 +41,32 @@ async function cargar() {
   }
 }
 
-onMounted(cargar)
+function imprimir() {
+  window.print()
+}
+
+onMounted(() => {
+  document.body.classList.add('imprimiendo-certificado')
+  cargar()
+})
+onBeforeUnmount(() => {
+  document.body.classList.remove('imprimiendo-certificado')
+})
 watch(() => props.codigo, cargar)
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-3xl px-4 py-10 sm:px-8">
+  <div class="certificado-print mx-auto w-full max-w-3xl px-4 py-10 sm:px-8">
+    <div class="no-print mb-6 flex justify-end">
+      <button
+        type="button"
+        class="inline-flex min-h-10 items-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 motion-reduce:transition-none"
+        @click="imprimir"
+      >
+        Imprimir / Guardar PDF
+      </button>
+    </div>
+
     <p class="text-center text-xs font-semibold uppercase tracking-[0.18em] text-cafe/45">
       Certificado de autenticidad
     </p>
@@ -192,3 +212,83 @@ watch(() => props.codigo, cargar)
     </article>
   </div>
 </template>
+
+<style>
+@media print {
+  @page {
+    margin: 12mm;
+  }
+
+  /* Solo se imprime el certificado: el resto de la app queda oculto. */
+  body.imprimiendo-certificado * {
+    visibility: hidden !important;
+  }
+
+  body.imprimiendo-certificado .certificado-print,
+  body.imprimiendo-certificado .certificado-print * {
+    visibility: visible !important;
+  }
+
+  body.imprimiendo-certificado .certificado-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: none;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Fuerza la paleta clara dentro del certificado al imprimir, para que en
+     modo oscuro el texto no salga claro sobre fondo blanco. */
+  body.imprimiendo-certificado .certificado-print {
+    --color-fondo: #fff6f1;
+    --color-superficie: #ffffff;
+    --color-superficie-alt: #fff0e9;
+    --color-texto: #4a1d2e;
+    --color-texto-suave: #6e3b4d;
+    --color-borde: #ffc2d1;
+    --color-acento: #c2185b;
+    --color-acento-suave: #c2185b;
+    --color-acento-hover: #9a1047;
+    --color-acento-contraste: #ffffff;
+    --color-inverso: #4a1d2e;
+    --color-inverso-suave: #ffc2d1;
+    --color-inverso-contraste: #fff6f1;
+    --color-tinta: #4a1d2e;
+
+    --color-crema: #fff6f1;
+    --color-rosa: #ffc2d1;
+    --color-durazno: #ffd9c7;
+    --color-coral: #c2185b;
+    --color-coral-vivo: #ff8a7a;
+    --color-rojizo: #9a1047;
+    --color-granate: #4a1d2e;
+    --color-cafe: #6e3b4d;
+    --color-blanco: #ffffff;
+    --color-mantequilla: #ffe8a3;
+  }
+
+  body.imprimiendo-certificado .text-green-700,
+  body.imprimiendo-certificado .text-green-600 {
+    color: #15803d !important;
+  }
+
+  body.imprimiendo-certificado .no-print {
+    display: none !important;
+  }
+
+  body.imprimiendo-certificado .certificado-print article {
+    box-shadow: none !important;
+    border: 1px solid #d9c9bd !important;
+    break-inside: avoid;
+  }
+
+  body.imprimiendo-certificado a[href]::after {
+    content: '';
+  }
+}
+</style>

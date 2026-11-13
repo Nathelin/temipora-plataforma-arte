@@ -13,7 +13,6 @@ const props = defineProps({
   anclado: { type: Boolean, default: false },
   bitcoinAltura: { type: [Number, String], default: null },
   fechaAnclaje: { type: String, default: null },
-  codigoCertificado: { type: String, default: null },
 })
 
 const emit = defineEmits(['ver-historial'])
@@ -62,22 +61,13 @@ const verificado = computed(() => Boolean(ultimoEvento.value?.verificado))
       Sin movimientos registrados.
     </p>
 
-    <div class="mt-3 flex flex-wrap items-center gap-2">
-      <button
-        v-if="eventos.length"
-        type="button"
-        class="rounded-full border border-rosa bg-blanco px-3 py-1.5 text-[11px] font-semibold text-granate transition hover:bg-rosa/20"
-        @click="emit('ver-historial')"
-      >
-        Ver historial completo
-      </button>
-      <router-link
-        v-if="codigoCertificado"
-        :to="{ name: 'certificado-publico', params: { codigo: codigoCertificado } }"
-        class="rounded-full border border-coral/40 bg-coral/10 px-3 py-1.5 text-[11px] font-semibold text-coral transition hover:bg-coral/20"
-      >
-        Ver certificado
-      </router-link>
-    </div>
+    <button
+      v-if="eventos.length"
+      type="button"
+      class="mt-3 rounded-full border border-rosa bg-blanco px-3 py-1.5 text-[11px] font-semibold text-granate transition hover:bg-rosa/20"
+      @click="emit('ver-historial')"
+    >
+      Ver historial completo
+    </button>
   </article>
 </template>
