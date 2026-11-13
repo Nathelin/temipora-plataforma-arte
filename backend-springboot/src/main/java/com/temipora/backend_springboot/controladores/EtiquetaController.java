@@ -38,7 +38,11 @@ public class EtiquetaController {
 
     @GetMapping("/selector")
     public List<EtiquetaDTO> selector(Authentication authentication) {
-        return etiquetaService.selector(usuarioActual(authentication));
+        // Catálogo público: un visitante anónimo solo ve las etiquetas VALIDA.
+        Usuario usuario = authentication != null && authentication.isAuthenticated()
+            ? usuarioRepository.findByNombreUsuarioIgnoreCase(authentication.getName()).orElse(null)
+            : null;
+        return etiquetaService.selector(usuario);
     }
 
     @GetMapping("/categorias")

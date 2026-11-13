@@ -290,8 +290,11 @@ public class EtiquetaService {
     public List<EtiquetaDTO> selector(Usuario usuario) {
         List<Etiqueta> opciones = new ArrayList<>(
             etiquetaRepository.findByEstadoOrderByNombreAsc(EtiquetaEstado.VALIDA));
-        opciones.addAll(etiquetaRepository.findByEstadoAndCreadoPorIdUsuario(
-            EtiquetaEstado.PENDIENTE, usuario.getIdUsuario()));
+        if (usuario != null) {
+            // El artista también ve sus propias propuestas pendientes en el selector.
+            opciones.addAll(etiquetaRepository.findByEstadoAndCreadoPorIdUsuario(
+                EtiquetaEstado.PENDIENTE, usuario.getIdUsuario()));
+        }
         return opciones.stream().map(EtiquetaDTO::desdeEtiqueta).toList();
     }
 
