@@ -76,7 +76,8 @@ public interface ProductoRepository
         "variantes",
         "imagenes",
         "etiquetas",
-        "etiquetas.etiqueta"
+        "etiquetas.etiqueta",
+        "etiquetas.etiqueta.categoria"
     })
     List<Producto> findByEstadoOrderByFechaCreacionDesc(EstadoProducto estado);
 

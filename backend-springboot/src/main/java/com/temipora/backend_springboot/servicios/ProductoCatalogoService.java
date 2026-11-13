@@ -8,6 +8,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.AnclajeLedger;
 import com.temipora.backend_springboot.modelo.CompraItem;
+import com.temipora.backend_springboot.modelo.ContenidoSensible;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.DerechoTerminoDTO;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
@@ -30,6 +32,7 @@ import com.temipora.backend_springboot.modelo.EstadoPublicacionReventa;
 import com.temipora.backend_springboot.modelo.EstadoVariante;
 import com.temipora.backend_springboot.modelo.EventoLedgerDTO;
 import com.temipora.backend_springboot.modelo.EventoLedgerPublicoDTO;
+import com.temipora.backend_springboot.modelo.FacetasProductoDTO;
 import com.temipora.backend_springboot.modelo.FiltroProductoRequest;
 import com.temipora.backend_springboot.modelo.LicenciaProducto;
 import com.temipora.backend_springboot.modelo.LicenciaProductoDTO;
@@ -61,9 +64,9 @@ import com.temipora.backend_springboot.repositorios.UsuarioRepository;
  * el listado y el detalle de solo lectura: nada de gestión ni de variantes
  * completas.
  *
- * El ranking personalizado todavía no se aplica: `RecomendacionService` opera
- * sobre servicios y las señales de compra de producto no existen hasta que
- * haya flujo de compra. Por eso `RELEVANCIA` cae hoy en "más recientes".
+ * El ranking personalizado usa {@code RecomendacionProductoService} cuando hay
+ * viewer; sin sesión, o si el recomendador no tiene señales suficientes,
+ * {@code RELEVANCIA} cae en "más recientes".
  */
 @Service
 public class ProductoCatalogoService {
@@ -130,9 +133,14 @@ public class ProductoCatalogoService {
         boolean incluirReventas = filtro == null
             || filtro.getIncluirReventas() == null
             || Boolean.TRUE.equals(filtro.getIncluirReventas());
+        // "Solo reventas" oculta los productos y deja únicamente las publicaciones.
+        boolean soloReventas = filtro != null
+            && Boolean.TRUE.equals(filtro.getSoloReventas());
         List<ItemCatalogo> items = new ArrayList<>();
-        for (Producto producto : filtrados) {
-            items.add(itemProducto(producto, moneda));
+        if (!soloReventas) {
+            for (Producto producto : filtrados) {
+                items.add(itemProducto(producto, moneda));
+            }
         }
         if (incluirReventas) {
             for (PublicacionReventa publicacion
@@ -256,6 +264,133 @@ public class ProductoCatalogoService {
             .hayMas(hasta < total)
             .personalizado(personalizado)
             .build();
+    }
+
+    /**
+     * Conteo de resultados por opción de filtro.
+     *
+     * Regla central: cada faceta se calcula con todos los filtros activos
+     * EXCEPTO el de su propia dimensión. A diferencia de servicios, acá no hace
+     * falta reconsultar: la lista de productos ya viene filtrada en memoria y
+     * sólo se vuelve a aplicar el resto de los predicados por dimensión.
+     *
+     * El universo respeta lo que el usuario vería: estado DISPONIBLE, stock,
+     * exclusión de productos propios, preferencia de contenido sensible e
+     * `incluirReventas`.
+     */
+    @Transactional(readOnly = true)
+    public FacetasProductoDTO facetas(FiltroProductoRequest filtro, Long viewerId) {
+        EPreferenciaContenidoSensible pref = preferenciaDe(viewerId);
+        boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
+        Moneda moneda = monedaPreferidaDe(viewerId);
+
+        List<Producto> base = productoRepository
+            .findByEstadoOrderByFechaCreacionDesc(EstadoProducto.DISPONIBLE).stream()
+            .filter(this::tieneStock)
+            .filter(producto -> viewerId == null || !esDelViewer(producto, viewerId))
+            .filter(producto -> !ocultarSensibles || !producto.isContenidoSensible())
+            .toList();
+
+        FacetasProductoDTO salida = new FacetasProductoDTO();
+        salida.setTipos(contarProductos(base, filtro, moneda, Dimension.TIPOS, "tipo"));
+        salida.setMedios(contarProductos(base, filtro, moneda, Dimension.MEDIOS, "medio"));
+        salida.setEtiquetas(contarProductos(base, filtro, moneda, Dimension.ETIQUETAS, "etiquetas"));
+        salida.setContenidosSensibles(contarProductos(
+            base, filtro, moneda, Dimension.CONTENIDOS_SENSIBLES, "contenidos"));
+
+        // `base` ya viene filtrada por stock, así que este conteo mide cuántos
+        // productos con stock cumplen el resto de los filtros.
+        Map<String, Long> disponibilidad = new LinkedHashMap<>();
+        disponibilidad.put("conStock", (long) base.stream()
+            .filter(producto -> cumpleFiltros(producto, filtro,
+                precioDesde(producto, moneda), Dimension.STOCK))
+            .count());
+        salida.setDisponibilidad(disponibilidad);
+
+        // Sólo tiene sentido discriminar producto vs reventa si las reventas
+        // están incluidas en el catálogo.
+        boolean incluirReventas = filtro == null
+            || filtro.getIncluirReventas() == null
+            || Boolean.TRUE.equals(filtro.getIncluirReventas());
+        if (incluirReventas) {
+            Map<String, Long> origen = new LinkedHashMap<>();
+            origen.put("producto", (long) base.stream()
+                .filter(producto -> cumpleFiltros(producto, filtro,
+                    precioDesde(producto, moneda), null))
+                .count());
+            origen.put("reventa", (long) publicacionReventaRepository
+                .findByEstadoOrderByFechaPublicacionDesc(
+                    EstadoPublicacionReventa.PUBLICADA).stream()
+                .filter(publicacion -> publicacion.getVariante() != null
+                    && publicacion.getVariante().getProducto() != null)
+                .filter(publicacion -> viewerId == null
+                    || publicacion.getVendedor() == null
+                    || !viewerId.equals(publicacion.getVendedor().getIdUsuario()))
+                .filter(publicacion -> {
+                    Producto producto = publicacion.getVariante().getProducto();
+                    if (ocultarSensibles && producto.isContenidoSensible()) {
+                        return false;
+                    }
+                    BigDecimal precio = convertir(
+                        publicacion.getPrecio(), producto, moneda);
+                    return cumpleFiltros(producto, filtro, precio, null);
+                })
+                .count());
+            salida.setOrigen(origen);
+        }
+
+        return salida;
+    }
+
+    /**
+     * Cuenta valores de una dimensión sobre los productos que cumplen el resto
+     * de los filtros. `modo` elige qué se agrupa.
+     */
+    private Map<String, Long> contarProductos(
+            List<Producto> base,
+            FiltroProductoRequest filtro,
+            Moneda moneda,
+            Dimension omitir,
+            String modo) {
+        Map<String, Long> conteos = new LinkedHashMap<>();
+        for (Producto producto : base) {
+            if (!cumpleFiltros(producto, filtro,
+                    precioDesde(producto, moneda), omitir)) {
+                continue;
+            }
+            switch (modo) {
+                case "tipo" -> {
+                    if (producto.getTipoProducto() != null) {
+                        conteos.merge(
+                            String.valueOf(producto.getTipoProducto().getIdTipoProducto()),
+                            1L, Long::sum);
+                    }
+                }
+                case "medio" -> {
+                    if (producto.getMedio() != null) {
+                        conteos.merge(String.valueOf(producto.getMedio().getIdMedio()),
+                            1L, Long::sum);
+                    }
+                }
+                case "etiquetas" -> {
+                    for (Long id : idsEtiquetasValidas(producto)) {
+                        conteos.merge(String.valueOf(id), 1L, Long::sum);
+                    }
+                }
+                case "contenidos" -> {
+                    if (producto.getContenidosSensibles() == null) {
+                        continue;
+                    }
+                    for (ContenidoSensible contenido : producto.getContenidosSensibles()) {
+                        conteos.merge(contenido.name(), 1L, Long::sum);
+                    }
+                }
+                default -> {
+                    // Sin agrupación para esta dimensión.
+                }
+            }
+        }
+        return conteos;
     }
 
     @Transactional(readOnly = true)
@@ -685,6 +820,29 @@ public class ProductoCatalogoService {
 
     private boolean cumpleFiltros(
             Producto producto, FiltroProductoRequest filtro, BigDecimal precio) {
+        return cumpleFiltros(producto, filtro, precio, null);
+    }
+
+    /**
+     * Dimensión de filtrado. Se usa para calcular los conteos de una faceta
+     * aplicando el resto de los filtros pero omitiendo el de su propia
+     * dimensión: si no, al elegir un medio todas las demás opciones quedarían
+     * en cero.
+     */
+    private enum Dimension {
+        TIPOS,
+        MEDIOS,
+        ETIQUETAS,
+        CONTENIDOS_SENSIBLES,
+        PRECIO,
+        STOCK
+    }
+
+    private boolean cumpleFiltros(
+            Producto producto,
+            FiltroProductoRequest filtro,
+            BigDecimal precio,
+            Dimension omitir) {
         if (filtro == null) {
             return true;
         }
@@ -693,6 +851,16 @@ public class ProductoCatalogoService {
             String titulo = producto.getTitulo() != null
                 ? producto.getTitulo().toLowerCase() : "";
             if (!titulo.contains(buscado)) {
+                return false;
+            }
+        }
+        if (hayTexto(filtro.getTextoLibre())) {
+            String buscado = filtro.getTextoLibre().trim().toLowerCase();
+            String titulo = producto.getTitulo() != null
+                ? producto.getTitulo().toLowerCase() : "";
+            String descripcion = producto.getDescripcion() != null
+                ? producto.getDescripcion().toLowerCase() : "";
+            if (!titulo.contains(buscado) && !descripcion.contains(buscado)) {
                 return false;
             }
         }
@@ -705,33 +873,113 @@ public class ProductoCatalogoService {
                 return false;
             }
         }
-        if (filtro.getIdTipoProducto() != null
+        if (omitir != Dimension.TIPOS && filtro.getIdsTiposProducto() != null
+                && !filtro.getIdsTiposProducto().isEmpty()) {
+            if (producto.getTipoProducto() == null
+                    || !filtro.getIdsTiposProducto()
+                        .contains(producto.getTipoProducto().getIdTipoProducto())) {
+                return false;
+            }
+        } else if (omitir != Dimension.TIPOS && filtro.getIdTipoProducto() != null
                 && (producto.getTipoProducto() == null
                     || !filtro.getIdTipoProducto()
                         .equals(producto.getTipoProducto().getIdTipoProducto()))) {
             return false;
         }
-        if (filtro.getIdMedio() != null
+        if (omitir != Dimension.MEDIOS && filtro.getIdsMedios() != null
+                && !filtro.getIdsMedios().isEmpty()) {
+            if (producto.getMedio() == null
+                    || !filtro.getIdsMedios()
+                        .contains(producto.getMedio().getIdMedio())) {
+                return false;
+            }
+        } else if (omitir != Dimension.MEDIOS && filtro.getIdMedio() != null
                 && (producto.getMedio() == null
                     || !filtro.getIdMedio().equals(producto.getMedio().getIdMedio()))) {
             return false;
+        }
+        if (omitir != Dimension.ETIQUETAS) {
+            Set<Long> etiquetasProducto = idsEtiquetasValidas(producto);
+            if (filtro.getIdsEtiquetas() != null && !filtro.getIdsEtiquetas().isEmpty()
+                    && filtro.getIdsEtiquetas().stream()
+                        .noneMatch(etiquetasProducto::contains)) {
+                return false;
+            }
+            if (filtro.getIdsEtiquetasExcluidas() != null
+                    && !filtro.getIdsEtiquetasExcluidas().isEmpty()
+                    && filtro.getIdsEtiquetasExcluidas().stream()
+                        .anyMatch(etiquetasProducto::contains)) {
+                return false;
+            }
         }
         if (filtro.getSensible() != null
                 && filtro.getSensible() != producto.isContenidoSensible()) {
             return false;
         }
-        if (Boolean.TRUE.equals(filtro.getSoloConStock()) && !tieneStock(producto)) {
-            return false;
+        if (omitir != Dimension.CONTENIDOS_SENSIBLES) {
+            Set<ContenidoSensible> contenidos = producto.getContenidosSensibles() != null
+                ? producto.getContenidosSensibles() : Set.of();
+            if (filtro.getContenidosSensibles() != null
+                    && !filtro.getContenidosSensibles().isEmpty()
+                    && filtro.getContenidosSensibles().stream()
+                        .noneMatch(contenidos::contains)) {
+                return false;
+            }
+            if (filtro.getExcluirContenidosSensibles() != null
+                    && !filtro.getExcluirContenidosSensibles().isEmpty()
+                    && filtro.getExcluirContenidosSensibles().stream()
+                        .anyMatch(contenidos::contains)) {
+                return false;
+            }
         }
-        if (filtro.getPrecioMin() != null
-                && (precio == null || precio.compareTo(filtro.getPrecioMin()) < 0)) {
-            return false;
+        if (omitir != Dimension.STOCK) {
+            if (Boolean.TRUE.equals(filtro.getSoloConStock()) && !tieneStock(producto)) {
+                return false;
+            }
+            if (Boolean.TRUE.equals(filtro.getSoloPiezaUnica()) && !esPiezaUnica(producto)) {
+                return false;
+            }
+            if (Boolean.TRUE.equals(filtro.getSoloIlimitado()) && !esIlimitado(producto)) {
+                return false;
+            }
         }
-        if (filtro.getPrecioMax() != null
-                && (precio == null || precio.compareTo(filtro.getPrecioMax()) > 0)) {
-            return false;
+        if (omitir != Dimension.PRECIO) {
+            if (filtro.getPrecioMin() != null
+                    && (precio == null || precio.compareTo(filtro.getPrecioMin()) < 0)) {
+                return false;
+            }
+            if (filtro.getPrecioMax() != null
+                    && (precio == null || precio.compareTo(filtro.getPrecioMax()) > 0)) {
+                return false;
+            }
         }
         return true;
+    }
+
+    /** Etiquetas vigentes asignadas al producto. */
+    private Set<Long> idsEtiquetasValidas(Producto producto) {
+        if (producto.getEtiquetas() == null) {
+            return Set.of();
+        }
+        Set<Long> ids = new HashSet<>();
+        for (ProductoEtiqueta asignacion : producto.getEtiquetas()) {
+            Etiqueta etiqueta = asignacion.getEtiqueta();
+            if (etiqueta != null && etiqueta.getEstado() == EtiquetaEstado.VALIDA) {
+                ids.add(etiqueta.getIdEtiqueta());
+            }
+        }
+        return ids;
+    }
+
+    private boolean esPiezaUnica(Producto producto) {
+        return producto.getVariantes() != null
+            && producto.getVariantes().stream().anyMatch(ProductoVariante::esUnica);
+    }
+
+    private boolean esIlimitado(Producto producto) {
+        return producto.getVariantes() != null
+            && producto.getVariantes().stream()
+                .anyMatch(v -> v.getStockDisponible() == null);
     }
 
     private Comparator<ItemCatalogo> comparadorCatalogo(OrdenProducto orden) {

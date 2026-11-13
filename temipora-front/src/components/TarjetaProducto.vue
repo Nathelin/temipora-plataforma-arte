@@ -61,7 +61,7 @@ const destino = computed(() => (
       <span class="sr-only">Ver {{ producto.titulo }}</span>
     </router-link>
 
-    <div class="relative aspect-video w-full overflow-hidden bg-rosa/20">
+    <div class="relative aspect-[4/3] w-full overflow-hidden bg-rosa/20">
       <img
         v-if="producto.imagenPortada"
         :src="producto.imagenPortada"
@@ -133,7 +133,7 @@ const destino = computed(() => (
       </button>
     </div>
 
-    <div class="flex flex-1 flex-col p-4">
+    <div class="flex flex-1 flex-col p-3.5">
       <h3 class="line-clamp-1 font-display text-base font-bold leading-snug text-granate">
         {{ producto.titulo }}
         <span
@@ -210,7 +210,7 @@ const destino = computed(() => (
       </div>
 
       <div class="mt-auto flex items-end justify-between gap-3 pt-4">
-        <p class="font-display text-lg font-extrabold text-coral">
+        <p class="font-display text-base font-extrabold text-coral">
           <span class="mr-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-cafe/45">
             {{ esReventa ? 'Precio' : 'Desde' }}
           </span>

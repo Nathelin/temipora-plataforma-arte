@@ -4,11 +4,13 @@ import java.util.List;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.temipora.backend_springboot.modelo.FacetasProductoDTO;
 import com.temipora.backend_springboot.modelo.FiltroProductoRequest;
 import com.temipora.backend_springboot.modelo.OrdenProducto;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
@@ -43,29 +45,24 @@ public class ProductoPublicoController {
 
     @GetMapping
     public PaginaDTO<ProductoCatalogoDTO> listar(
-            @RequestParam(required = false) String titulo,
-            @RequestParam(required = false) String nombreArtista,
-            @RequestParam(required = false) Long idTipoProducto,
-            @RequestParam(required = false) Long idMedio,
-            @RequestParam(required = false) Boolean sensible,
-            @RequestParam(required = false) java.math.BigDecimal precioMin,
-            @RequestParam(required = false) java.math.BigDecimal precioMax,
-            @RequestParam(required = false) Boolean soloConStock,
+            @ModelAttribute ParametrosFiltroProducto params,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "24") int tamanio,
             @RequestParam(defaultValue = "RELEVANCIA") OrdenProducto orden,
             Authentication authentication) {
-        FiltroProductoRequest filtro = new FiltroProductoRequest();
-        filtro.setTitulo(titulo);
-        filtro.setNombreArtista(nombreArtista);
-        filtro.setIdTipoProducto(idTipoProducto);
-        filtro.setIdMedio(idMedio);
-        filtro.setSensible(sensible);
-        filtro.setPrecioMin(precioMin);
-        filtro.setPrecioMax(precioMax);
-        filtro.setSoloConStock(soloConStock);
         return productoCatalogoService.listar(
-            filtro, idVisor(authentication), pagina, tamanio, orden);
+            params.aFiltro(), idVisor(authentication), pagina, tamanio, orden);
+    }
+
+    /**
+     * Conteo de resultados por opción de filtro, con los mismos parámetros que
+     * el listado. Alimenta los números del panel de filtros.
+     */
+    @GetMapping("/facetas")
+    public FacetasProductoDTO facetas(
+            @ModelAttribute ParametrosFiltroProducto params,
+            Authentication authentication) {
+        return productoCatalogoService.facetas(params.aFiltro(), idVisor(authentication));
     }
 
     @GetMapping("/artista/{nombreUsuario}")
