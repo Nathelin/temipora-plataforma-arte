@@ -225,7 +225,7 @@ onUnmounted(() => {
 <template>
   <div>
     <PageHeader
-      eyebrow="Tu actividad"
+      :eyebrow="esAreaArtista ? 'Tu espacio de trabajo' : 'Tu actividad'"
       titulo="Pedidos"
       :descripcion="bandejaActiva === 'recibidos'
         ? 'Pedidos que recibiste de tus clientes.'

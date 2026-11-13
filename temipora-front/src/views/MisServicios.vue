@@ -5,6 +5,7 @@ import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
 import { estadoServicioDe } from '../servicios/servicios'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+import PageHeader from '../components/PageHeader.vue'
 
 const router = useRouter()
 
@@ -347,22 +348,25 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
 </script>
 
 <template>
-  <div class="mx-auto px-4 sm:px-8 py-8">
-    <div class="flex items-center justify-between gap-4 mb-6">
-      <div>
-        <h1 class="text-2xl text-granate">Mis servicios</h1>
-        <p class="mt-1 text-sm text-cafe/60">Los servicios que ofrecés a tus clientes.</p>
-      </div>
-      <router-link
-        to="/panel/servicios/crear"
-        class="px-4 py-2 rounded-md text-sm text-white bg-coral hover:bg-rojizo transition shadow-sm"
-      >
-        Crear servicio
-      </router-link>
-    </div>
+  <div>
+    <PageHeader
+      eyebrow="Tu espacio de trabajo"
+      titulo="Mis servicios"
+      descripcion="Los servicios que ofrecés a tus clientes."
+      :nivel="2"
+    >
+      <template #acciones>
+        <router-link
+          to="/panel/servicios/crear"
+          class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo"
+        >
+          Crear servicio
+        </router-link>
+      </template>
+    </PageHeader>
 
-    <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
-    <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
+    <p v-if="cargando" class="mt-6 text-cafe/60 text-center py-10">Cargando...</p>
+    <p v-else-if="error" class="mt-6 text-rojizo text-center py-10">{{ error }}</p>
 
     <template v-else>
       <p v-if="!servicios.length" class="rounded-xl border border-dashed border-rosa/60 px-4 py-12 text-center text-sm text-cafe/50">

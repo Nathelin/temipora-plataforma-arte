@@ -86,7 +86,7 @@ onMounted(cargar)
 <template>
   <div>
     <PageHeader
-      eyebrow="Tu actividad"
+      :eyebrow="esBandejaRecibidas ? 'Tu espacio de trabajo' : 'Tu actividad'"
       titulo="Solicitudes"
       :descripcion="esBandejaRecibidas
         ? 'Solicitudes que recibiste de tus clientes.'

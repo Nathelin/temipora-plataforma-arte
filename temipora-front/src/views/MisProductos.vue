@@ -7,6 +7,7 @@ import {
   tieneLedger,
 } from '../servicios/productos'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+import PageHeader from '../components/PageHeader.vue'
 
 const productos = ref([])
 const cargando = ref(true)
@@ -237,24 +238,25 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
 </script>
 
 <template>
-  <div class="mx-auto px-4 py-8 sm:px-8">
-    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="text-2xl text-granate">Mis productos</h1>
-        <p class="mt-1 text-sm text-cafe/60">
-          Las publicaciones y variantes que ofrecés a tus clientes.
-        </p>
-      </div>
-      <router-link
-        to="/panel/productos/crear"
-        class="inline-flex items-center justify-center rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-rojizo"
-      >
-        Crear producto
-      </router-link>
-    </div>
+  <div>
+    <PageHeader
+      eyebrow="Tu espacio de trabajo"
+      titulo="Mis productos"
+      descripcion="Las publicaciones y variantes que ofrecés a tus clientes."
+      :nivel="2"
+    >
+      <template #acciones>
+        <router-link
+          to="/panel/productos/crear"
+          class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo"
+        >
+          Crear producto
+        </router-link>
+      </template>
+    </PageHeader>
 
-    <p v-if="cargando" class="py-10 text-center text-cafe/60">Cargando...</p>
-    <p v-else-if="error" class="py-10 text-center text-rojizo">{{ error }}</p>
+    <p v-if="cargando" class="mt-6 py-10 text-center text-cafe/60">Cargando...</p>
+    <p v-else-if="error" class="mt-6 py-10 text-center text-rojizo">{{ error }}</p>
 
     <template v-else>
       <div

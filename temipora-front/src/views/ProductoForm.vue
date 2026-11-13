@@ -914,7 +914,7 @@ onBeforeUnmount(() => {
 
     <div class="mx-auto mt-4 text-center">
       <div class="flex flex-wrap items-center justify-center gap-2">
-        <h1 class="text-2xl text-granate sm:text-3xl">{{ tituloPagina }}</h1>
+        <h1 class="font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">{{ tituloPagina }}</h1>
         <span
           v-if="esEdicion && estadoProducto === 'BORRADOR'"
           class="rounded-full border border-cafe/20 bg-cafe/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-cafe/70"
@@ -922,7 +922,7 @@ onBeforeUnmount(() => {
           Borrador
         </span>
       </div>
-      <p class="mt-2 text-sm text-cafe/60">
+      <p class="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-cafe/65">
         Completá la publicación y sus condiciones paso a paso. Podés guardar un
         borrador y continuar más tarde.
       </p>

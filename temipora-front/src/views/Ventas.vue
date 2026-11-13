@@ -13,6 +13,7 @@ import {
 } from '../servicios/ventas'
 import { usePanelArtista } from '../composables/usePanelArtista'
 import ModalComoSeCalcula from '../components/ModalComoSeCalcula.vue'
+import PageHeader from '../components/PageHeader.vue'
 
 const router = useRouter()
 
@@ -330,31 +331,33 @@ onMounted(() => {
 
 <template>
   <div class="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-10">
-    <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-coral">Tus ingresos</p>
-        <h1 class="mt-1 font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">
-          Ventas
-        </h1>
-        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-cafe/65">
+    <PageHeader
+      eyebrow="Tus ingresos"
+      titulo="Ventas"
+      :nivel="2"
+    >
+      <template #acciones>
+        <span
+          v-if="vista === 'servicios' ? (!cargando && !error) : (!cargandoProductos && !errorProductos)"
+          class="inline-flex self-start rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral sm:self-auto"
+        >
+          {{ totalMostrado }} {{ totalMostrado === 1 ? 'venta' : 'ventas' }}
+        </span>
+      </template>
+      <template #descripcion>
+        <span class="block">
           Todo lo que cobraste por tus pedidos de servicio y tus productos: lo que pagó el cliente,
           la comisión Temipora, el arancel de MercadoPago y tu neto.
-        </p>
+        </span>
         <button
           type="button"
-          class="mt-2 text-xs font-semibold text-coral underline-offset-2 transition hover:text-rojizo hover:underline"
+          class="mt-2 block text-xs font-semibold text-coral underline-offset-2 transition hover:text-rojizo hover:underline"
           @click="modalCalculoAbierto = true"
         >
           ¿Cómo se calcula?
         </button>
-      </div>
-      <span
-        v-if="vista === 'servicios' ? (!cargando && !error) : (!cargandoProductos && !errorProductos)"
-        class="inline-flex self-start rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral sm:self-auto"
-      >
-        {{ totalMostrado }} {{ totalMostrado === 1 ? 'venta' : 'ventas' }}
-      </span>
-    </header>
+      </template>
+    </PageHeader>
 
     <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <div

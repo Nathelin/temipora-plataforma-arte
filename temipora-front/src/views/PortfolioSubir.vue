@@ -13,6 +13,7 @@ import {
 import SelectorEtiquetas from '../components/SelectorEtiquetas.vue'
 import SelectorMateriales from '../components/SelectorMateriales.vue'
 import ImagenGaleria from '../components/ImagenGaleria.vue'
+import PageHeader from '../components/PageHeader.vue'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useAvisoActualizacion } from '../composables/useAvisoActualizacion'
 
@@ -709,8 +710,13 @@ function urlsSinPublicar() {
         ← Volver al portfolio
       </button>
 
-      <h1 class="mt-4 text-2xl text-granate">{{ tituloPagina }}</h1>
-      <p class="mt-1 mb-6 text-sm pb-5 text-cafe/60">{{ subtituloPagina }}</p>
+      <PageHeader
+        class="mt-4 mb-6"
+        eyebrow="Tu portfolio"
+        :titulo="tituloPagina"
+        :descripcion="subtituloPagina"
+        :nivel="2"
+      />
 
       <!-- ==================================================== -->
       <!-- Vista: selección (solo creación)                     -->
