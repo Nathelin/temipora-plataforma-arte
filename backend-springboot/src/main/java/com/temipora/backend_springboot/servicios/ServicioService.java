@@ -328,7 +328,6 @@ public class ServicioService {
         salida.setTipos(facetasPor(cargar.apply(Dimension.TIPOS), Dimension.TIPOS));
         salida.setMedios(facetasPor(cargar.apply(Dimension.MEDIOS), Dimension.MEDIOS));
         salida.setEtiquetas(facetasPor(cargar.apply(Dimension.ETIQUETAS), Dimension.ETIQUETAS));
-        salida.setCategorias(facetasPor(cargar.apply(Dimension.CATEGORIAS), Dimension.CATEGORIAS));
         salida.setContenidosSensibles(facetasPor(
             cargar.apply(Dimension.CONTENIDOS_SENSIBLES), Dimension.CONTENIDOS_SENSIBLES));
 
@@ -363,7 +362,6 @@ public class ServicioService {
             case MEDIOS -> tieneElementos(f.getIdsMedios());
             case ETIQUETAS -> tieneElementos(f.getIdsEtiquetas())
                 || tieneElementos(f.getIdsEtiquetasExcluidas());
-            case CATEGORIAS -> tieneElementos(f.getIdsCategoriasEtiqueta());
             case CONTENIDOS_SENSIBLES -> tieneElementos(f.getContenidosSensibles())
                 || tieneElementos(f.getExcluirContenidosSensibles());
             case LISTA_ESPERA -> Boolean.TRUE.equals(f.getSoloConListaEspera());
@@ -400,19 +398,6 @@ public class ServicioService {
                         conteos.merge(String.valueOf(etiqueta.getIdEtiqueta()), 1L, Long::sum);
                     }
                 }
-                case CATEGORIAS -> {
-                    if (s.getEtiquetas() == null) break;
-                    for (ServicioEtiqueta se : s.getEtiquetas()) {
-                        Etiqueta etiqueta = se.getEtiqueta();
-                        if (etiqueta == null || etiqueta.getEstado() != EtiquetaEstado.VALIDA
-                                || etiqueta.getCategoria() == null) {
-                            continue;
-                        }
-                        conteos.merge(
-                            String.valueOf(etiqueta.getCategoria().getIdCategoriaEtiqueta()),
-                            1L, Long::sum);
-                    }
-                }
                 case CONTENIDOS_SENSIBLES -> {
                     if (s.getContenidosSensibles() == null) break;
                     for (ContenidoSensible contenido : s.getContenidosSensibles()) {
@@ -432,7 +417,18 @@ public class ServicioService {
             FiltroServicioRequest filtro,
             Moneda moneda,
             Dimension omitir) {
-        Specification<Servicio> spec = aplicarFiltros(base, filtro, moneda, omitir);
+        // Las etiquetas y su categoría son LAZY y se recorren al contar, así que
+        // se traen en la misma consulta. Sin esto, cada servicio dispara sus
+        // propios SELECT (N+1) al calcular las facetas.
+        Specification<Servicio> conEtiquetas = (root, query, cb) -> {
+            query.distinct(true);
+            root.fetch("etiquetas", JoinType.LEFT)
+                .fetch("etiqueta", JoinType.LEFT)
+                .fetch("categoria", JoinType.LEFT);
+            return cb.conjunction();
+        };
+        Specification<Servicio> spec = aplicarFiltros(base, filtro, moneda, omitir)
+            .and(conEtiquetas);
         return servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre"));
     }
 
@@ -938,7 +934,6 @@ public class ServicioService {
         TIPOS,
         MEDIOS,
         ETIQUETAS,
-        CATEGORIAS,
         CONTENIDOS_SENSIBLES,
         LISTA_ESPERA,
         MONEDA_DECLARADA,
@@ -1035,14 +1030,6 @@ public class ServicioService {
                 conEtiqueta.where(
                     s.join("etiquetas").get("etiqueta").get("idEtiqueta").in(excluidas));
                 return cb.not(root.get("idServicio").in(conEtiqueta));
-            });
-        }
-        if (omitir != Dimension.CATEGORIAS && tieneElementos(f.getIdsCategoriasEtiqueta())) {
-            List<Long> ids = f.getIdsCategoriasEtiqueta();
-            spec = spec.and((root, query, cb) -> {
-                query.distinct(true);
-                return root.join("etiquetas").get("etiqueta").get("categoria")
-                    .get("idCategoriaEtiqueta").in(ids);
             });
         }
         if (omitir != Dimension.LISTA_ESPERA && Boolean.TRUE.equals(f.getSoloConListaEspera())) {

@@ -114,7 +114,7 @@ function limpiar() {
 
 <template>
   <GrupoFiltro titulo="Etiquetas" :activos="activas">
-    <div class="space-y-2">
+    <div class="space-y-3">
       <input
         v-model="busqueda"
         type="search"
@@ -172,10 +172,10 @@ function limpiar() {
             </label>
             <button
               type="button"
-              class="shrink-0 rounded px-1 text-xs font-bold transition"
+              class="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
               :class="exclusion.has(String(etiqueta.idEtiqueta))
-                ? 'text-rojizo'
-                : 'text-cafe/30 hover:text-rojizo'"
+                ? 'border-rojizo bg-rojizo text-white'
+                : 'border-coral/40 bg-coral/10 text-coral hover:border-coral hover:bg-coral hover:text-white'"
               :aria-label="exclusion.has(String(etiqueta.idEtiqueta))
                 ? `Dejar de excluir ${etiqueta.nombre}`
                 : `Excluir ${etiqueta.nombre}`"

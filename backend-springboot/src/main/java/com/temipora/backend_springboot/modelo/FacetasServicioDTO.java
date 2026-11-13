@@ -25,8 +25,6 @@ public class FacetasServicioDTO {
     private Map<String, Long> medios = new LinkedHashMap<>();
     /** idEtiqueta → cantidad */
     private Map<String, Long> etiquetas = new LinkedHashMap<>();
-    /** idCategoriaEtiqueta → cantidad */
-    private Map<String, Long> categorias = new LinkedHashMap<>();
     /** nombre del enum ContenidoSensible → cantidad */
     private Map<String, Long> contenidosSensibles = new LinkedHashMap<>();
     /** abiertos | sinCupos */

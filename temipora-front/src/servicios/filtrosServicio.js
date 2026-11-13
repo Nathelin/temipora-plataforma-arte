@@ -21,7 +21,6 @@ const LISTAS = [
   'idsTiposServicio',
   'idsEtiquetas',
   'idsEtiquetasExcluidas',
-  'idsCategoriasEtiqueta',
   'contenidosSensibles',
   'excluirContenidosSensibles',
 ]
@@ -46,7 +45,6 @@ export function estadoInicial() {
     idsTiposServicio: [],
     idsEtiquetas: [],
     idsEtiquetasExcluidas: [],
-    idsCategoriasEtiqueta: [],
     contenidosSensibles: [],
     excluirContenidosSensibles: [],
     soloConListaEspera: false,

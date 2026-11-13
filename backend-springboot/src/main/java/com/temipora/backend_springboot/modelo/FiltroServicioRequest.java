@@ -39,10 +39,6 @@ public class FiltroServicioRequest {
      * Etiquetas excluidas explícitamente (patrón AO3 acotado).
      */
     private List<Long> idsEtiquetasExcluidas;
-    /**
-     * Categorías de etiqueta aceptadas. OR entre ellas.
-     */
-    private List<Long> idsCategoriasEtiqueta;
 
     private List<ContenidoSensible> contenidosSensibles;
     private List<ContenidoSensible> excluirContenidosSensibles;

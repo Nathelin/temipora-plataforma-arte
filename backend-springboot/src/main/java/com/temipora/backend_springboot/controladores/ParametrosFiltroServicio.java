@@ -30,7 +30,6 @@ public class ParametrosFiltroServicio {
     private List<Long> idsMedios;
     private List<Long> idsEtiquetas;
     private List<Long> idsEtiquetasExcluidas;
-    private List<Long> idsCategoriasEtiqueta;
     private List<ContenidoSensible> contenidosSensibles;
     private List<ContenidoSensible> excluirContenidosSensibles;
     private Boolean soloConListaEspera;
@@ -57,7 +56,6 @@ public class ParametrosFiltroServicio {
         filtro.setIdsMedios(idsMedios);
         filtro.setIdsEtiquetas(idsEtiquetas);
         filtro.setIdsEtiquetasExcluidas(idsEtiquetasExcluidas);
-        filtro.setIdsCategoriasEtiqueta(idsCategoriasEtiqueta);
         filtro.setContenidosSensibles(contenidosSensibles);
         filtro.setExcluirContenidosSensibles(excluirContenidosSensibles);
         filtro.setSoloConListaEspera(soloConListaEspera);
