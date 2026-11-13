@@ -31,6 +31,14 @@ public class CompraLedgerDTO {
     private boolean integridad;
     private String mensaje;
 
+    /** Código público del certificado de autenticidad (null si no es pieza única). */
+    private String codigoCertificado;
+
+    /** El historial de la pieza ya está sellado en Bitcoin (OpenTimestamps). */
+    private boolean anclado;
+    private Long bitcoinAltura;
+    private LocalDateTime fechaAnclaje;
+
     @Builder.Default
     private List<EventoLedgerCompraDTO> eventos = new ArrayList<>();
 }

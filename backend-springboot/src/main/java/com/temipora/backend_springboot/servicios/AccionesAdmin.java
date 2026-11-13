@@ -49,6 +49,9 @@ public final class AccionesAdmin {
     public static final String REVENTA_SUSPENDER = "REVENTA_SUSPENDER";
     public static final String COMPRA_CONFIRMAR = "COMPRA_CONFIRMAR";
 
+    public static final String LEDGER_ANCLAR = "LEDGER_ANCLAR";
+    public static final String LEDGER_ANCLAJE_CONFIRMAR = "LEDGER_ANCLAJE_CONFIRMAR";
+
     public static final String TIPO_SERVICIO_CREAR = "TIPO_SERVICIO_CREAR";
     public static final String TIPO_SERVICIO_MODIFICAR = "TIPO_SERVICIO_MODIFICAR";
     public static final String TIPO_SERVICIO_BAJA = "TIPO_SERVICIO_BAJA";

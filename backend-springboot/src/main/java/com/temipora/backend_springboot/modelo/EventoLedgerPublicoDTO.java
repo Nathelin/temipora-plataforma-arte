@@ -24,4 +24,9 @@ public class EventoLedgerPublicoDTO {
     private TipoEventoLedger tipo;
     private LocalDateTime ocurridoEn;
     private boolean verificado;
+
+    /** El evento ya está sellado en Bitcoin (OpenTimestamps). */
+    private boolean anclado;
+    private LocalDateTime fechaAnclaje;
+    private Long bitcoinAltura;
 }

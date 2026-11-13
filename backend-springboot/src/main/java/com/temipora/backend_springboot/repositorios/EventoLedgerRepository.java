@@ -26,6 +26,9 @@ public interface EventoLedgerRepository extends JpaRepository<EventoLedger, Long
 
     List<EventoLedger> findByIdCompraItem(Long idCompraItem);
 
+    List<EventoLedger> findByIdEventoLedgerGreaterThanOrderByIdEventoLedgerAsc(
+        Long idEventoLedger, org.springframework.data.domain.Pageable pageable);
+
     @Query("""
         SELECT DISTINCT e.variante.idVariante
           FROM EventoLedger e

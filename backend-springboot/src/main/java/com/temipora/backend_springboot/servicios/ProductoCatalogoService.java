@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -16,6 +17,7 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.AnclajeLedger;
 import com.temipora.backend_springboot.modelo.CompraItem;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.DerechoTerminoDTO;
@@ -77,6 +79,7 @@ public class ProductoCatalogoService {
     private final LedgerService ledgerService;
     private final RecomendacionProductoService recomendacionProductoService;
     private final ReseniaPublicaService reseniaPublicaService;
+    private final AnclajeService anclajeService;
 
     public ProductoCatalogoService(
             ProductoRepository productoRepository,
@@ -87,7 +90,8 @@ public class ProductoCatalogoService {
             ConversionMonedaService conversionMonedaService,
             LedgerService ledgerService,
             RecomendacionProductoService recomendacionProductoService,
-            ReseniaPublicaService reseniaPublicaService) {
+            ReseniaPublicaService reseniaPublicaService,
+            AnclajeService anclajeService) {
         this.productoRepository = productoRepository;
         this.usuarioRepository = usuarioRepository;
         this.eventoLedgerRepository = eventoLedgerRepository;
@@ -97,6 +101,7 @@ public class ProductoCatalogoService {
         this.ledgerService = ledgerService;
         this.recomendacionProductoService = recomendacionProductoService;
         this.reseniaPublicaService = reseniaPublicaService;
+        this.anclajeService = anclajeService;
     }
 
     @Transactional(readOnly = true)
@@ -465,27 +470,69 @@ public class ProductoCatalogoService {
 
     private VarianteLedgerPublicoDTO aVarianteLedgerPublico(
             VarianteLedgerDTO variante) {
+        List<Long> idsEventos = variante.getEventos().stream()
+            .map(EventoLedgerDTO::getIdEventoLedger)
+            .filter(Objects::nonNull)
+            .toList();
+        Map<Long, AnclajeLedger> anclajes =
+            anclajeService.anclajesDeEventos(idsEventos);
+        AnclajeLedger mejor = anclajeDeMayorPuntaje(anclajes.values());
         return VarianteLedgerPublicoDTO.builder()
             .idVariante(variante.getIdVariante())
             .nombre(variante.getNombre())
             .tieneLedger(variante.isTieneLedger())
             .integridad(variante.isIntegridad())
             .mensaje(variante.getMensaje())
+            .codigoCertificado(variante.isTieneLedger()
+                    && variante.getIdVariante() != null
+                ? CodigoCertificado.codificar(variante.getIdVariante()) : null)
+            .anclado(mejor != null)
+            .fechaAnclaje(mejor != null ? fechaAnclaje(mejor) : null)
+            .bitcoinAltura(mejor != null ? mejor.getBitcoinAltura() : null)
             .eventos(variante.getEventos().stream()
-                .map(this::aEventoLedgerPublico)
+                .map(evento -> aEventoLedgerPublico(
+                    evento, anclajes.get(evento.getIdEventoLedger())))
                 .toList())
             .build();
     }
 
     private EventoLedgerPublicoDTO aEventoLedgerPublico(
-            EventoLedgerDTO evento) {
+            EventoLedgerDTO evento, AnclajeLedger anclaje) {
         return EventoLedgerPublicoDTO.builder()
             .idEventoLedger(evento.getIdEventoLedger())
             .secuencia(evento.getSecuencia())
             .tipo(evento.getTipo())
             .ocurridoEn(evento.getOcurridoEn())
             .verificado(evento.isVerificado())
+            .anclado(anclaje != null)
+            .fechaAnclaje(anclaje != null ? fechaAnclaje(anclaje) : null)
+            .bitcoinAltura(anclaje != null ? anclaje.getBitcoinAltura() : null)
             .build();
+    }
+
+    private AnclajeLedger anclajeDeMayorPuntaje(Collection<AnclajeLedger> anclajes) {
+        AnclajeLedger mejor = null;
+        for (AnclajeLedger anclaje : anclajes) {
+            if (mejor == null
+                    || puntajeAnclaje(anclaje) > puntajeAnclaje(mejor)) {
+                mejor = anclaje;
+            }
+        }
+        return mejor;
+    }
+
+    private int puntajeAnclaje(AnclajeLedger anclaje) {
+        return switch (anclaje.getEstado()) {
+            case CONFIRMADO -> 2;
+            case PENDIENTE -> 1;
+            case FALLIDO -> 0;
+        };
+    }
+
+    private java.time.LocalDateTime fechaAnclaje(AnclajeLedger anclaje) {
+        return anclaje.getFechaConfirmacion() != null
+            ? anclaje.getFechaConfirmacion()
+            : anclaje.getFechaSolicitud();
     }
 
     private Producto obtenerEntidadPublica(Long idProducto) {

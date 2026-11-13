@@ -148,7 +148,9 @@ public final class CatalogoAuditoria {
             AccionesAdmin.TERMINOS_ACEPTAR);
 
         registrar(CategoriaAuditoria.SISTEMA,
-            AccionesAdmin.COTIZACION_REFRESCAR);
+            AccionesAdmin.COTIZACION_REFRESCAR,
+            AccionesAdmin.LEDGER_ANCLAR,
+            AccionesAdmin.LEDGER_ANCLAJE_CONFIRMAR);
 
         criticas(
             AccionesAdmin.PRESUPUESTO_CREAR,

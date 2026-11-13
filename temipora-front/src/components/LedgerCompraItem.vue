@@ -4,6 +4,7 @@ import { formatearPrecio } from '../servicios/moneda'
 import { etiquetaEvento } from '../servicios/ledger'
 import { cargarLedgerCompraItem } from '../servicios/compras'
 import BurbujaInfo from './BurbujaInfo.vue'
+import ChipAnclaje from './ChipAnclaje.vue'
 
 const props = defineProps({
   idCompra: { type: Number, required: true },
@@ -81,14 +82,28 @@ function fecha(valor) {
         >
           {{ ledger.integridad ? 'Verificado' : 'Revisar' }}
         </span>
+        <ChipAnclaje
+          v-if="ledger"
+          :anclado="ledger.anclado"
+          :bitcoin-altura="ledger.bitcoinAltura"
+        />
       </div>
-      <button
-        type="button"
-        class="rounded-full border border-rosa bg-blanco px-3 py-1.5 text-[11px] font-semibold text-granate transition hover:bg-rosa/20"
-        @click="alternar"
-      >
-        {{ abierto ? 'Ocultar historial' : 'Ver historial completo' }}
-      </button>
+      <div class="flex flex-wrap items-center gap-2">
+        <router-link
+          v-if="ledger?.codigoCertificado"
+          :to="{ name: 'certificado-publico', params: { codigo: ledger.codigoCertificado } }"
+          class="rounded-full border border-coral/40 bg-coral/10 px-3 py-1.5 text-[11px] font-semibold text-coral transition hover:bg-coral/20"
+        >
+          Ver certificado
+        </router-link>
+        <button
+          type="button"
+          class="rounded-full border border-rosa bg-blanco px-3 py-1.5 text-[11px] font-semibold text-granate transition hover:bg-rosa/20"
+          @click="alternar"
+        >
+          {{ abierto ? 'Ocultar historial' : 'Ver historial completo' }}
+        </button>
+      </div>
     </div>
 
     <div v-if="abierto" class="mt-3">

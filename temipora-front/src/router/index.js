@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../components/Login.vue'
 import Usuarios from '../components/Usuarios.vue'
 import SancionesAdmin from '../components/SancionesAdmin.vue'
+import AnclajeAdmin from '../components/AnclajeAdmin.vue'
 import TiposAdmin from '../components/TiposAdmin.vue'
 import EtiquetasAdmin from '../components/EtiquetasAdmin.vue'
 import CategoriasEtiquetaAdmin from '../components/CategoriasEtiquetaAdmin.vue'
@@ -77,6 +78,7 @@ import MiReventa from '../views/MiReventa.vue'
 import Carrito from '../views/Carrito.vue'
 import MisCompras from '../views/MisCompras.vue'
 import CompraDetalle from '../views/CompraDetalle.vue'
+import CertificadoPublico from '../views/CertificadoPublico.vue'
 import ServiciosArchivados from '../views/ServiciosArchivados.vue'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useConfirmacionSalida } from '../composables/useConfirmacionSalida'
@@ -107,6 +109,10 @@ const routes = [
       { path: 'reventas/:id', name: 'reventa-publica', component: ReventaPublica,
         props: (route) => ({ id: Number(route.params.id) }),
         meta: { title: 'Detalle de la reventa' }
+      },
+      { path: 'certificado/:codigo', name: 'certificado-publico', component: CertificadoPublico,
+        props: (route) => ({ codigo: String(route.params.codigo) }),
+        meta: { title: (route) => `Certificado ${route.params.codigo}` }
       },
       {
         path: 'carrito',
@@ -363,6 +369,12 @@ const routes = [
         name: 'admin-sanciones',
         component: SancionesAdmin,
         meta: { title: 'Sanciones de cuentas' },
+      },
+      {
+        path: 'anclaje',
+        name: 'admin-anclaje',
+        component: AnclajeAdmin,
+        meta: { title: 'Anclaje en Bitcoin' },
       },
       {
         path: 'tipos/producto',

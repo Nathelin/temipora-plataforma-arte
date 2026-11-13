@@ -29,6 +29,7 @@ import com.temipora.backend_springboot.modelo.Compra;
 import com.temipora.backend_springboot.modelo.CompraDTO;
 import com.temipora.backend_springboot.modelo.CompraGrupo;
 import com.temipora.backend_springboot.modelo.CompraGrupoDTO;
+import com.temipora.backend_springboot.modelo.AnclajeLedger;
 import com.temipora.backend_springboot.modelo.CompraItem;
 import com.temipora.backend_springboot.modelo.CompraItemDTO;
 import com.temipora.backend_springboot.modelo.CompraLedgerDTO;
@@ -104,6 +105,7 @@ public class CompraService {
     private final ProductoVarianteImagenRepository varianteImagenRepository;
     private final EventoLedgerRepository eventoLedgerRepository;
     private final LedgerService ledgerService;
+    private final AnclajeService anclajeService;
     private final String proveedorPago;
     private final int reservaMinutos;
 
@@ -122,6 +124,7 @@ public class CompraService {
             ProductoVarianteImagenRepository varianteImagenRepository,
             EventoLedgerRepository eventoLedgerRepository,
             LedgerService ledgerService,
+            AnclajeService anclajeService,
             @Value("${pagos.proveedor:simulado}") String proveedorPago,
             @Value("${compra.reserva-minutos:30}") int reservaMinutos) {
         this.compraRepository = compraRepository;
@@ -138,6 +141,7 @@ public class CompraService {
         this.varianteImagenRepository = varianteImagenRepository;
         this.eventoLedgerRepository = eventoLedgerRepository;
         this.ledgerService = ledgerService;
+        this.anclajeService = anclajeService;
         this.proveedorPago = proveedorPago;
         this.reservaMinutos = reservaMinutos;
     }
@@ -381,6 +385,12 @@ public class CompraService {
             })
             .toList();
 
+        List<Long> idsEventos = eventos.stream()
+            .map(EventoLedger::getIdEventoLedger)
+            .toList();
+        AnclajeLedger anclaje = anclajeService.mejorAnclajeDeEventos(idsEventos)
+            .orElse(null);
+
         return CompraLedgerDTO.builder()
             .idCompra(idCompra)
             .idCompraItem(item.getIdCompraItem())
@@ -391,6 +401,16 @@ public class CompraService {
             .tieneLedger(verificacion.isTieneLedger())
             .integridad(verificacion.isIntegridad())
             .mensaje(verificacion.getMensaje())
+            .codigoCertificado(verificacion.isTieneLedger()
+                ? CodigoCertificado.codificar(item.getVariante().getIdVariante())
+                : null)
+            .anclado(anclaje != null)
+            .bitcoinAltura(anclaje != null ? anclaje.getBitcoinAltura() : null)
+            .fechaAnclaje(anclaje != null
+                ? (anclaje.getFechaConfirmacion() != null
+                    ? anclaje.getFechaConfirmacion()
+                    : anclaje.getFechaSolicitud())
+                : null)
             .eventos(dtos)
             .build();
     }

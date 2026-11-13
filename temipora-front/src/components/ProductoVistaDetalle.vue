@@ -842,6 +842,10 @@ watch(
               :estado="estadoDeVariante(varianteLedger.idVariante)"
               :eventos="varianteLedger.eventos"
               :integridad="varianteLedger.integridad"
+              :anclado="varianteLedger.anclado"
+              :bitcoin-altura="varianteLedger.bitcoinAltura"
+              :fecha-anclaje="varianteLedger.fechaAnclaje"
+              :codigo-certificado="varianteLedger.codigoCertificado"
               @ver-historial="abrirHistorial(varianteLedger)"
             />
           </div>

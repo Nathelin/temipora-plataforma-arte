@@ -24,6 +24,7 @@ import {
   Percent,
   Receipt,
   ShieldAlert,
+  ShieldCheck,
   Star,
   Tags,
   Users,
@@ -115,6 +116,7 @@ const grupos = [
     items: [
       { nombre: 'Países', to: '/admin/ajustes/paises', icono: Globe },
       { nombre: 'Mensajería', to: '/admin/ajustes/mensajeria', icono: MessageSquare },
+      { nombre: 'Anclaje en Bitcoin', to: '/admin/anclaje', icono: ShieldCheck },
       { nombre: 'Términos de la plataforma', to: '/admin/ajustes/terminos-plataforma', icono: FileText },
     ],
   },
