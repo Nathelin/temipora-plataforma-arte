@@ -52,6 +52,13 @@ public class Resenia {
     @JoinColumn(name = "id_compra_item")
     private CompraItem compraItem;
 
+    @Size(max = 500, message = "Las variantes compradas no pueden superar los 500 caracteres")
+    @Column(name = "variantes_compradas", length = 500)
+    private String variantesCompradas;
+
+    @Column(name = "cantidad_variantes_compradas", nullable = false)
+    private int cantidadVariantesCompradas = 0;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "id_autor", nullable = false)
     private Usuario autor;

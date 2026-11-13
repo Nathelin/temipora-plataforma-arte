@@ -26,6 +26,8 @@ public class ReseniaDTO {
     private String nombreProducto;
     private String nombreVariante;
     private boolean compraVerificada;
+    private String variantesCompradas;
+    private int cantidadVariantesCompradas;
     private AmbitoResenia direccion;
     private UsuarioResumenDTO autor;
     private EstadoResenia estado;
@@ -59,6 +61,8 @@ public class ReseniaDTO {
             .nombreProducto(producto != null ? producto.getTitulo() : null)
             .nombreVariante(compra != null ? compra.getNombreVariante() : null)
             .compraVerificada(producto != null)
+            .variantesCompradas(resenia.getVariantesCompradas())
+            .cantidadVariantesCompradas(resenia.getCantidadVariantesCompradas())
             .direccion(resenia.getAmbito())
             .autor(UsuarioResumenDTO.desdeUsuario(resenia.getAutor()))
             .estado(resenia.getEstado())

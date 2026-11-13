@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -263,6 +264,7 @@ public class ReseniaService {
         resenia.setAmbito(AmbitoResenia.PRODUCTO);
         resenia.setProducto(producto);
         resenia.setCompraItem(compra);
+        aplicarVariantesCompradas(resenia, idProducto, idUsuario);
         resenia.setAutor(autor);
         resenia.setEstado(EstadoResenia.PUBLICADA);
         resenia.setMostrarNombre(mostrarNombre(request, true));
@@ -303,6 +305,7 @@ public class ReseniaService {
         resenia.agregarVersion(nuevaVersion);
         resenia.setMostrarNombre(
             mostrarNombre(request, resenia.isMostrarNombre()));
+        aplicarVariantesCompradas(resenia, idProducto, idUsuario);
         resenia.setFechaActualizacion(LocalDateTime.now());
 
         Resenia guardada = reseniaRepository.save(resenia);
@@ -610,6 +613,31 @@ public class ReseniaService {
         return compraItemRepository
             .findFirstByProductoIdProductoAndGrupoCompraClienteIdUsuarioAndGrupoEstadoOrderByGrupoFechaPagoDesc(
                 idProducto, idUsuario, EstadoCompraGrupo.PAGADO);
+    }
+
+    private void aplicarVariantesCompradas(
+            Resenia resenia, Long idProducto, Long idUsuario) {
+        List<CompraItem> compras = compraItemRepository.findPagadosDeProducto(
+            idProducto, idUsuario, EstadoCompraGrupo.PAGADO);
+        LinkedHashSet<String> variantes = new LinkedHashSet<>();
+        for (CompraItem item : compras) {
+            String nombre = item.getNombreVariante();
+            if (nombre != null && !nombre.isBlank()) {
+                variantes.add(nombre.trim());
+            }
+        }
+        if (variantes.isEmpty() && resenia.getCompraItem() != null) {
+            String nombre = resenia.getCompraItem().getNombreVariante();
+            if (nombre != null && !nombre.isBlank()) {
+                variantes.add(nombre.trim());
+            }
+        }
+        String resumen = String.join(" · ", variantes);
+        if (resumen.length() > 500) {
+            resumen = resumen.substring(0, 500);
+        }
+        resenia.setVariantesCompradas(resumen.isEmpty() ? null : resumen);
+        resenia.setCantidadVariantesCompradas(variantes.size());
     }
 
     private LocalDateTime limiteCreacionProducto(

@@ -569,6 +569,8 @@ public class ReseniaPublicaService {
                 .nombreProducto(producto != null ? producto.getTitulo() : null)
                 .nombreVariante(compra != null ? compra.getNombreVariante() : null)
                 .compraVerificada(producto != null)
+                .variantesCompradas(resenia.getVariantesCompradas())
+                .cantidadVariantesCompradas(resenia.getCantidadVariantesCompradas())
                 .calificacionGeneral(version != null
                     ? version.getCalificacionGeneral()
                     : 0)

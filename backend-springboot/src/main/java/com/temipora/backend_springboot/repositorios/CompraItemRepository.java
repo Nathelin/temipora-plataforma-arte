@@ -33,6 +33,24 @@ public interface CompraItemRepository extends JpaRepository<CompraItem, Long> {
     Optional<CompraItem> findFirstByProductoIdProductoAndGrupoCompraClienteIdUsuarioAndGrupoEstadoOrderByGrupoFechaPagoDesc(
             Long idProducto, Long idUsuario, EstadoCompraGrupo estado);
 
+    /**
+     * Todas las compras pagadas de un usuario para un producto, incluidas las
+     * de distintas variantes y las reventas. Se usa para dejar constancia en la
+     * reseña de cuántas variantes compró.
+     */
+    @Query("""
+        SELECT i FROM CompraItem i
+        JOIN FETCH i.grupo g
+        WHERE i.producto.idProducto = :idProducto
+          AND g.compra.cliente.idUsuario = :idUsuario
+          AND g.estado = :estado
+        ORDER BY g.fechaPago ASC, i.idCompraItem ASC
+        """)
+    List<CompraItem> findPagadosDeProducto(
+        @Param("idProducto") Long idProducto,
+        @Param("idUsuario") Long idUsuario,
+        @Param("estado") EstadoCompraGrupo estado);
+
     Optional<CompraItem> findByIdCompraItemAndGrupoCompraClienteIdUsuario(
             Long idCompraItem, Long idUsuario);
 

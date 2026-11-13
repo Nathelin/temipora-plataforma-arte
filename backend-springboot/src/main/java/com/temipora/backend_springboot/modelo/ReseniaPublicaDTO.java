@@ -25,6 +25,8 @@ public class ReseniaPublicaDTO {
     private String nombreProducto;
     private String nombreVariante;
     private boolean compraVerificada;
+    private String variantesCompradas;
+    private int cantidadVariantesCompradas;
     private int calificacionGeneral;
     private String descripcion;
     private LocalDateTime fechaVersion;

@@ -70,15 +70,32 @@ const totalProductos = computed(() => {
   return productos.size
 })
 
-const itemsReseniables = computed(() => {
-  const ids = new Set()
+const productosReseniables = computed(() => {
+  const mapa = new Map()
   for (const grupo of grupos.value) {
     if (grupo.estado !== 'PAGADO') continue
     for (const item of grupo.items || []) {
-      if (item.idProducto) ids.add(item.idProducto)
+      if (!item.idProducto) continue
+      let producto = mapa.get(item.idProducto)
+      if (!producto) {
+        producto = {
+          idProducto: item.idProducto,
+          titulo: item.tituloProducto,
+          imagenUrl: item.imagenUrl,
+          variantes: new Set(),
+          items: [],
+        }
+        mapa.set(item.idProducto, producto)
+      }
+      producto.items.push(item)
+      const variante = String(item.nombreVariante || '').trim()
+      if (variante) producto.variantes.add(variante)
     }
   }
-  return [...ids]
+  return [...mapa.values()].map((producto) => ({
+    ...producto,
+    variantes: [...producto.variantes],
+  }))
 })
 
 function estadoDeProducto(idProducto) {
@@ -86,7 +103,7 @@ function estadoDeProducto(idProducto) {
 }
 
 async function cargarResenias() {
-  const ids = itemsReseniables.value
+  const ids = productosReseniables.value.map((producto) => producto.idProducto)
   if (!ids.length) {
     estadosResenia.value = {}
     return
@@ -184,9 +201,11 @@ async function cargar() {
     }
     await cargarResenias()
   } catch (e) {
-    error.value = e.response?.status === 403
-      ? 'No tenés acceso a esta compra.'
-      : (e.response?.data?.message || 'No se pudo cargar la compra.')
+    error.value = e.response?.status === 404
+      ? 'No encontramos esta compra en tu cuenta. Verificá que hayas iniciado sesión con el usuario que la hizo.'
+      : e.response?.status === 403
+        ? 'No tenés acceso a esta compra.'
+        : (e.response?.data?.message || 'No se pudo cargar la compra.')
   } finally {
     cargando.value = false
   }
@@ -580,72 +599,6 @@ onBeforeUnmount(() => {
                 :id-compra="compra.idCompra"
                 :item="item"
               />
-
-              <div
-                v-if="grupo.estado === 'PAGADO' && item.idProducto && estadoDeProducto(item.idProducto)"
-                class="mt-4 border-t border-rosa/40 pt-4"
-              >
-                <FormularioResenia
-                  v-if="reseniaEnEdicion === item.idProducto"
-                  :criterios="criteriosProducto"
-                  :resenia="estadoDeProducto(item.idProducto).miResenia"
-                  :guardando="guardandoResenia"
-                  :titulo="estadoDeProducto(item.idProducto).miResenia
-                    ? 'Editar tu reseña'
-                    : 'Reseñar este producto'"
-                  descripcion-ayuda="Solo evaluás la pieza: calidad, fidelidad a lo publicado y presentación. No se evalúa al artista ni al comprador."
-                  :texto-guardar="estadoDeProducto(item.idProducto).miResenia
-                    ? 'Guardar la única edición'
-                    : 'Publicar reseña'"
-                  :anonimo-forzado="estadoDeProducto(item.idProducto).anonimoForzado"
-                  etiqueta-anonima="Comprador verificado"
-                  placeholder-descripcion="Contá cómo es la pieza, su calidad y si coincide con lo publicado"
-                  @guardar="guardarResenia(item.idProducto, $event)"
-                  @cancelar="cerrarFormulario"
-                />
-
-                <template v-else>
-                  <TarjetaResenia
-                    v-if="estadoDeProducto(item.idProducto).miResenia"
-                    :resenia="estadoDeProducto(item.idProducto).miResenia"
-                    titulo="Tu reseña del producto"
-                    :puede-editar="estadoDeProducto(item.idProducto).puedeEditar"
-                    :puede-eliminar="estadoDeProducto(item.idProducto).puedeEliminar"
-                    :fecha-limite-edicion="estadoDeProducto(item.idProducto).fechaLimiteEdicion"
-                    @editar="abrirFormulario(item.idProducto)"
-                    @eliminar="pedirEliminarResenia(item.idProducto, item.tituloProducto)"
-                  />
-
-                  <div
-                    v-if="!estadoDeProducto(item.idProducto).miResenia
-                      && estadoDeProducto(item.idProducto).puedeCrear"
-                    class="flex flex-wrap items-center justify-between gap-3"
-                  >
-                    <div>
-                      <p class="text-sm font-semibold text-granate">
-                        Reseñá este producto
-                      </p>
-                      <p class="text-xs text-cafe/55">
-                        La reseña queda vinculada a tu compra. Podés elegir si mostrás tu nombre.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      class="rounded-lg bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-rojizo"
-                      @click="abrirFormulario(item.idProducto)"
-                    >
-                      Escribir reseña
-                    </button>
-                  </div>
-
-                  <p
-                    v-if="estadoDeProducto(item.idProducto).motivoNoDisponible"
-                    class="mt-2 text-xs text-cafe/50"
-                  >
-                    {{ estadoDeProducto(item.idProducto).motivoNoDisponible }}
-                  </p>
-                </template>
-              </div>
             </article>
           </div>
 
@@ -691,6 +644,113 @@ onBeforeUnmount(() => {
           </div>
         </section>
       </div>
+
+      <section v-if="productosReseniables.length" class="mt-6 space-y-4">
+        <div>
+          <h2 class="font-display text-xl font-bold text-granate">
+            Reseñas de productos
+          </h2>
+          <p class="mt-1 text-sm text-cafe/60">
+            Cada producto se reseña una sola vez, aunque hayas comprado varias variantes.
+          </p>
+        </div>
+
+        <article
+          v-for="producto in productosReseniables"
+          :key="producto.idProducto"
+          class="rounded-[22px] border border-borde/60 bg-superficie p-5 shadow-sm"
+        >
+          <div class="flex items-start gap-3">
+            <img
+              v-if="producto.imagenUrl"
+              :src="producto.imagenUrl"
+              alt=""
+              class="h-16 w-16 shrink-0 rounded-xl border border-borde/50 object-cover"
+            />
+            <div class="min-w-0">
+              <p class="font-display text-base font-bold text-granate">
+                {{ producto.titulo }}
+              </p>
+              <p v-if="producto.variantes.length === 1" class="mt-1 text-xs text-cafe/60">
+                Compraste la variante
+                <strong class="text-cafe/80">{{ producto.variantes[0] }}</strong>.
+              </p>
+              <p v-else-if="producto.variantes.length > 1" class="mt-1 text-xs text-cafe/60">
+                Compraste
+                <strong class="text-cafe/80">{{ producto.variantes.length }} variantes</strong>:
+                {{ producto.variantes.join(' · ') }}.
+              </p>
+              <p class="mt-2 rounded-lg bg-rosa/10 px-3 py-2 text-xs leading-relaxed text-cafe/70">
+                La reseña es del producto y se publica
+                <strong>una sola vez</strong>, aunque hayas comprado varias variantes.
+              </p>
+            </div>
+          </div>
+
+          <div v-if="estadoDeProducto(producto.idProducto)" class="mt-4">
+            <FormularioResenia
+              v-if="reseniaEnEdicion === producto.idProducto"
+              :criterios="criteriosProducto"
+              :resenia="estadoDeProducto(producto.idProducto).miResenia"
+              :guardando="guardandoResenia"
+              :titulo="estadoDeProducto(producto.idProducto).miResenia
+                ? 'Editar tu reseña'
+                : 'Reseñar este producto'"
+              descripcion-ayuda="Solo evaluás la pieza: calidad, fidelidad a lo publicado y presentación. La reseña se publica una sola vez por producto, aunque hayas comprado varias variantes."
+              :texto-guardar="estadoDeProducto(producto.idProducto).miResenia
+                ? 'Guardar la única edición'
+                : 'Publicar reseña'"
+              :anonimo-forzado="estadoDeProducto(producto.idProducto).anonimoForzado"
+              etiqueta-anonima="Comprador verificado"
+              placeholder-descripcion="Contá cómo es la pieza, su calidad y si coincide con lo publicado"
+              @guardar="guardarResenia(producto.idProducto, $event)"
+              @cancelar="cerrarFormulario"
+            />
+
+            <template v-else>
+              <TarjetaResenia
+                v-if="estadoDeProducto(producto.idProducto).miResenia"
+                :resenia="estadoDeProducto(producto.idProducto).miResenia"
+                titulo="Tu reseña del producto"
+                :puede-editar="estadoDeProducto(producto.idProducto).puedeEditar"
+                :puede-eliminar="estadoDeProducto(producto.idProducto).puedeEliminar"
+                :fecha-limite-edicion="estadoDeProducto(producto.idProducto).fechaLimiteEdicion"
+                @editar="abrirFormulario(producto.idProducto)"
+                @eliminar="pedirEliminarResenia(producto.idProducto, producto.titulo)"
+              />
+
+              <div
+                v-if="!estadoDeProducto(producto.idProducto).miResenia
+                  && estadoDeProducto(producto.idProducto).puedeCrear"
+                class="flex flex-wrap items-center justify-between gap-3"
+              >
+                <div>
+                  <p class="text-sm font-semibold text-granate">
+                    Reseñá este producto
+                  </p>
+                  <p class="text-xs text-cafe/55">
+                    La reseña se publica una sola vez y queda vinculada a tu compra.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="rounded-lg bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-rojizo"
+                  @click="abrirFormulario(producto.idProducto)"
+                >
+                  Escribir reseña
+                </button>
+              </div>
+
+              <p
+                v-if="estadoDeProducto(producto.idProducto).motivoNoDisponible"
+                class="mt-2 text-xs text-cafe/50"
+              >
+                {{ estadoDeProducto(producto.idProducto).motivoNoDisponible }}
+              </p>
+            </template>
+          </div>
+        </article>
+      </section>
 
       <div
         v-if="pagoSimulado"

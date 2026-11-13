@@ -379,7 +379,8 @@ watch(() => props.id, cargar)
         Reseñas del producto
       </h2>
       <p class="mt-1 text-sm text-cafe/55">
-        Opiniones de personas que compraron esta pieza.
+        Opiniones de personas que compraron esta pieza. La reseña es del producto
+        y se publica una sola vez, aunque se hayan comprado varias variantes.
       </p>
       <div class="mt-5">
         <ListaResenias

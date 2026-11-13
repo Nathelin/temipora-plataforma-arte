@@ -135,6 +135,14 @@ function claseOpcion(opcion) {
       {{ resenia.descripcion }}
     </p>
 
+    <p
+      v-if="resenia.cantidadVariantesCompradas > 1"
+      class="mt-3 rounded-lg bg-rosa/10 px-3 py-2 text-xs leading-relaxed text-cafe/70"
+    >
+      Compró {{ resenia.cantidadVariantesCompradas }} variantes:
+      <strong class="text-cafe/85">{{ resenia.variantesCompradas }}</strong>.
+    </p>
+
     <dl v-if="resenia.valores?.length" class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
       <div
         v-for="valor in resenia.valores"

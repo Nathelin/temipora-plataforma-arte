@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { formatearPrecio } from '../servicios/moneda'
 import {
@@ -125,7 +125,7 @@ async function cargarResenias(pagina = 0) {
   cargandoReseniasProducto.value = true
   errorReseniasProducto.value = ''
   try {
-    const data = await cargarReseniasProductoApi(idProducto.value, {
+    const { data } = await cargarReseniasProductoApi(idProducto.value, {
       calificacion: filtrosReseniasProducto.value.calificacion || undefined,
       orden: filtrosReseniasProducto.value.orden || 'RECIENTES',
       pagina,
@@ -149,6 +149,15 @@ function cambiarFiltrosResenias(nuevos) {
 
 function cambiarPaginaResenias(pagina) {
   cargarResenias(pagina)
+}
+
+async function irASeccionResenias() {
+  if (route.hash !== '#resenias') return
+  await nextTick()
+  document.getElementById('resenias')?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start',
+  })
 }
 
 async function cargar() {
@@ -179,6 +188,7 @@ async function cargar() {
   } finally {
     cargando.value = false
   }
+  await irASeccionResenias()
 }
 
 async function cambiarPaginaVariantes(paso) {
@@ -251,6 +261,9 @@ async function alternarFavorito() {
 }
 
 watch(idProducto, cargar)
+watch(() => route.hash, () => {
+  void irASeccionResenias()
+})
 onMounted(cargar)
 </script>
 
@@ -325,12 +338,13 @@ onMounted(cargar)
         </ProductoVistaDetalle>
       </div>
 
-      <section class="mt-10 border-t border-rosa/40 pt-8">
+      <section id="resenias" class="mt-10 scroll-mt-24 border-t border-rosa/40 pt-8">
         <h2 class="font-display text-2xl font-bold text-granate">
           Reseñas del producto
         </h2>
         <p class="mt-1 text-sm text-cafe/60">
-          Opiniones de personas que compraron esta pieza.
+          Opiniones de personas que compraron esta pieza. La reseña es del producto
+          y se publica una sola vez, aunque se hayan comprado varias variantes.
         </p>
         <div class="mt-5">
           <ListaResenias

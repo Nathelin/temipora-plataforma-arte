@@ -617,6 +617,41 @@ class ReseniaServiceTest {
         assertThat(dto.isMostrarNombre()).isTrue();
     }
 
+    @Test
+    void crearProducto_conVariasVariantes_guardaElResumenDeVariantes() {
+        Producto producto = producto(50L, "Obra original");
+        CompraItem compra = compra(LocalDateTime.now().minusDays(1));
+        CompraItem otra = compra(LocalDateTime.now().minusDays(2));
+        otra.setNombreVariante("Edición limitada");
+        when(productoRepository.findByIdProducto(50L))
+            .thenReturn(Optional.of(producto));
+        when(compraItemRepository
+            .findFirstByProductoIdProductoAndGrupoCompraClienteIdUsuarioAndGrupoEstadoOrderByGrupoFechaPagoDesc(
+                50L, 10L, EstadoCompraGrupo.PAGADO))
+            .thenReturn(Optional.of(compra));
+        when(compraItemRepository.findPagadosDeProducto(
+            50L, 10L, EstadoCompraGrupo.PAGADO))
+            .thenReturn(List.of(compra, otra));
+        when(configuracionService.obtener()).thenReturn(config(30, 3, 3));
+        when(reseniaRepository.existsByProductoIdProductoAndAutorIdUsuario(50L, 10L))
+            .thenReturn(false);
+        when(usuarioRepository.findByIdUsuario(10L))
+            .thenReturn(Optional.of(usuario(10L, "cliente10")));
+        when(criterioRepository
+            .findByActivoTrueAndAmbitoOrderByOrdenAscNombreAsc(AmbitoResenia.PRODUCTO))
+            .thenReturn(List.of());
+        when(reseniaRepository.save(any(Resenia.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        ReseniaDTO dto = reseniaService.crearProducto(50L, 10L,
+            request(5, List.of(), List.of()));
+
+        assertThat(dto.getCantidadVariantesCompradas()).isEqualTo(2);
+        assertThat(dto.getVariantesCompradas())
+            .contains("Original")
+            .contains("Edición limitada");
+    }
+
     // -----------------------------------------------------------------
     // helpers
     // -----------------------------------------------------------------
