@@ -70,6 +70,30 @@ const totalProductos = computed(() => {
   return productos.size
 })
 
+const gruposAbiertos = ref(new Set())
+let compraAcordeonId = null
+
+function esGrupoAbierto(grupo) {
+  return gruposAbiertos.value.has(grupo.idCompraGrupo)
+}
+
+function alternarGrupo(grupo) {
+  const id = grupo.idCompraGrupo
+  const siguiente = new Set(gruposAbiertos.value)
+  if (siguiente.has(id)) siguiente.delete(id)
+  else siguiente.add(id)
+  gruposAbiertos.value = siguiente
+}
+
+function inicializarAcordeon() {
+  const idCompraActual = compra.value?.idCompra
+  if (idCompraActual === compraAcordeonId) return
+  compraAcordeonId = idCompraActual
+  gruposAbiertos.value = grupos.value.length
+    ? new Set([grupos.value[0].idCompraGrupo])
+    : new Set()
+}
+
 const productosReseniables = computed(() => {
   const mapa = new Map()
   for (const grupo of grupos.value) {
@@ -190,6 +214,7 @@ async function cargar() {
   error.value = ''
   try {
     compra.value = await cargarCompra(idCompra.value)
+    inicializarAcordeon()
     if (route.query.pago) {
       await sincronizar(true)
       const limpia = { ...route.query }
@@ -457,7 +482,7 @@ onBeforeUnmount(() => {
                 </p>
               </div>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center justify-end gap-3">
               <span
                 class="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
                 :class="estadoGrupoDe(grupo.estado).clase"
@@ -467,6 +492,28 @@ onBeforeUnmount(() => {
               <p class="font-display text-lg font-bold text-granate">
                 {{ formatearPrecio(grupo.subtotal, grupo.moneda || 'ARS') }}
               </p>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 rounded-full border border-rosa bg-blanco px-3 py-1.5 text-xs font-semibold text-cafe transition hover:bg-rosa/20"
+                :aria-expanded="esGrupoAbierto(grupo)"
+                :aria-controls="`grupo-items-${grupo.idCompraGrupo}`"
+                @click="alternarGrupo(grupo)"
+              >
+                {{ esGrupoAbierto(grupo)
+                  ? 'Ocultar productos'
+                  : `Ver ${grupo.items.length} ${grupo.items.length === 1 ? 'producto' : 'productos'}` }}
+                <svg
+                  class="h-3.5 w-3.5 transition-transform"
+                  :class="{ 'rotate-180': esGrupoAbierto(grupo) }"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -474,7 +521,11 @@ onBeforeUnmount(() => {
             {{ grupo.mensajePago }}
           </p>
 
-          <div class="mt-4 divide-y divide-rosa/40">
+          <div
+            v-show="esGrupoAbierto(grupo)"
+            :id="`grupo-items-${grupo.idCompraGrupo}`"
+            class="mt-4 divide-y divide-rosa/40"
+          >
             <article
               v-for="item in grupo.items"
               :key="item.idCompraItem"
@@ -646,14 +697,9 @@ onBeforeUnmount(() => {
       </div>
 
       <section v-if="productosReseniables.length" class="mt-6 space-y-4">
-        <div>
-          <h2 class="font-display text-xl font-bold text-granate">
-            Reseñas de productos
-          </h2>
-          <p class="mt-1 text-sm text-cafe/60">
-            Cada producto se reseña una sola vez, aunque hayas comprado varias variantes.
-          </p>
-        </div>
+        <h2 class="font-display text-xl font-bold text-granate">
+          Reseñas de productos
+        </h2>
 
         <article
           v-for="producto in productosReseniables"
@@ -680,7 +726,10 @@ onBeforeUnmount(() => {
                 <strong class="text-cafe/80">{{ producto.variantes.length }} variantes</strong>:
                 {{ producto.variantes.join(' · ') }}.
               </p>
-              <p class="mt-2 rounded-lg bg-rosa/10 px-3 py-2 text-xs leading-relaxed text-cafe/70">
+              <p
+                v-if="producto.variantes.length > 1"
+                class="mt-2 rounded-lg bg-rosa/10 px-3 py-2 text-xs leading-relaxed text-cafe/70"
+              >
                 La reseña es del producto y se publica
                 <strong>una sola vez</strong>, aunque hayas comprado varias variantes.
               </p>
@@ -696,7 +745,7 @@ onBeforeUnmount(() => {
               :titulo="estadoDeProducto(producto.idProducto).miResenia
                 ? 'Editar tu reseña'
                 : 'Reseñar este producto'"
-              descripcion-ayuda="Solo evaluás la pieza: calidad, fidelidad a lo publicado y presentación. La reseña se publica una sola vez por producto, aunque hayas comprado varias variantes."
+              descripcion-ayuda="Solo evaluás la pieza: calidad, fidelidad a lo publicado y presentación."
               :texto-guardar="estadoDeProducto(producto.idProducto).miResenia
                 ? 'Guardar la única edición'
                 : 'Publicar reseña'"
@@ -729,7 +778,7 @@ onBeforeUnmount(() => {
                     Reseñá este producto
                   </p>
                   <p class="text-xs text-cafe/55">
-                    La reseña se publica una sola vez y queda vinculada a tu compra.
+                    La reseña queda vinculada a tu compra.
                   </p>
                 </div>
                 <button
