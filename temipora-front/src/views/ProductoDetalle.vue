@@ -112,7 +112,7 @@ onMounted(cargar)
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-screen-2xl px-4 py-8 sm:px-8">
+  <div>
     <router-link
       to="/panel/productos"
       class="text-sm text-granate transition hover:text-coral"

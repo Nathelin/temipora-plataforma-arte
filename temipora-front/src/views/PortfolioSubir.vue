@@ -700,15 +700,14 @@ function urlsSinPublicar() {
 </script>
 
 <template>
-  <div class="w-full">
-    <div class="mx-auto px-4 sm:px-8 py-8">
-      <button
-        type="button"
-        class="text-sm text-granate hover:text-coral transition"
-        @click="cancelar"
-      >
-        ← Volver al portfolio
-      </button>
+  <div>
+    <button
+      type="button"
+      class="text-sm text-granate hover:text-coral transition"
+      @click="cancelar"
+    >
+      ← Volver al portfolio
+    </button>
 
       <PageHeader
         class="mt-4 mb-6"
@@ -1096,6 +1095,5 @@ function urlsSinPublicar() {
           <div class="h-full bg-coral transition-all duration-150" :style="{ width: progreso + '%' }"></div>
         </div>
       </template>
-    </div>
   </div>
 </template>

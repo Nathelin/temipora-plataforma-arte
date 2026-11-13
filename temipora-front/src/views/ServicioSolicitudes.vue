@@ -125,7 +125,7 @@ onMounted(cargar)
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
+  <div>
     <router-link
       to="/panel/servicios"
       class="inline-flex items-center gap-1.5 text-sm font-medium text-coral transition hover:text-rojizo"

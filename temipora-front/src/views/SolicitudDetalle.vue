@@ -22,6 +22,7 @@ import { cargarResumenReseniasArtista, formatearPromedio } from '../servicios/re
 
 const route = useRoute()
 const router = useRouter()
+const enPanel = computed(() => route.path.startsWith('/panel'))
 
 const solicitud = ref(null)
 const pestanaActiva = ref('presupuesto')
@@ -359,7 +360,7 @@ async function confirmarCancelacion(motivo) {
 }
 
 function volver() {
-  const destino = route.path.startsWith('/panel') ? 'panel-solicitudes' : 'solicitudes'
+  const destino = enPanel.value ? 'panel-solicitudes' : 'solicitudes'
   router.push({ name: destino })
 }
 
@@ -390,7 +391,7 @@ onMounted(cargar)
 </script>
 
 <template>
-  <div class="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-10">
+  <div :class="enPanel ? '' : 'mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-10'">
     <button
       type="button"
       class="text-sm font-medium text-cafe/70 transition hover:text-coral"

@@ -39,6 +39,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const enPanel = computed(() => route.path.startsWith('/panel'))
 const idPedido = computed(() => Number(route.params.idPedido))
 
 const pedido = ref(null)
@@ -805,8 +806,7 @@ function volver() {
     router.push({ name: 'pedidos-admin' })
     return
   }
-  const enPanel = route.path.startsWith('/panel')
-  router.push({ name: enPanel ? 'panel-pedidos' : 'pedidos' })
+  router.push({ name: enPanel.value ? 'panel-pedidos' : 'pedidos' })
 }
 
 function abrirChat() {
@@ -822,7 +822,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
+  <div :class="enPanel ? '' : 'mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-10'">
     <button
       type="button"
       class="text-sm font-medium text-cafe/70 transition hover:text-coral"
