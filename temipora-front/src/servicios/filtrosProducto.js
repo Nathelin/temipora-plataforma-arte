@@ -44,6 +44,8 @@ const DEFINICION = {
     'excluirContenidosSensibles',
   ],
   booleanos: ['soloPiezaUnica', 'soloIlimitado'],
+  // "Todas" no es un filtro: no cuenta como activo ni viaja al backend.
+  valoresNeutros: { origen: 'TODAS' },
   ordenes: ORDENES,
   ordenPorDefecto: 'RELEVANCIA',
 }

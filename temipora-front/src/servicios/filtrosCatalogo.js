@@ -26,14 +26,14 @@ export function simboloMoneda(codigo = 'ARS') {
 /**
  * Definición de un catálogo.
  *
- * - `listas`: claves cuyo estado es un array de ids.
  * - `textos`: claves de texto libre.
+ * - `numericos`: claves numéricas.
+ * - `listas`: claves cuyo estado es un array de ids.
  * - `booleanos`: claves de checkbox simple.
+ * - `valoresNeutros`: valor que representa "sin filtro" para una clave. No
+ *   cuenta como filtro activo ni viaja al backend (p. ej. `origen: 'TODAS'`).
  * - `ordenes`: opciones del select de orden.
  * - `ordenPorDefecto`: valor inicial del orden.
- * - `chips`: función que, dado el estado y los catálogos auxiliares, devuelve
- *   los chips activos `{ clave, valor, texto }`. Cada catálogo decide sus
- *   etiquetas legibles.
  */
 export function estadoInicial(definicion) {
   const estado = {}
@@ -43,6 +43,12 @@ export function estadoInicial(definicion) {
   for (const clave of definicion.numericos || []) estado[clave] = ''
   estado.orden = definicion.ordenPorDefecto
   return estado
+}
+
+/** Indica si el valor de una clave equivale a "sin filtro". */
+function esNeutro(definicion, clave, valor) {
+  const neutro = definicion.valoresNeutros?.[clave]
+  return neutro !== undefined && String(valor) === String(neutro)
 }
 
 function listaDesde(valor) {
@@ -103,7 +109,7 @@ export function aParams(definicion, estado, {
 
   for (const clave of definicion.textos) {
     const valor = (estado[clave] || '').trim()
-    if (valor) params.set(clave, valor)
+    if (valor && !esNeutro(definicion, clave, valor)) params.set(clave, valor)
   }
   for (const clave of definicion.numericos || []) {
     const valor = estado[clave]
@@ -148,7 +154,10 @@ export function cantidadActivos(definicion, estado) {
   let total = 0
   for (const clave of definicion.textos) {
     const valor = estado[clave]
-    if (valor !== '' && valor !== null && valor !== undefined) total++
+    if (valor !== '' && valor !== null && valor !== undefined
+        && !esNeutro(definicion, clave, valor)) {
+      total++
+    }
   }
   for (const clave of definicion.numericos || []) {
     const valor = estado[clave]

@@ -217,31 +217,46 @@ class ProductoCatalogoFacetasTest {
     }
 
     @Test
-    void facetas_conIncluirReventasApagado_noDevuelveLaFacetaOrigen() {
+    void facetas_conSoloReventas_losProductosNoCuentanEnLasFacetas() {
         Producto p = producto(1L, ilustracion, digital);
         when(productoRepository.findByEstadoOrderByFechaCreacionDesc(
             EstadoProducto.DISPONIBLE)).thenReturn(List.of(p));
 
         FiltroProductoRequest filtro = new FiltroProductoRequest();
-        filtro.setIncluirReventas(false);
+        filtro.setSoloReventas(true);
 
         FacetasProductoDTO facetas = catalogoService.facetas(filtro, null);
 
-        assertThat(facetas.getOrigen()).isEmpty();
+        // El listado con "solo reventas" no muestra productos, así que los
+        // conteos no deben contarlos: la grilla y los números coinciden.
+        assertThat(facetas.getTipos()).isEmpty();
+        assertThat(facetas.getMedios()).isEmpty();
     }
 
     @Test
-    void facetas_conIncluirReventas_devuelveElDesgloseDeOrigen() {
-        Producto p = producto(1L, ilustracion, digital);
+    void facetas_respetaLaPreferenciaDeOcultarSensibles() {
+        Producto sensible = producto(1L, ilustracion, digital);
+        sensible.setContenidoSensible(true);
+        Usuario otroArtista = Usuario.builder()
+            .idUsuario(99L).nombreUsuario("otro").build();
+        sensible.setArtista(otroArtista);
         when(productoRepository.findByEstadoOrderByFechaCreacionDesc(
-            EstadoProducto.DISPONIBLE)).thenReturn(List.of(p));
+            EstadoProducto.DISPONIBLE)).thenReturn(List.of(sensible));
+
+        Usuario viewer = Usuario.builder()
+            .idUsuario(1L)
+            .nombreUsuario("viewer")
+            .preferenciaSensible(EPreferenciaContenidoSensible.OCULTAR)
+            .monedaPreferida(ars)
+            .build();
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(viewer));
 
         FacetasProductoDTO facetas = catalogoService.facetas(
-            new FiltroProductoRequest(), null);
+            new FiltroProductoRequest(), 1L);
 
-        assertThat(facetas.getOrigen())
-            .containsEntry("producto", 1L)
-            .containsEntry("reventa", 0L);
+        // El viewer prefiere ocultar contenido sensible: no debe contarlo.
+        assertThat(facetas.getTipos()).isEmpty();
+        assertThat(facetas.getMedios()).isEmpty();
     }
 
     // ------------------------------------------------------------------

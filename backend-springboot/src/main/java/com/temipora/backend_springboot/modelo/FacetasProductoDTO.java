@@ -27,8 +27,4 @@ public class FacetasProductoDTO {
     private Map<String, Long> etiquetas = new LinkedHashMap<>();
     /** nombre del enum ContenidoSensible → cantidad */
     private Map<String, Long> contenidosSensibles = new LinkedHashMap<>();
-    /** conStock | sinStock */
-    private Map<String, Long> disponibilidad = new LinkedHashMap<>();
-    /** producto | reventa, solo si el catálogo incluye reventas */
-    private Map<String, Long> origen = new LinkedHashMap<>();
 }

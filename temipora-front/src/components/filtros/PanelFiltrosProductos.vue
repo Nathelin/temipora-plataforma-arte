@@ -192,19 +192,11 @@ function cambiarLista(clave, valores) {
         <FiltroCheckbox
           :opciones="opcionesSensibles"
           :seleccionados="estado.contenidosSensibles"
+          :excluidos="estado.excluirContenidosSensibles"
           :conteos="conteosContenidos"
           @cambiar="(valores) => cambiarLista('contenidosSensibles', valores)"
+          @cambiar-excluidos="(valores) => cambiarLista('excluirContenidosSensibles', valores)"
         />
-        <div class="mt-2 border-t border-borde/40 pt-2">
-          <p class="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-cafe/50">
-            Excluir tipos
-          </p>
-          <FiltroCheckbox
-            :opciones="opcionesSensibles"
-            :seleccionados="estado.excluirContenidosSensibles"
-            @cambiar="(valores) => cambiarLista('excluirContenidosSensibles', valores)"
-          />
-        </div>
       </GrupoFiltro>
 
       <FiltroEtiquetas

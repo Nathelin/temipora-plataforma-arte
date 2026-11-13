@@ -275,14 +275,17 @@ public class ProductoCatalogoService {
      * sólo se vuelve a aplicar el resto de los predicados por dimensión.
      *
      * El universo respeta lo que el usuario vería: estado DISPONIBLE, stock,
-     * exclusión de productos propios, preferencia de contenido sensible e
-     * `incluirReventas`.
+     * exclusión de productos propios, preferencia de contenido sensible y
+     * `soloReventas` (que restringe los conteos a los productos en reventa).
      */
     @Transactional(readOnly = true)
     public FacetasProductoDTO facetas(FiltroProductoRequest filtro, Long viewerId) {
         EPreferenciaContenidoSensible pref = preferenciaDe(viewerId);
         boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
         Moneda moneda = monedaPreferidaDe(viewerId);
+
+        boolean soloReventas = filtro != null
+            && Boolean.TRUE.equals(filtro.getSoloReventas());
 
         List<Producto> base = productoRepository
             .findByEstadoOrderByFechaCreacionDesc(EstadoProducto.DISPONIBLE).stream()
@@ -291,53 +294,27 @@ public class ProductoCatalogoService {
             .filter(producto -> !ocultarSensibles || !producto.isContenidoSensible())
             .toList();
 
+        if (soloReventas) {
+            // Con "solo reventas" la grilla no muestra productos sueltos, así que
+            // los conteos sólo consideran los productos que están en reventa.
+            Set<Long> enReventa = publicacionReventaRepository
+                .findByEstadoOrderByFechaPublicacionDesc(
+                    EstadoPublicacionReventa.PUBLICADA).stream()
+                .filter(publicacion -> publicacion.getVariante() != null
+                    && publicacion.getVariante().getProducto() != null)
+                .map(publicacion -> publicacion.getVariante().getProducto().getIdProducto())
+                .collect(java.util.stream.Collectors.toSet());
+            base = base.stream()
+                .filter(producto -> enReventa.contains(producto.getIdProducto()))
+                .toList();
+        }
+
         FacetasProductoDTO salida = new FacetasProductoDTO();
         salida.setTipos(contarProductos(base, filtro, moneda, Dimension.TIPOS, "tipo"));
         salida.setMedios(contarProductos(base, filtro, moneda, Dimension.MEDIOS, "medio"));
         salida.setEtiquetas(contarProductos(base, filtro, moneda, Dimension.ETIQUETAS, "etiquetas"));
         salida.setContenidosSensibles(contarProductos(
             base, filtro, moneda, Dimension.CONTENIDOS_SENSIBLES, "contenidos"));
-
-        // `base` ya viene filtrada por stock, así que este conteo mide cuántos
-        // productos con stock cumplen el resto de los filtros.
-        Map<String, Long> disponibilidad = new LinkedHashMap<>();
-        disponibilidad.put("conStock", (long) base.stream()
-            .filter(producto -> cumpleFiltros(producto, filtro,
-                precioDesde(producto, moneda), Dimension.STOCK))
-            .count());
-        salida.setDisponibilidad(disponibilidad);
-
-        // Sólo tiene sentido discriminar producto vs reventa si las reventas
-        // están incluidas en el catálogo.
-        boolean incluirReventas = filtro == null
-            || filtro.getIncluirReventas() == null
-            || Boolean.TRUE.equals(filtro.getIncluirReventas());
-        if (incluirReventas) {
-            Map<String, Long> origen = new LinkedHashMap<>();
-            origen.put("producto", (long) base.stream()
-                .filter(producto -> cumpleFiltros(producto, filtro,
-                    precioDesde(producto, moneda), null))
-                .count());
-            origen.put("reventa", (long) publicacionReventaRepository
-                .findByEstadoOrderByFechaPublicacionDesc(
-                    EstadoPublicacionReventa.PUBLICADA).stream()
-                .filter(publicacion -> publicacion.getVariante() != null
-                    && publicacion.getVariante().getProducto() != null)
-                .filter(publicacion -> viewerId == null
-                    || publicacion.getVendedor() == null
-                    || !viewerId.equals(publicacion.getVendedor().getIdUsuario()))
-                .filter(publicacion -> {
-                    Producto producto = publicacion.getVariante().getProducto();
-                    if (ocultarSensibles && producto.isContenidoSensible()) {
-                        return false;
-                    }
-                    BigDecimal precio = convertir(
-                        publicacion.getPrecio(), producto, moneda);
-                    return cumpleFiltros(producto, filtro, precio, null);
-                })
-                .count());
-            salida.setOrigen(origen);
-        }
 
         return salida;
     }
