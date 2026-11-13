@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { listarReventas } from '../servicios/reventas'
 import TarjetaProducto from '../components/TarjetaProducto.vue'
+import PageHeader from '../components/PageHeader.vue'
 
 const reventas = ref([])
 const cargando = ref(true)
@@ -46,26 +47,21 @@ onMounted(cargar)
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-screen-2xl px-4 py-8 sm:px-8">
-    <div class="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p class="text-xs font-bold uppercase tracking-[0.18em] text-coral">
-          Reventa
-        </p>
-        <h1 class="mt-2 font-display text-3xl font-extrabold text-granate sm:text-4xl">
-          Piezas que vuelven a estar disponibles
-        </h1>
-        <p class="mt-1 text-sm text-cafe/60">
-          Piezas únicas que sus dueños ponen en venta. El pago se acredita al revendedor.
-        </p>
-      </div>
-      <router-link
-        to="/productos"
-        class="text-sm font-bold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
-      >
-        Ver todos los productos →
-      </router-link>
-    </div>
+  <div class="mx-auto w-full max-w-screen-2xl px-4 py-8 sm:px-8 sm:py-10">
+    <PageHeader
+      eyebrow="Reventa"
+      titulo="Piezas que vuelven a estar disponibles"
+      descripcion="Piezas únicas que sus dueños ponen en venta. El pago se acredita al revendedor."
+    >
+      <template #acciones>
+        <router-link
+          to="/productos"
+          class="text-sm font-bold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
+        >
+          Ver todos los productos →
+        </router-link>
+      </template>
+    </PageHeader>
 
     <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando reventas...</p>
     <p v-else-if="error" role="alert" class="py-16 text-center text-rojizo">{{ error }}</p>

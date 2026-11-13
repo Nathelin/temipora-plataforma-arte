@@ -1,8 +1,16 @@
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   eyebrow: { type: String, default: '' },
   titulo: { type: String, required: true },
   descripcion: { type: String, default: '' },
+  nivel: { type: [Number, String], default: 1 },
+})
+
+const etiquetaTitulo = computed(() => {
+  const valor = Number(props.nivel)
+  return valor === 2 ? 'h2' : 'h1'
 })
 </script>
 
@@ -15,11 +23,14 @@ defineProps({
       >
         {{ eyebrow }}
       </p>
-      <h1 class="mt-1 font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">
+      <component
+        :is="etiquetaTitulo"
+        class="mt-1 font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl"
+      >
         {{ titulo }}
-      </h1>
-      <p v-if="descripcion" class="mt-2 max-w-2xl text-sm leading-relaxed text-cafe/65">
-        {{ descripcion }}
+      </component>
+      <p v-if="descripcion || $slots.descripcion" class="mt-2 max-w-2xl text-sm leading-relaxed text-cafe/65">
+        <slot name="descripcion">{{ descripcion }}</slot>
       </p>
     </div>
 

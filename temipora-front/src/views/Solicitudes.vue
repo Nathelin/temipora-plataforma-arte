@@ -14,6 +14,7 @@ import {
 } from '../servicios/solicitudes'
 import { estadoServicioDe } from '../servicios/servicios'
 import ReputacionChip from '../components/ReputacionChip.vue'
+import PageHeader from '../components/PageHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -83,25 +84,24 @@ onMounted(cargar)
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
-    <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-coral">Tu actividad</p>
-        <h1 class="mt-1 font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">
-          Solicitudes
-        </h1>
-        <p class="mt-2 text-sm text-cafe/65">
-          {{ esBandejaRecibidas ? 'Solicitudes que recibiste de tus clientes.' : 'Solicitudes que enviaste a otros artistas.' }}
-        </p>
-      </div>
-
-      <span
-        v-if="!cargando && !error && porResponder"
-        class="inline-flex self-start rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral sm:self-auto"
-      >
-        {{ porResponder }} {{ esBandejaRecibidas ? 'por responder' : 'esperando respuesta' }}
-      </span>
-    </header>
+  <div>
+    <PageHeader
+      eyebrow="Tu actividad"
+      titulo="Solicitudes"
+      :descripcion="esBandejaRecibidas
+        ? 'Solicitudes que recibiste de tus clientes.'
+        : 'Solicitudes que enviaste a otros artistas.'"
+      :nivel="2"
+    >
+      <template #acciones>
+        <span
+          v-if="!cargando && !error && porResponder"
+          class="inline-flex self-start rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral sm:self-auto"
+        >
+          {{ porResponder }} {{ esBandejaRecibidas ? 'por responder' : 'esperando respuesta' }}
+        </span>
+      </template>
+    </PageHeader>
 
     <div v-if="cargando" class="mt-8 space-y-3" role="status" aria-live="polite">
       <span class="sr-only">Cargando solicitudes...</span>
@@ -153,7 +153,7 @@ onMounted(cargar)
 
       <template v-else>
         <div
-          class="mt-8 flex gap-1 overflow-x-auto rounded-xl border border-rosa/60 bg-blanco p-1"
+          class="mt-5 flex gap-1 overflow-x-auto rounded-xl border border-rosa/60 bg-blanco p-1"
           role="group"
           aria-label="Filtrar solicitudes por estado"
         >

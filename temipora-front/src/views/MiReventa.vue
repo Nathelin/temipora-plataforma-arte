@@ -10,6 +10,8 @@ import {
 } from '../servicios/reventas'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import BurbujaInfo from '../components/BurbujaInfo.vue'
+import PageHeader from '../components/PageHeader.vue'
+import EmptyState from '../components/EmptyState.vue'
 import ModalReventa from '../components/ModalReventa.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 
@@ -17,12 +19,12 @@ const router = useRouter()
 const { exito, error: notificarError } = useNotificaciones()
 
 const ESTADOS = {
-  PUBLICADA: { texto: 'Publicada', clase: 'bg-green-700/10 text-green-700' },
-  RESERVADA: { texto: 'Compra en curso', clase: 'bg-mantequilla/60 text-granate' },
-  VENDIDA: { texto: 'Vendida', clase: 'bg-coral/15 text-coral' },
-  ARCHIVADA: { texto: 'Archivada', clase: 'bg-cafe/10 text-cafe/60' },
-  SUSPENDIDA: { texto: 'Suspendida', clase: 'bg-rojizo/10 text-rojizo' },
-  VENCIDA: { texto: 'Vencida', clase: 'bg-cafe/10 text-cafe/60' },
+  PUBLICADA: { texto: 'Publicada', clase: 'border-green-700/30 bg-green-500/10 text-green-700' },
+  RESERVADA: { texto: 'Compra en curso', clase: 'border-mantequilla bg-mantequilla/60 text-granate' },
+  VENDIDA: { texto: 'Vendida', clase: 'border-coral/30 bg-coral/15 text-coral' },
+  ARCHIVADA: { texto: 'Archivada', clase: 'border-cafe/25 bg-cafe/10 text-cafe/60' },
+  SUSPENDIDA: { texto: 'Suspendida', clase: 'border-rojizo/30 bg-rojizo/10 text-rojizo' },
+  VENCIDA: { texto: 'Vencida', clase: 'border-cafe/25 bg-cafe/10 text-cafe/60' },
 }
 
 const cargando = ref(true)
@@ -58,7 +60,7 @@ function estadoTexto(estado) {
 }
 
 function estadoClase(estado) {
-  return ESTADOS[estado]?.clase || 'bg-cafe/10 text-cafe/60'
+  return ESTADOS[estado]?.clase || 'border-cafe/25 bg-cafe/10 text-cafe/60'
 }
 
 function fecha(valor) {
@@ -159,9 +161,13 @@ onMounted(cargar)
 
 <template>
   <div class="space-y-6">
-    <header>
-      <div class="flex items-center gap-2">
-        <h1 class="font-display text-2xl font-extrabold text-granate">Reventa</h1>
+    <PageHeader
+      eyebrow="Tu actividad"
+      titulo="Reventa"
+      descripcion="Las piezas únicas que podés volver a poner en venta y las que ya publicaste."
+      :nivel="2"
+    >
+      <template #acciones>
         <BurbujaInfo etiqueta="Cómo funciona la reventa">
           <strong class="block">Publicás, se vende y el dinero se acredita en tu cuenta.</strong>
           <span class="mt-1 block">
@@ -170,11 +176,8 @@ onMounted(cargar)
             archivás, la pieza vuelve a «Puedo revender».
           </span>
         </BurbujaInfo>
-      </div>
-      <p class="mt-1 text-sm text-cafe/60">
-        Las piezas únicas que podés volver a poner en venta y las que ya publicaste.
-      </p>
-    </header>
+      </template>
+    </PageHeader>
 
     <div
       v-if="!cargando && !conectada"
@@ -202,7 +205,7 @@ onMounted(cargar)
       <section>
         <div class="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 class="font-display text-lg font-bold text-granate">Puedo revender</h2>
+            <h3 class="font-display text-lg font-bold text-granate">Puedo revender</h3>
             <p class="mt-1 text-sm text-cafe/60">
               Piezas únicas que compraste, ya te fueron entregadas y todavía no tienen una reventa activa.
             </p>
@@ -212,23 +215,17 @@ onMounted(cargar)
           </span>
         </div>
 
-        <div
+        <EmptyState
           v-if="!piezas.length"
-          class="mt-3 rounded-2xl border border-dashed border-rosa/60 px-4 py-10 text-center"
-        >
-          <p class="text-sm font-medium text-granate">
-            No tenés piezas para poner en reventa.
-          </p>
-          <p class="mt-1 text-sm text-cafe/50">
-            Cuando compres una pieza única con derecho de reventa, va a aparecer acá.
-          </p>
-        </div>
+          titulo="No tenés piezas para poner en reventa."
+          detalle="Cuando compres una pieza única con derecho de reventa, va a aparecer acá."
+        />
 
         <div v-else class="mt-3 space-y-3">
           <article
             v-for="pieza in piezas"
             :key="pieza.idCompraItem"
-            class="flex flex-col gap-4 rounded-2xl border border-borde/60 bg-superficie p-4 sm:flex-row sm:items-center"
+            class="flex flex-col gap-4 rounded-2xl border border-rosa/50 bg-blanco p-5 transition hover:border-coral/40 hover:shadow-[0_10px_28px_rgba(74,29,46,0.08)] sm:flex-row sm:items-center"
           >
             <img
               v-if="pieza.imagenUrl"
@@ -237,9 +234,9 @@ onMounted(cargar)
               class="h-20 w-20 shrink-0 rounded-xl border border-rosa/50 object-cover"
             />
             <div class="min-w-0 flex-1">
-              <h3 class="font-display text-base font-bold text-granate">
+              <h4 class="font-display text-base font-bold text-granate">
                 {{ pieza.titulo }}
-              </h3>
+              </h4>
               <p class="text-sm text-cafe/60">{{ pieza.nombreVariante }}</p>
               <p class="mt-1 text-xs text-cafe/50">
                 Tope: {{ formatear(pieza.precioTope, pieza.moneda) }}
@@ -263,7 +260,7 @@ onMounted(cargar)
       <section>
         <div class="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 class="font-display text-lg font-bold text-granate">Mis publicaciones</h2>
+            <h3 class="font-display text-lg font-bold text-granate">Mis publicaciones</h3>
             <p class="mt-1 text-sm text-cafe/60">
               Las reventas activas y el historial de las que ya cerraron.
             </p>
@@ -273,23 +270,17 @@ onMounted(cargar)
           </span>
         </div>
 
-        <div
+        <EmptyState
           v-if="!activas.length"
-          class="mt-3 rounded-2xl border border-dashed border-rosa/60 px-4 py-10 text-center"
-        >
-          <p class="text-sm font-medium text-granate">
-            No tenés reventas activas.
-          </p>
-          <p class="mt-1 text-sm text-cafe/50">
-            Elegí una pieza de «Puedo revender» para publicarla.
-          </p>
-        </div>
+          titulo="No tenés reventas activas."
+          detalle="Elegí una pieza de «Puedo revender» para publicarla."
+        />
 
         <div v-else class="mt-3 space-y-3">
           <article
             v-for="publicacion in activas"
             :key="publicacion.idPublicacionReventa"
-            class="flex flex-col gap-4 rounded-2xl border border-borde/60 bg-superficie p-4 sm:flex-row sm:items-center"
+            class="flex flex-col gap-4 rounded-2xl border border-rosa/50 bg-blanco p-5 transition hover:border-coral/40 hover:shadow-[0_10px_28px_rgba(74,29,46,0.08)] sm:flex-row sm:items-center"
           >
             <img
               v-if="publicacion.imagenUrl"
@@ -299,11 +290,11 @@ onMounted(cargar)
             />
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">
-                <h3 class="font-display text-base font-bold text-granate">
+                <h4 class="font-display text-base font-bold text-granate">
                   {{ publicacion.titulo }}
-                </h3>
+                </h4>
                 <span
-                  class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                  class="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
                   :class="estadoClase(publicacion.estado)"
                 >
                   {{ estadoTexto(publicacion.estado) }}
@@ -372,11 +363,11 @@ onMounted(cargar)
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="min-w-0">
                   <div class="flex flex-wrap items-center gap-2">
-                    <h3 class="truncate text-sm font-semibold text-granate">
+                    <h4 class="truncate text-sm font-semibold text-granate">
                       {{ publicacion.titulo }}
-                    </h3>
+                    </h4>
                     <span
-                      class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                      class="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
                       :class="estadoClase(publicacion.estado)"
                     >
                       {{ estadoTexto(publicacion.estado) }}

@@ -9,6 +9,7 @@ import {
 } from '../servicios/productos'
 import api from '../servicios/api'
 import TarjetaProducto from '../components/TarjetaProducto.vue'
+import PageHeader from '../components/PageHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -208,26 +209,21 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-screen-2xl px-4 py-8 sm:px-8">
-    <div class="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p class="text-xs font-bold uppercase tracking-[0.18em] text-coral">
-          Productos
-        </p>
-        <h1 class="mt-2 font-display text-3xl font-extrabold text-granate sm:text-4xl">
-          Arte listo para llevar
-        </h1>
-        <p class="mt-1 text-sm text-cafe/60">
-          Piezas, adoptables, recursos digitales y reventas de artistas de la plataforma.
-        </p>
-      </div>
-      <router-link
-        to="/servicios"
-        class="text-sm font-bold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
-      >
-        Buscar un servicio a medida →
-      </router-link>
-    </div>
+  <div class="mx-auto w-full max-w-screen-2xl px-4 py-8 sm:px-8 sm:py-10">
+    <PageHeader
+      eyebrow="Productos"
+      titulo="Arte listo para llevar"
+      descripcion="Piezas, adoptables, recursos digitales y reventas de artistas de la plataforma."
+    >
+      <template #acciones>
+        <router-link
+          to="/servicios"
+          class="text-sm font-bold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
+        >
+          Buscar un servicio a medida →
+        </router-link>
+      </template>
+    </PageHeader>
 
     <div class="mt-6 rounded-[22px] border border-borde/60 bg-superficie p-4 shadow-sm">
       <div class="flex flex-wrap items-center gap-3">
@@ -236,13 +232,13 @@ onMounted(async () => {
             v-model="filtros.titulo"
             type="search"
             placeholder="Buscar por título del producto..."
-            class="w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+            class="min-h-10 w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
           />
         </div>
 
         <select
           v-model="orden"
-          class="rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+          class="min-h-10 rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
           aria-label="Ordenar resultados"
         >
           <option value="RELEVANCIA">Para vos</option>
@@ -254,7 +250,7 @@ onMounted(async () => {
 
         <button
           type="button"
-          class="inline-flex items-center gap-1.5 rounded-lg border border-rosa px-3 py-2 text-sm font-medium text-cafe transition hover:bg-rosa/20"
+          class="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-rosa px-3 py-2 text-sm font-medium text-cafe transition hover:bg-rosa/20"
           @click="filtrosAbiertos = !filtrosAbiertos"
         >
           Filtros
@@ -399,7 +395,7 @@ onMounted(async () => {
         </button>
       </div>
 
-      <div v-else class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+      <div v-else class="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
         <TarjetaProducto
           v-for="producto in productos"
           :key="producto.esReventa

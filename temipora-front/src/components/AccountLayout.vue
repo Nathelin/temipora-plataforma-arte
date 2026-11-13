@@ -32,7 +32,7 @@ function badgeDe(item) {
     <div class="mx-auto max-w-screen-2xl px-4 py-8 sm:px-8 lg:flex lg:gap-8">
       <aside class="mb-4 shrink-0 lg:mb-0 lg:w-64">
         <div class="lg:sticky lg:top-16">
-          <h1 class="mb-4 hidden px-1 font-display text-xl font-bold text-granate lg:block">{{ titulo }}</h1>
+          <h1 class="sr-only font-display text-xl font-bold text-granate lg:not-sr-only lg:mb-4 lg:block lg:px-1">{{ titulo }}</h1>
 
           <button
             type="button"
@@ -117,7 +117,9 @@ function badgeDe(item) {
       </aside>
 
       <div class="min-w-0 flex-1">
-        <slot />
+        <div class="mx-auto w-full max-w-6xl">
+          <slot />
+        </div>
       </div>
     </div>
   </div>

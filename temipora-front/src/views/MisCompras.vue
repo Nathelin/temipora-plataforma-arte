@@ -133,11 +133,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
+  <div>
     <PageHeader
       eyebrow="Tu actividad"
       titulo="Mis compras"
       descripcion="Tus compras de productos de la tienda."
+      :nivel="2"
     >
       <template #acciones>
         <span

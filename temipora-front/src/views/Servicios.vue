@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../servicios/api'
 import TarjetaServicio from '../components/TarjetaServicio.vue'
+import PageHeader from '../components/PageHeader.vue'
 import { useNotificaciones } from '../composables/useNotificaciones'
 
 const router = useRouter()
@@ -210,22 +211,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-screen-2xl px-4 py-10 sm:px-8 sm:py-14">
-    <div>
-      <div class="pb-2">
-        <span class="inline-block -rotate-2 rounded-full bg-mantequilla px-4 py-1.5 text-sm font-bold text-tinta shadow-sm">
-          Comisiones
-        </span>
-        <h1 class="mt-5 font-display text-4xl font-extrabold tracking-[-0.03em] text-granate sm:text-5xl">
-          Encontrá a tu próximo artista
-        </h1>
-        <p class="mt-3 text-lg leading-relaxed text-cafe/75">
-          Explorá servicios por estilo, precio y tiempo de entrega. Cada propuesta está creada por alguien de la comunidad.
-        </p>
-      </div>
-    </div>
+  <div class="mx-auto w-full max-w-screen-2xl px-4 py-8 sm:px-8 sm:py-10">
+    <PageHeader
+      eyebrow="Comisiones"
+      titulo="Encontrá a tu próximo artista"
+      descripcion="Explorá servicios por estilo, precio y tiempo de entrega."
+    />
 
-    <div class="mt-8 rounded-[28px] border border-borde/60 bg-superficie p-4 shadow-[0_14px_36px_rgba(74,29,46,0.08)] sm:p-5">
+    <div class="mt-6 rounded-[28px] border border-borde/60 bg-superficie p-4 shadow-[0_14px_36px_rgba(74,29,46,0.08)]">
       <div class="flex flex-wrap items-center gap-3">
         <div class="relative min-w-44 flex-1">
           <svg class="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cafe/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
@@ -372,7 +365,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div class="mt-8">
+    <div class="mt-6">
       <div v-if="cargando" class="flex flex-col items-center justify-center py-20 text-cafe/60">
         <span class="h-8 w-8 animate-spin rounded-full border-2 border-borde border-t-coral" aria-hidden="true"></span>
         <p class="mt-4 text-sm">Cargando servicios...</p>

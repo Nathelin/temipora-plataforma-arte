@@ -5,6 +5,7 @@ import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
 import { useSesion } from '../composables/useSesion'
 import { useAccesoEnlace } from '../composables/useAccesoEnlace'
+import PageHeader from '../components/PageHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -147,27 +148,21 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-screen-2xl px-4 py-10 sm:px-8 sm:py-14">
-    <div class="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <span class="inline-block -rotate-2 rounded-full bg-mantequilla px-4 py-1.5 text-sm font-bold text-tinta shadow-sm">
-          Ofertas
-        </span>
-        <h1 class="mt-5 font-display text-4xl font-extrabold tracking-[-0.03em] text-granate sm:text-5xl">
-          Propuestas para retomar
-        </h1>
-        <p class="mt-3 max-w-2xl text-lg leading-relaxed text-cafe/75">
-          Elegimos artistas que pueden interesarte y les aplicamos un descuento de reactivación para que vuelvas a crear.
-          Lo financia Temipora y se aplica sobre el presupuesto final.
-        </p>
-      </div>
-      <router-link
-        to="/servicios"
-        class="text-sm font-bold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
-      >
-        Seguir explorando →
-      </router-link>
-    </div>
+  <div class="mx-auto w-full max-w-screen-2xl px-4 py-8 sm:px-8 sm:py-10">
+    <PageHeader
+      eyebrow="Ofertas"
+      titulo="Propuestas para retomar"
+      descripcion="Elegimos artistas que pueden interesarte y les aplicamos un descuento de reactivación para que vuelvas a crear. Lo financia Temipora y se aplica sobre el presupuesto final."
+    >
+      <template #acciones>
+        <router-link
+          to="/servicios"
+          class="text-sm font-bold text-coral underline decoration-coral/40 underline-offset-4 transition hover:text-rojizo"
+        >
+          Seguir explorando →
+        </router-link>
+      </template>
+    </PageHeader>
 
     <div
       v-if="accesoNombre"

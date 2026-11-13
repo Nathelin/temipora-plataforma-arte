@@ -10,6 +10,7 @@ import {
 } from '../servicios/sustituciones'
 import { formatearPrecio } from '../servicios/moneda'
 import { useNotificaciones } from '../composables/useNotificaciones'
+import PageHeader from '../components/PageHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -187,19 +188,17 @@ onMounted(async () => {
       ← Volver al servicio
     </router-link>
 
-    <header class="mt-4 max-w-3xl">
-      <span class="inline-block -rotate-2 rounded-full bg-mantequilla px-4 py-1.5 text-sm font-bold text-tinta shadow-sm">
-        Alternativas con cupo
-      </span>
-      <h1 class="mt-4 font-display text-4xl font-extrabold tracking-[-0.03em] text-granate sm:text-5xl">
-        Artistas con cupo para este pedido
-      </h1>
-      <p v-if="origen" class="mt-3 text-lg leading-relaxed text-cafe/75">
+    <PageHeader
+      class="mt-4"
+      eyebrow="Alternativas con cupo"
+      titulo="Artistas con cupo para este pedido"
+    >
+      <template v-if="origen" #descripcion>
         Mismo estilo y rango de precio que «{{ nombreOrigen }}»
         <span v-if="artistaOrigen">de @{{ artistaOrigen }}</span>, con lugar para
         empezar ahora.
-      </p>
-    </header>
+      </template>
+    </PageHeader>
 
     <div v-if="cargando" class="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
       <div v-for="marcador in 6" :key="marcador" class="h-96 animate-pulse rounded-[26px] bg-rosa/25"></div>

@@ -223,13 +223,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
+  <div>
     <PageHeader
       eyebrow="Tu actividad"
       titulo="Pedidos"
       :descripcion="bandejaActiva === 'recibidos'
         ? 'Pedidos que recibiste de tus clientes.'
         : 'Pedidos que hiciste a otros artistas.'"
+      :nivel="2"
     >
       <template #acciones>
         <span
