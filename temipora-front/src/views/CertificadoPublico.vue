@@ -1,7 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import QrcodeVue from 'qrcode.vue'
-import { cargarCertificado } from '../servicios/certificados'
+import {
+  cargarCertificado,
+  descargarPruebaCertificado,
+  descargarDocumentoCertificado,
+} from '../servicios/certificados'
 import { etiquetaEvento, hashCorto, infoAnclaje } from '../servicios/ledger'
 import { formatearFechaHora } from '../servicios/fechas'
 
@@ -12,6 +16,11 @@ const props = defineProps({
 const certificado = ref(null)
 const cargando = ref(true)
 const error = ref('')
+const descargando = ref('')
+const errorDescarga = ref('')
+
+const tieneAnclaje = computed(() => Boolean(certificado.value?.estadoAnclaje))
+const anclajeConfirmado = computed(() => Boolean(certificado.value?.bitcoinAltura))
 
 const anclaje = computed(() => infoAnclaje(
   Boolean(certificado.value?.estadoAnclaje),
@@ -43,6 +52,35 @@ async function cargar() {
 
 function imprimir() {
   window.print()
+}
+
+function guardarBlob(blob, nombre) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = nombre
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+async function descargar(tipo) {
+  if (!certificado.value?.codigoCertificado) return
+  const codigo = certificado.value.codigoCertificado
+  descargando.value = tipo
+  errorDescarga.value = ''
+  try {
+    if (tipo === 'ots') {
+      guardarBlob(await descargarPruebaCertificado(codigo), `certificado-${codigo}.ots`)
+    } else {
+      guardarBlob(await descargarDocumentoCertificado(codigo), `certificado-${codigo}.txt`)
+    }
+  } catch (e) {
+    errorDescarga.value = 'No se pudo descargar el archivo. Probá de nuevo.'
+  } finally {
+    descargando.value = ''
+  }
 }
 
 onMounted(() => {
@@ -203,6 +241,85 @@ watch(() => props.codigo, cargar)
           </router-link>
         </aside>
       </div>
+
+      <section class="border-t border-rosa/40 px-6 py-5">
+        <h2 class="font-display text-base font-bold text-granate">Verificación independiente</h2>
+
+        <p v-if="!tieneAnclaje" class="mt-2 text-xs leading-relaxed text-cafe/60">
+          El sello en Bitcoin de esta pieza todavía se está preparando. Volvé a
+          entrar más tarde para poder verificarla por tu cuenta.
+        </p>
+
+        <template v-else>
+          <p class="mt-2 text-xs leading-relaxed text-cafe/60">
+            Podés comprobar vos mismo, sin depender de Temipora, que este historial
+            ya existía en la fecha indicada. El sello se apoya en la blockchain de
+            Bitcoin mediante <strong>OpenTimestamps</strong>.
+          </p>
+
+          <div class="mt-3 rounded-xl border border-green-600/25 bg-green-500/5 p-3 text-[11px] leading-relaxed text-cafe/75">
+            <p class="font-semibold text-green-700">Sin criptomonedas</p>
+            <p class="mt-1">
+              No minamos Bitcoin, no compramos ni vendemos criptomonedas, y no
+              necesitás ninguna billetera (wallet) ni pagar nada. Lo único que se
+              publica es una <strong>huella digital (hash)</strong> del registro; el
+              sellado lo realizan gratuitamente los calendarios públicos de
+              OpenTimestamps.
+            </p>
+          </div>
+
+          <div class="no-print mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded-full border border-rosa bg-blanco px-3 py-1.5 text-[11px] font-semibold text-granate transition hover:bg-rosa/20 disabled:opacity-50"
+              :disabled="descargando === 'ots'"
+              @click="descargar('ots')"
+            >
+              {{ descargando === 'ots' ? 'Descargando…' : 'Descargar prueba (.ots)' }}
+            </button>
+            <button
+              type="button"
+              class="rounded-full border border-rosa bg-blanco px-3 py-1.5 text-[11px] font-semibold text-granate transition hover:bg-rosa/20 disabled:opacity-50"
+              :disabled="descargando === 'doc'"
+              @click="descargar('doc')"
+            >
+              {{ descargando === 'doc' ? 'Descargando…' : 'Descargar documento (.txt)' }}
+            </button>
+            <a
+              href="https://opentimestamps.org/"
+              target="_blank"
+              rel="noopener"
+              class="rounded-full border border-coral/40 bg-coral/10 px-3 py-1.5 text-[11px] font-semibold text-coral transition hover:bg-coral/20"
+            >
+              Verificar en OpenTimestamps ↗
+            </a>
+          </div>
+
+          <ol class="mt-3 space-y-1 text-[11px] leading-relaxed text-cafe/65">
+            <li><b>1.</b> Descargá los dos archivos: la <b>prueba (.ots)</b> y el <b>documento (.txt)</b>.</li>
+            <li><b>2.</b> Entrá a <b>opentimestamps.org</b> y abrí la sección <b>“Verify”</b> (Verificar).</li>
+            <li><b>3.</b> Arrastrá ahí los dos archivos descargados.</li>
+            <li><b>4.</b> El sitio te mostrará la fecha y el bloque de Bitcoin en que se selló el certificado.</li>
+          </ol>
+
+          <p
+            v-if="anclajeConfirmado"
+            class="mt-3 rounded-xl bg-green-500/10 px-3 py-2 text-[11px] font-semibold text-green-700"
+          >
+            Confirmado en Bitcoin · bloque #{{ certificado.bitcoinAltura }}<template v-if="certificado.fechaAnclaje"> · {{ formatearFechaHora(certificado.fechaAnclaje) }}</template>
+          </p>
+          <p
+            v-else
+            class="mt-3 rounded-xl bg-amber-500/10 px-3 py-2 text-[11px] font-semibold text-amber-700"
+          >
+            Sello creado, esperando la confirmación de Bitcoin (suele tardar unos minutos).
+          </p>
+
+          <p v-if="errorDescarga" role="alert" class="mt-3 text-[11px] text-rojizo">
+            {{ errorDescarga }}
+          </p>
+        </template>
+      </section>
 
       <footer class="border-t border-rosa/40 px-6 py-4 text-center text-[10px] leading-relaxed text-cafe/45">
         Este certificado acredita la existencia e integridad del historial de la

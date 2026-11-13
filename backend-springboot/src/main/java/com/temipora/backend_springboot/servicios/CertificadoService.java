@@ -1,11 +1,13 @@
 package com.temipora.backend_springboot.servicios;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -150,5 +152,49 @@ public class CertificadoService {
         } catch (NoSuchElementException e) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Prueba OpenTimestamps (.ots) del anclaje que cubre la pieza. Es pública:
+     * contiene solo hashes y sirve para verificar de forma independiente.
+     */
+    @Transactional(readOnly = true)
+    public Optional<byte[]> pruebaOts(String codigo) {
+        return anclajeDe(codigo).map(anclaje -> anclaje.getPruebaConfirmada() != null
+            ? anclaje.getPruebaConfirmada()
+            : anclaje.getPruebaOts());
+    }
+
+    /**
+     * "Documento" que se selló: la raíz de Merkle del lote, como texto.
+     * Es lo que el verificador de OpenTimestamps necesita junto con el .ots.
+     */
+    @Transactional(readOnly = true)
+    public Optional<byte[]> documento(String codigo) {
+        return anclajeDe(codigo)
+            .map(anclaje -> anclaje.getHashRaiz().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private Optional<AnclajeLedger> anclajeDe(String codigo) {
+        Long idVariante = CodigoCertificado.decodificar(codigo).orElse(null);
+        if (idVariante == null) {
+            return Optional.empty();
+        }
+        ProductoVariante variante = varianteRepository.findById(idVariante)
+            .orElse(null);
+        if (variante == null) {
+            return Optional.empty();
+        }
+        VarianteLedgerDTO ledger = ledgerService.verificarVariante(variante);
+        if (!ledger.isTieneLedger()) {
+            return Optional.empty();
+        }
+        List<Long> idsEventos = ledger.getEventos().stream()
+            .map(EventoLedgerDTO::getIdEventoLedger)
+            .filter(Objects::nonNull)
+            .toList();
+        return anclajeService.mejorAnclajeDeEventos(idsEventos)
+            .filter(anclaje -> (anclaje.getPruebaConfirmada() != null
+                || anclaje.getPruebaOts() != null));
     }
 }
