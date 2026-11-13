@@ -71,7 +71,7 @@ class MercadoPagoOAuthControllerTest {
 
         assertThat(respuesta.getStatusCode()).isEqualTo(HttpStatus.FOUND);
         assertThat(respuesta.getHeaders().getLocation().toString())
-            .isEqualTo("http://localhost:5173/configuracion/cobros?mp=ok");
+            .isEqualTo("http://localhost:5173/configuracion/pagos-y-cobros?mp=ok");
         verify(oauthService).procesarCallback("code", "state");
     }
 
@@ -80,7 +80,7 @@ class MercadoPagoOAuthControllerTest {
         ResponseEntity<Void> respuesta = controller.callback(null, "state");
 
         assertThat(respuesta.getHeaders().getLocation().toString())
-            .isEqualTo("http://localhost:5173/configuracion/cobros?mp=error");
+            .isEqualTo("http://localhost:5173/configuracion/pagos-y-cobros?mp=error");
     }
 
     @Test
@@ -91,7 +91,7 @@ class MercadoPagoOAuthControllerTest {
         ResponseEntity<Void> respuesta = controller.callback("code", "state");
 
         assertThat(respuesta.getHeaders().getLocation().toString())
-            .isEqualTo("http://localhost:5173/configuracion/cobros?mp=error");
+            .isEqualTo("http://localhost:5173/configuracion/pagos-y-cobros?mp=error");
     }
 
     // ---------------------------------------------------------------

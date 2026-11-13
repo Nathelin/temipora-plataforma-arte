@@ -17,11 +17,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.ContadorMensajesDTO;
 import com.temipora.backend_springboot.modelo.CuentaCobroDTO;
+import com.temipora.backend_springboot.modelo.EstadoCompraGrupo;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.PanelArtistaResumenDTO;
 import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
+import com.temipora.backend_springboot.repositorios.CompraGrupoRepository;
 import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
 import com.temipora.backend_springboot.servicios.pagos.mercadopago.MercadoPagoOAuthService;
 
@@ -36,6 +38,8 @@ class PanelArtistaServiceTest {
     private PedidoService pedidoService;
     @Mock
     private HitoPedidoRepository hitoPedidoRepository;
+    @Mock
+    private CompraGrupoRepository compraGrupoRepository;
     @Mock
     private ConversacionService conversacionService;
     @Mock
@@ -152,6 +156,9 @@ class PanelArtistaServiceTest {
         when(hitoPedidoRepository.findPagadosDeArtista(
             ARTISTA, EstadoPagoHito.PAGADO))
             .thenReturn(List.of(deEsteMes, anterior));
+        when(compraGrupoRepository.netosPagadosDeArtista(
+            ARTISTA, EstadoCompraGrupo.PAGADO))
+            .thenReturn(List.of());
         when(pedidoService.netoMostradoDe(eq(deEsteMes), any(), any()))
             .thenReturn(new BigDecimal("300.00"));
         when(pedidoService.netoMostradoDe(eq(anterior), any(), any()))
@@ -187,6 +194,9 @@ class PanelArtistaServiceTest {
                 null));
         when(hitoPedidoRepository.findPagadosDeArtista(
             ARTISTA, EstadoPagoHito.PAGADO))
+            .thenReturn(List.of());
+        when(compraGrupoRepository.netosPagadosDeArtista(
+            ARTISTA, EstadoCompraGrupo.PAGADO))
             .thenReturn(List.of());
         when(conversacionService.contador(ARTISTA))
             .thenReturn(new ContadorMensajesDTO(0, 0));
