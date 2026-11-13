@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue'
 import ResumenResenias from './ResumenResenias.vue'
 import TarjetaReseniaPublica from './TarjetaReseniaPublica.vue'
 import { ORDENES_RESENIAS, etiquetaOrden } from '../servicios/resenias'
@@ -28,6 +29,29 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['cambiar-filtros', 'cambiar-pagina'])
+
+const hayFiltros = computed(() => Boolean(
+  props.filtros?.calificacion
+  || props.filtros?.idServicio
+  || props.filtros?.idProducto
+  || props.filtros?.idOpcion
+  || (props.filtros?.tipo && props.filtros.tipo !== 'TODOS'),
+))
+
+const hayReseniasTotales = computed(
+  () => Number(props.resumen?.cantidad || 0) > 0,
+)
+
+const mensajeVacio = computed(() => (
+  hayFiltros.value && hayReseniasTotales.value
+    ? 'No hay reseñas para estos filtros.'
+    : 'Todavía no hay reseñas.'
+))
+
+// Si el resumen ya dice “Todavía no hay reseñas.”, no repetimos el mensaje.
+const ocultarMensajeVacio = computed(
+  () => props.mostrarResumen && !hayReseniasTotales.value,
+)
 
 function cambiar(campo, valor) {
   const nuevos = { ...props.filtros, [campo]: valor }
@@ -136,8 +160,11 @@ function haySiguiente() {
 
     <p v-if="cargando" class="py-6 text-center text-sm text-cafe/55">Cargando reseñas...</p>
     <p v-else-if="error" role="alert" class="py-6 text-center text-sm text-rojizo">{{ error }}</p>
-    <p v-else-if="!resenias.length" class="py-6 text-center text-sm text-cafe/55">
-      No hay reseñas para estos filtros.
+    <p
+      v-else-if="!resenias.length && !ocultarMensajeVacio"
+      class="py-6 text-center text-sm text-cafe/55"
+    >
+      {{ mensajeVacio }}
     </p>
 
     <div v-else class="space-y-3">
