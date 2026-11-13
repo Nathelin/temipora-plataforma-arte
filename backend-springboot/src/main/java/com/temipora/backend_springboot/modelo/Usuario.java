@@ -80,6 +80,13 @@ public class Usuario {
     @Builder.Default
     private boolean pedidosPublicos = false;
 
+    @Column(name = "coleccion_publica", nullable = false)
+    @Builder.Default
+    private boolean coleccionPublica = false;
+
+    @Column(name = "coleccion_sugerida_en")
+    private LocalDateTime coleccionSugeridaEn;
+
     @Column(name = "mostrar_propietario", nullable = false)
     @Builder.Default
     private boolean mostrarPropietario = true;

@@ -35,4 +35,12 @@ public interface EventoLedgerRepository extends JpaRepository<EventoLedger, Long
          WHERE e.variante.producto.idProducto IN :idsProducto
         """)
     Set<Long> findVariantesConLedger(@Param("idsProducto") Collection<Long> idsProducto);
+
+    @Query("""
+        SELECT DISTINCT e.variante.idVariante
+          FROM EventoLedger e
+         WHERE e.variante.idVariante IN :idsVariante
+        """)
+    Set<Long> findVarianteIdsConLedger(
+        @Param("idsVariante") Collection<Long> idsVariante);
 }

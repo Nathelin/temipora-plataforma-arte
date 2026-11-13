@@ -124,6 +124,19 @@ public interface ReseniaRepository extends JpaRepository<Resenia, Long> {
         @Param("estado") EstadoResenia estado);
 
     @Query("""
+        SELECT r FROM Resenia r
+        JOIN FETCH r.producto prod
+        JOIN FETCH r.autor a
+        WHERE prod.idProducto IN :idsProducto
+          AND a.idUsuario = :idAutor
+          AND r.estado = :estado
+        """)
+    List<Resenia> findPublicadasPorProductosYAutor(
+        @Param("idsProducto") Collection<Long> idsProducto,
+        @Param("idAutor") Long idAutor,
+        @Param("estado") EstadoResenia estado);
+
+    @Query("""
         SELECT v.calificacionGeneral, COUNT(r)
         FROM Resenia r
         JOIN r.versiones v

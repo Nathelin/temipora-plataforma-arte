@@ -27,6 +27,8 @@ public class ActualizarPerfilDTO {
 
     private Boolean pedidosPublicos;
 
+    private Boolean coleccionPublica;
+
     private Boolean mostrarPropietario;
 
     private Boolean recibirEmailsPromocionales;

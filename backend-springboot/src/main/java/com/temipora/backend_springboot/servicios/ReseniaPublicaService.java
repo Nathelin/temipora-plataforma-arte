@@ -106,6 +106,32 @@ public class ReseniaPublicaService {
         return resumenPorPedidos(List.of(idPedido)).get(idPedido);
     }
 
+    /**
+     * Reseñas publicadas por un mismo autor sobre un conjunto de productos.
+     * Se devuelven también las anónimas: cada superficie decide si las muestra
+     * según quién mira (el dueño sí, el visitante no).
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, ReseniaPublicaResumenDTO> resumenesDeProductosPorAutor(
+            Collection<Long> idsProducto, Long idAutor) {
+        if (idsProducto == null || idsProducto.isEmpty() || idAutor == null) {
+            return Map.of();
+        }
+        List<Resenia> resenias = reseniaRepository.findPublicadasPorProductosYAutor(
+            idsProducto, idAutor, EstadoResenia.PUBLICADA);
+        if (resenias.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, ReseniaVersion> versiones = versionesActuales(resenias);
+        Map<Long, ReseniaPublicaResumenDTO> mapa = new HashMap<>();
+        for (Resenia resenia : resenias) {
+            mapa.put(
+                resenia.getProducto().getIdProducto(),
+                aResumen(resenia, versiones.get(resenia.getIdResenia())));
+        }
+        return mapa;
+    }
+
     @Transactional(readOnly = true)
     public ResumenReseniasDTO resumenServicio(Long idServicio) {
         return resumen(idServicio, null);

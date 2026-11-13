@@ -4,6 +4,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 import com.temipora.backend_springboot.modelo.CompraItem;
 import com.temipora.backend_springboot.modelo.EstadoCompraGrupo;
 import com.temipora.backend_springboot.modelo.EstadoEntregaItem;
+import com.temipora.backend_springboot.modelo.Usuario;
 
 public interface CompraItemRepository extends JpaRepository<CompraItem, Long> {
 
@@ -74,4 +77,124 @@ public interface CompraItemRepository extends JpaRepository<CompraItem, Long> {
     List<CompraItem> findEntregadosDeCliente(
             @Param("idUsuario") Long idUsuario,
             @Param("estado") EstadoEntregaItem estado);
+
+    /**
+     * Colección pública de productos comprados. Solo incluye compras pagadas.
+     * Para piezas únicas se descartan las compras anteriores a la más reciente
+     * de la misma variante, para que la pieza revendida salga de la colección
+     * del dueño anterior y no se duplique si la vuelve a comprar.
+     */
+    @Query(value = """
+        SELECT i FROM CompraItem i
+        JOIN FETCH i.grupo g
+        JOIN FETCH g.compra c
+        JOIN FETCH i.producto p
+        JOIN FETCH p.artista a
+        JOIN FETCH i.variante v
+        WHERE c.cliente.idUsuario = :idCliente
+          AND g.estado = :estadoPagado
+          AND i.estadoEntrega <> :estadoCancelado
+          AND (:esDuenio = true OR i.ocultoColeccion = false)
+          AND (:idArtista IS NULL OR a.idUsuario = :idArtista)
+          AND (:ocultarSensibles = false OR p.contenidoSensible = false)
+          AND (
+              NOT EXISTS (
+                  SELECT 1 FROM EventoLedger e WHERE e.variante = v
+              )
+              OR NOT EXISTS (
+                  SELECT 1 FROM CompraItem i2
+                  JOIN i2.grupo g2
+                  WHERE i2.variante = v
+                    AND g2.estado = :estadoPagado
+                    AND i2.estadoEntrega <> :estadoCancelado
+                    AND (g2.fechaPago > g.fechaPago
+                         OR (g2.fechaPago = g.fechaPago
+                             AND i2.idCompraItem > i.idCompraItem))
+              )
+          )
+        ORDER BY g.fechaPago DESC, i.idCompraItem DESC
+        """, countQuery = """
+        SELECT COUNT(i) FROM CompraItem i
+        JOIN i.grupo g
+        JOIN g.compra c
+        JOIN i.producto p
+        JOIN i.variante v
+        WHERE c.cliente.idUsuario = :idCliente
+          AND g.estado = :estadoPagado
+          AND i.estadoEntrega <> :estadoCancelado
+          AND (:esDuenio = true OR i.ocultoColeccion = false)
+          AND (:idArtista IS NULL OR p.artista.idUsuario = :idArtista)
+          AND (:ocultarSensibles = false OR p.contenidoSensible = false)
+          AND (
+              NOT EXISTS (
+                  SELECT 1 FROM EventoLedger e WHERE e.variante = v
+              )
+              OR NOT EXISTS (
+                  SELECT 1 FROM CompraItem i2
+                  JOIN i2.grupo g2
+                  WHERE i2.variante = v
+                    AND g2.estado = :estadoPagado
+                    AND i2.estadoEntrega <> :estadoCancelado
+                    AND (g2.fechaPago > g.fechaPago
+                         OR (g2.fechaPago = g.fechaPago
+                             AND i2.idCompraItem > i.idCompraItem))
+              )
+          )
+        """)
+    Page<CompraItem> findColeccion(
+        @Param("idCliente") Long idCliente,
+        @Param("esDuenio") boolean esDuenio,
+        @Param("ocultarSensibles") boolean ocultarSensibles,
+        @Param("idArtista") Long idArtista,
+        @Param("estadoPagado") EstadoCompraGrupo estadoPagado,
+        @Param("estadoCancelado") EstadoEntregaItem estadoCancelado,
+        Pageable pageable);
+
+    @Query("""
+        SELECT DISTINCT a FROM CompraItem i
+        JOIN i.grupo g
+        JOIN g.compra c
+        JOIN i.producto p
+        JOIN p.artista a
+        JOIN i.variante v
+        WHERE c.cliente.idUsuario = :idCliente
+          AND g.estado = :estadoPagado
+          AND i.estadoEntrega <> :estadoCancelado
+          AND (:esDuenio = true OR i.ocultoColeccion = false)
+          AND (:ocultarSensibles = false OR p.contenidoSensible = false)
+          AND (
+              NOT EXISTS (
+                  SELECT 1 FROM EventoLedger e WHERE e.variante = v
+              )
+              OR NOT EXISTS (
+                  SELECT 1 FROM CompraItem i2
+                  JOIN i2.grupo g2
+                  WHERE i2.variante = v
+                    AND g2.estado = :estadoPagado
+                    AND i2.estadoEntrega <> :estadoCancelado
+                    AND (g2.fechaPago > g.fechaPago
+                         OR (g2.fechaPago = g.fechaPago
+                             AND i2.idCompraItem > i.idCompraItem))
+              )
+          )
+        ORDER BY a.nombreUsuario
+        """)
+    List<Usuario> artistasDeColeccion(
+        @Param("idCliente") Long idCliente,
+        @Param("esDuenio") boolean esDuenio,
+        @Param("ocultarSensibles") boolean ocultarSensibles,
+        @Param("estadoPagado") EstadoCompraGrupo estadoPagado,
+        @Param("estadoCancelado") EstadoEntregaItem estadoCancelado);
+
+    @Query("""
+        SELECT COUNT(i) FROM CompraItem i
+        JOIN i.grupo g
+        WHERE g.compra.cliente.idUsuario = :idCliente
+          AND g.estado = :estadoPagado
+          AND i.estadoEntrega <> :estadoCancelado
+        """)
+    long contarColeccionables(
+        @Param("idCliente") Long idCliente,
+        @Param("estadoPagado") EstadoCompraGrupo estadoPagado,
+        @Param("estadoCancelado") EstadoEntregaItem estadoCancelado);
 }

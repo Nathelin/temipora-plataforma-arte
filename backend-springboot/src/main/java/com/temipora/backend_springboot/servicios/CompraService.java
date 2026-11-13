@@ -957,6 +957,14 @@ public class CompraService {
         return null;
     }
 
+    /**
+     * Imagen exacta que se compró: resuelve la versión de la variante por el
+     * hash del archivo, no la portada actual del producto.
+     */
+    public String imagenDeItem(CompraItem item) {
+        return imagenItem(item);
+    }
+
     private String imagenItem(CompraItem item) {
         ProductoVariante variante = item.getVariante();
         if (variante != null) {

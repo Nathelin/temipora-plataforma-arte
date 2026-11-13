@@ -176,6 +176,9 @@ public class UsuarioService {
         if (dto.getPedidosPublicos() != null) {
             usuario.setPedidosPublicos(dto.getPedidosPublicos());
         }
+        if (dto.getColeccionPublica() != null) {
+            usuario.setColeccionPublica(dto.getColeccionPublica());
+        }
         if (dto.getMostrarPropietario() != null) {
             usuario.setMostrarPropietario(dto.getMostrarPropietario());
         }

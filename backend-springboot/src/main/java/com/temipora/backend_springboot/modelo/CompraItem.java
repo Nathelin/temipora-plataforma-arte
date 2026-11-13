@@ -96,4 +96,10 @@ public class CompraItem {
 
     @Column(name = "fecha_entrega")
     private LocalDateTime fechaEntrega;
+
+    @Column(name = "oculto_coleccion", nullable = false)
+    private boolean ocultoColeccion = false;
+
+    @Column(name = "oculto_coleccion_en")
+    private LocalDateTime ocultoColeccionEn;
 }
