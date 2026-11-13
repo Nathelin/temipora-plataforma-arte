@@ -245,6 +245,10 @@ function cambiarLista(clave, valores) {
         titulo="Moneda del precio original"
         :activos="estado.monedaDeclarada ? 1 : 0"
       >
+        <p class="mb-2 text-[11px] leading-relaxed text-cafe/50">
+          El rango de precio ya contempla todas las monedas convertidas.
+          Este filtro sirve solo si querés ver únicamente servicios publicados en una.
+        </p>
         <FiltroCheckbox
           :opciones="monedasDisponibles.map((c) => ({ valor: c, texto: c }))"
           :seleccionados="estado.monedaDeclarada ? [estado.monedaDeclarada] : []"

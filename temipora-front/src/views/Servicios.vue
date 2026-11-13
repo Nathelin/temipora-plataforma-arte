@@ -45,6 +45,7 @@ const chips = computed(() => chipsActivos(filtros.value, {
   tipos: tipos.value,
   medios: medios.value,
   etiquetas: etiquetas.value,
+  moneda: monedaUsuario.value,
 }))
 
 const hayFiltrosActivos = computed(() => chips.value.length > 0)

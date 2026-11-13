@@ -120,6 +120,9 @@ public class Servicio {
     @Column(name = "imagen_portada", length = 255)
     private String imagenPortada;
 
+    @Column(name = "fecha_creacion", nullable = false, updatable = false)
+    private LocalDateTime fechaCreacion = LocalDateTime.now();
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private EstadoServicio estado = EstadoServicio.PUBLICADO;

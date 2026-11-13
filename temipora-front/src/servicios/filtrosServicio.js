@@ -2,9 +2,30 @@
 // Única fuente de verdad para: leerse de la URL, viajar al backend y volver.
 
 import api from './api'
+import { formatearMonto } from './moneda'
+
+/**
+ * Símbolo de la moneda según Intl, para no hardcodear "$": en USD debe verse
+ * "US$" y en ARS "$". Si el entorno no lo resuelve, cae al código.
+ */
+export function simboloMoneda(codigo = 'ARS') {
+  const iso = (codigo || 'ARS').toUpperCase()
+  try {
+    const partes = new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: iso,
+      currencyDisplay: 'narrowSymbol',
+    }).formatToParts(0)
+    const simbolo = partes.find((p) => p.type === 'currency')?.value
+    return simbolo || `${iso} `
+  } catch {
+    return `${iso} `
+  }
+}
 
 export const ORDENES = [
   { valor: 'RELEVANCIA', texto: 'Para vos' },
+  { valor: 'RECIENTES', texto: 'Más recientes' },
   { valor: 'NOMBRE', texto: 'Nombre' },
   { valor: 'PRECIO_ASC', texto: 'Precio: menor a mayor' },
   { valor: 'PRECIO_DESC', texto: 'Precio: mayor a menor' },
@@ -161,7 +182,12 @@ export function cantidadActivos(estado) {
 }
 
 /** Chips removibles que se muestran arriba de la grilla. */
-export function chipsActivos(estado, { tipos = [], medios = [], etiquetas = [] } = {}) {
+export function chipsActivos(estado, {
+  tipos = [],
+  medios = [],
+  etiquetas = [],
+  moneda = 'ARS',
+} = {}) {
   const chips = []
   const agregar = (clave, valor, texto) => chips.push({ clave, valor, texto })
 
@@ -180,11 +206,14 @@ export function chipsActivos(estado, { tipos = [], medios = [], etiquetas = [] }
     agregar('sensible', '', estado.sensible === 'true' ? 'Con contenido sensible' : 'Sin contenido sensible')
   }
   if (estado.precioMin !== '' || estado.precioMax !== '') {
-    const desde = estado.precioMin !== '' ? estado.precioMin : null
-    const hasta = estado.precioMax !== '' ? estado.precioMax : null
+    const simbolo = simboloMoneda(moneda)
+    const desde = estado.precioMin !== '' ? formatearMonto(estado.precioMin) : null
+    const hasta = estado.precioMax !== '' ? formatearMonto(estado.precioMax) : null
     const texto = desde && hasta
-      ? `Precio: ${desde} – ${hasta}`
-      : (desde ? `Precio desde ${desde}` : `Precio hasta ${hasta}`)
+      ? `Precio ${simbolo}${desde} – ${simbolo}${hasta}`
+      : (desde
+        ? `Precio desde ${simbolo}${desde}`
+        : `Precio hasta ${simbolo}${hasta}`)
     agregar('rangoPrecio', '', texto)
   }
   if (estado.tiempoMaxDias !== '') {

@@ -285,6 +285,22 @@ public class ServicioService {
             .build();
     }
 
+    /**
+     * Orden "más recientes": fecha de creación descendente y, a igual fecha,
+     * id descendente para que el resultado sea estable.
+     *
+     * nullsFirst combinado con reversed deja las fechas nulas al final del
+     * orden descendente. La columna es NOT NULL, pero el id es el desempate
+     * que evita resultados indeterminados entre dos altas del mismo instante.
+     */
+    static Comparator<Servicio> comparadorRecientes() {
+        return Comparator.comparing(
+                Servicio::getFechaCreacion,
+                Comparator.nullsFirst(Comparator.naturalOrder()))
+            .reversed()
+            .thenComparing(Servicio::getIdServicio, Comparator.reverseOrder());
+    }
+
     private record Ordenados(List<Servicio> items, boolean personalizado) {
     }
 
@@ -486,6 +502,8 @@ public class ServicioService {
             }
             ordenados.sort(comparator.thenComparing(
                 Servicio::getNombre, String.CASE_INSENSITIVE_ORDER));
+        } else if (orden == OrdenServicio.RECIENTES) {
+            ordenados.sort(comparadorRecientes());
         }
         return new Ordenados(ordenados, personalizado);
     }
@@ -1094,24 +1112,53 @@ public class ServicioService {
             return (root, query, cb) -> cb.conjunction();
         }
 
+        Map<Long, RangoPrecio> rangos = rangosPorMoneda(precioMin, precioMax, factores);
         return (root, query, cb) -> {
             List<Predicate> porMoneda = new ArrayList<>();
-            for (Map.Entry<Long, BigDecimal> entrada : factores.entrySet()) {
-                BigDecimal factor = entrada.getValue();
-                List<Predicate> rango = new ArrayList<>();
-                rango.add(cb.equal(root.get("moneda").get("idMoneda"), entrada.getKey()));
-                if (precioMin != null) {
-                    rango.add(cb.greaterThanOrEqualTo(
-                        root.get("precioBase"), precioMin.divide(factor, 2, RoundingMode.HALF_UP)));
+            for (Map.Entry<Long, RangoPrecio> entrada : rangos.entrySet()) {
+                RangoPrecio rango = entrada.getValue();
+                List<Predicate> condiciones = new ArrayList<>();
+                condiciones.add(cb.equal(root.get("moneda").get("idMoneda"), entrada.getKey()));
+                if (rango.minimo() != null) {
+                    condiciones.add(cb.greaterThanOrEqualTo(root.get("precioBase"), rango.minimo()));
                 }
-                if (precioMax != null) {
-                    rango.add(cb.lessThanOrEqualTo(
-                        root.get("precioBase"), precioMax.divide(factor, 2, RoundingMode.HALF_UP)));
+                if (rango.maximo() != null) {
+                    condiciones.add(cb.lessThanOrEqualTo(root.get("precioBase"), rango.maximo()));
                 }
-                porMoneda.add(cb.and(rango.toArray(new Predicate[0])));
+                porMoneda.add(cb.and(condiciones.toArray(new Predicate[0])));
             }
             return cb.or(porMoneda.toArray(new Predicate[0]));
         };
+    }
+
+    /** Rango de precio expresado en la moneda en la que está cargado el servicio. */
+    record RangoPrecio(BigDecimal minimo, BigDecimal maximo) {
+    }
+
+    /**
+     * Convierte un rango de precio pedido en la moneda del usuario al equivalente
+     * en cada moneda del catálogo.
+     *
+     * Un servicio de USD 20 con factor 1000 se muestra como ARS 20.000. Para que
+     * entre en el rango ARS 10.000–30.000 hay que comparar su precio base contra
+     * USD 10–30, es decir el rango dividido por el factor.
+     */
+    static Map<Long, RangoPrecio> rangosPorMoneda(
+            BigDecimal precioMin,
+            BigDecimal precioMax,
+            Map<Long, BigDecimal> factores) {
+        Map<Long, RangoPrecio> rangos = new LinkedHashMap<>();
+        for (Map.Entry<Long, BigDecimal> entrada : factores.entrySet()) {
+            BigDecimal factor = entrada.getValue();
+            BigDecimal minimo = precioMin == null
+                ? null
+                : precioMin.divide(factor, 2, RoundingMode.HALF_UP);
+            BigDecimal maximo = precioMax == null
+                ? null
+                : precioMax.divide(factor, 2, RoundingMode.HALF_UP);
+            rangos.put(entrada.getKey(), new RangoPrecio(minimo, maximo));
+        }
+        return rangos;
     }
 
     private boolean tieneElementos(Collection<?> valores) {

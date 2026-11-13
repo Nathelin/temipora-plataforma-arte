@@ -10,9 +10,26 @@ const props = defineProps({
 
 const emit = defineEmits(['cambiar'])
 
-const sugerencias = [0, 5000, 10000, 25000, 50000, 100000]
+// Los montos sugeridos dependen de la escala de la moneda: 100.000 tiene
+// sentido en ARS y ninguno en USD.
+const sugerenciasPorMoneda = {
+  ARS: [0, 5000, 10000, 25000, 50000, 100000],
+  USD: [0, 5, 10, 25, 50, 100],
+}
+
+const sugerencias = computed(
+  () => sugerenciasPorMoneda[props.moneda] || sugerenciasPorMoneda.USD,
+)
 
 const activo = computed(() => props.precioMin !== '' || props.precioMax !== '')
+
+// Un mínimo mayor que el máximo deja la lista vacía sin explicar por qué.
+const invertido = computed(() => {
+  if (props.precioMin === '' || props.precioMax === '') return false
+  const min = Number(props.precioMin)
+  const max = Number(props.precioMax)
+  return Number.isFinite(min) && Number.isFinite(max) && min > max
+})
 
 function alEscribir(clave, evento) {
   const valor = parsearMonto(evento.target.value)
@@ -62,7 +79,16 @@ function limpiar() {
     </div>
 
     <p class="text-[11px] leading-relaxed text-cafe/50">
-      En {{ moneda }}, convirtiendo los precios declarados en otra moneda.
+      Precio en <strong class="font-semibold text-cafe/65">{{ moneda }}</strong>,
+      convirtiendo los servicios publicados en otra moneda.
+    </p>
+
+    <p
+      v-if="invertido"
+      role="alert"
+      class="rounded-lg border border-rojizo/30 bg-rojizo/10 px-2.5 py-1.5 text-[11px] font-medium leading-relaxed text-rojizo"
+    >
+      El mínimo es mayor que el máximo: no vas a obtener resultados.
     </p>
 
     <div class="flex flex-wrap gap-1.5">
