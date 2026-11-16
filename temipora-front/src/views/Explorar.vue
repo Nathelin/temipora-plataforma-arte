@@ -10,6 +10,9 @@ const route = useRoute()
 const router = useRouter()
 
 const LIMITE = 8
+// El hero usa el primer producto como "recién publicado", así que pedimos
+// uno extra para que la grilla conserve 8 tarjetas en desktop.
+const LIMITE_PRODUCTOS = LIMITE + 1
 const MAX_CHIPS = 6
 
 const servicios = ref([])
@@ -142,7 +145,7 @@ async function cargar() {
     api.get('/servicios', {
       params: { orden: 'RELEVANCIA', pagina: 0, tamanio: LIMITE },
     }),
-    cargarCatalogoProductos({ orden: 'RELEVANCIA', pagina: 0, tamanio: LIMITE }),
+    cargarCatalogoProductos({ orden: 'RELEVANCIA', pagina: 0, tamanio: LIMITE_PRODUCTOS }),
     api.get('/tipos-producto'),
   ]
   const [serviciosRes, productosRes, tiposRes] =
@@ -287,7 +290,21 @@ watch(serviciosGrilla, async () => {
               {{ heroServicio.nombre }}
             </h2>
             <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-inverso-suave">
-              <span>@{{ heroServicio.nombreArtista }}</span>
+              <span class="inline-flex items-center gap-2">
+                <img
+                  v-if="heroServicio.urlFotoArtista"
+                  :src="heroServicio.urlFotoArtista"
+                  alt=""
+                  class="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-white/40"
+                />
+                <span
+                  v-else
+                  class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15 text-[10px] font-bold text-inverso-contraste"
+                >
+                  {{ (heroServicio.nombreArtista || '?').charAt(0).toUpperCase() }}
+                </span>
+                @{{ heroServicio.nombreArtista }}
+              </span>
               <span>{{ ratingServicio(heroServicio) }}</span>
               <span>{{ textoEntrega(heroServicio) }}</span>
             </div>
@@ -495,7 +512,16 @@ watch(serviciosGrilla, async () => {
                   class="mt-2 flex w-fit items-center gap-2 text-xs font-medium text-cafe/70 transition hover:text-acento"
                   @click.stop="irAPerfil(servicio.nombreArtista)"
                 >
-                  <span class="flex h-6 w-6 items-center justify-center rounded-full bg-rosa/40 text-[10px] font-bold text-granate">
+                  <img
+                    v-if="servicio.urlFotoArtista"
+                    :src="servicio.urlFotoArtista"
+                    alt=""
+                    class="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-borde/50"
+                  />
+                  <span
+                    v-else
+                    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-rosa/40 text-[10px] font-bold text-granate"
+                  >
                     {{ (servicio.nombreArtista || '?').charAt(0).toUpperCase() }}
                   </span>
                   @{{ servicio.nombreArtista }}
@@ -627,7 +653,16 @@ watch(serviciosGrilla, async () => {
                 class="mt-1.5 flex w-fit items-center gap-1.5 text-[11px] text-cafe/65 transition hover:text-acento"
                 @click.stop="irAPerfil(producto.nombreArtista)"
               >
-                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-rosa/40 text-[9px] font-bold text-granate">
+                <img
+                  v-if="producto.urlFotoArtista"
+                  :src="producto.urlFotoArtista"
+                  alt=""
+                  class="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-borde/50"
+                />
+                <span
+                  v-else
+                  class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rosa/40 text-[9px] font-bold text-granate"
+                >
                   {{ (producto.nombreArtista || '?').charAt(0).toUpperCase() }}
                 </span>
                 @{{ producto.nombreArtista }}
