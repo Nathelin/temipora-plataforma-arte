@@ -900,12 +900,8 @@ public class PedidoService {
                     porVencer++;
                 }
                 if (hito.getEstadoPago() == EstadoPagoHito.PENDIENTE) {
-                    porCobrar = sumar(porCobrar, netoMostrado(
-                        hito,
-                        muestraOrigen,
-                        muestraCobro,
-                        factorCobro,
-                        factorOrigen));
+                    porCobrar = sumar(porCobrar,
+                        hito.getHitoPresupuesto().getMontoNetoCobro());
                 }
 
                 int prioridad = revision ? 0
@@ -967,25 +963,7 @@ public class PedidoService {
             conRevision,
             porVencer,
             porCobrar,
-            mostrada != null ? mostrada.getCodigo() : null);
-    }
-
-    public BigDecimal netoMostradoDe(
-            HitoPedido hito, Moneda mostrada, LocalDateTime fecha) {
-        Pedido pedido = hito.getPedido();
-        boolean muestraOrigen = PresupuestoDTO.mismaMoneda(
-            mostrada, pedido.getPresupuesto().getMoneda());
-        boolean muestraCobro = !muestraOrigen && PresupuestoDTO.mismaMoneda(
-            mostrada, pedido.getPresupuesto().getMonedaCobro());
-        BigDecimal factorCobro = mostrada != null
-            ? monedaVistaService.factorCobroAMostrada(mostrada, fecha)
-            : null;
-        BigDecimal factorOrigen = mostrada != null
-            ? monedaVistaService.factorOrigenAMostrada(
-                pedido.getPresupuesto().getMoneda(), mostrada, fecha)
-            : null;
-        return netoMostrado(
-            hito, muestraOrigen, muestraCobro, factorCobro, factorOrigen);
+            monedaVistaService.CODIGO_COBRO);
     }
 
     private int urgenciaPedido(PedidoResumenDTO resumen) {
@@ -999,30 +977,6 @@ public class PedidoService {
             return 2;
         }
         return 3;
-    }
-
-    private BigDecimal netoMostrado(
-            HitoPedido hito,
-            boolean muestraOrigen,
-            boolean muestraCobro,
-            BigDecimal factorCobro,
-            BigDecimal factorOrigen) {
-        BigDecimal neto = hito.getHitoPresupuesto().getMontoNeto();
-        BigDecimal netoCobro = hito.getHitoPresupuesto().getMontoNetoCobro();
-        if (neto == null) {
-            neto = hito.getHitoPresupuesto().getMonto() != null && hito.getHitoPresupuesto().getComisionMonto() != null
-                ? hito.getHitoPresupuesto().getMonto().subtract(hito.getHitoPresupuesto().getComisionMonto())
-                : hito.getHitoPresupuesto().getMonto();
-        }
-        if (netoCobro == null) {
-            netoCobro = hito.getHitoPresupuesto().getMontoCobro() != null
-                    && hito.getHitoPresupuesto().getComisionMontoCobro() != null
-                ? hito.getHitoPresupuesto().getMontoCobro().subtract(hito.getHitoPresupuesto().getComisionMontoCobro())
-                : hito.getHitoPresupuesto().getMontoCobro();
-        }
-        return PresupuestoDTO.totalMostrado(
-            neto, netoCobro, muestraOrigen, muestraCobro,
-            factorCobro, factorOrigen);
     }
 
     @Transactional

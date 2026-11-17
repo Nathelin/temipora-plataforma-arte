@@ -53,12 +53,12 @@ const tarjetas = computed(() => [
   {
     etiqueta: 'Recibido total',
     valor: formatearPrecio(dinero.value.cobradoTotal, dinero.value.monedaMostrada),
-    detalle: 'Neto de todos tus pagos acreditados.',
+    detalle: 'Neto liquidado por el medio de pago.',
   },
   {
     etiqueta: 'Recibido este mes',
     valor: formatearPrecio(dinero.value.cobradoMes, dinero.value.monedaMostrada),
-    detalle: 'Neto acreditado en el mes corriente.',
+    detalle: 'Neto liquidado en el mes corriente.',
   },
   {
     etiqueta: 'Por cobrar',
@@ -85,24 +85,20 @@ const totalMostrado = computed(
   () => (vista.value === 'servicios' ? totalElementos.value : totalProductos.value),
 )
 
+const informeUrl = computed(() => ({
+  name: 'panel-informes',
+  query: {
+    ...(mes.value ? { mes: mes.value } : {}),
+    tipo: vista.value === 'productos' ? 'PRODUCTOS' : 'SERVICIOS',
+  },
+}))
+
 function monedaNetoDe(venta) {
-  if (venta.netoRecibidoMp != null) return venta.monedaCobro
-  return venta.monedaMostrada || venta.monedaCobro
+  return venta.monedaCobro || 'ARS'
 }
 
 function netoDe(venta) {
-  return venta.netoRecibidoMp ?? venta.netoMostrado ?? venta.montoNetoCobro
-}
-
-function netoVenta(venta) {
-  return venta.netoMostrado ?? venta.montoNetoCobro
-}
-
-function formatearNeto(venta) {
-  return formatearPrecio(
-    netoVenta(venta),
-    venta.monedaMostrada || venta.monedaCobro,
-  )
+  return venta.netoRecibidoMp ?? venta.montoNetoCobro
 }
 
 function tieneDescuento(venta) {
@@ -297,23 +293,15 @@ function cantidadProductos(venta) {
 }
 
 function netoProducto(venta) {
-  return venta.netoRecibidoMp ?? venta.netoMostrado ?? venta.montoNetoCobro
+  return venta.netoRecibidoMp ?? venta.montoNetoCobro
 }
 
 function monedaNetoProducto(venta) {
-  if (venta.netoRecibidoMp != null) return venta.monedaCobro
-  return venta.monedaMostrada || venta.monedaCobro
+  return venta.monedaCobro || 'ARS'
 }
 
 function formatearNetoProducto(venta) {
   return formatearPrecio(netoProducto(venta), monedaNetoProducto(venta))
-}
-
-function formatearNetoMostradoProducto(venta) {
-  return formatearPrecio(
-    venta.netoMostrado ?? venta.montoNetoCobro,
-    venta.monedaMostrada || venta.monedaCobro,
-  )
 }
 
 function proveedorDe(venta) {
@@ -337,6 +325,12 @@ onMounted(() => {
       :nivel="2"
     >
       <template #acciones>
+        <router-link
+          :to="informeUrl"
+          class="inline-flex min-h-9 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+        >
+          Informe del período
+        </router-link>
         <span
           v-if="vista === 'servicios' ? (!cargando && !error) : (!cargandoProductos && !errorProductos)"
           class="inline-flex self-start rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral sm:self-auto"
@@ -520,7 +514,6 @@ onMounted(() => {
                 <th class="px-4 py-3 font-semibold">Servicio / hito</th>
                 <th class="px-4 py-3 text-right font-semibold">El cliente pagó</th>
                 <th class="px-4 py-3 text-right font-semibold">Comisión Temipora</th>
-                <th class="px-4 py-3 text-right font-semibold">Tu neto</th>
                 <th class="px-4 py-3 text-right font-semibold">Arancel MercadoPago</th>
                 <th class="px-4 py-3 text-right font-semibold">Recibís</th>
                 <th class="px-4 py-3 font-semibold">Medio de pago</th>
@@ -561,9 +554,6 @@ onMounted(() => {
                 </td>
                 <td class="px-4 py-3 text-right whitespace-nowrap text-cafe/60">
                   {{ formatearPrecio(venta.comisionMontoCobro, venta.monedaCobro) }}
-                </td>
-                <td class="px-4 py-3 text-right whitespace-nowrap font-semibold text-granate">
-                  {{ formatearNeto(venta) }}
                 </td>
                 <td class="px-4 py-3 text-right whitespace-nowrap">
                   <span class="block text-cafe/70">
@@ -642,12 +632,6 @@ onMounted(() => {
                 </dd>
               </div>
               <div class="text-right">
-                <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Tu neto</dt>
-                <dd class="text-cafe/80">
-                  {{ formatearNeto(venta) }}
-                </dd>
-              </div>
-              <div>
                 <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Comisión Temipora</dt>
                 <dd class="text-cafe/60">
                   {{ formatearPrecio(venta.comisionMontoCobro, venta.monedaCobro) }}
@@ -828,7 +812,6 @@ onMounted(() => {
                 <th class="px-4 py-3 font-semibold">Producto</th>
                 <th class="px-4 py-3 text-right font-semibold">El cliente pagó</th>
                 <th class="px-4 py-3 text-right font-semibold">Comisión Temipora</th>
-                <th class="px-4 py-3 text-right font-semibold">Tu neto</th>
                 <th class="px-4 py-3 text-right font-semibold">Arancel MercadoPago</th>
                 <th class="px-4 py-3 text-right font-semibold">Recibís</th>
                 <th class="px-4 py-3 font-semibold">Pago</th>
@@ -886,9 +869,6 @@ onMounted(() => {
                   <td class="px-4 py-3 text-right whitespace-nowrap text-cafe/60">
                     {{ formatearPrecio(venta.comisionMontoCobro, venta.monedaCobro) }}
                   </td>
-                  <td class="px-4 py-3 text-right whitespace-nowrap font-semibold text-granate">
-                    {{ formatearNetoMostradoProducto(venta) }}
-                  </td>
                   <td class="px-4 py-3 text-right whitespace-nowrap text-cafe/70">
                     {{ formatearPrecio(venta.arancelMp, venta.monedaCobro) }}
                   </td>
@@ -911,7 +891,7 @@ onMounted(() => {
                   v-if="filaExpandida === venta.idCompraGrupo"
                   class="border-t border-rosa/40 bg-rosa/5"
                 >
-                  <td colspan="10" class="px-4 py-3">
+                  <td colspan="9" class="px-4 py-3">
                     <ul class="grid gap-2 sm:grid-cols-2">
                       <li
                         v-for="item in venta.items"
@@ -1003,12 +983,6 @@ onMounted(() => {
                 </dd>
               </div>
               <div class="text-right">
-                <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Tu neto</dt>
-                <dd class="text-cafe/80">
-                  {{ formatearNetoMostradoProducto(venta) }}
-                </dd>
-              </div>
-              <div>
                 <dt class="text-[11px] uppercase tracking-wide text-cafe/45">Comisión Temipora</dt>
                 <dd class="text-cafe/60">
                   {{ formatearPrecio(venta.comisionMontoCobro, venta.monedaCobro) }}

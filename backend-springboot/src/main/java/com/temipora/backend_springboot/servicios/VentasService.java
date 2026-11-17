@@ -18,7 +18,10 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 
 import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.HitoPedido;
@@ -107,10 +110,11 @@ public class VentasService {
                 predicados.add(cb.equal(root.get("estado"), estado));
             }
             if (rango != null) {
+                Expression<LocalDateTime> fecha = expresionFechaEfectiva(
+                    root, cb);
                 predicados.add(cb.greaterThanOrEqualTo(
-                    root.<LocalDateTime>get("fechaCreacion"), rango.desde()));
-                predicados.add(cb.lessThan(
-                    root.<LocalDateTime>get("fechaCreacion"), rango.hasta()));
+                    fecha, rango.desde()));
+                predicados.add(cb.lessThan(fecha, rango.hasta()));
             }
             if (idServicio != null) {
                 predicados.add(cb.equal(
@@ -122,11 +126,32 @@ public class VentasService {
         };
     }
 
+    private Expression<LocalDateTime> expresionFechaEfectiva(
+            Root<Pago> root, CriteriaBuilder cb) {
+        Expression<LocalDateTime> acreditacion =
+            root.get("fechaAcreditacion");
+        Expression<LocalDateTime> aprobacion =
+            root.get("fechaAprobacion");
+        Expression<LocalDateTime> creacion = root.get("fechaCreacion");
+        return cb.coalesce(cb.coalesce(acreditacion, aprobacion), creacion);
+    }
+
+    private LocalDateTime fechaEfectiva(Pago pago) {
+        if (pago.getFechaAcreditacion() != null) {
+            return pago.getFechaAcreditacion();
+        }
+        if (pago.getFechaAprobacion() != null) {
+            return pago.getFechaAprobacion();
+        }
+        return pago.getFechaCreacion();
+    }
+
     private VentaDTO dto(Pago pago, Moneda mostrada) {
         HitoPedido hito = pago.getHitoPedido();
         Pedido pedido = hito.getPedido();
+        LocalDateTime fecha = fechaEfectiva(pago);
         BigDecimal netoMostrado = convertir(
-            pago.getMontoNetoCobro(), mostrada, pago.getFechaCreacion());
+            pago.getMontoNetoCobro(), mostrada, fecha);
         // El descuento lo financia Temipora: se prorratea por el monto de este
         // pago sobre el total que paga el cliente.
         BigDecimal descuentoCobro = BigDecimal.ZERO;
@@ -142,7 +167,7 @@ public class VentasService {
 
         return VentaDTO.builder()
             .idPago(pago.getIdPago())
-            .fecha(pago.getFechaCreacion())
+            .fecha(fecha)
             .fechaAcreditacion(pago.getFechaAcreditacion())
             .idPedido(pedido.getIdPedido())
             .nombreServicio(pedido.getServicio() != null
@@ -171,7 +196,7 @@ public class VentasService {
             .descuentoPorcentaje(pedido.getPresupuesto().getDescuentoPorcentaje())
             .descuentoMontoCobro(descuentoCobro)
             .descuentoMostrado(convertir(
-                descuentoCobro, mostrada, pago.getFechaCreacion()))
+                descuentoCobro, mostrada, fecha))
             .monedaMostrada(mostrada != null ? mostrada.getCodigo() : null)
             .arancelMp(pago.getArancelMp())
             .netoRecibidoMp(pago.getNetoRecibidoMp())

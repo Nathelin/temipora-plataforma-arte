@@ -91,4 +91,24 @@ public interface CompraGrupoRepository extends JpaRepository<CompraGrupo, Long>,
         @Param("idArtista") Long idArtista,
         @Param("desde") LocalDateTime desde,
         @Param("hasta") LocalDateTime hasta);
+
+    /**
+     * Neto realmente liquidado y fecha de pago de cada grupo pagado del
+     * artista. Alimenta los totales del panel.
+     */
+    @Query(value = """
+        SELECT COALESCE(ic.neto_recibido_mp, g.neto_artista), g.fecha_pago
+        FROM compra_grupo g
+        LEFT JOIN (
+            SELECT icg.id_compra_grupo AS id_grupo,
+                   MAX(icg.id_intento_cobro) AS id_intento
+            FROM intento_cobro_grupo icg
+            WHERE icg.estado = 'APROBADO'
+            GROUP BY icg.id_compra_grupo
+        ) a ON a.id_grupo = g.id_compra_grupo
+        LEFT JOIN intento_cobro ic ON ic.id_intento_cobro = a.id_intento
+        WHERE g.id_artista = :idArtista
+          AND g.estado = 'PAGADO'
+        """, nativeQuery = true)
+    List<Object[]> netosRealesDeArtista(@Param("idArtista") Long idArtista);
 }

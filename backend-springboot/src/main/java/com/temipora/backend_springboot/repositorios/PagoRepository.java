@@ -103,4 +103,20 @@ public interface PagoRepository
         @Param("idArtista") Long idArtista,
         @Param("desde") LocalDateTime desde,
         @Param("hasta") LocalDateTime hasta);
+
+    /**
+     * Neto realmente liquidado por el medio de pago y fecha efectiva de cada
+     * cobro. Alimenta los totales del panel del artista.
+     */
+    @Query(value = """
+        SELECT COALESCE(p.neto_recibido_mp, p.monto_neto_cobro),
+               COALESCE(p.fecha_acreditacion, p.fecha_aprobacion,
+                    p.fecha_creacion)
+        FROM pago p
+        JOIN hito_pedido h ON h.id_hito_pedido = p.id_hito_pedido
+        JOIN pedido pe ON pe.id_pedido = h.id_pedido
+        WHERE pe.id_artista = :idArtista
+          AND p.estado = 'APROBADO'
+        """, nativeQuery = true)
+    List<Object[]> netosRealesDeArtista(@Param("idArtista") Long idArtista);
 }

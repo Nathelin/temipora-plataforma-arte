@@ -17,14 +17,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.ContadorMensajesDTO;
 import com.temipora.backend_springboot.modelo.CuentaCobroDTO;
-import com.temipora.backend_springboot.modelo.EstadoCompraGrupo;
-import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
-import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.PanelArtistaResumenDTO;
 import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
 import com.temipora.backend_springboot.repositorios.CompraGrupoRepository;
-import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
+import com.temipora.backend_springboot.repositorios.PagoRepository;
 import com.temipora.backend_springboot.servicios.pagos.mercadopago.MercadoPagoOAuthService;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,15 +34,13 @@ class PanelArtistaServiceTest {
     @Mock
     private PedidoService pedidoService;
     @Mock
-    private HitoPedidoRepository hitoPedidoRepository;
+    private PagoRepository pagoRepository;
     @Mock
     private CompraGrupoRepository compraGrupoRepository;
     @Mock
     private ConversacionService conversacionService;
     @Mock
     private MercadoPagoOAuthService mercadoPagoOAuthService;
-    @Mock
-    private MonedaVistaService monedaVistaService;
 
     @InjectMocks
     private PanelArtistaService panelArtistaService;
@@ -134,10 +129,7 @@ class PanelArtistaServiceTest {
     }
 
     @Test
-    void sumaElNetoCobradoSeparandoElMesCorriente() {
-        HitoPedido deEsteMes = hitoPagado(LocalDateTime.now());
-        HitoPedido anterior = hitoPagado(LocalDateTime.now().minusMonths(2));
-
+    void sumaElNetoRealSeparandoElMesCorriente() {
         when(solicitudServicioService.listarRecibidasEnEstados(
             eq(ARTISTA), any()))
             .thenReturn(List.of());
@@ -153,16 +145,17 @@ class PanelArtistaServiceTest {
                 0,
                 new BigDecimal("250.00"),
                 "ARS"));
-        when(hitoPedidoRepository.findPagadosDeArtista(
-            ARTISTA, EstadoPagoHito.PAGADO))
-            .thenReturn(List.of(deEsteMes, anterior));
-        when(compraGrupoRepository.netosPagadosDeArtista(
-            ARTISTA, EstadoCompraGrupo.PAGADO))
+        when(pagoRepository.netosRealesDeArtista(ARTISTA))
+            .thenReturn(List.<Object[]>of(
+                new Object[] {
+                    new BigDecimal("300.00"), LocalDateTime.now(),
+                },
+                new Object[] {
+                    new BigDecimal("100.00"),
+                    LocalDateTime.now().minusMonths(2),
+                }));
+        when(compraGrupoRepository.netosRealesDeArtista(ARTISTA))
             .thenReturn(List.of());
-        when(pedidoService.netoMostradoDe(eq(deEsteMes), any(), any()))
-            .thenReturn(new BigDecimal("300.00"));
-        when(pedidoService.netoMostradoDe(eq(anterior), any(), any()))
-            .thenReturn(new BigDecimal("100.00"));
         when(conversacionService.contador(ARTISTA))
             .thenReturn(new ContadorMensajesDTO(0, 0));
         when(mercadoPagoOAuthService.estado(ARTISTA))
@@ -176,6 +169,7 @@ class PanelArtistaServiceTest {
             .isEqualByComparingTo("300.00");
         assertThat(resumen.getDinero().getPorCobrar())
             .isEqualByComparingTo("250.00");
+        assertThat(resumen.getDinero().getMonedaMostrada()).isEqualTo("ARS");
         assertThat(resumen.isCuentaCobrosConectada()).isTrue();
     }
 
@@ -191,12 +185,10 @@ class PanelArtistaServiceTest {
                 0,
                 0,
                 BigDecimal.ZERO,
-                null));
-        when(hitoPedidoRepository.findPagadosDeArtista(
-            ARTISTA, EstadoPagoHito.PAGADO))
+                "ARS"));
+        when(pagoRepository.netosRealesDeArtista(ARTISTA))
             .thenReturn(List.of());
-        when(compraGrupoRepository.netosPagadosDeArtista(
-            ARTISTA, EstadoCompraGrupo.PAGADO))
+        when(compraGrupoRepository.netosRealesDeArtista(ARTISTA))
             .thenReturn(List.of());
         when(conversacionService.contador(ARTISTA))
             .thenReturn(new ContadorMensajesDTO(0, 0));
@@ -212,12 +204,5 @@ class PanelArtistaServiceTest {
             .fechaCreacion(creada)
             .nombreServicio("Retrato")
             .build();
-    }
-
-    private HitoPedido hitoPagado(LocalDateTime fechaPago) {
-        HitoPedido hito = new HitoPedido();
-        hito.setFechaPago(fechaPago);
-        hito.setEstadoPago(EstadoPagoHito.PAGADO);
-        return hito;
     }
 }

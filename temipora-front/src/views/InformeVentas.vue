@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
 import SerieVentas from '../components/SerieVentas.vue'
@@ -9,6 +10,7 @@ import { descargarInformeVentasPdf, obtenerInformeVentas } from '../servicios/in
 import { formatearPrecio } from '../servicios/moneda'
 
 const { exito, error: notificarError } = useNotificaciones()
+const route = useRoute()
 
 const MAXIMO_DIAS_DIARIO = 366
 
@@ -61,6 +63,10 @@ const puedeDiario = computed(() => dias.value <= MAXIMO_DIAS_DIARIO)
 const moneda = computed(() => informe.value?.moneda || 'ARS')
 const totales = computed(() => informe.value?.totales || null)
 const items = computed(() => informe.value?.items || [])
+const mostrarTipo = computed(() => tipo.value === 'TODOS')
+const hayProductos = computed(
+  () => items.value.some((item) => item.tipo === 'PRODUCTO'),
+)
 
 const tarjetas = computed(() => {
   const t = totales.value
@@ -76,11 +82,6 @@ const tarjetas = computed(() => {
       etiqueta: 'Ventas brutas',
       valor: formatearPrecio(t.bruto, moneda.value),
       detalle: 'Precio pagado por los clientes.',
-    },
-    {
-      etiqueta: 'Operaciones',
-      valor: String(t.operaciones),
-      detalle: 'Ventas y pedidos del período.',
     },
     {
       etiqueta: 'Ticket promedio',
@@ -201,7 +202,25 @@ async function descargar() {
   }
 }
 
-onMounted(cargar)
+function aplicarQueryInicial() {
+  const mes = String(route.query.mes || '')
+  if (/^\d{4}-\d{2}$/.test(mes)) {
+    const [anio, numeroMes] = mes.split('-').map(Number)
+    desde.value = iso(new Date(anio, numeroMes - 1, 1))
+    hasta.value = iso(new Date(anio, numeroMes, 0))
+    preset.value = 'personalizado'
+  }
+
+  const tipoQuery = String(route.query.tipo || '').toUpperCase()
+  if (['TODOS', 'PRODUCTOS', 'SERVICIOS'].includes(tipoQuery)) {
+    tipo.value = tipoQuery
+  }
+
+  ajustarAgrupacion()
+  cargar()
+}
+
+onMounted(aplicarQueryInicial)
 </script>
 
 <template>
@@ -215,7 +234,7 @@ onMounted(cargar)
         :to="{ name: 'panel-ventas' }"
         class="inline-flex min-h-10 items-center justify-center rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
       >
-        Ver ventas
+        Volver a ventas
       </router-link>
       <button
         type="button"
@@ -302,9 +321,9 @@ onMounted(cargar)
 
   <div v-if="cargando" class="mt-6 space-y-3" role="status" aria-live="polite">
     <span class="sr-only">Generando el informe...</span>
-    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="grid gap-3 sm:grid-cols-3">
       <div
-        v-for="n in 4"
+        v-for="n in 3"
         :key="n"
         class="h-24 animate-pulse rounded-2xl border border-rosa/40 bg-blanco"
       ></div>
@@ -327,7 +346,7 @@ onMounted(cargar)
   </div>
 
   <template v-else-if="informe">
-    <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="mt-6 grid gap-3 sm:grid-cols-3">
       <div
         v-for="tarjeta in tarjetas"
         :key="tarjeta.etiqueta"
@@ -349,8 +368,6 @@ onMounted(cargar)
       <span class="text-xs text-cafe/50">{{ rangoComparacion }}</span>
     </div>
 
-    
-
     <div class="mt-6">
       <SerieVentas
         :serie="informe.serie"
@@ -362,7 +379,7 @@ onMounted(cargar)
     <EmptyState
       v-if="!items.length"
       titulo="No hay ventas en el período"
-      detalle="Probá con otro rango de fechas o incluí productos y servicios."
+      detalle="Probá con otro rango de fechas o con otro tipo de venta."
     />
 
     <template v-else>
@@ -370,13 +387,11 @@ onMounted(cargar)
         <table class="min-w-full text-sm">
           <thead class="bg-rosa/20 text-left text-xs uppercase tracking-wide text-cafe/60">
             <tr>
-              <th class="px-4 py-3 font-semibold">Tipo</th>
+              <th v-if="mostrarTipo" class="px-4 py-3 font-semibold">Tipo</th>
               <th class="px-4 py-3 font-semibold">Ítem</th>
-              <th class="px-4 py-3 text-right font-semibold">Unidades</th>
               <th class="px-4 py-3 text-right font-semibold">Operaciones</th>
+              <th v-if="hayProductos" class="px-4 py-3 text-right font-semibold">Unidades</th>
               <th class="px-4 py-3 text-right font-semibold">Bruto</th>
-              <th class="px-4 py-3 text-right font-semibold">Comisión Temipora</th>
-              <th class="px-4 py-3 text-right font-semibold">Arancel MercadoPago</th>
               <th class="px-4 py-3 text-right font-semibold">Neto percibido</th>
               <th class="px-4 py-3 text-right font-semibold">Participación</th>
             </tr>
@@ -387,7 +402,7 @@ onMounted(cargar)
               :key="`${item.tipo}-${item.id}`"
               class="border-t border-rosa/40 transition hover:bg-rosa/10"
             >
-              <td class="px-4 py-3">
+              <td v-if="mostrarTipo" class="px-4 py-3">
                 <span
                   class="inline-flex whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
                   :class="item.tipo === 'PRODUCTO'
@@ -398,16 +413,10 @@ onMounted(cargar)
                 </span>
               </td>
               <td class="px-4 py-3 font-medium text-granate">{{ item.nombre }}</td>
-              <td class="px-4 py-3 text-right tabular-nums text-cafe/70">{{ item.unidades }}</td>
               <td class="px-4 py-3 text-right tabular-nums text-cafe/70">{{ item.operaciones }}</td>
+              <td v-if="hayProductos" class="px-4 py-3 text-right tabular-nums text-cafe/70">{{ item.unidades }}</td>
               <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums text-cafe/80">
                 {{ formatearPrecio(item.bruto, moneda) }}
-              </td>
-              <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums text-cafe/60">
-                {{ formatearPrecio(item.comision, moneda) }}
-              </td>
-              <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums text-cafe/60">
-                {{ formatearPrecio(item.arancel, moneda) }}
               </td>
               <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums font-semibold text-granate">
                 {{ formatearPrecio(item.netoPercibido, moneda) }}
@@ -419,17 +428,11 @@ onMounted(cargar)
           </tbody>
           <tfoot class="border-t border-rosa/60 bg-rosa/10 text-sm">
             <tr>
-              <td class="px-4 py-3 font-semibold text-cafe/60" colspan="2">Total</td>
-              <td class="px-4 py-3 text-right tabular-nums font-semibold text-granate">{{ totales.unidades }}</td>
+              <td class="px-4 py-3 font-semibold text-cafe/60" :colspan="mostrarTipo ? 2 : 1">Total</td>
               <td class="px-4 py-3 text-right tabular-nums font-semibold text-granate">{{ totales.operaciones }}</td>
+              <td v-if="hayProductos" class="px-4 py-3 text-right tabular-nums font-semibold text-granate">{{ totales.unidades }}</td>
               <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums font-semibold text-granate">
                 {{ formatearPrecio(totales.bruto, moneda) }}
-              </td>
-              <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums font-semibold text-granate">
-                {{ formatearPrecio(totales.comision, moneda) }}
-              </td>
-              <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums font-semibold text-granate">
-                {{ formatearPrecio(totales.arancel, moneda) }}
               </td>
               <td class="px-4 py-3 text-right whitespace-nowrap tabular-nums font-semibold text-granate">
                 {{ formatearPrecio(totales.netoPercibido, moneda) }}
@@ -448,7 +451,7 @@ onMounted(cargar)
         >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-[11px] font-semibold uppercase tracking-wide text-cafe/55">
+              <p v-if="mostrarTipo" class="text-[11px] font-semibold uppercase tracking-wide text-cafe/55">
                 {{ item.tipo === 'PRODUCTO' ? 'Producto' : 'Servicio' }}
               </p>
               <p class="truncate font-semibold text-granate">{{ item.nombre }}</p>
@@ -463,12 +466,10 @@ onMounted(cargar)
               <dd class="text-cafe/75">{{ formatearPrecio(item.bruto, moneda) }}</dd>
             </div>
             <div>
-              <dt class="text-cafe/45">Comisión + arancel</dt>
-              <dd class="text-cafe/75">
-                {{ formatearPrecio(Number(item.comision) + Number(item.arancel), moneda) }}
-              </dd>
+              <dt class="text-cafe/45">Operaciones</dt>
+              <dd class="text-cafe/75">{{ item.operaciones }}</dd>
             </div>
-            <div>
+            <div v-if="hayProductos">
               <dt class="text-cafe/45">Unidades</dt>
               <dd class="text-cafe/75">{{ item.unidades }}</dd>
             </div>
@@ -480,11 +481,5 @@ onMounted(cargar)
         </li>
       </ul>
     </template>
-
-    <p class="mt-4 text-xs leading-relaxed text-cafe/50">
-      El neto percibido es el importe que el medio de pago liquidó realmente.
-      La comisión de Temipora y el arancel de MercadoPago se muestran como
-      referencia.
-    </p>
   </template>
 </template>
