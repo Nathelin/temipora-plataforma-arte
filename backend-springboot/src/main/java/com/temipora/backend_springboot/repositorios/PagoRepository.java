@@ -72,4 +72,35 @@ public interface PagoRepository
         @Param("estado") EstadoPago estado,
         @Param("desde") LocalDateTime desde,
         @Param("hasta") LocalDateTime hasta);
+
+    /**
+     * Pagos aprobados del artista en el período, con la fecha efectiva de
+     * acreditación. Alimenta el informe de ventas.
+     */
+    @Query(value = """
+        SELECT CAST(COALESCE(p.fecha_acreditacion, p.fecha_aprobacion,
+                    p.fecha_creacion) AS date),
+               pe.id_servicio,
+               s.nombre,
+               p.monto_cobro,
+               p.comision_monto_cobro,
+               COALESCE(p.arancel_mp, 0),
+               COALESCE(p.neto_recibido_mp, p.monto_neto_cobro),
+               CASE WHEN p.neto_recibido_mp IS NULL THEN 1 ELSE 0 END,
+               pe.id_pedido
+        FROM pago p
+        JOIN hito_pedido h ON h.id_hito_pedido = p.id_hito_pedido
+        JOIN pedido pe ON pe.id_pedido = h.id_pedido
+        LEFT JOIN servicio s ON s.id_servicio = pe.id_servicio
+        WHERE pe.id_artista = :idArtista
+          AND p.estado = 'APROBADO'
+          AND COALESCE(p.fecha_acreditacion, p.fecha_aprobacion,
+                p.fecha_creacion) >= :desde
+          AND COALESCE(p.fecha_acreditacion, p.fecha_aprobacion,
+                p.fecha_creacion) < :hasta
+        """, nativeQuery = true)
+    List<Object[]> filasInformeServicios(
+        @Param("idArtista") Long idArtista,
+        @Param("desde") LocalDateTime desde,
+        @Param("hasta") LocalDateTime hasta);
 }

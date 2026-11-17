@@ -37,6 +37,7 @@ import Explorar from '../views/Explorar.vue'
 import AdminResumen from '../views/AdminResumen.vue'
 import PanelResumen from '../views/PanelResumen.vue'
 import Ventas from '../views/Ventas.vue'
+import InformeVentas from '../views/InformeVentas.vue'
 import Perfil from '../views/Perfil.vue'
 import Favoritos from '../views/Favoritos.vue'
 import FavoritosArtistas from '../views/FavoritosArtistas.vue'
@@ -309,6 +310,7 @@ const routes = [
           { path: 'pedidos', name: 'panel-pedidos', component: Pedidos, meta: { title: 'Pedidos' } },
           { path: 'pedidos/:idPedido', name: 'panel-pedido-detalle', component: PedidoDetalle, meta: { title: 'Pedido' } },
           { path: 'ventas', name: 'panel-ventas', component: Ventas, meta: { title: 'Ventas' } },
+          { path: 'informes', name: 'panel-informes', component: InformeVentas, meta: { title: 'Informe de ventas' } },
           { path: 'mensajes', name: 'panel-mensajes', component: Mensajes, meta: { title: 'Mensajes' } },
           { path: 'mensajes/:nombreUsuario', name: 'panel-conversacion', component: Conversacion, meta: { title: 'Conversación' } },
           { path: 'formulario-pedidos', name: 'panel-formulario-pedidos', component: ConfiguracionFormularioPedidos, meta: { title: 'Formulario de pedidos' } },

@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.repositorios;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -197,4 +198,29 @@ public interface CompraItemRepository extends JpaRepository<CompraItem, Long> {
         @Param("idCliente") Long idCliente,
         @Param("estadoPagado") EstadoCompraGrupo estadoPagado,
         @Param("estadoCancelado") EstadoEntregaItem estadoCancelado);
+
+    /**
+     * Ítems de los grupos pagados del artista en el período. El título es el
+     * snapshot de la compra, así que sigue disponible si el producto se dio de
+     * baja.
+     */
+    @Query(value = """
+        SELECT i.id_compra_grupo,
+               i.id_producto,
+               i.titulo_producto,
+               i.cantidad,
+               i.precio_cobro,
+               i.comision_monto
+        FROM compra_item i
+        JOIN compra_grupo g ON g.id_compra_grupo = i.id_compra_grupo
+        WHERE g.id_artista = :idArtista
+          AND g.estado = 'PAGADO'
+          AND g.fecha_pago >= :desde
+          AND g.fecha_pago < :hasta
+        ORDER BY i.id_compra_grupo, i.id_compra_item
+        """, nativeQuery = true)
+    List<Object[]> filasInformeProductos(
+        @Param("idArtista") Long idArtista,
+        @Param("desde") LocalDateTime desde,
+        @Param("hasta") LocalDateTime hasta);
 }
