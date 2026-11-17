@@ -68,6 +68,9 @@ public class GaleriaPublicaService {
         Usuario duenio = usuarioService.getByNombreUsuario(nombreUsuario);
         boolean esDuenio = viewerId != null
             && duenio.getIdUsuario().equals(viewerId);
+        if (!duenio.isEstadoCuenta() && !esDuenio) {
+            return vacia(pagina, tamanio);
+        }
         boolean visible = duenio.isPedidosPublicos();
         if (!esDuenio && !visible) {
             return vacia(pagina, tamanio);
@@ -179,7 +182,9 @@ public class GaleriaPublicaService {
                 || archivo.getMime() == null
                 || !archivo.getMime().startsWith("image/")
                 || pedido.getEstado() != EstadoPedido.FINALIZADO
-                || !pedido.isPublicacionAutorizada()) {
+                || !pedido.isPublicacionAutorizada()
+                || !pedido.getCliente().isEstadoCuenta()
+                || !pedido.getArtista().isEstadoCuenta()) {
             throw new NoSuchElementException("Archivo no disponible.");
         }
 

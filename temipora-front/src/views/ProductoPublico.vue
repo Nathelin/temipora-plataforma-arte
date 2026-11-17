@@ -181,8 +181,8 @@ async function cargar() {
     await cargarFavorito()
     await cargarResenias(0)
   } catch (e) {
-    error.value = e.response?.status === 404
-      ? 'Este producto no está disponible.'
+    error.value = (e.response?.status === 404 || e.response?.status === 410)
+      ? (e.response?.data?.message || 'Este producto no está disponible.')
       : (e.response?.data?.message
         || 'No se pudo cargar el producto.')
   } finally {

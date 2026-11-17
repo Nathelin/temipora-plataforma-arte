@@ -24,6 +24,7 @@ import org.springframework.validation.annotation.Validated;
 
 import com.temipora.backend_springboot.modelo.ContenidoSensible;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
+import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.Etiqueta;
@@ -755,12 +756,16 @@ public class ServicioService {
 
     private Specification<Servicio> activos(boolean ocultarSensibles) {
         return (root, query, cb) -> {
+            var artistaActivo = cb.isTrue(root.get("artista").get("estadoCuenta"));
             if (ocultarSensibles) {
                 return cb.and(
                     cb.equal(root.get("estado"), EstadoServicio.PUBLICADO),
+                    artistaActivo,
                     cb.isFalse(root.get("contenidoSensible")));
             }
-            return cb.equal(root.get("estado"), EstadoServicio.PUBLICADO);
+            return cb.and(
+                cb.equal(root.get("estado"), EstadoServicio.PUBLICADO),
+                artistaActivo);
         };
     }
 
@@ -1204,6 +1209,13 @@ public class ServicioService {
         if (servicio.getEstado() == EstadoServicio.ARCHIVADO
                 || (!esDuenio && servicio.getEstado() != EstadoServicio.PUBLICADO)) {
             throw new NoSuchElementException("Servicio no encontrado: " + idServicio);
+        }
+        boolean esAdmin = viewerId != null && usuarioRepository.findByIdUsuario(viewerId)
+            .map(u -> u.getRol() != null && u.getRol().getNombre() == ERol.ADMIN)
+            .orElse(false);
+        if (!esDuenio && !esAdmin && servicio.getArtista() != null
+                && !servicio.getArtista().isEstadoCuenta()) {
+            throw new ServicioNoDisponibleException("Este servicio no está disponible.");
         }
         if (!esDuenio && pref == EPreferenciaContenidoSensible.OCULTAR && servicio.isContenidoSensible()) {
             throw new NoSuchElementException("Servicio no encontrado: " + idServicio);

@@ -171,9 +171,11 @@ class ServicioServiceTest {
         CriteriaBuilder cb = mock(CriteriaBuilder.class);
         Path<Object> artista = mock(Path.class);
         Path<Object> idArtista = mock(Path.class);
+        Path<Object> estadoCuenta = mock(Path.class);
 
         when(root.get("artista")).thenReturn((Path) artista);
         when(artista.get("idUsuario")).thenReturn(idArtista);
+        when(artista.get("estadoCuenta")).thenReturn((Path) estadoCuenta);
 
         captor.getValue().toPredicate(root, query, cb);
 

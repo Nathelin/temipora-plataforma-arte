@@ -29,6 +29,7 @@ import com.temipora.backend_springboot.modelo.QuitarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
 import com.temipora.backend_springboot.servicios.BajaCuentaService;
+import com.temipora.backend_springboot.servicios.ServicioNoDisponibleException;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 import com.temipora.backend_springboot.servicios.VisitaService;
 
@@ -68,6 +69,10 @@ public class UsuarioController {
 			@PathVariable String nombreUsuario,
 			Authentication authentication) {
 		Usuario usuario = usuarioService.getByNombreUsuario(nombreUsuario);
+		if (!usuario.isEstadoCuenta()) {
+			throw new ServicioNoDisponibleException(
+				"Esta cuenta no está disponible.");
+		}
 		Long viewerId = idAutenticado(authentication);
 		if (viewerId != null
 				&& usuario.getRol() != null

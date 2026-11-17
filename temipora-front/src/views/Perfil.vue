@@ -49,6 +49,7 @@ const perfil = ref({
 
 const cargandoPerfil = ref(true)
 const errorCarga = ref('')
+const perfilNoDisponible = ref(false)
 
 const { exito, error: notificarError } = useNotificaciones()
 const esFavorito = ref(false)
@@ -103,6 +104,7 @@ const filtrosReseniasArtista = reactive({
 async function cargarPerfil() {
   cargandoPerfil.value = true
   errorCarga.value = ''
+  perfilNoDisponible.value = false
   esFavorito.value = false
   cargandoEstadoFavorito.value = false
   actualizandoFavorito.value = false
@@ -142,7 +144,12 @@ async function cargarPerfil() {
       await Promise.all([cargarGaleria(true), cargarColeccion(true)])
     }
   } catch (e) {
-    errorCarga.value = 'No se pudo cargar el perfil.'
+    if (e.response?.status === 410) {
+      perfilNoDisponible.value = true
+      errorCarga.value = ''
+    } else {
+      errorCarga.value = 'No se pudo cargar el perfil.'
+    }
   } finally {
     cargandoPerfil.value = false
   }
@@ -1089,6 +1096,21 @@ function irASubirImagen(imagen = null) {
   <div class="w-full">
     <div v-if="cargandoPerfil" class="max-w-screen-2xl mx-auto px-4 sm:px-8 py-16 text-center text-cafe/60">
       Cargando perfil...
+    </div>
+    <div
+      v-else-if="perfilNoDisponible"
+      class="mx-auto max-w-xl rounded-2xl border border-rosa/60 bg-blanco px-6 py-12 text-center"
+    >
+      <p class="font-display text-lg font-bold text-granate">Esta cuenta no está disponible.</p>
+      <p class="mt-2 text-sm leading-relaxed text-cafe/70">
+        La persona dio de baja su cuenta o ya no está activa en Temipora.
+      </p>
+      <router-link
+        to="/explorar"
+        class="mt-4 inline-block text-sm font-medium text-coral transition hover:text-rojizo"
+      >
+        ← Explorar artistas
+      </router-link>
     </div>
     <div v-else-if="errorCarga" class="max-w-screen-2xl mx-auto px-4 sm:px-8 py-16 text-center text-rojizo">
       {{ errorCarga }}

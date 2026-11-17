@@ -125,6 +125,8 @@ public class ProductoCatalogoService {
         List<Producto> filtrados = productoRepository
             .findByEstadoOrderByFechaCreacionDesc(EstadoProducto.DISPONIBLE).stream()
             .filter(this::tieneStock)
+            .filter(producto -> producto.getArtista() == null
+                || producto.getArtista().isEstadoCuenta())
             .filter(producto -> !esDelViewer(producto, viewerId))
             .filter(producto -> !ocultarSensibles || !producto.isContenidoSensible())
             .filter(producto -> cumpleFiltros(producto, filtro, moneda))
@@ -152,6 +154,14 @@ public class ProductoCatalogoService {
                     continue;
                 }
                 Producto producto = variante.getProducto();
+                if (publicacion.getVendedor() != null
+                        && !publicacion.getVendedor().isEstadoCuenta()) {
+                    continue;
+                }
+                if (producto.getArtista() != null
+                        && !producto.getArtista().isEstadoCuenta()) {
+                    continue;
+                }
                 if (viewerId != null && publicacion.getVendedor() != null
                         && viewerId.equals(
                             publicacion.getVendedor().getIdUsuario())) {
@@ -290,6 +300,8 @@ public class ProductoCatalogoService {
         List<Producto> base = productoRepository
             .findByEstadoOrderByFechaCreacionDesc(EstadoProducto.DISPONIBLE).stream()
             .filter(this::tieneStock)
+            .filter(producto -> producto.getArtista() == null
+                || producto.getArtista().isEstadoCuenta())
             .filter(producto -> viewerId == null || !esDelViewer(producto, viewerId))
             .filter(producto -> !ocultarSensibles || !producto.isContenidoSensible())
             .toList();
@@ -302,6 +314,8 @@ public class ProductoCatalogoService {
                     EstadoPublicacionReventa.PUBLICADA).stream()
                 .filter(publicacion -> publicacion.getVariante() != null
                     && publicacion.getVariante().getProducto() != null)
+                .filter(publicacion -> publicacion.getVendedor() == null
+                    || publicacion.getVendedor().isEstadoCuenta())
                 .map(publicacion -> publicacion.getVariante().getProducto().getIdProducto())
                 .collect(java.util.stream.Collectors.toSet());
             base = base.stream()
@@ -375,6 +389,9 @@ public class ProductoCatalogoService {
         Usuario artista = usuarioRepository.findByNombreUsuario(nombreUsuario)
             .orElseThrow(() -> new NoSuchElementException(
                 "Artista no encontrado: " + nombreUsuario));
+        if (!artista.isEstadoCuenta()) {
+            return List.of();
+        }
         EPreferenciaContenidoSensible pref = preferenciaDe(viewerId);
         boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
         Moneda moneda = monedaPreferidaDe(viewerId);
@@ -401,6 +418,12 @@ public class ProductoCatalogoService {
             .stream()
             .filter(publicacion -> publicacion.getVariante() != null
                 && publicacion.getVariante().getProducto() != null)
+            .filter(publicacion -> publicacion.getVendedor() == null
+                || publicacion.getVendedor().isEstadoCuenta())
+            .filter(publicacion -> {
+                Usuario artista = publicacion.getVariante().getProducto().getArtista();
+                return artista == null || artista.isEstadoCuenta();
+            })
             .map(publicacion -> aDTOReventa(publicacion, viewerId))
             .toList();
         aplicarCalificaciones(items);
@@ -493,6 +516,8 @@ public class ProductoCatalogoService {
             .filter(this::tieneStock)
             .filter(producto -> !Objects.equals(
                 producto.getIdProducto(), idProducto))
+            .filter(producto -> producto.getArtista() == null
+                || producto.getArtista().isEstadoCuenta())
             .filter(producto -> !esDelViewer(producto, viewerId))
             .filter(producto -> !ocultarSensibles || !producto.isContenidoSensible())
             .toList();
@@ -653,6 +678,9 @@ public class ProductoCatalogoService {
                 "Producto no encontrado: " + idProducto));
         if (producto.getEstado() != EstadoProducto.DISPONIBLE) {
             throw new NoSuchElementException("Producto no encontrado: " + idProducto);
+        }
+        if (producto.getArtista() != null && !producto.getArtista().isEstadoCuenta()) {
+            throw new ServicioNoDisponibleException("Este producto no está disponible.");
         }
         return producto;
     }

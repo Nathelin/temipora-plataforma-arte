@@ -118,8 +118,13 @@ async function cargar() {
     reventa.value = await cargarReventa(props.id)
     await cargarResenias()
   } catch (e) {
-    error.value = e.response?.data?.message
-      || 'No se pudo cargar la publicación de reventa.'
+    if (e.response?.status === 404 || e.response?.status === 410) {
+      error.value = e.response?.data?.message
+        || 'Esta publicación no está disponible.'
+    } else {
+      error.value = e.response?.data?.message
+        || 'No se pudo cargar la publicación de reventa.'
+    }
   } finally {
     cargando.value = false
   }
@@ -170,7 +175,20 @@ watch(() => props.id, cargar)
     </button>
 
     <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando publicación...</p>
-    <p v-else-if="error" role="alert" class="py-16 text-center text-rojizo">{{ error }}</p>
+    <div
+      v-else-if="error"
+      class="mx-auto max-w-xl rounded-2xl border border-rosa/60 bg-blanco px-6 py-12 text-center"
+      role="alert"
+    >
+      <p class="font-display text-lg font-bold text-granate">{{ error }}</p>
+      <button
+        type="button"
+        class="mt-4 inline-block text-sm font-medium text-coral transition hover:text-rojizo"
+        @click="volver"
+      >
+        ← Volver a productos
+      </button>
+    </div>
 
     <div v-else-if="reventa" class="mt-5 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
       <section class="space-y-4">

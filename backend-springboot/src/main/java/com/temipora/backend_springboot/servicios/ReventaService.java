@@ -297,6 +297,14 @@ public class ReventaService {
         Usuario vendedor = publicacion.getVendedor();
         boolean propia = viewerId != null && vendedor != null
             && viewerId.equals(vendedor.getIdUsuario());
+        if (!propia && vendedor != null && !vendedor.isEstadoCuenta()) {
+            throw new ServicioNoDisponibleException(
+                "Esta publicación no está disponible.");
+        }
+        if (!propia && artista != null && !artista.isEstadoCuenta()) {
+            throw new ServicioNoDisponibleException(
+                "Esta publicación no está disponible.");
+        }
         boolean puedeComprar = publicacion.getEstado()
             == EstadoPublicacionReventa.PUBLICADA && !propia;
         return ReventaDetalleDTO.builder()
