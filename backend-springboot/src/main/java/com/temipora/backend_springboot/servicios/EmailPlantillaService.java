@@ -209,7 +209,7 @@ public class EmailPlantillaService {
     }
 
     private String baseFront() {
-        return frontUrl == null ? "" : frontUrl;
+        return frontUrl == null ? "" : frontUrl.replaceAll("/+$", "");
     }
 
     private List<Map<String, Object>> vistaOfertas(List<OfertaEmail> ofertas) {
@@ -309,7 +309,7 @@ public class EmailPlantillaService {
     }
 
     private String baseApi() {
-        return apiUrl == null ? "" : apiUrl;
+        return apiUrl == null ? "" : apiUrl.replaceAll("/+$", "");
     }
 
     private String url(String valor) {
