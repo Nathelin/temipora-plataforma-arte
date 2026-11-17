@@ -259,6 +259,19 @@ class ProductoCatalogoFacetasTest {
         assertThat(facetas.getMedios()).isEmpty();
     }
 
+    @Test
+    void listarDeArtista_artistaInactivo_devuelveVacio() {
+        Usuario artista = Usuario.builder()
+            .idUsuario(9L)
+            .nombreUsuario("baja")
+            .estadoCuenta(false)
+            .build();
+        when(usuarioRepository.findByNombreUsuario("baja"))
+            .thenReturn(Optional.of(artista));
+
+        assertThat(catalogoService.listarDeArtista("baja", null)).isEmpty();
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------

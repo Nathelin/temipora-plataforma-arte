@@ -468,6 +468,17 @@ class ServicioServiceTest {
             .isInstanceOf(ConflictoException.class);
     }
 
+    @Test
+    void obtener_artistaInactivo_lanzaServicioNoDisponible() {
+        Servicio servicio = servicioLista(1L, ModoRecepcionSolicitud.ABIERTA, 2);
+        servicio.getArtista().setEstadoCuenta(false);
+        when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio));
+
+        assertThatThrownBy(() -> servicioService.obtener(1L, null))
+            .isInstanceOf(ServicioNoDisponibleException.class)
+            .hasMessage("Este servicio no está disponible.");
+    }
+
     // ---------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------
