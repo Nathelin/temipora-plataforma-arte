@@ -33,13 +33,18 @@ api.interceptors.response.use(
       window.dispatchEvent(new CustomEvent('tos-no-aceptados'))
     }
     if (status === 403
-        && (data?.codigo === 'CUENTA_SANCIONADA' || data?.codigo === 'CUENTA_INACTIVA')) {
+        && (data?.codigo === 'CUENTA_SANCIONADA'
+          || data?.codigo === 'CUENTA_INACTIVA'
+          || data?.codigo === 'CUENTA_DE_BAJA')) {
       try {
         sessionStorage.setItem('cuentaInhabilitada', JSON.stringify({
           codigo: data.codigo,
           motivo: data.motivo || '',
           contacto: data.contacto || '',
           fechaFin: data.fechaFin || null,
+          fechaBaja: data.fechaBaja || null,
+          reactivarHasta: data.reactivarHasta || null,
+          puedeReactivar: data.puedeReactivar ?? null,
           message: data.message || '',
         }))
       } catch {

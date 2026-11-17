@@ -50,6 +50,9 @@ public final class CatalogoAuditoria {
             AccionesAdmin.USUARIO_CAMBIAR_CONTRASENIA,
             AccionesAdmin.USUARIO_CAMBIAR_TELEFONO,
             AccionesAdmin.USUARIO_QUITAR_TELEFONO,
+            AccionesAdmin.USUARIO_BAJA_VOLUNTARIA,
+            AccionesAdmin.USUARIO_REACTIVAR_CUENTA,
+            AccionesAdmin.USUARIO_REACTIVAR_CUENTA_ADMIN,
             AccionesAdmin.LOGIN_FALLIDO,
             AccionesAdmin.SESION_ACCESO_ENLACE,
             AccionesAdmin.SESION_ACCESO_ENLACE_FALLIDO);
@@ -131,6 +134,7 @@ public final class CatalogoAuditoria {
             AccionesAdmin.MENSAJERIA_CONFIG_ACTUALIZAR,
             AccionesAdmin.RESENIA_CONFIG_ACTUALIZAR,
             AccionesAdmin.INACTIVIDAD_CONFIG_ACTUALIZAR,
+            AccionesAdmin.BAJA_CUENTA_CONFIG_ACTUALIZAR,
             AccionesAdmin.REACTIVACION_EJECUTAR,
             AccionesAdmin.SUSTITUCION_CONFIG_ACTUALIZAR,
             AccionesAdmin.COTIZACION_ACTUALIZAR,
@@ -184,6 +188,9 @@ public final class CatalogoAuditoria {
             AccionesAdmin.USUARIO_CAMBIAR_CONTRASENIA,
             AccionesAdmin.USUARIO_CAMBIAR_TELEFONO,
             AccionesAdmin.USUARIO_QUITAR_TELEFONO,
+            AccionesAdmin.USUARIO_BAJA_VOLUNTARIA,
+            AccionesAdmin.USUARIO_REACTIVAR_CUENTA,
+            AccionesAdmin.USUARIO_REACTIVAR_CUENTA_ADMIN,
             AccionesAdmin.RESENIA_OCULTAR,
             AccionesAdmin.RESENIA_RESTAURAR,
             AccionesAdmin.RESENIA_DESCARTAR_REPORTES);

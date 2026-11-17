@@ -136,6 +136,9 @@ public class Usuario {
     @Column(name = "token_baja_email", length = 64, unique = true)
     private String tokenBajaEmail;
 
+    @Column(name = "fecha_baja_voluntaria")
+    private LocalDateTime fechaBajaVoluntaria;
+
     // TODO: Ver si manejo estadoCuenta con booleano o enum........
 
     public void activar() {
@@ -144,6 +147,16 @@ public class Usuario {
 
     public void desactivar() {
         this.estadoCuenta = false;
+    }
+
+    public void marcarBajaVoluntaria(LocalDateTime fecha) {
+        this.estadoCuenta = false;
+        this.fechaBajaVoluntaria = fecha;
+    }
+
+    public void reactivarCuenta() {
+        this.estadoCuenta = true;
+        this.fechaBajaVoluntaria = null;
     }
 
     /*@ManyToOne(targetEntity = Rol.class, cascade = CascadeType.PERSIST, fetch = FetchType.LAZY)

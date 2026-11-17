@@ -19,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.temipora.backend_springboot.config.AccesoUsuarioService;
 import com.temipora.backend_springboot.config.ContactoPlataforma;
 import com.temipora.backend_springboot.config.JwtUtils;
+import com.temipora.backend_springboot.servicios.CuentaDeBajaException;
 import com.temipora.backend_springboot.servicios.CuentaSancionadaException;
 
 import jakarta.servlet.FilterChain;
@@ -66,6 +67,9 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
                             sancionada.getMotivo(), sancionada.getContacto(),
                             sancionada.getFechaFin());
                         return;
+                    } catch (CuentaDeBajaException deBaja) {
+                        escribirBaja(response, deBaja);
+                        return;
                     } catch (DisabledException deshabilitada) {
                         escribir403(response, "CUENTA_INACTIVA", null, contacto.getEmail(), null);
                         return;
@@ -111,6 +115,33 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
         body.put("message", "CUENTA_SANCIONADA".equals(codigo)
             ? "Tu cuenta se encuentra inhabilitada."
             : "Tu cuenta se encuentra desactivada.");
+
+        response.getWriter().write(new ObjectMapper().writeValueAsString(body));
+        response.getWriter().flush();
+    }
+
+    private void escribirBaja(
+            HttpServletResponse response,
+            CuentaDeBajaException deBaja) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("codigo", "CUENTA_DE_BAJA");
+        if (deBaja.getFechaBaja() != null) {
+            body.put("fechaBaja", deBaja.getFechaBaja().toString());
+        }
+        if (deBaja.getReactivarHasta() != null) {
+            body.put("reactivarHasta", deBaja.getReactivarHasta().toString());
+        }
+        body.put("puedeReactivar", deBaja.isPuedeReactivar());
+        if (deBaja.getContacto() != null) {
+            body.put("contacto", deBaja.getContacto());
+        }
+        body.put("message", deBaja.isPuedeReactivar()
+            ? "Tu cuenta está dada de baja."
+            : "El plazo para reactivar tu cuenta venció.");
 
         response.getWriter().write(new ObjectMapper().writeValueAsString(body));
         response.getWriter().flush();

@@ -21,6 +21,8 @@ import com.temipora.backend_springboot.modelo.SancionCuenta;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.SancionCuentaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
+import com.temipora.backend_springboot.servicios.ConfiguracionBajaCuentaService;
+import com.temipora.backend_springboot.servicios.CuentaDeBajaException;
 import com.temipora.backend_springboot.servicios.CuentaSancionadaException;
 
 //interfaz que actua como colaborador entre el framework y la info del usuario para autenticar y autorizar
@@ -29,14 +31,17 @@ public class DetallesUsuarioService implements UserDetailsService, AccesoUsuario
 
     private final UsuarioRepository usuarioRepository;
     private final SancionCuentaRepository sancionCuentaRepository;
+    private final ConfiguracionBajaCuentaService configuracionBajaCuentaService;
     private final ContactoPlataforma contacto;
 
     public DetallesUsuarioService(
             UsuarioRepository usuarioRepository,
             SancionCuentaRepository sancionCuentaRepository,
+            ConfiguracionBajaCuentaService configuracionBajaCuentaService,
             ContactoPlataforma contacto) {
         this.usuarioRepository = usuarioRepository;
         this.sancionCuentaRepository = sancionCuentaRepository;
+        this.configuracionBajaCuentaService = configuracionBajaCuentaService;
         this.contacto = contacto;
     }
 
@@ -63,6 +68,15 @@ public class DetallesUsuarioService implements UserDetailsService, AccesoUsuario
                                      .orElseThrow(()-> new UsernameNotFoundException("No se encontró al usuario."));
 
         if (!usuario.isEstadoCuenta()) {
+            if (usuario.getFechaBajaVoluntaria() != null) {
+                LocalDateTime hasta = usuario.getFechaBajaVoluntaria()
+                    .plusDays(configuracionBajaCuentaService.diasParaReactivar());
+                throw new CuentaDeBajaException(
+                    usuario.getFechaBajaVoluntaria(),
+                    hasta,
+                    !LocalDateTime.now().isAfter(hasta),
+                    contacto.getEmail());
+            }
             throw new DisabledException("La cuenta está desactivada.");
         }
 

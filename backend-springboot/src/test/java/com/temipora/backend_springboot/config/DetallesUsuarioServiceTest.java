@@ -20,6 +20,7 @@ import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.SancionCuentaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
+import com.temipora.backend_springboot.servicios.ConfiguracionBajaCuentaService;
 
 @ExtendWith(MockitoExtension.class)
 class DetallesUsuarioServiceTest {
@@ -29,6 +30,9 @@ class DetallesUsuarioServiceTest {
 
     @Mock
     private SancionCuentaRepository sancionCuentaRepository;
+
+    @Mock
+    private ConfiguracionBajaCuentaService configuracionBajaCuentaService;
 
     @Mock
     private ContactoPlataforma contacto;

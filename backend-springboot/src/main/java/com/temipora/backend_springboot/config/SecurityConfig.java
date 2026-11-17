@@ -25,6 +25,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import com.temipora.backend_springboot.config.filters.JwtAuthenticationFilter;
 import com.temipora.backend_springboot.config.filters.JwtAuthorizationFilter;
 import com.temipora.backend_springboot.config.filters.TerminosAceptadosFilter;
+import com.temipora.backend_springboot.servicios.ConfiguracionBajaCuentaService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
 import java.util.List;
@@ -54,11 +55,15 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
             AuthenticationManager authenticationManager,
-            UsuarioService usuarioService) throws Exception {
+            UsuarioService usuarioService,
+            PasswordEncoder passwordEncoder,
+            ObjectProvider<ConfiguracionBajaCuentaService> configuracionBajaCuentaProvider)
+            throws Exception {
 
         ContactoPlataforma contactoPlataforma = new ContactoPlataforma(contactoEmail);
         JwtAuthenticationFilter jwtAuthenticationFilter =
-            new JwtAuthenticationFilter(jwtUtils, usuarioService, contactoPlataforma);
+            new JwtAuthenticationFilter(jwtUtils, usuarioService, passwordEncoder,
+                configuracionBajaCuentaProvider.getIfAvailable(), contactoPlataforma);
         jwtAuthenticationFilter.setFilterProcessesUrl("/api/auth/login");
         jwtAuthenticationFilter.setAuthenticationManager(authenticationManager);
 
@@ -75,6 +80,8 @@ public class SecurityConfig {
                     "/api/auth/registrarse",
                     "/api/auth/acceso",
                     "/api/auth/acceso/**",
+                    "/api/auth/reactivar-cuenta",
+                    "/api/configuracion-baja-cuenta",
                     "/api/contacto",
                     "/api/upload",
                     "/api/checkNombreUsuario",

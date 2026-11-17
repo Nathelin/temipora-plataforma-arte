@@ -50,6 +50,7 @@ public class UsuarioService {
     private final MonedaService monedaService;
     private final AuditoriaService auditoria;
     private final TerminosPlataformaService terminosPlataformaService;
+    private final ConfiguracionBajaCuentaService configuracionBajaCuentaService;
 
     public UsuarioService(
             UsuarioRepository usuarioRepository,
@@ -60,7 +61,8 @@ public class UsuarioService {
             TelefonoService telefonoService,
             MonedaService monedaService,
             AuditoriaService auditoria,
-            TerminosPlataformaService terminosPlataformaService) {
+            TerminosPlataformaService terminosPlataformaService,
+            ConfiguracionBajaCuentaService configuracionBajaCuentaService) {
 
         this.usuarioRepository = usuarioRepository;
         this.sancionCuentaRepository = sancionCuentaRepository;
@@ -71,6 +73,7 @@ public class UsuarioService {
         this.monedaService = monedaService;
         this.auditoria = auditoria;
         this.terminosPlataformaService = terminosPlataformaService;
+        this.configuracionBajaCuentaService = configuracionBajaCuentaService;
     }
 
     @Transactional
@@ -219,8 +222,9 @@ public class UsuarioService {
             }
         }
 
+        int diasParaReactivar = configuracionBajaCuentaService.diasParaReactivar();
         return page.map(usuario -> {
-            UsuarioDTO dto = UsuarioDTO.desdeUsuario(usuario);
+            UsuarioDTO dto = UsuarioDTO.desdeUsuario(usuario, diasParaReactivar);
             SancionCuenta sancion = vigentes.get(usuario.getIdUsuario());
             if (sancion != null) {
                 dto.setSancionado(true);

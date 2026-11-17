@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.config;
 
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -14,6 +15,8 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import com.temipora.backend_springboot.servicios.AccesoDenegadoException;
 import com.temipora.backend_springboot.servicios.ConflictoException;
+import com.temipora.backend_springboot.servicios.CredencialesInvalidasException;
+import com.temipora.backend_springboot.servicios.ReactivacionVencidaException;
 import com.temipora.backend_springboot.servicios.ServicioNoDisponibleException;
 import com.temipora.backend_springboot.servicios.pagos.mercadopago.MercadoPagoException;
 
@@ -33,6 +36,28 @@ public class ManejoGlobalErrores {
     @ExceptionHandler(ConflictoException.class)
     public ResponseEntity<Map<String, String>> manejarConflicto(ConflictoException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", e.getMessage()));
+    }
+
+    @ExceptionHandler(CredencialesInvalidasException.class)
+    public ResponseEntity<Map<String, String>> manejarCredencialesInvalidas(
+            CredencialesInvalidasException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .body(Map.of("message", e.getMessage()));
+    }
+
+    @ExceptionHandler(ReactivacionVencidaException.class)
+    public ResponseEntity<Map<String, Object>> manejarReactivacionVencida(
+            ReactivacionVencidaException e) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("codigo", "REACTIVACION_VENCIDA");
+        body.put("message", e.getMessage());
+        if (e.getContacto() != null) {
+            body.put("contacto", e.getContacto());
+        }
+        if (e.getReactivarHasta() != null) {
+            body.put("reactivarHasta", e.getReactivarHasta().toString());
+        }
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
 
     @ExceptionHandler(ServicioNoDisponibleException.class)

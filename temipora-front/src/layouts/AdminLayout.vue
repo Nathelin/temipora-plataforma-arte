@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   Star,
   Tags,
+  UserX,
   Users,
   Wrench,
 } from '@lucide/vue'
@@ -65,6 +66,7 @@ const grupos = [
         badge: 'reportes',
       },
       { nombre: 'Sanciones', to: '/admin/sanciones', icono: Ban },
+      { nombre: 'Bajas de cuenta', to: '/admin/ajustes/bajas-cuenta', icono: UserX },
     ],
   },
   {

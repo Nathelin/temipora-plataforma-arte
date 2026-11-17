@@ -74,6 +74,9 @@ class UsuarioServiceTest {
     @Mock
     private TerminosPlataformaService terminosPlataformaService;
 
+    @Mock
+    private ConfiguracionBajaCuentaService configuracionBajaCuentaService;
+
     @InjectMocks
     private UsuarioService usuarioService;
 

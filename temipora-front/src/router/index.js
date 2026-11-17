@@ -17,6 +17,7 @@ import ComisionAdmin from '../components/ComisionAdmin.vue'
 import PromocionesAdmin from '../components/PromocionesAdmin.vue'
 import SustitucionesAdmin from '../components/SustitucionesAdmin.vue'
 import PedidoConfigAdmin from '../components/PedidoConfigAdmin.vue'
+import ConfiguracionBajaCuentaAdmin from '../components/ConfiguracionBajaCuentaAdmin.vue'
 import ConfiguracionMensajeriaAdmin from '../components/ConfiguracionMensajeriaAdmin.vue'
 import TerminosPlataformaAdmin from '../components/TerminosPlataformaAdmin.vue'
 import CriteriosReseniaAdmin from '../components/CriteriosReseniaAdmin.vue'
@@ -497,6 +498,12 @@ const routes = [
         name: 'pedidos-admin',
         component: PedidoConfigAdmin,
         meta: { title: 'Hitos y pedidos' },
+      },
+      {
+        path: 'ajustes/bajas-cuenta',
+        name: 'bajas-cuenta-admin',
+        component: ConfiguracionBajaCuentaAdmin,
+        meta: { title: 'Bajas de cuenta' },
       },
       {
         path: 'ajustes/mensajeria',

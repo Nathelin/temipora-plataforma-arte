@@ -40,6 +40,7 @@ import com.temipora.backend_springboot.modelo.ActualizarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.QuitarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
+import com.temipora.backend_springboot.servicios.BajaCuentaService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 import com.temipora.backend_springboot.servicios.VisitaService;
 
@@ -65,6 +66,9 @@ class UsuarioControllerTest {
 
     @MockitoBean
     private VisitaService visitaService;
+
+    @MockitoBean
+    private BajaCuentaService bajaCuentaService;
 
     @MockitoBean
     private UserDetailsService userDetailsService;

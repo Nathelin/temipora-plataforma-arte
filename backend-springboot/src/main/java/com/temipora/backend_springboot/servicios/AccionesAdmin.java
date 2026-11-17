@@ -93,6 +93,10 @@ public final class AccionesAdmin {
     public static final String USUARIO_CAMBIAR_CONTRASENIA = "USUARIO_CAMBIAR_CONTRASENIA";
     public static final String USUARIO_CAMBIAR_TELEFONO = "USUARIO_CAMBIAR_TELEFONO";
     public static final String USUARIO_QUITAR_TELEFONO = "USUARIO_QUITAR_TELEFONO";
+    public static final String USUARIO_BAJA_VOLUNTARIA = "USUARIO_BAJA_VOLUNTARIA";
+    public static final String USUARIO_REACTIVAR_CUENTA = "USUARIO_REACTIVAR_CUENTA";
+    public static final String USUARIO_REACTIVAR_CUENTA_ADMIN = "USUARIO_REACTIVAR_CUENTA_ADMIN";
+    public static final String BAJA_CUENTA_CONFIG_ACTUALIZAR = "BAJA_CUENTA_CONFIG_ACTUALIZAR";
     public static final String LOGIN_FALLIDO = "LOGIN_FALLIDO";
     public static final String SESION_ACCESO_ENLACE = "SESION_ACCESO_ENLACE";
     public static final String SESION_ACCESO_ENLACE_FALLIDO = "SESION_ACCESO_ENLACE_FALLIDO";

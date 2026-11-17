@@ -19,5 +19,13 @@ export function useSesion() {
     return Boolean(localStorage.getItem('token'))
   }
 
-  return { guardarSesion, usuarioActual, estaAutenticado }
+  function limpiarSesionLocal() {
+    localStorage.removeItem('token')
+    localStorage.removeItem('rol')
+    localStorage.removeItem('nombreUsuario')
+    localStorage.removeItem('idUsuario')
+    localStorage.removeItem('urlFotoPerfil')
+  }
+
+  return { guardarSesion, usuarioActual, estaAutenticado, limpiarSesionLocal }
 }

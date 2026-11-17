@@ -110,6 +110,23 @@ public class AuditoriaService {
     }
 
     /**
+     * Para acciones hechas por alguien que todavía no tiene sesión (por ejemplo,
+     * reactivar la cuenta con usuario y contraseña desde el login). El actor se
+     * informa explícitamente porque no está en el SecurityContext.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void registrarActor(
+            String accion,
+            String entidad,
+            Object entidadId,
+            String resumen,
+            String actorNombre,
+            String actorRol) {
+        guardar(accion, entidad, entidadId, resumen, List.of(), null,
+            actorNombre, actorRol);
+    }
+
+    /**
      * Para tareas de sistema que no corren dentro de una transacción de negocio.
      * Fail-open: si la auditoría falla, la tarea ya ejecutada no se revierte.
      */
@@ -333,6 +350,18 @@ public class AuditoriaService {
             String resumen,
             List<CambioAuditoriaDTO> cambios,
             String motivo) {
+        guardar(accion, entidad, entidadId, resumen, cambios, motivo, null, null);
+    }
+
+    private void guardar(
+            String accion,
+            String entidad,
+            Object entidadId,
+            String resumen,
+            List<CambioAuditoriaDTO> cambios,
+            String motivo,
+            String actorNombre,
+            String actorRol) {
         EventoAuditoria evento = new EventoAuditoria();
         evento.setOcurridoEn(LocalDateTime.now());
         evento.setAccion(accion);
@@ -342,7 +371,15 @@ public class AuditoriaService {
         evento.setCambios(serializar(cambios));
         evento.setMotivo(recortar(motivo, MOTIVO_MAXIMO));
         evento.setResultado("OK");
-        completarActor(evento);
+        if (actorNombre != null && !actorNombre.isBlank()) {
+            evento.setActorNombre(recortar(actorNombre, 60));
+            evento.setActorRol(actorRol);
+            evento.setOrigen(actorRol != null && !actorRol.isBlank()
+                ? actorRol
+                : "USUARIO");
+        } else {
+            completarActor(evento);
+        }
         completarRequest(evento);
         eventoRepository.save(evento);
     }

@@ -1,7 +1,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { parsePhoneNumberFromString, getExampleNumber } from 'libphonenumber-js'
 import api from '../servicios/api'
+import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+import { useSesion } from '../composables/useSesion'
+import { formatearFecha } from '../servicios/fechas'
 
 const nombreUsuario = localStorage.getItem('nombreUsuario') || ''
 
@@ -49,6 +53,28 @@ const mostrarClaveConfirmar = ref(false)
 const guardandoClave = ref(false)
 const mensajeClave = ref('')
 const errorClave = ref('')
+
+const router = useRouter()
+const { limpiarSesionLocal } = useSesion()
+const esAdmin = localStorage.getItem('rol') === 'ADMIN'
+
+const diasReactivar = ref(30)
+const modalBaja = ref(false)
+const aceptaBaja = ref(false)
+const claveBaja = ref('')
+const mostrarClaveBaja = ref(false)
+const bajando = ref(false)
+const errorBaja = ref('')
+
+const puedeConfirmarBaja = computed(
+  () => aceptaBaja.value && !!claveBaja.value.trim() && !bajando.value,
+)
+
+const reactivarHastaTexto = computed(() => {
+  const fecha = new Date()
+  fecha.setDate(fecha.getDate() + Number(diasReactivar.value || 0))
+  return formatearFecha(fecha)
+})
 
 const nuevaValida = computed(() => {
   const c = claveNueva.value
@@ -183,9 +209,12 @@ async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    const [res, paisesRes] = await Promise.all([
+    const [res, paisesRes, configRes] = await Promise.all([
       api.get(`/perfil/${nombreUsuario}`),
       api.get('/paises').catch(() => ({ data: [] })),
+      api.get('/configuracion-baja-cuenta').catch(() => ({
+        data: { diasParaReactivar: 30 },
+      })),
     ])
     idUsuario.value = res.data.idUsuario
     correoActual.value = res.data.correo || ''
@@ -193,6 +222,7 @@ async function cargar() {
     idPais.value = res.data.idPais ?? null
     telefonoEnmascarado.value = res.data.telefonoEnmascarado || ''
     tieneTelefono.value = !!res.data.tieneTelefono
+    diasReactivar.value = Number(configRes.data?.diasParaReactivar) || 30
   } catch (e) {
     error.value = e.response?.data?.message || 'No se pudo cargar la cuenta.'
   } finally {
@@ -347,6 +377,54 @@ async function cambiarClave() {
     errorClave.value = e.response?.data?.message || 'No se pudo actualizar la contraseña.'
   } finally {
     guardandoClave.value = false
+  }
+}
+
+function abrirModalBaja() {
+  errorBaja.value = ''
+  aceptaBaja.value = false
+  claveBaja.value = ''
+  mostrarClaveBaja.value = false
+  modalBaja.value = true
+}
+
+function cerrarModalBaja() {
+  if (!bajando.value) {
+    modalBaja.value = false
+  }
+}
+
+async function confirmarBaja() {
+  errorBaja.value = ''
+  if (!aceptaBaja.value) {
+    errorBaja.value = 'Marcá la casilla para confirmar que entendés lo que implica.'
+    return
+  }
+  if (!claveBaja.value) {
+    errorBaja.value = 'Ingresá tu contraseña actual.'
+    return
+  }
+
+  bajando.value = true
+  try {
+    const res = await api.post(`/usuarios/${idUsuario.value}/baja`, {
+      contrasenia: claveBaja.value,
+    })
+    try {
+      sessionStorage.setItem('cuentaBaja', JSON.stringify({
+        reactivarHasta: res.data?.reactivarHasta || null,
+      }))
+    } catch {
+      // sessionStorage no disponible: el login muestra el aviso genérico.
+    }
+    modalBaja.value = false
+    limpiarSesionLocal()
+    router.push({ name: 'login' })
+  } catch (e) {
+    errorBaja.value = e.response?.data?.message
+      || 'No se pudo dar de baja la cuenta.'
+  } finally {
+    bajando.value = false
   }
 }
 
@@ -700,6 +778,84 @@ onMounted(cargar)
           </div>
         </div>
       </div>
+
+      <!-- Baja de cuenta -->
+      <div v-if="!esAdmin" class="border-t border-rojizo/20 pt-6">
+        <div class="rounded-2xl border border-rojizo/30 bg-rosa/20 p-4 sm:p-5">
+          <h3 class="text-base font-semibold text-granate">Dar de baja la cuenta</h3>
+          <p class="mt-1 text-sm text-cafe/70">
+            Tu cuenta quedará inactiva y no vas a poder iniciar sesión hasta reactivarla.
+          </p>
+          <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-cafe/80">
+            <li>Tu perfil dejará de aparecer en búsquedas y catálogos.</li>
+            <li>Tus servicios y productos no van a poder contratarse ni comprarse.</li>
+            <li>Se conservan tus datos, compras, ventas, reseñas e historial.</li>
+            <li>
+              Vas a poder reactivarla iniciando sesión dentro de los próximos
+              <strong>{{ diasReactivar }} días</strong>.
+            </li>
+          </ul>
+          <p class="mt-3 text-sm text-cafe/70">
+            Si tenés pedidos o solicitudes abiertos, primero tenés que terminarlos o cancelarlos.
+          </p>
+          <button
+            type="button"
+            class="mt-4 inline-flex min-h-10 items-center justify-center rounded-full bg-rojizo px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-granate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rojizo/60 focus-visible:ring-offset-2 focus-visible:ring-offset-blanco motion-reduce:transition-none"
+            @click="abrirModalBaja"
+          >
+            Dar de baja mi cuenta
+          </button>
+        </div>
+      </div>
     </div>
+
+    <ModalConfirmacion
+      :abierto="modalBaja"
+      titulo="¿Dar de baja tu cuenta?"
+      :mensaje="`Tu cuenta quedará inactiva y podrás reactivarla iniciando sesión hasta el ${reactivarHastaTexto}.`"
+      texto-confirmar="Sí, dar de baja mi cuenta"
+      texto-cancelar="Cancelar"
+      destructivo
+      :confirmar-habilitado="puedeConfirmarBaja"
+      @confirmar="confirmarBaja"
+      @cerrar="cerrarModalBaja"
+    >
+      <div class="mt-4 space-y-4">
+        <label class="flex items-start gap-3 rounded-xl border border-coral/50 bg-coral/10 p-3 text-sm text-granate">
+          <input
+            v-model="aceptaBaja"
+            type="checkbox"
+            class="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-rojizo"
+          />
+          <span>
+            Entiendo que mi cuenta quedará inactiva y que mis servicios y productos
+            dejarán de estar disponibles hasta que la reactive.
+          </span>
+        </label>
+
+        <div>
+          <label class="block text-sm text-cafe">
+            Contraseña actual <span class="text-rojizo">*</span>
+          </label>
+          <div class="relative mt-2">
+            <input
+              v-model="claveBaja"
+              :type="mostrarClaveBaja ? 'text' : 'password'"
+              autocomplete="current-password"
+              class="pl-4 pr-20 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+            />
+            <button
+              type="button"
+              class="absolute inset-y-0 right-3 flex items-center text-xs text-cafe/60 transition hover:text-cafe"
+              @click="mostrarClaveBaja = !mostrarClaveBaja"
+            >
+              {{ mostrarClaveBaja ? 'Ocultar' : 'Mostrar' }}
+            </button>
+          </div>
+        </div>
+
+        <p v-if="errorBaja" class="text-sm text-rojizo">{{ errorBaja }}</p>
+      </div>
+    </ModalConfirmacion>
   </div>
 </template>

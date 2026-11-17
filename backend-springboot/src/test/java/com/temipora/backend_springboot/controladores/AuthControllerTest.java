@@ -31,6 +31,7 @@ import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.RegistroUsuarioDTO;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.servicios.BajaCuentaService;
 import com.temipora.backend_springboot.servicios.FormatoArchivoInvalidoException;
 import com.temipora.backend_springboot.servicios.LimpiezaArchivosService;
 import com.temipora.backend_springboot.servicios.StorageService;
@@ -56,6 +57,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private LimpiezaArchivosService limpiezaArchivosService;
+
+    @MockitoBean
+    private BajaCuentaService bajaCuentaService;
 
     @MockitoBean
     private UserDetailsService userDetailsService;

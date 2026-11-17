@@ -3,6 +3,8 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../servicios/api'
 import SancionCuentaModal from './SancionCuentaModal.vue'
+import ModalConfirmacion from './ModalConfirmacion.vue'
+import { formatearFecha } from '../servicios/fechas'
 
 const router = useRouter()
 const usernameSearch = ref('')
@@ -19,6 +21,9 @@ const totalElements = ref(0)
 const totalPages = ref(0)
 const usuarios = ref([]) // content of current page
 const usuarioSancionar = ref(null)
+const usuarioReactivar = ref(null)
+const reactivando = ref(false)
+const errorReactivar = ref('')
 let debounceTimer
 let requestId = 0
 
@@ -109,6 +114,35 @@ function verSancion(usuario) {
 
 function alAplicarSancion() {
   fetchUsers()
+}
+
+function abrirReactivar(usuario) {
+  errorReactivar.value = ''
+  usuarioReactivar.value = usuario
+}
+
+function cerrarReactivar() {
+  if (!reactivando.value) {
+    usuarioReactivar.value = null
+  }
+}
+
+async function confirmarReactivar() {
+  if (!usuarioReactivar.value || reactivando.value) {
+    return
+  }
+  reactivando.value = true
+  errorReactivar.value = ''
+  try {
+    await api.post(`/admin/usuarios/${usuarioReactivar.value.idUsuario}/reactivar`)
+    usuarioReactivar.value = null
+    await fetchUsers()
+  } catch (e) {
+    errorReactivar.value = e.response?.data?.message
+      || 'No se pudo reactivar la cuenta.'
+  } finally {
+    reactivando.value = false
+  }
 }
 
 function cerrarSesion() {
@@ -216,6 +250,12 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
                     >
                       Inhabilitada
                     </span>
+                    <span
+                      v-if="!u.estadoCuenta"
+                      class="ml-2 rounded-full bg-granate/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-granate"
+                    >
+                      Dada de baja
+                    </span>
                   </td>
                   <td class="px-5 py-3">
                     <span
@@ -233,19 +273,28 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
                   <td class="px-5 py-3 text-right">
                     <div class="flex items-center justify-end gap-3">
                       <button
-                        v-if="!u.sancionado"
-                        class="text-sm font-semibold text-rojizo hover:text-coral transition"
-                        @click.stop="abrirSancion(u)"
+                        v-if="!u.estadoCuenta"
+                        class="text-sm font-semibold text-coral hover:text-rojizo transition"
+                        @click.stop="abrirReactivar(u)"
                       >
-                        Inhabilitar
+                        Reactivar
                       </button>
-                      <button
-                        v-else
-                        class="text-sm font-semibold text-granate hover:text-coral transition"
-                        @click.stop="verSancion(u)"
-                      >
-                        Ver sanción
-                      </button>
+                      <template v-else>
+                        <button
+                          v-if="!u.sancionado"
+                          class="text-sm font-semibold text-rojizo hover:text-coral transition"
+                          @click.stop="abrirSancion(u)"
+                        >
+                          Inhabilitar
+                        </button>
+                        <button
+                          v-else
+                          class="text-sm font-semibold text-granate hover:text-coral transition"
+                          @click.stop="verSancion(u)"
+                        >
+                          Ver sanción
+                        </button>
+                      </template>
                       <button
                         class="text-rojizo hover:text-coral transition"
                         @click="alternarDetalle(u.idUsuario)"
@@ -294,6 +343,16 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
                               : '—'
                           }}
                         </p>
+                        <p v-if="!u.estadoCuenta" class="sm:col-span-2">
+                          <span class="text-rojizo">Baja voluntaria:</span>
+                          {{ u.fechaBajaVoluntaria ? formatearFecha(u.fechaBajaVoluntaria) : '—' }}
+                          <span v-if="u.reactivarHasta" class="text-cafe/60">
+                            · Puede reactivarse hasta el {{ formatearFecha(u.reactivarHasta) }}
+                          </span>
+                          <span v-else-if="u.fechaBajaVoluntaria" class="text-rojizo">
+                            · Plazo vencido
+                          </span>
+                        </p>
                       </div>
                     </div>
                   </td>
@@ -337,5 +396,19 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
       @cerrar="usuarioSancionar = null"
       @aplicada="alAplicarSancion"
     />
+
+    <ModalConfirmacion
+      :abierto="Boolean(usuarioReactivar)"
+      titulo="¿Reactivar esta cuenta?"
+      :mensaje="usuarioReactivar
+        ? `La cuenta de @${usuarioReactivar.nombreUsuario} va a poder iniciar sesión nuevamente.`
+        : ''"
+      texto-confirmar="Reactivar cuenta"
+      :confirmar-habilitado="!reactivando"
+      @confirmar="confirmarReactivar"
+      @cerrar="cerrarReactivar"
+    >
+      <p v-if="errorReactivar" class="mt-3 text-sm text-rojizo">{{ errorReactivar }}</p>
+    </ModalConfirmacion>
   </div>
 </template>
