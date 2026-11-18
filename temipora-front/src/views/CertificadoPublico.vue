@@ -472,8 +472,7 @@ watch(() => props.codigo, cargar)
         <p class="min-w-0 flex-1 text-xs leading-relaxed text-cafe/55">
           <b class="font-semibold text-cafe">Escaneá para ver este certificado en línea.</b>
           Si cambia el propietario, el certificado se actualiza y el historial
-          anterior queda registrado. No reemplaza los derechos de autor ni
-          constituye asesoramiento legal.
+          anterior queda registrado. No reemplaza los derechos de autor.
         </p>
       </footer>
     </article>
