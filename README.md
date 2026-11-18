@@ -8,6 +8,9 @@ Trabajo final de la carrera **Analista en Sistemas de Computación** de la **Uni
 
 ---
 
+## DEMO: https://youtu.be/ul04Hp9WDDU 
+## MANUAL DE USUARIO: https://github.com/Nathelin/temipora-plataforma-arte/blob/main/documentacion/manual/Temipora%20%E2%80%94%20Manual%20de%20usuario.pdf
+
 ## Índice
 
 - [De qué trata el proyecto](#de-qué-trata-el-proyecto)
