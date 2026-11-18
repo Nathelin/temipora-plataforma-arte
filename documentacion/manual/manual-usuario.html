@@ -1,0 +1,2075 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Temipora — Manual de usuario</title>
+<meta name="description" content="Manual de usuario de Temipora: guía completa para visitantes, clientes, artistas y administradores.">
+<style>
+  :root{
+    --bg:#fff6f1;
+    --surface:#ffffff;
+    --surface-alt:#fff0e9;
+    --ink:#4a1d2e;
+    --ink-soft:#6e3b4d;
+    --line:#ffc2d1;
+    --accent:#c2185b;
+    --accent-hover:#9a1047;
+    --accent-soft:#ff9fbc;
+    --action:#4a1d2e;
+    --deco-1:#ff8a7a;
+    --deco-2:#ffd9c7;
+    --deco-3:#ffe8a3;
+    --ok:#2f7a4f;
+    --ok-bg:#eaf5ee;
+    --warn:#8a5a10;
+    --warn-bg:#fdf3dc;
+    --bad:#a32338;
+    --bad-bg:#fbeaec;
+    --radius:18px;
+    --shadow:0 18px 40px rgba(74,29,46,.08);
+    --font-display:'Bricolage Grotesque','Trebuchet MS',Georgia,serif;
+    --font-body:'DM Sans','Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth;max-width:100%;overflow-x:hidden}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-body);
+    font-size:15px;
+    line-height:1.65;
+    letter-spacing:.005em;
+  }
+  a{color:var(--accent);text-decoration:none}
+  a:hover{color:var(--accent-hover);text-decoration:underline}
+  .layout{display:grid;grid-template-columns:300px minmax(0,1fr);max-width:1360px;margin:0 auto;gap:0}
+  /* ---------- barra lateral ---------- */
+  .sidebar{
+    position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+    padding:26px 20px 40px;border-right:1px solid var(--line);
+    background:linear-gradient(180deg,#fffaf7 0%,var(--bg) 100%);
+  }
+  .sidebar details>summary{display:none}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .brand-dot{width:14px;height:14px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px rgba(194,24,91,.12)}
+  .brand-name{font-family:var(--font-display);font-weight:800;font-size:22px;letter-spacing:-.03em;color:var(--ink)}
+  .brand-sub{font-size:11px;text-transform:uppercase;letter-spacing:.16em;color:var(--accent);font-weight:700;margin:0 0 18px 24px}
+  .toc{list-style:none;margin:0;padding:0;font-size:13.5px}
+  .toc li{margin:0}
+  .toc a{display:block;padding:5px 10px;border-radius:8px;color:var(--ink-soft);border-left:2px solid transparent}
+  .toc a:hover{background:var(--surface-alt);text-decoration:none;color:var(--ink)}
+  .toc a.active{background:#fff;border-left-color:var(--accent);color:var(--accent);font-weight:700}
+  .toc .toc-part{margin-top:16px;padding:0 10px 4px;font-family:var(--font-display);font-weight:800;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink)}
+  .toc .toc-sub a{padding-left:22px;font-size:13px}
+  /* ---------- contenido ---------- */
+  .content{padding:0 46px 90px;min-width:0}
+  .cover{
+    margin:0 -46px 44px;padding:64px 46px 56px;
+    background:linear-gradient(135deg,var(--action) 0%,#7c2d3a 55%,var(--accent) 100%);
+    color:#fff6f1;position:relative;overflow:hidden;
+  }
+  .cover::after{
+    content:"";position:absolute;right:-90px;top:-90px;width:320px;height:320px;border-radius:50%;
+    background:radial-gradient(circle at 30% 30%,rgba(255,217,199,.5),rgba(255,138,122,.15) 60%,transparent 70%);
+  }
+  .cover .eyebrow{color:var(--deco-2);font-size:12px;letter-spacing:.2em;text-transform:uppercase;font-weight:700;margin:0 0 14px}
+  .cover h1{font-family:var(--font-display);font-size:clamp(44px,7vw,76px);line-height:.95;letter-spacing:-.045em;margin:0;font-weight:800;color:#fff}
+  .cover .tagline{font-size:clamp(16px,2vw,21px);max-width:640px;margin:20px 0 0;color:#ffe8e0}
+  .cover .meta{display:flex;flex-wrap:wrap;gap:10px 28px;margin-top:34px;font-size:13px;color:#ffd9c7}
+  .cover .meta strong{color:#fff}
+  .cover .meta span{display:inline-block}
+  h1,h2,h3,h4{font-family:var(--font-display);color:var(--ink);letter-spacing:-.025em}
+  h2{
+    font-size:30px;line-height:1.2;margin:56px 0 8px;padding-top:14px;
+    border-top:2px solid var(--line);scroll-margin-top:20px;
+  }
+  h2 .num{color:var(--accent);font-size:.62em;letter-spacing:0;margin-right:10px;font-weight:800}
+  h3{font-size:20px;line-height:1.3;margin:34px 0 8px;scroll-margin-top:20px}
+  h4{font-size:16px;margin:22px 0 6px;color:var(--ink-soft)}
+  p{margin:10px 0}
+  .lead{font-size:17px;color:var(--ink-soft);max-width:70ch}
+  ul,ol{padding-left:24px}
+  li{margin:5px 0}
+  strong{color:var(--ink)}
+  code{
+    font-family:'Cascadia Code',Consolas,'Courier New',monospace;font-size:.88em;
+    background:var(--surface-alt);border:1px solid #f6d9cf;border-radius:6px;padding:1px 5px;color:#7c2d3a;
+    overflow-wrap:anywhere;
+  }
+  kbd{
+    font-family:'Cascadia Code',Consolas,monospace;font-size:.8em;background:#fff;border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:6px;padding:1px 6px;color:var(--ink);
+  }
+  /* ---------- componentes ---------- */
+  .ui{
+    display:inline-block;background:#fff;border:1px solid var(--line);border-radius:7px;
+    padding:0 7px;font-weight:700;font-size:.92em;color:var(--ink);white-space:nowrap;
+  }
+  .pasos{list-style:none;counter-reset:paso;padding:0;margin:16px 0}
+  .pasos>li{
+    counter-increment:paso;position:relative;padding:2px 0 10px 44px;margin:0;
+  }
+  .pasos>li::before{
+    content:counter(paso);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;
+    background:var(--accent);color:#fff;font-family:var(--font-display);font-weight:800;font-size:14px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .pasos>li::after{
+    content:"";position:absolute;left:13.5px;top:30px;bottom:0;width:1px;background:var(--line);
+  }
+  .pasos>li:last-child::after{display:none}
+  .captura-img{
+    margin:18px 0;border:1px solid #f0d9d0;border-radius:14px;overflow:hidden;
+    background:var(--surface);box-shadow:0 8px 22px rgba(74,29,46,.06);
+  }
+  .captura-img img{display:block;width:100%;height:auto}
+  .captura-img figcaption{
+    padding:8px 14px;font-size:12.5px;color:var(--ink-soft);border-top:1px solid #f7dfd6;
+  }
+  .nota,.aviso,.tip,.peligro{border-radius:12px;padding:12px 16px;margin:16px 0;font-size:14px;border-left:4px solid}
+  .nota{background:var(--surface-alt);border-color:var(--accent)}
+  .tip{background:var(--ok-bg);border-color:var(--ok)}
+  .aviso{background:var(--warn-bg);border-color:var(--warn)}
+  .peligro{background:var(--bad-bg);border-color:var(--bad)}
+  .nota strong,.tip strong,.aviso strong,.peligro strong{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+  .tip strong{color:var(--ok)} .aviso strong{color:var(--warn)} .peligro strong{color:var(--bad)}
+  .nota strong{color:var(--accent)}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.8px;background:var(--surface);border-radius:12px;overflow:hidden}
+  caption{text-align:left;font-size:12.5px;color:var(--ink-soft);padding:0 0 6px}
+  th,td{padding:9px 12px;text-align:left;vertical-align:top;border-bottom:1px solid #f7dfd6;overflow-wrap:anywhere}
+  th{background:var(--surface-alt);font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft)}
+  tr:last-child td{border-bottom:0}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .tag{display:inline-block;padding:1px 9px;border-radius:999px;font-size:11.5px;font-weight:700;border:1px solid}
+  .tag.ok{color:var(--ok);background:var(--ok-bg);border-color:#bfe0cb}
+  .tag.no{color:var(--bad);background:var(--bad-bg);border-color:#efc6cc}
+  .tag.warn{color:var(--warn);background:var(--warn-bg);border-color:#ecd6a6}
+  .tag.neutral{color:var(--ink-soft);background:var(--surface-alt);border-color:var(--line)}
+  .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin:18px 0}
+  .card{background:var(--surface);border:1px solid #f7dfd6;border-radius:var(--radius);padding:18px 20px;box-shadow:0 6px 18px rgba(74,29,46,.04)}
+  .card h4{margin-top:0}
+  .card p:last-child{margin-bottom:0}
+  .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:16px 0}
+  .swatch{border:1px solid #f0d9d0;border-radius:12px;overflow:hidden;background:#fff}
+  .swatch .color{height:52px}
+  .swatch .info{padding:8px 10px;font-size:11.5px;line-height:1.4}
+  .swatch .info b{display:block;font-size:12.5px;color:var(--ink)}
+  .swatch .info code{background:none;border:0;padding:0;font-size:11px}
+  .theme-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin:18px 0}
+  .theme-card{border:1px solid #f0d9d0;border-radius:16px;overflow:hidden;background:#fff}
+  .theme-card .preview{height:76px;display:flex}
+  .theme-card .preview span{flex:1}
+  .theme-card .body{padding:12px 14px}
+  .theme-card .body b{font-family:var(--font-display);font-size:15px}
+  .theme-card .body p{margin:2px 0 0;font-size:12px;color:var(--ink-soft)}
+  .faq{margin:12px 0}
+  .faq details{background:var(--surface);border:1px solid #f7dfd6;border-radius:12px;margin:8px 0;padding:0 16px}
+  .faq summary{cursor:pointer;padding:12px 0;font-weight:700;color:var(--ink);list-style:none;display:flex;justify-content:space-between;gap:14px}
+  .faq summary::-webkit-details-marker{display:none}
+  .faq summary::after{content:"+";color:var(--accent);font-weight:800;font-size:18px;line-height:1}
+  .faq details[open] summary::after{content:"–"}
+  .faq details p{padding-bottom:12px;margin:0}
+  .check{list-style:none;padding-left:0}
+  .check li{position:relative;padding-left:28px}
+  .check li::before{content:"✓";position:absolute;left:0;top:0;color:var(--ok);font-weight:800}
+  .fin{text-align:center;color:var(--ink-soft);font-size:12px;margin:60px 0 0;padding-top:20px;border-top:1px solid var(--line)}
+  .part-cover{margin:60px 0 10px;padding:26px 28px;border-radius:20px;background:linear-gradient(120deg,var(--surface-alt),#fff);border:1px solid var(--line)}
+  .part-cover .eyebrow{color:var(--accent);font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:800;margin:0}
+  .part-cover h2{border:0;margin:4px 0 0;padding:0;font-size:34px}
+  .part-cover p{margin:6px 0 0;color:var(--ink-soft)}
+  .kpi{display:inline-block;background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px 12px;font-size:12.5px;margin:3px 6px 3px 0}
+  .kpi b{color:var(--accent)}
+  /* ---------- impresión ---------- */
+  @media print{
+    :root{--bg:#fff}
+    body{font-size:10.5pt;background:#fff}
+    .layout{display:block;max-width:none}
+    .sidebar,.no-print{display:none!important}
+    .content{padding:0}
+    .cover{margin:0 0 18mm;padding:26mm 16mm;border-radius:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .cover h1{font-size:44pt}
+    h2{page-break-after:avoid;font-size:18pt;margin-top:12mm}
+    h3,h4{page-break-after:avoid}
+    .part-cover{page-break-before:always;background:#fff}
+    .captura-img{page-break-inside:avoid}
+    table,tr,td,th{page-break-inside:avoid}
+    a{color:inherit;text-decoration:none}
+    .fin{page-break-before:always}
+  }
+  @media (max-width:900px){
+    .layout{display:block}
+    .sidebar{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:18px 20px}
+    .sidebar details>summary{
+      display:block;cursor:pointer;font-weight:700;color:var(--accent);margin:6px 0 0;list-style:none;
+    }
+    .sidebar details>summary::-webkit-details-marker{display:none}
+    .toc{max-height:60vh;overflow:auto}
+    .content{padding:0 20px 60px}
+    .cover{margin:0 -20px 30px;padding:42px 20px 38px}
+    h2{font-size:26px}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<aside class="sidebar no-print">
+  <div class="brand"><span class="brand-dot"></span><span class="brand-name">Temipora</span></div>
+  <p class="brand-sub">Manual de usuario</p>
+  <details open>
+    <summary>Índice</summary>
+    <ul class="toc">
+      <li><a href="#portada">Portada y cómo usar el manual</a></li>
+      <li class="toc-part">Antes de empezar</li>
+      <li><a href="#introduccion">1 · Introducción</a></li>
+      <li class="toc-sub"><a href="#que-es">1.1 Qué es Temipora</a></li>
+      <li class="toc-sub"><a href="#roles">1.2 Roles</a></li>
+      <li class="toc-sub"><a href="#acceso">1.3 Cómo acceder</a></li>
+      <li class="toc-sub"><a href="#glosario-breve">1.4 Glosario rápido</a></li>
+      <li><a href="#primeros-pasos">2 · Primeros pasos</a></li>
+      <li class="toc-sub"><a href="#crear-cuenta">2.1 Crear una cuenta</a></li>
+      <li class="toc-sub"><a href="#iniciar-sesion">2.2 Iniciar y cerrar sesión</a></li>
+      <li class="toc-sub"><a href="#cuenta-inhabilitada">2.3 Cuentas sancionadas o dadas de baja</a></li>
+      <li class="toc-sub"><a href="#terminos">2.4 Términos y condiciones</a></li>
+      <li class="toc-sub"><a href="#interfaz">2.5 Conocer la interfaz</a></li>
+      <li class="toc-part">Parte 1 · Visitante</li>
+      <li><a href="#visitante">3 · Recorrer Temipora</a></li>
+      <li class="toc-sub"><a href="#inicio">3.1 Inicio</a></li>
+      <li class="toc-sub"><a href="#explorar">3.2 Explorar</a></li>
+      <li class="toc-sub"><a href="#buscar-servicios">3.3 Buscar servicios</a></li>
+      <li class="toc-sub"><a href="#catalogo-productos">3.4 Catálogo de productos</a></li>
+      <li class="toc-sub"><a href="#reventas">3.5 Reventas</a></li>
+      <li class="toc-sub"><a href="#perfiles">3.6 Perfiles y portfolio</a></li>
+      <li class="toc-sub"><a href="#certificado">3.7 Certificado de autenticidad</a></li>
+      <li class="toc-sub"><a href="#favoritos">3.8 Favoritos</a></li>
+      <li class="toc-part">Parte 2 · Cliente</li>
+      <li><a href="#cliente">4 · Comprar y contratar</a></li>
+      <li class="toc-sub"><a href="#solicitar-servicio">4.1 Solicitar un servicio</a></li>
+      <li class="toc-sub"><a href="#presupuesto">4.2 Presupuesto y pago</a></li>
+      <li class="toc-sub"><a href="#seguir-pedido">4.3 Seguir un pedido</a></li>
+      <li class="toc-sub"><a href="#comprar-producto">4.4 Comprar un producto</a></li>
+      <li class="toc-sub"><a href="#descargas">4.5 Entregas y certificado</a></li>
+      <li class="toc-sub"><a href="#revender">4.6 Revender una pieza</a></li>
+      <li class="toc-sub"><a href="#mensajeria">4.7 Mensajería</a></li>
+      <li class="toc-sub"><a href="#resenias">4.8 Reseñas</a></li>
+      <li class="toc-sub"><a href="#notificaciones">4.9 Notificaciones y ofertas</a></li>
+      <li class="toc-sub"><a href="#configuracion">4.10 Configuración de la cuenta</a></li>
+      <li class="toc-part">Parte 3 · Artista</li>
+      <li><a href="#artista">5 · Vender en Temipora</a></li>
+      <li class="toc-sub"><a href="#panel-artista">5.1 El panel del artista</a></li>
+      <li class="toc-sub"><a href="#publicar-servicio">5.2 Publicar un servicio</a></li>
+      <li class="toc-sub"><a href="#formulario-global">5.3 Formulario de pedidos global</a></li>
+      <li class="toc-sub"><a href="#terminos-artista">5.4 Términos globales</a></li>
+      <li class="toc-sub"><a href="#etiquetas-artista">5.5 Etiquetas</a></li>
+      <li class="toc-sub"><a href="#portfolio">5.6 Portfolio</a></li>
+      <li class="toc-sub"><a href="#publicar-producto">5.7 Crear un producto</a></li>
+      <li class="toc-sub"><a href="#gestion-solicitudes">5.8 Solicitudes y presupuestos</a></li>
+      <li class="toc-sub"><a href="#gestion-pedidos">5.9 Gestionar pedidos</a></li>
+      <li class="toc-sub"><a href="#ventas-informes">5.10 Ventas e informes</a></li>
+      <li class="toc-sub"><a href="#cobros">5.11 Cobros con MercadoPago</a></li>
+      <li class="toc-part">Parte 4 · Administrador</li>
+      <li><a href="#admin">6 · Administrar la plataforma</a></li>
+      <li class="toc-sub"><a href="#admin-resumen">6.1 Acceso y resumen</a></li>
+      <li class="toc-sub"><a href="#admin-usuarios">6.2 Usuarios y sanciones</a></li>
+      <li class="toc-sub"><a href="#admin-catalogos">6.3 Catálogos maestros</a></li>
+      <li class="toc-sub"><a href="#admin-operacion">6.4 Operación</a></li>
+      <li class="toc-sub"><a href="#admin-promociones">6.5 Promociones</a></li>
+      <li class="toc-sub"><a href="#admin-resenias">6.6 Moderación de reseñas</a></li>
+      <li class="toc-sub"><a href="#admin-terminos">6.7 Términos de la plataforma</a></li>
+      <li class="toc-sub"><a href="#admin-informes">6.8 Informes y comisiones</a></li>
+      <li class="toc-sub"><a href="#admin-auditoria">6.9 Auditoría</a></li>
+      <li class="toc-sub"><a href="#admin-anclaje">6.10 Anclaje en Bitcoin</a></li>
+      <li class="toc-sub"><a href="#admin-notificaciones">6.11 Notificaciones del sistema</a></li>
+      <li><a href="#identidad">7 · Identidad visual</a></li>
+      <li class="toc-sub"><a href="#paleta">7.1 Paleta y tipografía</a></li>
+      <li class="toc-sub"><a href="#temas">7.2 Los cuatro temas</a></li>
+      <li class="toc-sub"><a href="#mapa-pantallas">7.3 Mapa de pantallas</a></li>
+      <li><a href="#faq">8 · Preguntas frecuentes y problemas</a></li>
+      <li><a href="#apendices">9 · Apéndices</a></li>
+      <li class="toc-sub"><a href="#ap-glosario">A. Glosario</a></li>
+      <li class="toc-sub"><a href="#ap-estados">B. Estados de la interfaz</a></li>
+      <li class="toc-sub"><a href="#ap-checklists">C. Listas de verificación</a></li>
+      <li class="toc-sub"><a href="#ap-trazabilidad">D. Trazabilidad de casos de uso</a></li>
+      <li class="toc-sub"><a href="#ap-versiones">E. Control de versiones</a></li>
+    </ul>
+  </details>
+</aside>
+
+<main class="content">
+
+<!-- ============================ PORTADA ============================ -->
+<section id="portada">
+  <header class="cover">
+    <p class="eyebrow">Manual de usuario · Versión 1.0</p>
+    <h1>Temipora</h1>
+    <p class="tagline">La plataforma donde artistas y clientes se encuentran para crear, encargar y vender arte.</p>
+    <div class="meta">
+      <span><strong>Autora:</strong> Menacho, Natalia Agustina</span>
+      <span><strong>Carrera:</strong> Analista en Sistemas de Computación</span>
+      <span><strong>Institución:</strong> Universidad Nacional de Misiones</span>
+      <span><strong>Fecha:</strong> noviembre de 2026</span>
+    </div>
+  </header>
+
+  <h2>Cómo usar este manual</h2>
+  <p class="lead">Este manual explica, pantalla por pantalla y tarea por tarea, cómo usar Temipora. Está pensado para personas que quieren comprar arte, artistas que quieren venderlo y administradores que gestionan la plataforma. No hace falta saber nada de programación para seguirlo.</p>
+
+  <div class="grid-2">
+    <div class="card">
+      <h4>Si es tu primera vez</h4>
+      <p>Empezá por el capítulo <a href="#primeros-pasos">2 · Primeros pasos</a>: crear la cuenta, iniciar sesión y reconocer la interfaz. Después saltá a la parte de tu rol.</p>
+    </div>
+    <div class="card">
+      <h4>Si buscás una tarea puntual</h4>
+      <p>Usá el índice lateral. Cada procedimiento indica qué necesitás antes de empezar y qué deberías ver al terminar.</p>
+    </div>
+  </div>
+
+  <h3>Convenciones</h3>
+  <table>
+    <thead><tr><th>Elemento</th><th>Significado</th></tr></thead>
+    <tbody>
+      <tr><td><span class="ui">Registrarse</span></td><td>Botón, pestaña, campo o menú tal como aparece en pantalla.</td></tr>
+      <tr><td><strong>negrita</strong></td><td>Nombre de un concepto importante del dominio.</td></tr>
+      <tr><td><code>/ruta</code></td><td>Dirección dentro de la aplicación. Nunca hace falta escribirla a mano: se llega navegando.</td></tr>
+      <tr><td><kbd>Tab</kbd></td><td>Tecla del teclado.</td></tr>
+      <tr><td>Paso numerado</td><td>Acción que se realiza en orden. Un paso equivale, en general, a un clic.</td></tr>
+      <tr><td>Captura</td><td>Imagen de la pantalla que ilustra el paso o la sección.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="aviso">
+    <strong>Idioma y datos</strong>
+    Los textos entre comillas reproducen literalmente la interfaz. Los ejemplos usan datos ficticios; los nombres, obras y precios reales pueden variar.
+  </div>
+</section>
+
+<!-- ============================ 1. INTRODUCCIÓN ============================ -->
+<h2 id="introduccion"><span class="num">1</span>Introducción</h2>
+<p class="lead">Qué es Temipora, quién puede hacer qué y cuáles son las palabras que vas a encontrar todo el tiempo.</p>
+
+<h3 id="que-es">1.1 Qué es Temipora</h3>
+<p>Temipora es una plataforma web que conecta <strong>artistas</strong> con <strong>clientes</strong> que buscan arte personalizado o piezas listas para comprar. Resuelve un problema concreto: muchas ventas de arte ocurren por redes sociales, con acuerdos informales, sin seguimiento del pedido y sin protección clara para ninguna de las dos partes.</p>
+<p>Con Temipora podés:</p>
+<ul>
+  <li><strong>Descubrir</strong> servicios a medida y productos digitales en catálogos públicos, con búsqueda, filtros, favoritos y recomendaciones.</li>
+  <li><strong>Contratar formalmente</strong> un servicio: solicitud, presupuesto del artista, hitos de pago, seguimiento y entrega.</li>
+  <li><strong>Pagar</strong> con MercadoPago o con el proveedor de pago simulado del entorno de prueba.</li>
+  <li><strong>Comunicarte</strong> por mensajería privada en tiempo real.</li>
+  <li><strong>Construir reputación</strong> con reseñas moderadas y un portfolio profesional.</li>
+  <li><strong>Verificar</strong> la autenticidad de piezas únicas mediante un certificado público con código y QR.</li>
+</ul>
+
+<div class="grid-2">
+  <div class="card"><h4>Para clientes</h4><p>Explorar, encargar una comisión, comprar productos, seguir el pedido, descargar entregas y dejar reseñas.</p></div>
+  <div class="card"><h4>Para artistas</h4><p>Publicar servicios y productos, gestionar solicitudes, presupuestos, pedidos, portfolio, ventas y cobros.</p></div>
+</div>
+
+<h3 id="roles">1.2 Roles y permisos</h3>
+<p>Toda cuenta tiene exactamente un rol. El rol se elige al registrarse y determina qué secciones ves y qué acciones podés hacer.</p>
+<table>
+  <thead><tr><th>Rol</th><th>Qué puede hacer</th><th>Acceso</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Visitante</strong></td>
+      <td>Recorrer la landing, los catálogos de servicios y productos, los perfiles públicos, las reventas y los certificados. No puede comprar, guardar favoritos ni escribir mensajes.</td>
+      <td>Sin cuenta</td>
+    </tr>
+    <tr>
+      <td><strong>Cliente</strong></td>
+      <td>Todo lo del visitante, más: favoritos, carrito, compras, solicitudes de servicio, presupuestos, pagos, mensajería, reseñas y configuración de cuenta.</td>
+      <td>Cuenta con rol <code>CLIENTE</code></td>
+    </tr>
+    <tr>
+      <td><strong>Artista</strong></td>
+      <td>Todo lo del cliente, más el <strong>panel del artista</strong>: servicios, productos, portfolio, solicitudes, presupuestos, pedidos, ventas, informes, etiquetas y cobros.</td>
+      <td>Cuenta con rol <code>ARTISTA</code></td>
+    </tr>
+    <tr>
+      <td><strong>Administrador</strong></td>
+      <td>Panel de administración completo: usuarios, sanciones, catálogos maestros, operación, promociones, moderación, términos, informes, auditoría y anclaje en Bitcoin.</td>
+      <td>Cuenta con rol <code>ADMIN</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="nota">
+  <strong>Importante</strong>
+  El rol de administrador no se elige en el registro público. Se crea desde la configuración del sistema con las variables <code>ADMIN_CORREO</code>, <code>ADMIN_CONTRASENIA</code> y <code>ADMIN_NOMBRE_USUARIO</code>, o lo asigna otro administrador.
+</div>
+
+<h3 id="acceso">1.3 Cómo acceder</h3>
+<p>Temipora funciona en el navegador: no hay nada que instalar. Usá una versión reciente de Chrome, Edge, Firefox o Safari, con JavaScript habilitado.</p>
+<ul>
+  <li><strong>Entorno de desarrollo:</strong> el frontend se sirve en <code>http://localhost:5173</code> y el backend en <code>http://localhost:8080</code>.</li>
+  <li><strong>Entorno publicado:</strong> usá la dirección que te haya indicado la organización. Siempre empieza con <code>https://</code>.</li>
+</ul>
+<p>La sesión se mantiene con un token que el navegador guarda de forma local. Al cerrar sesión o cuando el token vence, la aplicación te pide que vuelvas a ingresar. Si intentás abrir una página privada sin sesión, te redirige al inicio de sesión y, después de ingresar, te devuelve a la página que querías ver.</p>
+
+<div class="tip">
+  <strong>Recomendación</strong>
+  Usá una sola pestaña por cuenta. Si abrís Temipora en dos navegadores distintos con la misma cuenta, los cambios de sesión en uno no se reflejan en el otro.
+</div>
+
+<h3 id="glosario-breve">1.4 Glosario rápido</h3>
+<p>Estos términos aparecen en toda la plataforma. El glosario completo está en el <a href="#ap-glosario">apéndice A</a>.</p>
+<table>
+  <thead><tr><th>Término</th><th>Qué significa</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Servicio</strong></td><td>Una propuesta de arte a medida que publica un artista, con precio base, cupos, plazo de entrega y condiciones.</td></tr>
+    <tr><td><strong>Solicitud</strong></td><td>El pedido formal que hace un cliente sobre un servicio. Inicia el circuito de presupuesto y pago.</td></tr>
+    <tr><td><strong>Presupuesto</strong></td><td>La propuesta económica que envía el artista: precio por dibujo, hitos de pago, plazo y derechos de uso.</td></tr>
+    <tr><td><strong>Hito</strong></td><td>Una etapa de pago de un pedido. El primero suele ser un anticipo; el último, la entrega.</td></tr>
+    <tr><td><strong>Pedido</strong></td><td>El trabajo en curso una vez aceptado el presupuesto y realizado el primer pago.</td></tr>
+    <tr><td><strong>Entrega</strong></td><td>El archivo o conjunto de archivos que el artista sube para el cliente, sea un avance o la versión final.</td></tr>
+    <tr><td><strong>Pieza verificada</strong></td><td>Una obra publicada en el portfolio del artista que quedó asociada a un pedido real y a su certificado.</td></tr>
+    <tr><td><strong>Reventa</strong></td><td>La publicación de una pieza única comprada antes, para que otro usuario la adquiera.</td></tr>
+    <tr><td><strong>Certificado</strong></td><td>El registro público que prueba la autenticidad de una pieza. Se consulta por código o QR.</td></tr>
+    <tr><td><strong>Cupo</strong></td><td>Un lugar disponible para aceptar una solicitud de servicio. Una solicitud completa ocupa un cupo.</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================ 2. PRIMEROS PASOS ============================ -->
+<h2 id="primeros-pasos"><span class="num">2</span>Primeros pasos</h2>
+<p class="lead">Crear la cuenta, entrar, aceptar los términos y reconocer las zonas de la pantalla.</p>
+
+<h3 id="crear-cuenta">2.1 Crear una cuenta</h3>
+<p>El registro se hace en cuatro pasos y lleva menos de cinco minutos. Necesitás un nombre de usuario, un correo electrónico válido y una contraseña. Si querés vender, elegí el rol <strong>Artista</strong>; si solo querés comprar, elegí <strong>Cliente</strong>.</p>
+
+<figure class="captura-img">
+  <img src="captura 01.png" alt="Captura 01: Registro, paso 1" loading="lazy">
+  <figcaption>Captura 01 — Registro, paso 1</figcaption>
+</figure>
+
+<h4>Paso 1 — Cuenta</h4>
+<ol class="pasos">
+  <li>Abrí Temipora y elegí <span class="ui">Registrarse</span> en la pantalla de inicio de sesión.</li>
+  <li>Escribí un <strong>Nombre de usuario</strong>. Debe tener al menos 2 caracteres y no puede estar en uso; la aplicación lo verifica automáticamente al salir del campo.</li>
+  <li>Escribí tu <strong>Correo electrónico</strong>. Se usa para notificaciones y para recuperar el acceso.</li>
+  <li>Creá una <strong>Contraseña</strong> de al menos 8 caracteres, con al menos una mayúscula y un número. Podés usar <span class="ui">Ver</span> para comprobar lo que escribiste.</li>
+  <li>Repetila en <strong>Confirmar contraseña</strong>.</li>
+  <li>Marcá la casilla <strong>Acepto los términos y condiciones</strong>. El enlace abre los términos completos en otra pantalla.</li>
+  <li>Elegí <span class="ui">Siguiente</span>.</li>
+</ol>
+
+<table>
+  <caption>Mensajes de validación del paso 1 y cómo resolverlos</caption>
+  <thead><tr><th>Mensaje</th><th>Solución</th></tr></thead>
+  <tbody>
+    <tr><td>El nombre de usuario debe tener al menos 2 caracteres.</td><td>Escribí un nombre más largo.</td></tr>
+    <tr><td>Este nombre de usuario ya está en uso.</td><td>Probá con otra variante; el campo se valida solo al salir.</td></tr>
+    <tr><td>El correo no es válido.</td><td>Revisá que tenga el formato <code>nombre@dominio.com</code>, sin espacios.</td></tr>
+    <tr><td>La contraseña debe incluir al menos una mayúscula y un número.</td><td>Agregá una mayúscula y un dígito; no alcanza con que sea larga.</td></tr>
+    <tr><td>Las contraseñas no coinciden.</td><td>Volvé a escribir la confirmación, respetando mayúsculas.</td></tr>
+    <tr><td>Debés aceptar los términos y condiciones.</td><td>Marcá la casilla antes de continuar.</td></tr>
+  </tbody>
+</table>
+
+<h4>Paso 2 — Datos personales</h4>
+<ol class="pasos">
+  <li>Completá <strong>Nombre</strong> y <strong>Apellido</strong> (mínimo 2 caracteres cada uno).</li>
+  <li>Ingresá tu <strong>Fecha de nacimiento</strong> con el formato <code>DD/MM/AAAA</code>. La aplicación agrega las barras por vos mientras escribís.</li>
+  <li>Elegí <span class="ui">Siguiente</span>.</li>
+</ol>
+<div class="aviso">
+  <strong>Mayoría de edad</strong>
+  Tenés que ser mayor de 18 años para registrarte. Si la fecha indica una edad menor, el registro no avanza.
+</div>
+
+<h4>Paso 3 — Rol</h4>
+<p>La pregunta es <strong>¿Qué te gustaría hacer en Temipora?</strong> y hay dos opciones excluyentes:</p>
+<div class="grid-2">
+  <div class="card">
+    <h4>Solo comprar arte</h4>
+    <p>Crea una cuenta de <strong>Cliente</strong>. Podés explorar, comprar, contratar servicios, mensajear y reseñar.</p>
+  </div>
+  <div class="card">
+    <h4>Vender y comprar arte</h4>
+    <p>Crea una cuenta de <strong>Artista</strong>. Además de lo anterior, habilita el panel del artista para publicar y vender.</p>
+  </div>
+</div>
+<div class="nota">
+  <strong>¿Necesitás cambiar de rol?</strong>
+  Si empezaste como cliente y luego querés vender, escribí a <a href="mailto:temiporasupport@gmail.com">temiporasupport@gmail.com</a> para evaluar el cambio. No es necesario crear otra cuenta ni perder el historial.
+</div>
+
+<figure class="captura-img">
+  <img src="captura 02.png" alt="Captura 02: Registro, paso 3" loading="lazy">
+  <figcaption>Captura 02 — Registro, paso 3</figcaption>
+</figure>
+
+<h4>Paso 4 — Perfil</h4>
+<ol class="pasos">
+  <li>Opcionalmente, elegí una <strong>foto de perfil</strong> con <span class="ui">Elegir foto</span>. Se aceptan imágenes; el sistema las optimiza antes de subirlas y muestra el progreso.</li>
+  <li>Opcionalmente, escribí una <strong>Biografía</strong> de hasta 500 caracteres. El contador aparece abajo a la derecha.</li>
+  <li>Elegí <span class="ui">Registrarse</span>.</li>
+</ol>
+<p>Si todo sale bien, la aplicación te lleva a la pantalla de inicio de sesión para que ingreses con las credenciales que acabas de crear.</p>
+
+<div class="tip">
+  <strong>Después del registro</strong>
+  La foto y la biografía también se pueden cargar o modificar más tarde desde <strong>Configuración → Perfil</strong>. No es necesario completarlas para empezar a usar la plataforma.
+</div>
+
+<h3 id="iniciar-sesion">2.2 Iniciar y cerrar sesión</h3>
+<ol class="pasos">
+  <li>Elegí <span class="ui">Iniciar sesión</span>.</li>
+  <li>Ingresá tu <strong>Nombre de usuario</strong> y tu <strong>Contraseña</strong>.</li>
+  <li>Opcionalmente, usá <span class="ui">Ver</span> para comprobar la contraseña antes de enviarla.</li>
+  <li>Elegí <span class="ui">Ingresar</span>.</li>
+</ol>
+<p>Después de ingresar:</p>
+<ul>
+  <li>Los <strong>clientes</strong> y <strong>artistas</strong> llegan a <strong>Explorar</strong>.</li>
+  <li>Los <strong>administradores</strong> llegan al <strong>Resumen de administración</strong>.</li>
+  <li>Si habías intentado abrir una página privada, volvés directamente a esa página.</li>
+</ul>
+<p>Para cerrar sesión, abrí el menú de tu usuario, arriba a la derecha, y elegí <span class="ui">Cerrar sesión</span>. La sesión también se cierra sola cuando vence el token.</p>
+
+<figure class="captura-img">
+  <img src="captura 03.png" alt="Captura 03: Inicio de sesión" loading="lazy">
+  <figcaption>Captura 03 — Inicio de sesión</figcaption>
+</figure>
+
+<div class="nota">
+  <strong>¿Olvidaste la contraseña?</strong>
+  La pantalla de ingreso no incluye recuperación automática. Escribí a <a href="mailto:temiporasupport@gmail.com">temiporasupport@gmail.com</a> desde el correo asociado a tu cuenta para que un administrador te ayude.
+</div>
+
+<h3 id="cuenta-inhabilitada">2.3 Cuentas sancionadas o dadas de baja</h3>
+<p>Si tu cuenta fue sancionada, suspendida o dada de baja, al intentar ingresar vas a ver un aviso con el motivo y, cuando corresponda, la fecha hasta la que podés reactivarla.</p>
+
+<h4>Reactivar una cuenta dada de baja</h4>
+<ol class="pasos">
+  <li>En el aviso de baja, elegí <span class="ui">Reactivar cuenta</span>.</li>
+  <li>Ingresá tu <strong>Nombre de usuario</strong> y tu <strong>Contraseña</strong>.</li>
+  <li>Confirmá la reactivación.</li>
+</ol>
+<p>Si la reactivación se hace dentro del plazo permitido, la sesión se inicia automáticamente y volvés a <strong>Explorar</strong> (o al panel de administración, si sos admin). Si el plazo venció, el mensaje indica hasta qué fecha estaba disponible y te ofrece el correo de contacto.</p>
+
+<div class="peligro">
+  <strong>Cuenta sancionada</strong>
+  Una sanción no se revierte desde la pantalla de ingreso. El aviso muestra el motivo y el contacto de soporte. Si creés que se trata de un error, escribí a <a href="mailto:temiporasupport@gmail.com">temiporasupport@gmail.com</a>.
+</div>
+
+<h3 id="terminos">2.4 Términos y condiciones</h3>
+<p>Antes de operar, la plataforma puede pedirte que aceptes la versión vigente de los términos. El modal de aceptación aparece automáticamente cuando hay una versión nueva y no permite continuar hasta que la aceptes.</p>
+<ul>
+  <li>El enlace <strong>términos y condiciones</strong> del registro abre el documento completo.</li>
+  <li>La aceptación queda registrada con la versión que aceptaste.</li>
+  <li>Los artistas tienen, además, sus propios <strong>términos de servicio</strong> por servicio, que el cliente acepta al enviar una solicitud.</li>
+</ul>
+
+<h3 id="interfaz">2.5 Conocer la interfaz</h3>
+<p>La mayor parte de la aplicación comparte el mismo encabezado. Estas son sus zonas:</p>
+<table>
+  <thead><tr><th>Zona</th><th>Qué encontrás</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Logo y nombre</strong></td><td>Arriba a la izquierda. Siempre vuelve al inicio.</td></tr>
+    <tr><td><strong>Navegación principal</strong></td><td><span class="ui">Explorar</span>, <span class="ui">Servicios</span>, <span class="ui">Productos</span> y, con sesión iniciada, <span class="ui">Mi actividad</span>.</td></tr>
+    <tr><td><strong>Panel</strong></td><td>Visible para artistas. Abre el panel de gestión.</td></tr>
+    <tr><td><strong>Carrito</strong></td><td>Muestra la cantidad de productos agregados. Solo para clientes y artistas.</td></tr>
+    <tr><td><strong>Mensajes</strong></td><td>Acceso a conversaciones y solicitudes de contacto.</td></tr>
+    <tr><td><strong>Notificaciones</strong></td><td>Campana con avisos del sistema y de la actividad de tus pedidos.</td></tr>
+    <tr><td><strong>Menú de usuario</strong></td><td>Tu perfil público, configuración, selector de tema y cierre de sesión.</td></tr>
+  </tbody>
+</table>
+
+<figure class="captura-img">
+  <img src="captura 04.png" alt="Captura 04: Encabezado general" loading="lazy">
+  <figcaption>Captura 04 — Encabezado general</figcaption>
+</figure>
+
+<h4>Zonas de trabajo según el rol</h4>
+<div class="grid-2">
+  <div class="card">
+    <h4>Mi actividad (cliente)</h4>
+    <p>Barra lateral con <strong>Mis compras</strong>, <strong>Reventa</strong>, <strong>Mis pedidos</strong> y <strong>Mis solicitudes</strong>, más el acceso a la configuración de la cuenta.</p>
+  </div>
+  <div class="card">
+    <h4>Panel (artista)</h4>
+    <p>Menú con <strong>Resumen</strong>, <strong>Servicios</strong>, <strong>Productos</strong>, <strong>Solicitudes</strong>, <strong>Pedidos</strong>, <strong>Ventas</strong>, <strong>Mensajes</strong> y <strong>Portfolio</strong>, más los ajustes de formulario, términos y etiquetas.</p>
+  </div>
+  <div class="card">
+    <h4>Administración</h4>
+    <p>Barra lateral oscura con todas las secciones de gestión, agrupadas por usuarios, catálogos, operación, campañas y auditoría.</p>
+  </div>
+  <div class="card">
+    <h4>Configuración</h4>
+    <p>Perfil, apariencia, privacidad, cuenta y pagos y cobros. Es la misma para clientes y artistas.</p>
+  </div>
+</div>
+
+<div class="tip">
+  <strong>Atajo de navegación</strong>
+  El menú de usuario permite cambiar el tema visual en cualquier momento. La elección se guarda en el navegador y se aplica la próxima vez que entres.
+</div>
+
+<!-- ============================ PARTE 1 ============================ -->
+<section class="part-cover" id="visitante">
+  <p class="eyebrow">Parte 1</p>
+  <h2>Visitante</h2>
+  <p>Recorrer la plataforma sin cuenta: qué se puede ver, cómo buscar y cómo reconocer una pieza verificada.</p>
+</section>
+
+<h3 id="inicio">3.1 Inicio</h3>
+<p>La página de inicio es la carta de presentación de Temipora. Se puede ver sin iniciar sesión y desde cualquier dispositivo.</p>
+<ul>
+  <li><strong>Encabezado</strong> con la propuesta de valor: arte hecho a mano, comisiones y una comunidad de artistas.</li>
+  <li><strong>Llamados a la acción</strong> para explorar servicios, ver productos o crear una cuenta.</li>
+  <li><strong>Accesos rápidos</strong> a las secciones principales y al registro.</li>
+  <li><strong>Pie de página</strong> con los enlaces institucionales y el contacto de soporte.</li>
+</ul>
+
+<figure class="captura-img">
+  <img src="captura 05.png" alt="Captura 05: Página de inicio" loading="lazy">
+  <figcaption>Captura 05 — Página de inicio</figcaption>
+</figure>
+
+<div class="tip">
+  <strong>Sin cuenta también se navega</strong>
+  Podés recorrer catálogos completos, abrir fichas de servicios y productos, ver perfiles de artistas y consultar certificados. Solo se te pedirá iniciar sesión cuando intentes comprar, guardar un favorito o escribir un mensaje.
+</div>
+
+<h3 id="explorar">3.2 Explorar</h3>
+<p><strong>Explorar</strong> es la portada personalizada. Reúne lo destacado de servicios y productos y, si tenés sesión, saluda con tu nombre de usuario: <em>“Hola, @tuusuario”</em>. Sin sesión, el título es <em>“Descubrí lo que se está creando”</em>.</p>
+
+<h4>Qué muestra la pantalla</h4>
+<ol class="pasos">
+  <li><strong>Destacados:</strong> una pieza grande y dos miniaturas. La grande suele ser un servicio con etiqueta <em>“Elegido para vos”</em> cuando la recomendación es personalizada.</li>
+  <li><strong>Chips por tipo de producto:</strong> accesos rápidos para filtrar el catálogo. El chip <span class="ui">Todo</span> abre todos los productos y <span class="ui">Ver servicios →</span> lleva al catálogo de servicios.</li>
+  <li><strong>Comisiones abiertas:</strong> carrusel horizontal de servicios. En escritorio podés desplazarlo con las flechas; en el teléfono, deslizando con el dedo.</li>
+  <li><strong>Listos para descargar:</strong> grilla de productos digitales con precio, tipo y artista.</li>
+  <li><strong>Cierre:</strong> dos tarjetas para saltar a los catálogos completos con filtros.</li>
+</ol>
+
+<h4>Qué significa cada indicador de una tarjeta</h4>
+<table>
+  <thead><tr><th>Indicador</th><th>Significado</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Desde $…</strong></td><td>Precio base del servicio o precio mínimo del producto, según sus variantes.</td></tr>
+    <tr><td><strong>★ 4,8 (12)</strong></td><td>Calificación promedio y cantidad de reseñas. Si no hay reseñas, dice <strong>Nuevo</strong>.</td></tr>
+    <tr><td><strong>“3 semanas”</strong></td><td>Tiempo de entrega estimado. Si el artista no lo definió, dice <strong>A convenir</strong>.</td></tr>
+    <tr><td><strong>−20%</strong></td><td>Descuento vigente por una oferta o promoción.</td></tr>
+    <tr><td><strong>Contenido sensible</strong></td><td>La imagen aparece desenfocada hasta que el usuario habilita ese contenido en su configuración de privacidad.</td></tr>
+    <tr><td><strong>Pieza única</strong></td><td>El producto es una obra original, no una copia ni un recurso replicable.</td></tr>
+  </tbody>
+</table>
+
+<figure class="captura-img">
+  <img src="captura 06.png" alt="Captura 06: Explorar" loading="lazy">
+  <figcaption>Captura 06 — Explorar</figcaption>
+</figure>
+
+<h3 id="buscar-servicios">3.3 Buscar servicios</h3>
+<p>El catálogo de servicios (<span class="ui">Servicios</span> en la navegación) permite encontrar una comisión por estilo, medio, presupuesto, plazo o disponibilidad. Los filtros se aplican solos, sin botón de “Buscar”, y se reflejan en la dirección de la página para que puedas compartirla.</p>
+
+<h4>Panel de filtros</h4>
+<table>
+  <thead><tr><th>Grupo</th><th>Opciones y comportamiento</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Búsqueda</strong></td><td>Texto libre por nombre o descripción; filtro por artista (<code>@usuario</code>) y selector de orden.</td></tr>
+    <tr><td><strong>Ordenar por</strong></td><td><em>Para vos</em>, <em>Más recientes</em>, <em>Nombre</em>, <em>Precio: menor a mayor</em>, <em>Precio: mayor a menor</em>.</td></tr>
+    <tr><td><strong>Tipo de servicio</strong></td><td>Casillas con la cantidad de resultados de cada tipo.</td></tr>
+    <tr><td><strong>Medio</strong></td><td>Casillas por medio artístico (digital, tradicional y los que haya configurado el administrador).</td></tr>
+    <tr><td><strong>Precio</strong></td><td>Rango mínimo y máximo en la moneda de tu perfil.</td></tr>
+    <tr><td><strong>Entrega</strong></td><td>Plazo máximo: <em>7</em>, <em>14</em>, <em>30</em> o <em>60 días</em>.</td></tr>
+    <tr><td><strong>Disponibilidad</strong></td><td><em>Solo con cupos disponibles</em> y <em>Acepta lista de espera</em>.</td></tr>
+    <tr><td><strong>Valoración</strong></td><td><em>★ 3 o más</em>, <em>★ 4 o más</em>, <em>★ 4,5 o más</em>.</td></tr>
+    <tr><td><strong>Contenido sensible</strong></td><td>Incluir o excluir violencia, desnudos y contenido sensible general.</td></tr>
+    <tr><td><strong>Moneda del precio original</strong></td><td>Solo aparece si hay servicios en más de una moneda.</td></tr>
+    <tr><td><strong>Etiquetas</strong></td><td>Selección por categoría, con posibilidad de excluir etiquetas.</td></tr>
+  </tbody>
+</table>
+
+<h4>Cómo filtrar paso a paso</h4>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Servicios</span>.</li>
+  <li>Escribí en <strong>Buscar por nombre o descripción…</strong> si sabés qué querés, o elegí un <strong>Tipo de servicio</strong>.</li>
+  <li>Marcá uno o más <strong>Medios</strong> para acotar la técnica.</li>
+  <li>Definí el rango de <strong>Precio</strong> y, si tenés fecha, el plazo máximo de <strong>Entrega</strong>.</li>
+  <li>Activá <strong>Solo con cupos disponibles</strong> si necesitás empezar ya.</li>
+  <li>Revisá los <strong>chips</strong> que aparecen arriba de la grilla: cada uno se puede quitar con un clic.</li>
+  <li>Usá <span class="ui">Limpiar (n)</span> o <span class="ui">Limpiar todos los filtros</span> para volver al estado inicial.</li>
+</ol>
+
+<div class="nota">
+  <strong>El orden “Para vos”</strong>
+  Cuando iniciás sesión, el orden por defecto combina lo que guardaste y visitaste. Si no hay historial suficiente, se comporta como <em>Más recientes</em>. El indicador <em>“Elegido para vos”</em> solo aparece cuando la recomendación es realmente personalizada.
+</div>
+
+<h4>Ficha de un servicio</h4>
+<p>Al abrir una tarjeta ves el detalle público: nombre, artista, imágenes, descripción, precio base, tiempo de entrega, cupos, reseñas y las condiciones del servicio. Desde ahí podés:</p>
+<ul>
+  <li>Marcar el servicio como <strong>favorito</strong> (requiere sesión).</li>
+  <li>Abrir el <strong>perfil del artista</strong> y su portfolio.</li>
+  <li>Iniciar una <strong>solicitud</strong> con <span class="ui">Solicitar</span> si hay cupos, o anotarte en la <strong>lista de espera</strong>.</li>
+  <li>Ver <strong>artistas alternativos</strong> cuando el servicio está lleno, mediante la pantalla de artistas con cupo.</li>
+</ul>
+
+<figure class="captura-img">
+  <img src="captura 07.png" alt="Captura 07: Ficha de servicio" loading="lazy">
+  <figcaption>Captura 07 — Ficha de servicio</figcaption>
+</figure>
+
+<h3 id="catalogo-productos">3.4 Catálogo de productos</h3>
+<p><span class="ui">Productos</span> reúne las piezas listas para comprar o descargar. La grilla muestra la portada, el título, el artista, el precio desde y, cuando corresponde, las etiquetas <strong>Pieza única</strong> o <strong>Descarga inmediata</strong>.</p>
+<ul>
+  <li><strong>Buscador y filtros</strong> por tipo de producto, medio, rango de precio, etiquetas y contenido sensible.</li>
+  <li><strong>Orden</strong> por relevancia, novedad, nombre y precio.</li>
+  <li><strong>Favoritos</strong> con la estrella de cada tarjeta.</li>
+  <li><strong>Ficha del producto</strong> con galería, variantes disponibles, stock, licencia de uso, reseñas y certificado cuando es pieza única.</li>
+</ul>
+
+<div class="tip">
+  <strong>Productos digitales</strong>
+  Los productos marcados como <em>digitales</em> se descargan apenas se confirma el pago. Los físicos o de entrega manual dependen de lo que haya configurado el artista.
+</div>
+
+<figure class="captura-img">
+  <img src="captura 08.png" alt="Captura 08: Catálogo de productos" loading="lazy">
+  <figcaption>Captura 08 — Catálogo de productos</figcaption>
+</figure>
+
+<h3 id="reventas">3.5 Reventas</h3>
+<p>La sección <span class="ui">Reventas</span> publica piezas únicas que un comprador anterior puso a la venta. Cada reventa conserva la trazabilidad de la obra: quién la creó, qué certificado la respalda y en qué condiciones se ofrece.</p>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Reventas</span> desde el catálogo o desde la navegación.</li>
+  <li>Abrí una pieza para ver su historia, el precio de reventa y el estado de la publicación.</li>
+  <li>Si te interesa, iniciá el proceso de compra con las mismas reglas que un producto común.</li>
+</ol>
+<div class="aviso">
+  <strong>Disponibilidad</strong>
+  Una reventa puede pausarse o cerrarse si la pieza deja de estar disponible. En ese caso la ficha lo indica y no permite comprar.
+</div>
+
+<h3 id="perfiles">3.6 Perfiles y portfolio</h3>
+<p>Cada usuario tiene un perfil público en <code>/perfil/@usuario</code>. En el caso de los artistas, el perfil funciona como vidriera profesional.</p>
+<h4>Qué incluye el perfil de un artista</h4>
+<ul>
+  <li>Foto, nombre de usuario, biografía y datos públicos que el artista haya decidido mostrar.</li>
+  <li><strong>Portfolio:</strong> obras organizadas por materiales, medios y etiquetas, con visibilidad configurable.</li>
+  <li><strong>Galería pública de pedidos:</strong> trabajos realizados, incluidos los publicados como <strong>piezas verificadas</strong>.</li>
+  <li><strong>Servicios y productos activos</strong>, con acceso directo a cada ficha.</li>
+  <li><strong>Reseñas</strong> recibidas y calificación promedio.</li>
+</ul>
+<p>Si iniciás sesión, desde el perfil podés seguir al artista, agregarlo a favoritos o solicitar una conversación. Los contenidos marcados como sensibles aparecen con una advertencia y solo se revelan si habilitaste ese tipo de contenido en <strong>Configuración → Privacidad</strong>.</p>
+
+<figure class="captura-img">
+  <img src="captura 09.png" alt="Captura 09: Perfil público de artista" loading="lazy">
+  <figcaption>Captura 09 — Perfil público de artista</figcaption>
+</figure>
+
+<h3 id="certificado">3.7 Certificado de autenticidad</h3>
+<p>Las piezas únicas pueden tener un <strong>certificado público</strong> que prueba su origen y su historial. Se consulta sin iniciar sesión.</p>
+<ol class="pasos">
+  <li>Abrí el enlace del certificado o escaneá el <strong>código QR</strong> que acompaña a la pieza.</li>
+  <li>La página muestra el código del certificado y los datos de la obra.</li>
+  <li>Verificá que el título, el artista y la fecha coincidan con la pieza que tenés en mano.</li>
+</ol>
+<p>Si el código no existe o la pieza fue dada de baja, la página muestra un mensaje de error en lugar de los datos.</p>
+
+<div class="nota">
+  <strong>Qué garantiza y qué no</strong>
+  El certificado acredita que Temipora registró esa pieza y su historial. No reemplaza un peritaje físico ni una tasación. Para piezas de alto valor, combinalo con una verificación profesional.
+</div>
+
+<figure class="captura-img">
+  <img src="captura 10.png" alt="Captura 10: Certificado público" loading="lazy">
+  <figcaption>Captura 10 — Certificado público</figcaption>
+</figure>
+
+<h3 id="favoritos">3.8 Favoritos</h3>
+<p>Los favoritos permiten guardar artistas, servicios y productos para encontrarlos después. Requieren sesión iniciada.</p>
+<ol class="pasos">
+  <li>Buscá la estrella en una tarjeta, en una ficha o en el perfil del artista.</li>
+  <li>Elegí la estrella para guardar. Se rellena y el aviso confirma la acción.</li>
+  <li>Para quitarlo, volvé a elegir la estrella.</li>
+  <li>Consultá todo desde <span class="ui">Favoritos</span>, con las pestañas <strong>Artistas favoritos</strong> y <strong>Servicios favoritos</strong>.</li>
+</ol>
+<div class="tip">
+  <strong>Los favoritos alimentan las recomendaciones</strong>
+  Lo que guardás y visitás influye en el orden <em>Para vos</em> y en los destacados de <strong>Explorar</strong>.
+</div>
+
+<!-- ============================ PARTE 2 ============================ -->
+<section class="part-cover" id="cliente">
+  <p class="eyebrow">Parte 2</p>
+  <h2>Cliente</h2>
+  <p>Contratar una comisión, comprar una pieza, seguir el pedido, descargar las entregas y dejar tu opinión.</p>
+</section>
+
+<h3 id="solicitar-servicio">4.1 Solicitar un servicio</h3>
+<p>Una <strong>solicitud</strong> es el pedido formal de una comisión. No se paga al enviarla: primero el artista evalúa el pedido y responde con un <strong>presupuesto</strong>.</p>
+
+<h4>Antes de empezar</h4>
+<ul>
+  <li>Tener una cuenta de <strong>Cliente</strong> o <strong>Artista</strong> iniciada.</li>
+  <li>Haber leído la ficha del servicio y sus condiciones.</li>
+  <li>Saber cuántos dibujos querés encargar y qué derechos de uso necesitás.</li>
+</ul>
+
+<h4>Los cinco pasos</h4>
+<ol class="pasos">
+  <li><strong>Términos.</strong> Leé las condiciones del servicio: información general, política de revisiones, cancelaciones, uso del artista, uso del cliente, qué dibuja y qué no dibuja. Marcá la aceptación para continuar.</li>
+  <li><strong>Dibujos y cupos.</strong> Indicá la cantidad de dibujos y, si el servicio lo permite, elegí los derechos de uso adicionales. La pantalla informa cuántos cupos hay y si la solicitud ocupará uno.</li>
+  <li><strong>Formulario.</strong> Completá las preguntas que definió el artista para este servicio. Pueden incluir referencias, personajes, colores, formato y archivos adjuntos.</li>
+  <li><strong>Prioridad.</strong> Este paso solo aparece cuando hay más de un dibujo en la solicitud. Ordená los dibujos según la prioridad en que querés que se trabajen.</li>
+  <li><strong>Revisión.</strong> Revisá el resumen completo y elegí <span class="ui">Enviar solicitud</span>.</li>
+</ol>
+
+<figure class="captura-img">
+  <img src="captura 11.png" alt="Captura 11: Solicitud de servicio" loading="lazy">
+  <figcaption>Captura 11 — Solicitud de servicio</figcaption>
+</figure>
+
+<h4>Reglas de cupos y lista de espera</h4>
+<table>
+  <thead><tr><th>Situación</th><th>Qué pasa</th></tr></thead>
+  <tbody>
+    <tr><td>Hay cupos y el servicio está abierto</td><td>La solicitud se envía y queda pendiente de presupuesto. Una solicitud completa ocupa un solo cupo, aunque tenga varios dibujos.</td></tr>
+    <tr><td>No hay cupos libres</td><td>La solicitud puede enviarse igual; queda pendiente y el artista la presupuestará cuando se libere un cupo.</td></tr>
+    <tr><td>El servicio está en <strong>Solo lista de espera</strong></td><td>Debés aceptar la lista de espera. La solicitud no se promueve automáticamente: el artista decide cuándo tomarla.</td></tr>
+    <tr><td>El servicio está <strong>Cerrado a nuevas solicitudes</strong></td><td>No se puede solicitar. La pantalla lo informa y ofrece ver artistas alternativos.</td></tr>
+    <tr><td>Ya tenés una solicitud activa</td><td>La plataforma impide duplicarla. Podés seguirla desde <strong>Mis solicitudes</strong>.</td></tr>
+  </tbody>
+</table>
+
+<div class="aviso">
+  <strong>La cantidad de dibujos tiene un máximo</strong>
+  Cada servicio define cuántos dibujos admite por solicitud (3 por defecto). El selector no permite superar ese límite.
+</div>
+
+<h4>Artistas alternativos</h4>
+<p>Si el servicio que querés está cerrado o sin cupos, elegí <span class="ui">Ver artistas con cupo</span>. La pantalla muestra propuestas similares de otros artistas, con precio y plazo, para que puedas continuar sin salir del catálogo.</p>
+
+<h3 id="presupuesto">4.2 Recibir un presupuesto y pagar</h3>
+<p>El artista responde a tu solicitud con un presupuesto. La propuesta incluye el precio por dibujo, los hitos de pago, el plazo de entrega y los derechos de uso.</p>
+
+<h4>Qué revisar antes de aceptar</h4>
+<ul>
+  <li><strong>Precio total</strong> y moneda.</li>
+  <li><strong>Hitos:</strong> cuántos pagos hay, qué porcentaje corresponde al primero y cuándo vence cada uno.</li>
+  <li><strong>Plazo de entrega</strong> y fecha estimada de inicio.</li>
+  <li><strong>Derechos de uso</strong> incluidos y recargos por derechos adicionales.</li>
+  <li><strong>Vigencia</strong> del presupuesto: si vence, el artista puede tener que emitir uno nuevo.</li>
+</ul>
+
+<h4>Aceptar y pagar</h4>
+<ol class="pasos">
+  <li>Entrá a <strong>Mis solicitudes</strong> y abrí la solicitud con presupuesto.</li>
+  <li>Revisá el detalle y elegí <span class="ui">Aceptar presupuesto</span>.</li>
+  <li>Elegí <span class="ui">Pagar</span>. La pantalla de pago muestra el monto del hito y el medio disponible.</li>
+  <li>Completá el pago en MercadoPago o, en el entorno simulado, confirmá la operación de prueba.</li>
+  <li>Al volver, la plataforma muestra el resultado y actualiza el estado del pedido.</li>
+</ol>
+
+<figure class="captura-img">
+  <img src="captura 12.png" alt="Captura 12: Presupuesto recibido" loading="lazy">
+  <figcaption>Captura 12 — Presupuesto recibido</figcaption>
+</figure>
+
+<div class="peligro">
+  <strong>No pagues fuera de la plataforma</strong>
+  Los pagos hechos por fuera de Temipora no quedan registrados, no habilitan el seguimiento del pedido y no cuentan para la protección de la compra.
+</div>
+
+<h4>Rechazar un presupuesto</h4>
+<p>Si la propuesta no te sirve, elegí <span class="ui">Rechazar</span> e indicá el motivo si la pantalla lo pide. La solicitud se cierra y el artista recibe la notificación. Podés volver a solicitar el servicio más adelante.</p>
+
+<h3 id="seguir-pedido">4.3 Seguir un pedido</h3>
+<p>Cuando aceptás el presupuesto y pagás el primer hito, la solicitud se convierte en un <strong>pedido</strong>. Desde <strong>Mis pedidos</strong> podés ver todo el avance.</p>
+<table>
+  <thead><tr><th>Zona del pedido</th><th>Qué muestra</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Resumen</strong></td><td>Artista, servicio, cantidad de dibujos, estado general y fechas.</td></tr>
+    <tr><td><strong>Hitos</strong></td><td>Cada etapa de pago, su monto, su vencimiento y si está paga o pendiente.</td></tr>
+    <tr><td><strong>Avances</strong></td><td>Entregas parciales que sube el artista, con archivos y comentarios.</td></tr>
+    <tr><td><strong>Entrega final</strong></td><td>Los archivos definitivos del pedido.</td></tr>
+    <tr><td><strong>Conversación</strong></td><td>Acceso al hilo de mensajes con el artista.</td></tr>
+  </tbody>
+</table>
+
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Mi actividad</span> y elegí <strong>Mis pedidos</strong>.</li>
+  <li>Abrí el pedido para ver el detalle y el estado de cada hito.</li>
+  <li>Cuando el artista sube un avance, revisalo y comentá si hace falta.</li>
+  <li>Al recibir la entrega final, descargá los archivos y confirmá la conformidad si la pantalla lo solicita.</li>
+</ol>
+
+<div class="tip">
+  <strong>Los avances no son la entrega final</strong>
+  Las imágenes de avance sirven para revisar el rumbo del trabajo. Los archivos definitivos, en la calidad acordada, aparecen recién en la entrega final.
+</div>
+
+<figure class="captura-img">
+  <img src="captura 13.png" alt="Captura 13: Detalle de pedido" loading="lazy">
+  <figcaption>Captura 13 — Detalle de pedido</figcaption>
+</figure>
+
+<h3 id="comprar-producto">4.4 Comprar un producto</h3>
+<p>Los productos se compran con un carrito, que agrupa los artículos por artista. Podés comprar productos de distintos artistas, pero cada grupo se paga por separado.</p>
+
+<h4>Agregar al carrito</h4>
+<ol class="pasos">
+  <li>Entrá al catálogo <span class="ui">Productos</span> y abrí una ficha.</li>
+  <li>Revisá las <strong>variantes</strong> disponibles (formato, tamaño, licencia, color) y elegí una.</li>
+  <li>Elegí <span class="ui">Agregar al carrito</span> o <span class="ui">Comprar ahora</span>.</li>
+  <li>Repetí con los productos que quieras. El ícono del carrito muestra la cantidad acumulada.</li>
+</ol>
+
+<h4>Finalizar la compra</h4>
+<ol class="pasos">
+  <li>Abrí el <strong>Carrito</strong>.</li>
+  <li>Si hay artículos de varios artistas, elegí el grupo que querés pagar o revisá el índice general.</li>
+  <li>Verificá cantidades y subtotales. Podés quitar un artículo con <span class="ui">Eliminar</span> o vaciar el carrito completo.</li>
+  <li>Elegí <span class="ui">Continuar</span>.</li>
+  <li>Completá el pago en MercadoPago o en el proveedor simulado.</li>
+  <li>Al terminar, la plataforma abre el <strong>detalle de la compra</strong> con el resultado.</li>
+</ol>
+
+<figure class="captura-img">
+  <img src="captura 14.png" alt="Captura 14: Carrito" loading="lazy">
+  <figcaption>Captura 14 — Carrito</figcaption>
+</figure>
+
+<div class="nota">
+  <strong>Stock y disponibilidad</strong>
+  El carrito vuelve a verificar la disponibilidad antes de cobrar. Si una variante se agotó o cambió de precio, el aviso lo indica y bloquea el pago de ese grupo hasta que lo resuelvas.
+</div>
+
+<h4>Medios de pago</h4>
+<ul>
+  <li><strong>MercadoPago:</strong> checkout externo con retorno a Temipora. Requiere que el artista tenga vinculada su cuenta de cobro.</li>
+  <li><strong>Proveedor simulado:</strong> disponible en entornos de prueba. Permite aprobar o rechazar la operación sin dinero real.</li>
+</ul>
+
+<h3 id="descargas">4.5 Entregas, descargas y certificado</h3>
+<p>Después de una compra o de la entrega final de un pedido, los archivos quedan disponibles en el detalle correspondiente.</p>
+<ul>
+  <li><strong>Mis compras:</strong> cada compra muestra sus productos, el estado del pago y los entregables descargables.</li>
+  <li><strong>Mis pedidos:</strong> la entrega final del pedido reúne los archivos acordados con el artista.</li>
+  <li><strong>Certificado:</strong> si la pieza es única, la ficha y el detalle de compra incluyen el acceso al certificado y su QR.</li>
+</ul>
+<ol class="pasos">
+  <li>Entrá a <strong>Mi actividad → Mis compras</strong> (o <strong>Mis pedidos</strong>).</li>
+  <li>Abrí la operación.</li>
+  <li>Buscá el bloque de <strong>entregables</strong> o <strong>archivos</strong>.</li>
+  <li>Elegí <span class="ui">Descargar</span> en cada archivo.</li>
+</ol>
+<div class="aviso">
+  <strong>Los archivos son privados</strong>
+  Los originales y entregables no son públicos: se sirven mediante enlaces controlados. No compartas esos enlaces si la licencia no lo permite.
+</div>
+
+<h3 id="revender">4.6 Revender una pieza única</h3>
+<p>Si compraste una pieza única y querés transferirla, podés publicarla en reventa.</p>
+<ol class="pasos">
+  <li>Entrá a <strong>Mi actividad → Reventa</strong>.</li>
+  <li>Elegí la pieza que querés revender.</li>
+  <li>Definí el precio y las condiciones de la publicación.</li>
+  <li>Revisá y publicá.</li>
+</ol>
+<p>La reventa aparece en el catálogo público con la trazabilidad de la obra y su certificado. Podés pausarla o retirarla desde la misma sección.</p>
+
+<h3 id="mensajeria">4.7 Mensajería</h3>
+<p>La mensajería permite coordinar detalles antes de contratar y durante el pedido. Es privada y funciona en tiempo real.</p>
+<h4>Iniciar una conversación</h4>
+<ol class="pasos">
+  <li>Abrí el perfil del artista o la ficha del servicio.</li>
+  <li>Elegí <span class="ui">Enviar mensaje</span> o <span class="ui">Solicitar contacto</span>.</li>
+  <li>Escribí el primer mensaje y confirmá la solicitud.</li>
+  <li>Cuando el artista acepta, se habilita el hilo de conversación.</li>
+</ol>
+<h4>Durante la conversación</h4>
+<ul>
+  <li>Los mensajes aparecen al instante, sin recargar la página.</li>
+  <li>El indicador de escritura muestra cuándo la otra persona está redactando.</li>
+  <li>El historial queda disponible en <span class="ui">Mensajes</span>.</li>
+  <li>Las notificaciones avisan de mensajes nuevos cuando no estás en el hilo.</li>
+</ul>
+<div class="nota">
+  <strong>Reglas de contacto</strong>
+  La configuración de mensajería del administrador puede exigir una solicitud previa antes de habilitar el chat. Si la opción no aparece, es posible que el artista haya restringido el contacto directo.
+</div>
+
+<h3 id="resenias">4.8 Reseñas</h3>
+<p>Las reseñas construyen la reputación de los artistas y ayudan a otros clientes a decidir. Se habilitan cuando existe una operación concreta: una compra o un pedido entregado.</p>
+<h4>Dejar una reseña</h4>
+<ol class="pasos">
+  <li>Entrá al detalle de la compra o del pedido entregado.</li>
+  <li>Elegí <span class="ui">Dejar reseña</span>.</li>
+  <li>Asigná una calificación y escribí tu comentario.</li>
+  <li>Confirmá el envío.</li>
+</ol>
+<h4>Modificar o eliminar</h4>
+<ul>
+  <li>Podés editar tu reseña desde el mismo lugar donde la creaste.</li>
+  <li>Podés eliminarla mientras la plataforma lo permita según el estado de la operación.</li>
+  <li>Las reseñas pueden ser <strong>reportadas</strong> por otros usuarios. Un administrador las revisa y decide si corresponde sancionarlas o retirarlas.</li>
+</ul>
+<div class="aviso">
+  <strong>Una reseña por operación</strong>
+  Cada compra o pedido habilita una sola reseña. Si intentás crear otra, la plataforma te ofrece modificar la existente.
+</div>
+
+<h3 id="notificaciones">4.9 Notificaciones y ofertas</h3>
+<p>La campana del encabezado reúne los avisos del sistema: cambios de estado de solicitudes y pedidos, mensajes, resoluciones de moderación y promociones.</p>
+<ul>
+  <li><strong>Notificaciones:</strong> listado completo con estado de lectura. Se pueden marcar como leídas.</li>
+  <li><strong>Ofertas para vos:</strong> descuentos y promociones personalizadas. Algunas llegan por correo con un enlace directo.</li>
+  <li><strong>Campañas de reactivación:</strong> si pasaste tiempo sin entrar, podés recibir una oferta con vencimiento.</li>
+</ul>
+
+<h3 id="configuracion">4.10 Configuración de la cuenta</h3>
+<p>La configuración se abre desde el menú de usuario y se organiza en cinco secciones.</p>
+
+<h4>Perfil</h4>
+<ul>
+  <li>Foto, nombre, apellido, biografía y datos públicos.</li>
+  <li>Nombre de usuario y correo, con las mismas validaciones del registro.</li>
+  <li>Preferencias de visualización del perfil público.</li>
+</ul>
+
+<h4>Apariencia</h4>
+<p>Permite elegir entre los cuatro temas de Temipora: <strong>Amanecer</strong>, <strong>Medianoche</strong>, <strong>Cielo</strong> y <strong>Océano</strong>. El cambio se aplica al instante y se guarda en el navegador.</p>
+
+<h4>Privacidad</h4>
+<ul>
+  <li>Qué datos del perfil se muestran públicamente.</li>
+  <li>Preferencia sobre <strong>contenido sensible</strong>: si está desactivada, las imágenes sensibles aparecen desenfocadas con una advertencia.</li>
+  <li>Control de quién puede iniciar una conversación.</li>
+</ul>
+
+<h4>Cuenta y seguridad</h4>
+<ul>
+  <li><strong>Cambiar contraseña:</strong> pide la actual y la nueva, con la misma regla de mayúscula y número.</li>
+  <li><strong>Teléfono:</strong> se carga con validación de formato y confirmación.</li>
+  <li><strong>Darse de baja:</strong> desactiva la cuenta. Durante el plazo indicado podés reactivarla desde el inicio de sesión.</li>
+</ul>
+
+<h4>Pagos y cobros</h4>
+<ul>
+  <li>Vinculación de la cuenta de MercadoPago para artistas que quieren cobrar.</li>
+  <li>Estado de la vinculación y posibilidad de desvincular.</li>
+  <li>Historial de operaciones y liquidaciones, cuando corresponda.</li>
+</ul>
+
+<figure class="captura-img">
+  <img src="captura 15.png" alt="Captura 15: Configuración" loading="lazy">
+  <figcaption>Captura 15 — Configuración</figcaption>
+</figure>
+
+<!-- ============================ PARTE 3 ============================ -->
+<section class="part-cover" id="artista">
+  <p class="eyebrow">Parte 3</p>
+  <h2>Artista</h2>
+  <p>Publicar servicios y productos, responder solicitudes, gestionar pedidos, cobrar y hacer crecer tu portfolio.</p>
+</section>
+
+<h3 id="panel-artista">5.1 El panel del artista</h3>
+<p>El <strong>panel del artista</strong> es el centro de operaciones de tu actividad. Se abre desde <span class="ui">Panel</span> en el encabezado y tiene una barra lateral con las secciones de trabajo.</p>
+<table>
+  <thead><tr><th>Sección</th><th>Para qué sirve</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Resumen</strong></td><td>Métricas generales, pedidos activos y tareas pendientes.</td></tr>
+    <tr><td><strong>Servicios</strong></td><td>Alta, edición y baja lógica de servicios; solicitudes por servicio.</td></tr>
+    <tr><td><strong>Productos</strong></td><td>Borradores, publicación, variantes, stock y entregables.</td></tr>
+    <tr><td><strong>Solicitudes</strong></td><td>Bandeja de pedidos entrantes y envío de presupuestos.</td></tr>
+    <tr><td><strong>Pedidos</strong></td><td>Trabajos en curso, avances y entregas.</td></tr>
+    <tr><td><strong>Ventas</strong></td><td>Historial de ventas, liquidaciones y comisiones.</td></tr>
+    <tr><td><strong>Mensajes</strong></td><td>Conversaciones con clientes.</td></tr>
+    <tr><td><strong>Portfolio</strong></td><td>Carga y edición de obras.</td></tr>
+    <tr><td><strong>Configuración de servicios</strong></td><td>Formulario de pedidos, términos y etiquetas.</td></tr>
+  </tbody>
+</table>
+
+<figure class="captura-img">
+  <img src="captura 16.png" alt="Captura 16: Panel del artista" loading="lazy">
+  <figcaption>Captura 16 — Panel del artista</figcaption>
+</figure>
+
+<h3 id="publicar-servicio">5.2 Publicar un servicio</h3>
+<p>Un servicio describe qué ofrecés, cuánto cuesta, en qué plazo y con qué condiciones. Se crea en seis pasos y queda publicado al terminar el último.</p>
+
+<h4>Antes de empezar</h4>
+<ul>
+  <li>Tener el rol de artista.</li>
+  <li>Una imagen de portada y, si querés, imágenes de ejemplo.</li>
+  <li>Definir precio base, moneda, cupos y plazo de entrega.</li>
+  <li>Decidir si usás tu formulario y tus términos globales o unos propios para este servicio.</li>
+</ul>
+
+<h4>Paso 1 — Datos</h4>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Panel → Servicios</span> y elegí <span class="ui">Crear servicio</span>.</li>
+  <li>Escribí el <strong>Nombre</strong> del servicio.</li>
+  <li>Elegí el <strong>Tipo de servicio</strong> y el <strong>Medio</strong>.</li>
+  <li>Redactá una <strong>Descripción</strong> clara de lo que incluye.</li>
+  <li>Definí el <strong>Precio base</strong> y la <strong>Moneda</strong>. El precio base es por dibujo.</li>
+  <li>Indicá si el servicio incluye <strong>contenido sensible</strong> y de qué tipo: violencia, desnudos o contenido sensible general.</li>
+  <li>Elegí <span class="ui">Siguiente</span>.</li>
+</ol>
+
+<h4>Paso 2 — Entrega</h4>
+<ol class="pasos">
+  <li>Definí el <strong>Tiempo de entrega</strong> en días, semanas o meses.</li>
+  <li>Indicá la cantidad de <strong>Cupos</strong> disponibles (máximo 10).</li>
+  <li>Elegí el <strong>Modo de recepción</strong>: <em>Abierta a solicitudes</em>, <em>Solo lista de espera</em> o <em>Cerrada a nuevas solicitudes</em>.</li>
+  <li>Definí cuántos <strong>dibujos por solicitud</strong> aceptás (máximo 50).</li>
+  <li>Agregá <strong>Etiquetas</strong> para que el servicio se encuentre en el catálogo.</li>
+  <li>Elegí <span class="ui">Siguiente</span>.</li>
+</ol>
+
+<table>
+  <caption>Modos de recepción y su efecto</caption>
+  <thead><tr><th>Modo</th><th>Qué ve el cliente</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Abierta a solicitudes</strong></td><td>Puede solicitar mientras haya cupos. Si no hay, la solicitud queda pendiente.</td></tr>
+    <tr><td><strong>Solo lista de espera</strong></td><td>Puede anotarse aceptando la lista de espera. La solicitud no se promueve sola.</td></tr>
+    <tr><td><strong>Cerrada a nuevas solicitudes</strong></td><td>No puede solicitar; se le ofrecen artistas alternativos.</td></tr>
+  </tbody>
+</table>
+
+<h4>Paso 3 — Imágenes</h4>
+<ol class="pasos">
+  <li>Subí una <strong>portada</strong> atractiva. Es la imagen que se ve en el catálogo.</li>
+  <li>Agregá imágenes de ejemplo para mostrar tu estilo.</li>
+  <li>Reordená las imágenes arrastrándolas, si la pantalla lo permite.</li>
+  <li>Elegí <span class="ui">Siguiente</span>.</li>
+</ol>
+
+<h4>Paso 4 — Formulario</h4>
+<p>Decidí si el servicio usa tu <strong>formulario global</strong> o un formulario propio. Si elegís uno propio, vas a poder agregar, modificar y eliminar preguntas. Podés previsualizar el formulario antes de continuar.</p>
+
+<h4>Paso 5 — Términos</h4>
+<p>Elegí entre tus <strong>términos globales</strong> o condiciones específicas para este servicio. El editor cubre información general, política de revisiones, cancelaciones, uso del artista, uso del cliente, qué dibujás, qué no dibujás y pagos extra.</p>
+
+<h4>Paso 6 — Revisión</h4>
+<ol class="pasos">
+  <li>Revisá todos los datos, las imágenes, el formulario y los términos.</li>
+  <li>Si algo está incompleto, volvé al paso correspondiente con <span class="ui">Atrás</span>.</li>
+  <li>Elegí <span class="ui">Publicar servicio</span>.</li>
+</ol>
+
+<figure class="captura-img">
+  <img src="captura 17.png" alt="Captura 17: Alta de servicio" loading="lazy">
+  <figcaption>Captura 17 — Alta de servicio</figcaption>
+</figure>
+
+<div class="tip">
+  <strong>Pausar en lugar de archivar</strong>
+  Si necesitás dejar de recibir solicitudes por un tiempo, usá <span class="ui">Pausar</span>. El servicio conserva toda su configuración y podés reactivarlo con un clic. Archivar es para servicios que no vas a volver a ofrecer.
+</div>
+
+<h4>Modificar o dar de baja un servicio</h4>
+<ul>
+  <li><strong>Modificar:</strong> abrí el servicio desde <strong>Mis servicios</strong> y elegí <span class="ui">Editar</span>. Cualquier cambio se refleja en el catálogo.</li>
+  <li><strong>Pausar:</strong> deja de recibir solicitudes sin perder la configuración. Se reactiva cuando quieras.</li>
+  <li><strong>Archivar:</strong> retira el servicio del catálogo y conserva el historial de pedidos y solicitudes. Si hay pedidos en curso, la plataforma puede bloquear el archivado hasta que se cierren.</li>
+</ul>
+
+<h3 id="formulario-global">5.3 Formulario de pedidos global</h3>
+<p>El formulario global es el conjunto de preguntas que se le hace al cliente cuando solicita cualquiera de tus servicios, salvo que un servicio tenga un formulario propio.</p>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Panel → Ajustes → Formulario de pedidos</span>.</li>
+  <li>Revisá las preguntas existentes o elegí <span class="ui">Agregar campo</span>.</li>
+  <li>Definí el <strong>tipo de campo</strong>, el <strong>texto de la pregunta</strong>, si es obligatorio y las opciones, cuando corresponda.</li>
+  <li>Guardá los cambios.</li>
+</ol>
+<h4>Qué podés hacer con los campos</h4>
+<table>
+  <thead><tr><th>Acción</th><th>Cómo</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Agregar</strong></td><td><span class="ui">Agregar campo</span>, completar la definición y guardar.</td></tr>
+    <tr><td><strong>Modificar</strong></td><td>Editar el campo y guardar. Los pedidos ya enviados conservan las respuestas originales.</td></tr>
+    <tr><td><strong>Eliminar</strong></td><td>Eliminar el campo y confirmar. No afecta los pedidos existentes.</td></tr>
+    <tr><td><strong>Reordenar</strong></td><td>Arrastrar los campos en el orden en que querés que aparezcan.</td></tr>
+  </tbody>
+</table>
+<div class="aviso">
+  <strong>Previsualizá antes de guardar</strong>
+  Usá la vista previa para comprobar cómo se ve el formulario para el cliente. Un campo mal redactado genera solicitudes incompletas.
+</div>
+
+<h3 id="terminos-artista">5.4 Términos y condiciones globales</h3>
+<p>Los términos globales definen las reglas de tus comisiones y se muestran al cliente antes de enviar una solicitud.</p>
+<table>
+  <thead><tr><th>Sección</th><th>Qué conviene escribir</th></tr></thead>
+  <tbody>
+    <tr><td>Información general</td><td>Qué ofrecés, qué incluye el precio y qué no.</td></tr>
+    <tr><td>Política de revisiones</td><td>Cuántas rondas de cambios incluye y qué se considera un cambio mayor.</td></tr>
+    <tr><td>Política de cancelaciones</td><td>Qué pasa si el cliente cancela y cómo se reintegra lo pagado.</td></tr>
+    <tr><td>Uso del artista</td><td>Si podés publicar la obra en tu portfolio o vender copias.</td></tr>
+    <tr><td>Uso del cliente</td><td>Para qué puede usar la obra el cliente.</td></tr>
+    <tr><td>Qué dibujás</td><td>Temas, estilos y formatos que aceptás.</td></tr>
+    <tr><td>Qué no dibujás</td><td>Temas excluidos, para evitar solicitudes que no vas a aceptar.</td></tr>
+    <tr><td>Pagos extra</td><td>Recargos por complejidad, urgencias o derechos adicionales.</td></tr>
+  </tbody>
+</table>
+<p>Si un servicio necesita condiciones distintas, podés crear términos propios al publicarlo. Los términos globales se reutilizan como base y podés editarlos desde <span class="ui">Panel → Ajustes → Términos y condiciones</span>.</p>
+
+<div class="nota">
+  <strong>Coherencia</strong>
+  El cliente acepta los términos del servicio al enviar la solicitud. Si cambiás los términos globales, los servicios que usan la versión global toman la versión nueva; los que tienen términos propios no se modifican.
+</div>
+
+<h3 id="etiquetas-artista">5.5 Etiquetas</h3>
+<p>Las etiquetas ayudan a que tus servicios y productos aparezcan en las búsquedas. Algunas las crea el administrador y otras las podés proponer.</p>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Panel → Ajustes → Mis etiquetas</span>.</li>
+  <li>Consultá el estado de tus etiquetas: aprobadas, pendientes o rechazadas.</li>
+  <li>Para proponer una nueva, elegí <span class="ui">Proponer etiqueta</span>, escribí el nombre y la categoría, y confirmá.</li>
+  <li>Si una etiqueta fue rechazada, revisá el motivo y elegí <span class="ui">Volver a solicitar</span> cuando corresponda.</li>
+</ol>
+<div class="aviso">
+  <strong>Las etiquetas no se publican solas</strong>
+  Una etiqueta propuesta queda pendiente hasta que un administrador la evalúe. Mientras esté pendiente, no aparece en los filtros públicos.
+</div>
+
+<h3 id="portfolio">5.6 Portfolio</h3>
+<p>El portfolio es tu vidriera de obras. Cada imagen puede llevar materiales, medios, etiquetas y una marca de contenido sensible.</p>
+<h4>Cargar una obra</h4>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Panel → Portfolio</span>.</li>
+  <li>Elegí las imágenes o arrastralas al área de carga.</li>
+  <li>Completá el título, la descripción y los datos de la obra.</li>
+  <li>Seleccioná materiales, medios y etiquetas.</li>
+  <li>Indicá si contiene contenido sensible.</li>
+  <li>Definí la visibilidad: pública o solo visible para vos.</li>
+  <li>Publicá la obra.</li>
+</ol>
+<h4>Editar, ordenar y eliminar</h4>
+<ul>
+  <li>Podés modificar los datos de cada obra sin volver a subir la imagen.</li>
+  <li>El orden del portfolio se puede ajustar arrastrando las obras.</li>
+  <li>La baja de una imagen es definitiva para el portfolio, pero no afecta los pedidos ni los certificados ya emitidos.</li>
+</ul>
+<div class="nota">
+  <strong>Piezas verificadas</strong>
+  Cuando una obra se origina en un pedido entregado, la plataforma puede publicarla como <strong>pieza verificada</strong>. Esa marca la distingue de una imagen cargada manualmente y la vincula a su certificado.
+</div>
+
+<h3 id="publicar-producto">5.7 Crear y publicar un producto</h3>
+<p>Los productos son piezas listas para vender, sean digitales o físicas. Se crean en cuatro pasos y admiten guardado como borrador.</p>
+
+<h4>Paso 1 — Detalles</h4>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Panel → Productos</span> y elegí <span class="ui">Crear producto</span>.</li>
+  <li>Escribí el <strong>Título</strong> y la <strong>Descripción</strong>.</li>
+  <li>Elegí el <strong>Tipo de producto</strong> y el <strong>Medio</strong>.</li>
+  <li>Subí las imágenes: una portada y las vistas adicionales. Se admiten hasta 60 imágenes por producto.</li>
+  <li>Agregá <strong>Etiquetas</strong> y marcá el contenido sensible si corresponde.</li>
+  <li>Elegí <span class="ui">Siguiente</span>.</li>
+</ol>
+
+<h4>Paso 2 — Precio y stock</h4>
+<ol class="pasos">
+  <li>Elegí la <strong>Moneda</strong> de la publicación.</li>
+  <li>Creá las <strong>variantes</strong> que necesites: nombre, precio, stock e imagen.</li>
+  <li>Definí si el stock es limitado o ilimitado.</li>
+  <li>Revisá la <strong>liquidación estimada</strong>: la pantalla muestra cuánto recibís después de la comisión y el arancel de MercadoPago.</li>
+  <li>Elegí <span class="ui">Siguiente</span>.</li>
+</ol>
+
+<h4>Paso 3 — Licencia y reventa</h4>
+<ul>
+  <li><strong>Derechos de uso</strong> incluidos en la venta.</li>
+  <li>Si se permiten <strong>modificaciones</strong> de la obra.</li>
+  <li>Si se requiere <strong>crédito</strong> al artista.</li>
+  <li>Texto adicional de licencia.</li>
+  <li>Si la pieza es única y se permite su <strong>reventa</strong>.</li>
+</ul>
+
+<h4>Paso 4 — Revisión</h4>
+<ol class="pasos">
+  <li>Revisá el resumen completo.</li>
+  <li>Elegí <span class="ui">Guardar borrador</span> si todavía no querés publicarlo, o <span class="ui">Publicar producto</span>.</li>
+</ol>
+
+<figure class="captura-img">
+  <img src="captura 18.png" alt="Captura 18: Alta de producto" loading="lazy">
+  <figcaption>Captura 18 — Alta de producto</figcaption>
+</figure>
+
+<h4>Estados del producto</h4>
+<table>
+  <thead><tr><th>Estado</th><th>Qué implica</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Borrador</strong></td><td>Solo lo ves vos. No aparece en el catálogo.</td></tr>
+    <tr><td><strong>Disponible</strong></td><td>Publicado, visible y comprable según stock.</td></tr>
+    <tr><td><strong>Pausado</strong></td><td>Deja de venderse temporalmente, sin perder la configuración.</td></tr>
+    <tr><td><strong>Archivado</strong></td><td>Se retira del catálogo y conserva el historial de ventas.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="gestion-solicitudes">5.8 Solicitudes y presupuestos</h3>
+<p>Las solicitudes entrantes se concentran en <span class="ui">Panel → Solicitudes</span>. Desde ahí podés revisar el pedido, conversar con el cliente, aceptarlo o rechazarlo, y enviar un presupuesto.</p>
+
+<h4>Revisar una solicitud</h4>
+<ol class="pasos">
+  <li>Filtrá la bandeja por estado: pendientes, en lista de espera, presupuestadas o cerradas.</li>
+  <li>Abrí la solicitud para ver el formulario respondido, las referencias adjuntas y el historial.</li>
+  <li>Si necesitás aclarar algo, abrí la conversación con el cliente.</li>
+</ol>
+
+<h4>Enviar un presupuesto</h4>
+<ol class="pasos">
+  <li>En la solicitud, elegí <span class="ui">Enviar presupuesto</span>.</li>
+  <li><strong>Entrega:</strong> definí el plazo y la fecha estimada de inicio.</li>
+  <li><strong>Dibujos:</strong> asigná el precio de cada dibujo y los derechos de uso incluidos.</li>
+  <li><strong>Hitos:</strong> dividí el pago en etapas. El primer hito no puede superar el 50 % del total y el presupuesto admite hasta 4 hitos.</li>
+  <li><strong>Resumen:</strong> revisá el total, la comisión y la vigencia. El presupuesto vence a las 72 horas por defecto.</li>
+  <li>Elegí <span class="ui">Enviar presupuesto</span>.</li>
+</ol>
+
+<div class="aviso">
+  <strong>Un presupuesto por solicitud</strong>
+  Mientras el presupuesto esté vigente no podés enviar otro. Si el cliente lo rechaza o vence, la solicitud vuelve a estar disponible para presupuestar.
+</div>
+
+<h4>Aceptar o rechazar una solicitud</h4>
+<ul>
+  <li><strong>Aceptar:</strong> confirma que vas a tomar el trabajo y habilita el envío del presupuesto.</li>
+  <li><strong>Rechazar:</strong> cierra la solicitud e informa al cliente. Si indicás un motivo, el cliente lo ve.</li>
+  <li><strong>Lista de espera:</strong> las solicitudes en espera no ocupan cupo hasta que las promovés.</li>
+</ul>
+
+<figure class="captura-img">
+  <img src="captura 19.png" alt="Captura 19: Envío de presupuesto" loading="lazy">
+  <figcaption>Captura 19 — Envío de presupuesto</figcaption>
+</figure>
+
+<h3 id="gestion-pedidos">5.9 Gestionar pedidos</h3>
+<p>Un pedido es un trabajo aceptado y pagado. Desde <span class="ui">Panel → Pedidos</span> administrás el avance y las entregas.</p>
+<ol class="pasos">
+  <li>Abrí el pedido en curso.</li>
+  <li>Revisá el estado de los hitos y si el cliente ya pagó el anticipo.</li>
+  <li>Subí un <strong>avance</strong> cuando tengas algo para mostrar: archivo, comentario y etapa.</li>
+  <li>Esperá la conformidad del cliente o respondé sus observaciones.</li>
+  <li>Al terminar, subí la <strong>entrega final</strong> con los archivos definitivos.</li>
+  <li>Si corresponde, publicá la obra en tu portfolio como <strong>pieza verificada</strong>.</li>
+</ol>
+
+<table>
+  <thead><tr><th>Acción</th><th>Efecto</th></tr></thead>
+  <tbody>
+    <tr><td>Subir avance</td><td>Notifica al cliente y deja registro de la etapa.</td></tr>
+    <tr><td>Subir entrega final</td><td>Habilita la descarga definitiva y el cierre del pedido.</td></tr>
+    <tr><td>Publicar como verificada</td><td>Vincula la obra al pedido y a su certificado.</td></tr>
+    <tr><td>Cancelar</td><td>Requiere acuerdo con el cliente y sigue la política de cancelación de los términos.</td></tr>
+  </tbody>
+</table>
+
+<div class="tip">
+  <strong>Comunicación temprana</strong>
+  Si una entrega se va a atrasar, avisá por mensajería antes de que venza el plazo. La mayoría de los conflictos se evitan con un aviso a tiempo.
+</div>
+
+<h3 id="ventas-informes">5.10 Ventas e informes</h3>
+<p>En <span class="ui">Panel → Ventas</span> ves el historial de operaciones: productos vendidos, pedidos cobrados, comisiones y liquidaciones.</p>
+<ul>
+  <li><strong>Ventas:</strong> detalle por operación, con fecha, comprador, monto y estado.</li>
+  <li><strong>Liquidaciones:</strong> cuánto corresponde al artista después de la comisión de la plataforma y los aranceles.</li>
+  <li><strong>Informe de ventas:</strong> reporte descargable en PDF con el período seleccionado.</li>
+</ul>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Panel → Ventas</span>.</li>
+  <li>Elegí el período.</li>
+  <li>Revisá los totales y el detalle.</li>
+  <li>Elegí <span class="ui">Descargar PDF</span> para guardar el informe.</li>
+</ol>
+
+<div class="nota">
+  <strong>Comisión de la plataforma</strong>
+  El porcentaje de comisión lo define el administrador y se muestra en el detalle de cada venta. Si cambia, no se recalcula el historial: cada operación conserva la comisión vigente al momento del cobro.
+</div>
+
+<h3 id="cobros">5.11 Cobros con MercadoPago</h3>
+<p>Para cobrar con MercadoPago, el artista debe vincular su cuenta mediante OAuth. Sin vinculación, los pagos se procesan con el proveedor simulado del entorno de prueba.</p>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Configuración → Pagos y cobros</span>.</li>
+  <li>Elegí <span class="ui">Vincular MercadoPago</span>.</li>
+  <li>Ingresá con tu cuenta de MercadoPago y autorizá a Temipora.</li>
+  <li>Al volver, verificá que el estado figure como vinculado.</li>
+</ol>
+<h4>Desvincular</h4>
+<p>Si desvinculás la cuenta, las ventas nuevas dejan de poder cobrarse por MercadoPago. Las operaciones ya realizadas conservan su historial. Podés volver a vincular cuando quieras.</p>
+
+<div class="peligro">
+  <strong>Datos de cobro</strong>
+  Temipora no almacena tu usuario ni tu contraseña de MercadoPago. Solo conserva el token de autorización, cifrado, para operar en tu nombre.
+</div>
+
+<!-- ============================ PARTE 4 ============================ -->
+<section class="part-cover" id="admin">
+  <p class="eyebrow">Parte 4</p>
+  <h2>Administrador</h2>
+  <p>Gestionar usuarios, catálogos, configuración, moderación, informes y la trazabilidad de la plataforma.</p>
+</section>
+
+<h3 id="admin-resumen">6.1 Acceso y resumen</h3>
+<p>El panel de administración se abre en <code>/admin</code> y requiere una cuenta con rol <code>ADMIN</code>. Al ingresar, el administrador llega al <strong>Resumen de administración</strong>.</p>
+<ul>
+  <li><strong>Indicadores generales:</strong> usuarios, pedidos, ventas y actividad reciente.</li>
+  <li><strong>Alertas operativas:</strong> situaciones que requieren atención, como reportes pendientes o lotes de anclaje sin sellar.</li>
+  <li><strong>Accesos rápidos</strong> a las secciones de uso frecuente.</li>
+</ul>
+<p>La barra lateral agrupa las secciones por áreas: <strong>Resumen</strong> e <strong>Informes</strong>; <strong>Comunidad</strong>, con usuarios, reseñas, moderación, sanciones y bajas de cuenta; <strong>Catálogo</strong>, con tipos de producto, tipos de servicio, servicios archivados, arte, etiquetas y categorías; y las secciones de <strong>Auditoría</strong> y configuración.</p>
+
+<figure class="captura-img">
+  <img src="captura 20.png" alt="Captura 20: Panel de administración" loading="lazy">
+  <figcaption>Captura 20 — Panel de administración</figcaption>
+</figure>
+
+<h3 id="admin-usuarios">6.2 Usuarios y sanciones</h3>
+<h4>Consultar usuarios</h4>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Usuarios registrados</span>.</li>
+  <li>Buscá por nombre de usuario, correo o rol.</li>
+  <li>Abrí el detalle para ver el perfil, el historial de actividad y el estado de la cuenta.</li>
+</ol>
+<h4>Sancionar una cuenta</h4>
+<ol class="pasos">
+  <li>En el detalle del usuario, elegí <span class="ui">Sancionar</span>.</li>
+  <li>Indicá el motivo y la duración o el tipo de sanción.</li>
+  <li>Confirmá. El usuario recibe el aviso al intentar ingresar.</li>
+</ol>
+<h4>Dar de baja una cuenta</h4>
+<p>La baja administrativa desactiva la cuenta y deja un plazo de reactivación. El usuario puede reactivarla desde el inicio de sesión si el plazo sigue vigente. La configuración de bajas define ese plazo y el contacto de soporte.</p>
+
+<div class="aviso">
+  <strong>Las sanciones quedan auditadas</strong>
+  Toda sanción, baja o cambio de rol genera un registro en <strong>Auditoría</strong> con el administrador responsable y los datos modificados.
+</div>
+
+<h3 id="admin-catalogos">6.3 Catálogos maestros</h3>
+<p>Los catálogos maestros alimentan los formularios de toda la plataforma. Un valor dado de baja deja de ofrecerse, pero no borra los registros históricos que lo usan.</p>
+<table>
+  <thead><tr><th>Catálogo</th><th>Qué controla</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Tipos de producto</strong></td><td>Clasificación del catálogo de productos.</td></tr>
+    <tr><td><strong>Tipos de servicio</strong></td><td>Clasificación de los servicios a medida.</td></tr>
+    <tr><td><strong>Etiquetas</strong></td><td>Palabras clave para búsqueda y filtros. Incluye la aprobación de propuestas de artistas.</td></tr>
+    <tr><td><strong>Categorías de etiquetas</strong></td><td>Agrupación de etiquetas para el filtro del catálogo.</td></tr>
+    <tr><td><strong>Medios</strong></td><td>Técnica o soporte de la obra.</td></tr>
+    <tr><td><strong>Tipos de arte</strong></td><td>Clasificación artística general.</td></tr>
+    <tr><td><strong>Materiales</strong></td><td>Materiales usados en las obras del portfolio.</td></tr>
+    <tr><td><strong>Países</strong></td><td>Países disponibles para direcciones y perfiles.</td></tr>
+    <tr><td><strong>Monedas</strong></td><td>Monedas habilitadas para publicar precios.</td></tr>
+  </tbody>
+</table>
+<h4>Alta, modificación y baja</h4>
+<ol class="pasos">
+  <li>Entrá a la sección del catálogo.</li>
+  <li>Elegí <span class="ui">Nuevo</span> o <span class="ui">Agregar</span>.</li>
+  <li>Completá el nombre y los datos que pida el formulario.</li>
+  <li>Guardá. El valor queda disponible de inmediato en los formularios.</li>
+  <li>Para modificar, abrí el registro y elegí <span class="ui">Editar</span>.</li>
+  <li>Para dar de baja, elegí <span class="ui">Dar de baja</span> y confirmá.</li>
+</ol>
+
+<div class="nota">
+  <strong>Baja lógica</strong>
+  Ningún catálogo se borra físicamente. La baja lo oculta de las opciones nuevas pero conserva la integridad de los datos históricos.
+</div>
+
+<h4>Evaluar etiquetas propuestas</h4>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Etiquetas</span> y filtrá por estado <em>pendiente</em>.</li>
+  <li>Revisá el nombre, la categoría y el artista que la propuso.</li>
+  <li>Elegí <span class="ui">Aprobar</span> o <span class="ui">Rechazar</span>. Si rechazás, escribí el motivo para que el artista pueda corregirla.</li>
+</ol>
+
+<h3 id="admin-operacion">6.4 Operación</h3>
+<table>
+  <thead><tr><th>Sección</th><th>Qué configura</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Comisión Temipora</strong></td><td>Porcentaje que retiene la plataforma en cada venta.</td></tr>
+    <tr><td><strong>Presupuestos</strong></td><td>Reglas de vigencia, cantidad de hitos y límites de anticipo.</td></tr>
+    <tr><td><strong>Hitos y pedidos</strong></td><td>Etapas, porcentajes y condiciones de los pedidos.</td></tr>
+    <tr><td><strong>Sustituciones de artistas</strong></td><td>Reemplazo de un artista en un pedido en curso, con acuerdo del cliente.</td></tr>
+    <tr><td><strong>Servicios archivados</strong></td><td>Consulta de servicios retirados y su historial.</td></tr>
+    <tr><td><strong>Mensajería</strong></td><td>Reglas de solicitud de contacto y límites de conversación.</td></tr>
+    <tr><td><strong>Bajas de cuenta</strong></td><td>Plazo de reactivación y contacto de soporte.</td></tr>
+    <tr><td><strong>Cotización de monedas</strong></td><td>Actualización del tipo de cambio usado para mostrar precios.</td></tr>
+  </tbody>
+</table>
+<p>Cada cambio se guarda al confirmar y afecta las operaciones nuevas. Las operaciones ya cerradas conservan las condiciones con las que se realizaron.</p>
+
+<h3 id="admin-promociones">6.5 Promociones</h3>
+<p>Las promociones permiten reactivar usuarios inactivos y ofrecer descuentos.</p>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Campañas → Promociones</span>.</li>
+  <li>Elegí <span class="ui">Nueva promoción</span>.</li>
+  <li>Definí el segmento: usuarios inactivos, nuevos o un grupo específico.</li>
+  <li>Indicá el beneficio: porcentaje de descuento, monto o condición.</li>
+  <li>Definí la vigencia y el canal de envío.</li>
+  <li>Revisá y activá la campaña.</li>
+</ol>
+<div class="nota">
+  <strong>El envío puede ser automático</strong>
+  Si la reactivación programada está habilitada, el sistema envía las promociones de reactivación de forma diaria. Podés desactivarla desde la configuración del sistema.
+</div>
+
+<h3 id="admin-resenias">6.6 Moderación de reseñas</h3>
+<ul>
+  <li><strong>Reportadas:</strong> reseñas que otros usuarios marcaron como problemáticas. Podés aprobarlas, ocultarlas o sancionar al autor.</li>
+  <li><strong>Historial de reportes:</strong> todos los reportes, resueltos o no, con su resolución.</li>
+  <li><strong>Criterios de evaluación:</strong> pautas que se muestran a los usuarios al reseñar.</li>
+  <li><strong>Configuración de reseñas:</strong> cuándo se habilita una reseña y qué restricciones se aplican.</li>
+</ul>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Moderación de reseñas</span>.</li>
+  <li>Abrí un reporte y leé el comentario, el motivo y el historial del autor.</li>
+  <li>Elegí una resolución y agregá una nota interna.</li>
+  <li>Confirmá. El autor y el reportante reciben la notificación correspondiente.</li>
+</ol>
+
+<h3 id="admin-terminos">6.7 Términos de la plataforma</h3>
+<p>Los términos de la plataforma son el documento legal que aceptan todos los usuarios. Están versionados: cada cambio genera una versión nueva y obliga a aceptarla en el próximo ingreso.</p>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Configuración → Términos de la plataforma</span>.</li>
+  <li>Editá el contenido en el editor.</li>
+  <li>Revisá la vista previa.</li>
+  <li>Elegí <span class="ui">Publicar nueva versión</span>.</li>
+</ol>
+<div class="aviso">
+  <strong>Una versión publicada no se edita</strong>
+  Para corregir un error, publicá una versión nueva. Así queda registro de qué texto aceptó cada usuario.
+</div>
+
+<h3 id="admin-informes">6.8 Informes y comisiones</h3>
+<p>En <span class="ui">Informes → Ventas y comisiones</span> se consultan los totales de la plataforma y se descargan reportes.</p>
+<ul>
+  <li>Ventas por período, artista y tipo de operación.</li>
+  <li>Comisiones retenidas y liquidaciones pendientes.</li>
+  <li>Exportación en PDF para respaldo o contabilidad.</li>
+</ul>
+
+<h3 id="admin-auditoria">6.9 Auditoría</h3>
+<p>La auditoría registra las acciones administrativas: sanciones, bajas, cambios de rol, modificaciones de catálogos y de configuración.</p>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Auditoría</span>.</li>
+  <li>Filtrá por administrador, tipo de acción, entidad o fecha.</li>
+  <li>Abrí un registro para ver el detalle del cambio, el valor anterior y el nuevo.</li>
+</ol>
+<div class="tip">
+  <strong>Para resolver reclamos</strong>
+  La auditoría permite reconstruir quién hizo qué y cuándo. Es la fuente de verdad ante un reclamo sobre una sanción o un cambio de datos.
+</div>
+
+<h3 id="admin-anclaje">6.10 Anclaje en Bitcoin</h3>
+<p>Los certificados de autenticidad se agrupan en lotes y se sellan con <strong>OpenTimestamps</strong>, que registra el hash del lote en la cadena de Bitcoin. Esto permite demostrar que el registro existía en una fecha determinada.</p>
+<ol class="pasos">
+  <li>Entrá a <span class="ui">Anclaje en Bitcoin</span>.</li>
+  <li>Revisá los lotes pendientes, confirmados y fallidos.</li>
+  <li>Abrí un lote para ver su hash, la cantidad de eventos y el estado del sellado.</li>
+  <li>Si un lote falló, revisá el mensaje y reintentá cuando el calendario de OpenTimestamps esté disponible.</li>
+</ol>
+<table>
+  <thead><tr><th>Estado</th><th>Significado</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Pendiente</strong></td><td>El lote se formó pero todavía no se envió a sellar.</td></tr>
+    <tr><td><strong>Confirmado</strong></td><td>El lote tiene prueba de anclaje verificable en Bitcoin.</td></tr>
+    <tr><td><strong>Fallido</strong></td><td>El intento no prosperó; puede reintentarse.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="admin-notificaciones">6.11 Notificaciones del sistema</h3>
+<p>Desde <span class="ui">Notificaciones</span> el administrador consulta los avisos dirigidos a su cuenta: reportes nuevos, lotes fallidos, errores de envío de correo y eventos de configuración.</p>
+
+<!-- ============================ 7. IDENTIDAD VISUAL ============================ -->
+<h2 id="identidad"><span class="num">7</span>Identidad visual</h2>
+<p class="lead">Los colores, las tipografías y los temas que dan forma a Temipora, con sus valores exactos para mantener la coherencia en materiales impresos y digitales.</p>
+
+<h3 id="paleta">7.1 Paleta y tipografía</h3>
+<p>La identidad de Temipora es cálida y artesanal: un fondo crema, texto granate y un acento coral-fucsia. Los nombres de la tabla son los mismos tokens que usa el frontend, así que sirven tanto para diseño como para desarrollo.</p>
+
+<div class="swatches">
+  <div class="swatch"><div class="color" style="background:#fff6f1"></div><div class="info"><b>Fondo</b><code>#fff6f1</code>Fondo general de la aplicación.</div></div>
+  <div class="swatch"><div class="color" style="background:#ffffff;border-bottom:1px solid #eee"></div><div class="info"><b>Superficie</b><code>#ffffff</code>Tarjetas, tablas y modales.</div></div>
+  <div class="swatch"><div class="color" style="background:#fff0e9"></div><div class="info"><b>Superficie alterna</b><code>#fff0e9</code>Inputs, filas y zonas suaves.</div></div>
+  <div class="swatch"><div class="color" style="background:#4a1d2e"></div><div class="info"><b>Texto / granate</b><code>#4a1d2e</code>Texto principal y botón oscuro.</div></div>
+  <div class="swatch"><div class="color" style="background:#6e3b4d"></div><div class="info"><b>Texto suave</b><code>#6e3b4d</code>Texto secundario.</div></div>
+  <div class="swatch"><div class="color" style="background:#ffc2d1"></div><div class="info"><b>Borde / rosa</b><code>#ffc2d1</code>Bordes, separadores y realces.</div></div>
+  <div class="swatch"><div class="color" style="background:#c2185b"></div><div class="info"><b>Acento / coral</b><code>#c2185b</code>Acciones, enlaces y foco.</div></div>
+  <div class="swatch"><div class="color" style="background:#9a1047"></div><div class="info"><b>Acento hover</b><code>#9a1047</code>Estado hover y activo.</div></div>
+  <div class="swatch"><div class="color" style="background:#ff8a7a"></div><div class="info"><b>Decorativo 1</b><code>#ff8a7a</code>Acentos ilustrados.</div></div>
+  <div class="swatch"><div class="color" style="background:#ffd9c7"></div><div class="info"><b>Decorativo 2</b><code>#ffd9c7</code>Fondos y degradados.</div></div>
+  <div class="swatch"><div class="color" style="background:#ffe8a3"></div><div class="info"><b>Decorativo 3</b><code>#ffe8a3</code>Detalles y destacados.</div></div>
+  <div class="swatch"><div class="color" style="background:#2f7a4f"></div><div class="info"><b>Éxito</b><code>#2f7a4f</code>Confirmaciones (uso del manual).</div></div>
+</div>
+
+<table>
+  <caption>Equivalencias semánticas usadas en los componentes</caption>
+  <thead><tr><th>Token</th><th>Valor</th><th>Se usa en</th></tr></thead>
+  <tbody>
+    <tr><td><code>--color-fondo</code></td><td>#fff6f1</td><td>Fondo de la aplicación.</td></tr>
+    <tr><td><code>--color-superficie</code></td><td>#ffffff</td><td>Cards, tablas, modales.</td></tr>
+    <tr><td><code>--color-texto</code></td><td>#4a1d2e</td><td>Texto principal.</td></tr>
+    <tr><td><code>--color-texto-suave</code></td><td>#6e3b4d</td><td>Texto secundario y ayudas.</td></tr>
+    <tr><td><code>--color-borde</code></td><td>#ffc2d1</td><td>Bordes y separadores.</td></tr>
+    <tr><td><code>--color-acento</code></td><td>#c2185b</td><td>Botones y enlaces principales.</td></tr>
+    <tr><td><code>--color-acento-hover</code></td><td>#9a1047</td><td>Hover del acento.</td></tr>
+    <tr><td><code>--color-accion</code></td><td>#4a1d2e</td><td>Botón primario oscuro.</td></tr>
+    <tr><td><code>--color-inverso</code></td><td>#4a1d2e</td><td>Footer y barra lateral de administración.</td></tr>
+  </tbody>
+</table>
+
+<h4>Tipografía</h4>
+<div class="grid-2">
+  <div class="card">
+    <h4 style="font-family:'Bricolage Grotesque','Trebuchet MS',Georgia,serif;font-size:26px">Bricolage Grotesque</h4>
+    <p>Se usa en títulos y en la marca. Siempre en peso extrabold y con tracking negativo. Da un tono expresivo y artesanal.</p>
+    <p><code>--font-display</code></p>
+  </div>
+  <div class="card">
+    <h4 style="font-family:'DM Sans','Segoe UI',system-ui,sans-serif;font-size:26px">DM Sans</h4>
+    <p>Se usa en el cuerpo, formularios y navegación. Tamaño base de 14 px, altura de línea 1,55 y peso regular.</p>
+    <p><code>--font-sans</code></p>
+  </div>
+</div>
+<ul>
+  <li><strong>Títulos de página:</strong> 30–36 px, extrabold, tracking <code>-0.02em</code>.</li>
+  <li><strong>Título de inicio:</strong> 46–76 px, leading <code>0.95</code>, tracking <code>-0.04em</code>.</li>
+  <li><strong>Eyebrow:</strong> 12–14 px, mayúsculas, tracking <code>0.18em</code>, color acento.</li>
+  <li><strong>Texto de interfaz:</strong> 14 px con altura de línea 1,55.</li>
+</ul>
+
+<div class="aviso">
+  <strong>Estados de color</strong>
+  El sistema de diseño no define tokens para error, éxito y advertencia: esos estados usan la paleta estándar de Tailwind. Para materiales oficiales, usá los valores de respaldo de esta tabla: éxito <code>#2f7a4f</code>, advertencia <code>#8a5a10</code> y error <code>#a32338</code>.
+</div>
+
+<h3 id="temas">7.2 Los cuatro temas</h3>
+<p>Temipora incluye cuatro temas conmutables. Cambian el fondo, las superficies, los bordes y el acento, pero conservan la misma estructura y tipografía. La preferencia se guarda en el navegador y se aplica antes de que se dibuje la página, para evitar parpadeos.</p>
+
+<div class="theme-grid">
+  <div class="theme-card">
+    <div class="preview"><span style="background:#fff6f1"></span><span style="background:#ffffff"></span><span style="background:#c2185b"></span><span style="background:#4a1d2e"></span></div>
+    <div class="body"><b>Amanecer</b><p>Claro cálido · tema por defecto<br>Fondo <code>#fff6f1</code> · Acento <code>#c2185b</code></p></div>
+  </div>
+  <div class="theme-card">
+    <div class="preview"><span style="background:#241018"></span><span style="background:#321923"></span><span style="background:#ff9fbc"></span><span style="background:#c2185b"></span></div>
+    <div class="body"><b>Medianoche</b><p>Oscuro cálido<br>Fondo <code>#241018</code> · Acento suave <code>#ff9fbc</code></p></div>
+  </div>
+  <div class="theme-card">
+    <div class="preview"><span style="background:#eef4ff"></span><span style="background:#ffffff"></span><span style="background:#1f6feb"></span><span style="background:#4a1d2e"></span></div>
+    <div class="body"><b>Cielo</b><p>Claro azul<br>Fondo <code>#eef4ff</code> · Acento <code>#1f6feb</code></p></div>
+  </div>
+  <div class="theme-card">
+    <div class="preview"><span style="background:#0b1726"></span><span style="background:#122239"></span><span style="background:#8ec6ff"></span><span style="background:#1f6feb"></span></div>
+    <div class="body"><b>Océano</b><p>Oscuro azul<br>Fondo <code>#0b1726</code> · Acento suave <code>#8ec6ff</code></p></div>
+  </div>
+</div>
+
+<h4>Cómo cambiar el tema</h4>
+<ol class="pasos">
+  <li>Abrí <span class="ui">Configuración → Apariencia</span>.</li>
+  <li>Elegí una de las cuatro tarjetas.</li>
+  <li>El cambio se aplica al instante en toda la aplicación.</li>
+</ol>
+<div class="tip">
+  <strong>Acceso rápido</strong>
+  El menú de usuario del encabezado incluye el selector de tema para cambiarlo sin entrar a configuración. En el teléfono, el menú móvil ofrece la misma opción.
+</div>
+
+<h3 id="mapa-pantallas">7.3 Mapa de pantallas</h3>
+<p>Este mapa resume las rutas principales y quién puede acceder. Sirve como referencia rápida para soporte y para ubicar una función en el manual.</p>
+
+<table>
+  <caption>Pantallas públicas</caption>
+  <thead><tr><th>Ruta</th><th>Pantalla</th><th>Acceso</th></tr></thead>
+  <tbody>
+    <tr><td><code>/</code></td><td>Inicio</td><td>Público</td></tr>
+    <tr><td><code>/explorar</code></td><td>Explorar</td><td>Público</td></tr>
+    <tr><td><code>/servicios</code></td><td>Catálogo de servicios</td><td>Público</td></tr>
+    <tr><td><code>/servicios/:id</code></td><td>Detalle del servicio</td><td>Público</td></tr>
+    <tr><td><code>/productos</code></td><td>Catálogo de productos</td><td>Público</td></tr>
+    <tr><td><code>/productos/:id</code></td><td>Detalle del producto</td><td>Público</td></tr>
+    <tr><td><code>/reventas</code></td><td>Reventas</td><td>Público</td></tr>
+    <tr><td><code>/perfil/:nombreUsuario</code></td><td>Perfil público</td><td>Público</td></tr>
+    <tr><td><code>/certificado/:codigo</code></td><td>Certificado público</td><td>Público</td></tr>
+    <tr><td><code>/login</code></td><td>Iniciar sesión</td><td>Público</td></tr>
+    <tr><td><code>/registrarse</code></td><td>Crear cuenta</td><td>Público</td></tr>
+    <tr><td><code>/terminos</code></td><td>Términos y condiciones</td><td>Público</td></tr>
+  </tbody>
+</table>
+
+<table>
+  <caption>Pantallas con sesión (cliente y artista)</caption>
+  <thead><tr><th>Ruta</th><th>Pantalla</th><th>Acceso</th></tr></thead>
+  <tbody>
+    <tr><td><code>/carrito</code></td><td>Carrito</td><td>Cliente / Artista</td></tr>
+    <tr><td><code>/compras</code></td><td>Mis compras</td><td>Cliente / Artista</td></tr>
+    <tr><td><code>/compras/:id</code></td><td>Detalle de compra</td><td>Cliente / Artista</td></tr>
+    <tr><td><code>/pedidos</code></td><td>Mis pedidos</td><td>Cliente / Artista</td></tr>
+    <tr><td><code>/pedidos/:idPedido</code></td><td>Detalle de pedido</td><td>Cliente / Artista</td></tr>
+    <tr><td><code>/solicitudes</code></td><td>Mis solicitudes</td><td>Cliente / Artista</td></tr>
+    <tr><td><code>/solicitudes/:idSolicitud</code></td><td>Detalle de solicitud</td><td>Cliente / Artista</td></tr>
+    <tr><td><code>/solicitudes/:idSolicitud/pagar</code></td><td>Pagar presupuesto</td><td>Cliente / Artista</td></tr>
+    <tr><td><code>/solicitudes/:id/solicitar</code></td><td>Solicitar servicio</td><td>Cliente / Artista</td></tr>
+    <tr><td><code>/favoritos</code></td><td>Favoritos</td><td>Cliente / Artista</td></tr>
+    <tr><td><code>/mensajes</code></td><td>Mensajes</td><td>Cliente / Artista</td></tr>
+    <tr><td><code>/notificaciones</code></td><td>Notificaciones</td><td>Cliente / Artista</td></tr>
+    <tr><td><code>/reventa</code></td><td>Mi reventa</td><td>Cliente / Artista</td></tr>
+    <tr><td><code>/configuracion</code></td><td>Configuración de la cuenta</td><td>Cliente / Artista</td></tr>
+  </tbody>
+</table>
+
+<table>
+  <caption>Panel del artista</caption>
+  <thead><tr><th>Ruta</th><th>Pantalla</th></tr></thead>
+  <tbody>
+    <tr><td><code>/panel</code></td><td>Resumen</td></tr>
+    <tr><td><code>/panel/servicios</code></td><td>Mis servicios</td></tr>
+    <tr><td><code>/panel/servicios/crear</code></td><td>Crear servicio</td></tr>
+    <tr><td><code>/panel/productos</code></td><td>Mis productos</td></tr>
+    <tr><td><code>/panel/solicitudes</code></td><td>Solicitudes</td></tr>
+    <tr><td><code>/panel/pedidos</code></td><td>Pedidos</td></tr>
+    <tr><td><code>/panel/ventas</code></td><td>Ventas</td></tr>
+    <tr><td><code>/panel/informes</code></td><td>Informe de ventas</td></tr>
+    <tr><td><code>/panel/portfolio</code></td><td>Portfolio</td></tr>
+    <tr><td><code>/panel/formulario-pedidos</code></td><td>Formulario de pedidos</td></tr>
+    <tr><td><code>/panel/terminos</code></td><td>Términos y condiciones</td></tr>
+    <tr><td><code>/panel/etiquetas</code></td><td>Mis etiquetas</td></tr>
+  </tbody>
+</table>
+
+<table>
+  <caption>Administración</caption>
+  <thead><tr><th>Ruta</th><th>Pantalla</th></tr></thead>
+  <tbody>
+    <tr><td><code>/admin</code></td><td>Resumen de administración</td></tr>
+    <tr><td><code>/admin/informes/ventas</code></td><td>Ventas y comisiones</td></tr>
+    <tr><td><code>/admin/usuarios</code></td><td>Usuarios registrados</td></tr>
+    <tr><td><code>/admin/sanciones</code></td><td>Sanciones de cuentas</td></tr>
+    <tr><td><code>/admin/anclaje</code></td><td>Anclaje en Bitcoin</td></tr>
+    <tr><td><code>/admin/tipos/producto</code></td><td>Tipos de producto</td></tr>
+    <tr><td><code>/admin/tipos/servicio</code></td><td>Tipos de servicio</td></tr>
+    <tr><td><code>/admin/etiquetas</code></td><td>Etiquetas</td></tr>
+    <tr><td><code>/admin/etiquetas/categorias</code></td><td>Categorías</td></tr>
+    <tr><td><code>/admin/resenas/reportadas</code></td><td>Moderación de reseñas</td></tr>
+    <tr><td><code>/admin/resenas/historial</code></td><td>Historial de reportes</td></tr>
+    <tr><td><code>/admin/resenas/criterios</code></td><td>Criterios de evaluación</td></tr>
+    <tr><td><code>/admin/arte/medios</code></td><td>Medios</td></tr>
+    <tr><td><code>/admin/arte/tipos</code></td><td>Tipos de arte</td></tr>
+    <tr><td><code>/admin/arte/materiales</code></td><td>Materiales</td></tr>
+    <tr><td><code>/admin/ajustes/paises</code></td><td>Países</td></tr>
+    <tr><td><code>/admin/ajustes/cotizacion</code></td><td>Cotización de monedas</td></tr>
+    <tr><td><code>/admin/ajustes/comisiones</code></td><td>Comisión Temipora</td></tr>
+    <tr><td><code>/admin/campanas/promociones</code></td><td>Promociones</td></tr>
+    <tr><td><code>/admin/auditoria</code></td><td>Auditoría</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================ 8. FAQ ============================ -->
+<h2 id="faq"><span class="num">8</span>Preguntas frecuentes y solución de problemas</h2>
+<p class="lead">Las dudas más habituales, ordenadas por rol, y una guía rápida para resolver los errores más comunes.</p>
+
+<h3>Cuenta y acceso</h3>
+<div class="faq">
+  <details>
+    <summary>No me llega el correo de confirmación o de aviso. ¿Qué hago?</summary>
+    <p>Revisá la carpeta de correo no deseado. Si el entorno de prueba usa Mailpit, los correos no salen a internet: se consultan en la interfaz local de Mailpit. Si el problema persiste, verificá que tu dirección esté bien escrita en <strong>Configuración → Perfil</strong> y escribí a soporte.</p>
+  </details>
+  <details>
+    <summary>Olvidé mi contraseña.</summary>
+    <p>La pantalla de ingreso no tiene recuperación automática. Escribí a <a href="mailto:temiporasupport@gmail.com">temiporasupport@gmail.com</a> desde el correo de la cuenta para que un administrador te ayude a restablecerla.</p>
+  </details>
+  <details>
+    <summary>Mi cuenta aparece sancionada o dada de baja.</summary>
+    <p>El aviso de ingreso muestra el motivo. Si es una baja y estás dentro del plazo, usá <span class="ui">Reactivar cuenta</span> con tu usuario y contraseña. Si es una sanción, el plazo y el motivo los define el administrador; para apelar, escribí a soporte.</p>
+  </details>
+  <details>
+    <summary>Puedo comprar pero no vender. ¿Cómo consigo el panel de artista?</summary>
+    <p>Tu cuenta es de tipo Cliente. Un administrador puede cambiarte el rol a Artista sin que pierdas el historial. Si te registraste mal, no hace falta crear otra cuenta.</p>
+  </details>
+</div>
+
+<h3>Compras y pagos</h3>
+<div class="faq">
+  <details>
+    <summary>¿Por qué se me pide iniciar sesión al agregar al carrito?</summary>
+    <p>El carrito, los favoritos y la mensajería requieren una cuenta. Después de ingresar, volvés automáticamente a la página donde estabas.</p>
+  </details>
+  <details>
+    <summary>Mi pago quedó pendiente o fue rechazado.</summary>
+    <p>Revisá el detalle de la compra: allí figura el estado y el motivo. En MercadoPago, verificá el medio de pago y los límites de la tarjeta. En el proveedor simulado, el resultado depende de la configuración de prueba. Si el pago se acreditó y la plataforma no lo refleja, esperá unos minutos y volvé a abrir el detalle; si persiste, contactá a soporte con el número de operación.</p>
+  </details>
+  <details>
+    <summary>No puedo pagar porque un producto se agotó.</summary>
+    <p>El carrito vuelve a validar el stock antes de cobrar. Quitá la variante agotada o elegí otra disponible. El resto del grupo se puede pagar por separado.</p>
+  </details>
+  <details>
+    <summary>Compré dos productos de artistas distintos. ¿Llega todo junto?</summary>
+    <p>El carrito agrupa por artista y cada grupo se paga por separado. Por eso vas a ver una operación por artista, con su propio estado y su propia entrega.</p>
+  </details>
+</div>
+
+<h3>Servicios y pedidos</h3>
+<div class="faq">
+  <details>
+    <summary>Envié una solicitud y no tengo respuesta. ¿Cuánto tarda?</summary>
+    <p>El artista decide cuándo presupuestar. Si el servicio está en lista de espera, la solicitud no se promueve automáticamente. Podés consultar el estado en <strong>Mis solicitudes</strong> o enviar un mensaje al artista.</p>
+  </details>
+  <details>
+    <summary>No hay cupos. ¿Conviene solicitar igual?</summary>
+    <p>Sí, si el servicio está abierto o en lista de espera. La solicitud queda pendiente y el artista la presupuestará cuando libere un cupo. Si el servicio está cerrado, la plataforma ofrece artistas alternativos.</p>
+  </details>
+  <details>
+    <summary>¿Puedo cambiar la cantidad de dibujos después de enviar la solicitud?</summary>
+    <p>No directamente. Hablá con el artista por mensajería: él puede ajustar el presupuesto o pedirte que envíes una solicitud nueva. La cantidad máxima por solicitud la define cada servicio.</p>
+  </details>
+  <details>
+    <summary>El presupuesto venció. ¿Se pierde el trabajo?</summary>
+    <p>No. La solicitud sigue existiendo, pero el presupuesto deja de ser válido. El artista puede emitir uno nuevo con las condiciones actualizadas.</p>
+  </details>
+  <details>
+    <summary>No veo mi entrega final.</summary>
+    <p>Verificá que el pedido esté en la etapa de entrega y que el pago del hito correspondiente esté acreditado. Los archivos aparecen en el detalle del pedido, en el bloque de entrega final. Si el artista todavía no la subió, el estado lo indica.</p>
+  </details>
+</div>
+
+<h3>Artistas</h3>
+<div class="faq">
+  <details>
+    <summary>¿Cómo hago que mi servicio aparezca en el catálogo?</summary>
+    <p>El servicio debe estar publicado, no en borrador. Revisá en <strong>Panel → Servicios</strong> que el estado sea publicado y que tenga al menos una imagen de portada y un tipo asignado.</p>
+  </details>
+  <details>
+    <summary>Propuse una etiqueta y no aparece en los filtros.</summary>
+    <p>Las etiquetas propuestas quedan pendientes hasta que un administrador las apruebe. Consultá su estado en <strong>Panel → Ajustes → Mis etiquetas</strong>; si fue rechazada, el motivo indica qué corregir antes de volver a solicitarla.</p>
+  </details>
+  <details>
+    <summary>No puedo cobrar con MercadoPago.</summary>
+    <p>Vinculá tu cuenta en <strong>Configuración → Pagos y cobros</strong>. Si la vinculación falla, revisá que hayas autorizado a Temipora en MercadoPago y volvé a intentarlo. Sin vinculación, el entorno usa el proveedor simulado.</p>
+  </details>
+  <details>
+    <summary>¿Puedo editar un servicio que tiene pedidos en curso?</summary>
+    <p>Sí, pero los pedidos ya aceptados conservan las condiciones con las que se acordaron. Los cambios afectan a las solicitudes nuevas. Si el servicio ya no se ofrece, archivalo en lugar de eliminarlo.</p>
+  </details>
+</div>
+
+<h3>Solución rápida de problemas</h3>
+<table>
+  <thead><tr><th>Síntoma</th><th>Causa probable</th><th>Solución</th></tr></thead>
+  <tbody>
+    <tr><td>La sesión se cerró sola.</td><td>El token venció o se cerró sesión en otro lugar.</td><td>Volvé a ingresar. La aplicación te devuelve a la página donde estabas.</td></tr>
+    <tr><td>Una imagen aparece desenfocada.</td><td>Contenido sensible con la preferencia desactivada.</td><td>Activalo en <strong>Configuración → Privacidad</strong>.</td></tr>
+    <tr><td>No puedo subir un archivo.</td><td>Formato no admitido o tamaño excedido.</td><td>Usá una imagen JPG, PNG o WebP dentro del límite indicado y volvé a intentar.</td></tr>
+    <tr><td>No aparece el botón de solicitar.</td><td>Servicio cerrado, sin cupos o con una solicitud activa.</td><td>Revisá el aviso de la ficha; usá lista de espera o artistas alternativos.</td></tr>
+    <tr><td>No puedo dejar una reseña.</td><td>La operación todavía no está entregada o ya existe una reseña.</td><td>Esperá el cierre del pedido o editá la reseña existente.</td></tr>
+    <tr><td>El total del carrito cambió.</td><td>Precio o stock actualizado por el artista.</td><td>Revisá el aviso y confirmá el nuevo total antes de pagar.</td></tr>
+    <tr><td>La página muestra un error de carga.</td><td>Fallo temporal de red o del servicio.</td><td>Recargá. Si persiste, probá en otra pestaña y contactá a soporte.</td></tr>
+    <tr><td>No recibo notificaciones.</td><td>Sesión no iniciada o preferencias del navegador.</td><td>Ingresá de nuevo y revisá la campana. Las notificaciones dentro de la app no dependen del permiso del sistema.</td></tr>
+  </tbody>
+</table>
+
+<div class="nota">
+  <strong>Soporte</strong>
+  Si nada de lo anterior resuelve el problema, escribí a <a href="mailto:temiporasupport@gmail.com">temiporasupport@gmail.com</a> con tu nombre de usuario, la pantalla donde ocurrió y una descripción del paso que estabas haciendo.
+</div>
+
+<!-- ============================ 9. APÉNDICES ============================ -->
+<h2 id="apendices"><span class="num">9</span>Apéndices</h2>
+<p class="lead">Glosario completo, estados de la interfaz, listas de verificación, trazabilidad con los casos de uso y control de versiones.</p>
+
+<h3 id="ap-glosario">A. Glosario</h3>
+<table>
+  <thead><tr><th>Término</th><th>Definición</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Administrador</strong></td><td>Rol con acceso al panel de gestión de la plataforma.</td></tr>
+    <tr><td><strong>Artista</strong></td><td>Usuario que publica servicios y productos, y puede comprar como cualquier cliente.</td></tr>
+    <tr><td><strong>Borrador</strong></td><td>Publicación guardada pero no visible en el catálogo.</td></tr>
+    <tr><td><strong>Certificado</strong></td><td>Registro público que acredita la autenticidad y la trazabilidad de una pieza única.</td></tr>
+    <tr><td><strong>Cliente</strong></td><td>Usuario que compra productos y contrata servicios.</td></tr>
+    <tr><td><strong>Cupo</strong></td><td>Lugar disponible para aceptar una solicitud de servicio.</td></tr>
+    <tr><td><strong>Derechos de uso</strong></td><td>Condiciones bajo las cuales el cliente puede usar la obra: personal, comercial, con modificaciones, con crédito.</td></tr>
+    <tr><td><strong>Entrega final</strong></td><td>Archivos definitivos del pedido, en la calidad acordada.</td></tr>
+    <tr><td><strong>Hito</strong></td><td>Etapa de pago de un pedido. El primero suele ser un anticipo.</td></tr>
+    <tr><td><strong>Lista de espera</strong></td><td>Cola de solicitudes para un servicio sin cupo. No se promueve automáticamente.</td></tr>
+    <tr><td><strong>Pedido</strong></td><td>Trabajo en curso surgido de una solicitud aceptada y pagada.</td></tr>
+    <tr><td><strong>Pieza única</strong></td><td>Obra original que no se replica. Puede tener certificado y habilitar reventa.</td></tr>
+    <tr><td><strong>Pieza verificada</strong></td><td>Obra del portfolio vinculada a un pedido real y a su certificado.</td></tr>
+    <tr><td><strong>Portfolio</strong></td><td>Galería de obras del artista, con visibilidad y metadatos configurables.</td></tr>
+    <tr><td><strong>Presupuesto</strong></td><td>Propuesta económica del artista: precio por dibujo, hitos, plazo y derechos.</td></tr>
+    <tr><td><strong>Reventa</strong></td><td>Publicación de una pieza única comprada antes para transferirla.</td></tr>
+    <tr><td><strong>Servicio</strong></td><td>Propuesta de arte a medida publicada por un artista.</td></tr>
+    <tr><td><strong>Solicitud</strong></td><td>Pedido formal de un cliente sobre un servicio, previo al presupuesto.</td></tr>
+    <tr><td><strong>Sanción</strong></td><td>Restricción aplicada por un administrador a una cuenta.</td></tr>
+    <tr><td><strong>Token</strong></td><td>Credencial de sesión que el navegador guarda para no pedir la contraseña en cada acción.</td></tr>
+    <tr><td><strong>Variante</strong></td><td>Presentación concreta de un producto: formato, tamaño, licencia o color.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="ap-estados">B. Estados de la interfaz</h3>
+<table>
+  <thead><tr><th>Ámbito</th><th>Estados que vas a ver</th><th>Qué significan</th></tr></thead>
+  <tbody>
+    <tr><td>Solicitud</td><td>Pendiente · En lista de espera · Presupuestada · Pagada · Finalizada · Rechazada · Cancelada · Vencida</td><td>Recorre el circuito desde que se envía hasta que se paga, se rechaza o vence.</td></tr>
+    <tr><td>Pedido</td><td>Pendiente de pago · En curso · Finalizado · Cancelado · Impago</td><td>Estado general del trabajo una vez aceptado el presupuesto.</td></tr>
+    <tr><td>Hito de pago</td><td>Pendiente · Pagado · Vencido · Reembolsado · Cancelado</td><td>Estado de cada etapa de pago del pedido.</td></tr>
+    <tr><td>Pago</td><td>Pendiente · Aprobado · Rechazado · Reembolsado · Cancelado</td><td>Resultado de la operación de pago.</td></tr>
+    <tr><td>Compra</td><td>Pendiente de pago · Parcialmente paga · Paga · Vencida · Cancelada</td><td>Estado del carrito convertido en compra, agrupado por artista.</td></tr>
+    <tr><td>Recepción del servicio</td><td>Abierta a solicitudes · Solo lista de espera · Cerrada</td><td>Define si el cliente puede solicitar, anotarse o no puede hacerlo.</td></tr>
+    <tr><td>Presupuesto</td><td>Vigente · Vencido · Rechazado · Aceptado</td><td>La vigencia por defecto es de 72 horas.</td></tr>
+    <tr><td>Producto</td><td>Borrador · Disponible · Pausado · Archivado</td><td>Controla la visibilidad y la posibilidad de compra.</td></tr>
+    <tr><td>Servicio</td><td>Publicado · Pausado · Archivado</td><td>Los archivados se conservan para el historial.</td></tr>
+    <tr><td>Reventa</td><td>Publicada · Reservada · Vendida · Cancelada · Archivada · Suspendida · Vencida</td><td>Estado de la publicación de una pieza única.</td></tr>
+    <tr><td>Anclaje</td><td>Pendiente · Confirmado · Fallido</td><td>Estado del lote enviado a OpenTimestamps.</td></tr>
+    <tr><td>Vinculación de cobros</td><td>Pendiente · Activa · Revocada · Error</td><td>Estado de la cuenta de MercadoPago del artista.</td></tr>
+  </tbody>
+</table>
+
+<h3 id="ap-checklists">C. Listas de verificación</h3>
+<div class="grid-2">
+  <div class="card">
+    <h4>Antes de contratar un servicio</h4>
+    <ul class="check">
+      <li>Leí la descripción y los términos.</li>
+      <li>Revisé el precio base y qué incluye.</li>
+      <li>Sé cuántos dibujos necesito.</li>
+      <li>Revisé el plazo de entrega.</li>
+      <li>Tengo las referencias listas para adjuntar.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>Antes de publicar un servicio</h4>
+    <ul class="check">
+      <li>El precio y la moneda son correctos.</li>
+      <li>Definí cupos y modo de recepción.</li>
+      <li>El formulario pide todo lo que necesito.</li>
+      <li>Los términos explican revisiones y cancelaciones.</li>
+      <li>La portada representa el estilo del servicio.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>Antes de publicar un producto</h4>
+    <ul class="check">
+      <li>Título y descripción claros.</li>
+      <li>Variantes con precio y stock.</li>
+      <li>Licencia y derechos definidos.</li>
+      <li>Imágenes suficientes y nítidas.</li>
+      <li>Revisé la liquidación estimada.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>Antes de cerrar un pedido</h4>
+    <ul class="check">
+      <li>Todos los hitos están pagos.</li>
+      <li>La entrega final incluye los archivos acordados.</li>
+      <li>El cliente confirmó la conformidad.</li>
+      <li>La obra quedó publicada como verificada, si corresponde.</li>
+    </ul>
+  </div>
+</div>
+
+<h3 id="ap-trazabilidad">D. Trazabilidad de casos de uso</h3>
+<p>Esta tabla vincula cada caso de uso documentado en <code>documentacion/casos-de-uso</code> con la sección del manual que lo explica. Sirve para comprobar la cobertura del manual frente a la especificación.</p>
+<table>
+  <thead><tr><th>UC</th><th>Caso de uso</th><th>Sección</th></tr></thead>
+  <tbody>
+    <tr><td>UC-01</td><td>Alta producto</td><td>5.7</td></tr>
+    <tr><td>UC-02</td><td>Modificar producto</td><td>5.7</td></tr>
+    <tr><td>UC-03</td><td>Baja producto</td><td>5.7</td></tr>
+    <tr><td>UC-04</td><td>Buscar producto</td><td>3.4</td></tr>
+    <tr><td>UC-05</td><td>Alta servicio</td><td>5.2</td></tr>
+    <tr><td>UC-06</td><td>Modificar servicio</td><td>5.2</td></tr>
+    <tr><td>UC-07</td><td>Baja servicio</td><td>5.2</td></tr>
+    <tr><td>UC-08</td><td>Buscar servicio</td><td>3.3</td></tr>
+    <tr><td>UC-09</td><td>Configurar términos globales</td><td>5.4</td></tr>
+    <tr><td>UC-10</td><td>Configurar formulario global</td><td>5.3</td></tr>
+    <tr><td>UC-11</td><td>Alta imagen en portfolio</td><td>5.6</td></tr>
+    <tr><td>UC-12</td><td>Modificar imagen en portfolio</td><td>5.6</td></tr>
+    <tr><td>UC-13</td><td>Baja imagen en portfolio</td><td>5.6</td></tr>
+    <tr><td>UC-14</td><td>Buscar imagen en portfolio</td><td>5.6</td></tr>
+    <tr><td>UC-15</td><td>Alta avance de pedido</td><td>5.9</td></tr>
+    <tr><td>UC-16</td><td>Alta entrega final</td><td>5.9</td></tr>
+    <tr><td>UC-17</td><td>Buscar pedido</td><td>4.3 / 5.9</td></tr>
+    <tr><td>UC-18</td><td>Enviar presupuesto de servicio</td><td>5.8</td></tr>
+    <tr><td>UC-19</td><td>Rechazar solicitud de servicio</td><td>5.8</td></tr>
+    <tr><td>UC-20</td><td>Buscar solicitud de servicio</td><td>5.8</td></tr>
+    <tr><td>UC-21</td><td>Alta de solicitud de servicio</td><td>4.1</td></tr>
+    <tr><td>UC-22</td><td>Cancelar solicitud de servicio</td><td>4.1 / 4.2</td></tr>
+    <tr><td>UC-23</td><td>Buscar artista</td><td>3.3 / 3.6</td></tr>
+    <tr><td>UC-24</td><td>Pagar servicio</td><td>4.2</td></tr>
+    <tr><td>UC-25</td><td>Cancelar pedido</td><td>4.3 / 5.9</td></tr>
+    <tr><td>UC-26</td><td>Comprar producto</td><td>4.4</td></tr>
+    <tr><td>UC-27</td><td>Procesar pago</td><td>4.4</td></tr>
+    <tr><td>UC-28</td><td>Agregar artista a favoritos</td><td>3.8</td></tr>
+    <tr><td>UC-29</td><td>Registrarse</td><td>2.1</td></tr>
+    <tr><td>UC-30</td><td>Procesar datos de inicio</td><td>3.1 / 3.2</td></tr>
+    <tr><td>UC-31</td><td>Iniciar sesión</td><td>2.2</td></tr>
+    <tr><td>UC-32</td><td>Darse de baja del sistema</td><td>4.10 / 2.3</td></tr>
+    <tr><td>UC-33</td><td>Modificar datos personales y preferencias</td><td>4.10</td></tr>
+    <tr><td>UC-34</td><td>Enviar solicitud de mensaje privado</td><td>4.7</td></tr>
+    <tr><td>UC-35</td><td>Enviar mensaje privado</td><td>4.7</td></tr>
+    <tr><td>UC-36</td><td>Buscar usuario no artista</td><td>4.7</td></tr>
+    <tr><td>UC-37</td><td>Dar de alta un tipo de servicio</td><td>6.3</td></tr>
+    <tr><td>UC-38</td><td>Modificar un tipo de servicio</td><td>6.3</td></tr>
+    <tr><td>UC-39</td><td>Dar de baja un tipo de servicio</td><td>6.3</td></tr>
+    <tr><td>UC-40</td><td>Dar de alta un tipo de producto</td><td>6.3</td></tr>
+    <tr><td>UC-41</td><td>Modificar un tipo de producto</td><td>6.3</td></tr>
+    <tr><td>UC-42</td><td>Dar de baja un tipo de producto</td><td>6.3</td></tr>
+    <tr><td>UC-43</td><td>Sancionar usuario</td><td>6.2</td></tr>
+    <tr><td>UC-44</td><td>Configurar descuentos a usuarios inactivos</td><td>6.5</td></tr>
+    <tr><td>UC-45</td><td>Agregar campo a formulario</td><td>5.3</td></tr>
+    <tr><td>UC-46</td><td>Eliminar campo de formulario</td><td>5.3</td></tr>
+    <tr><td>UC-47</td><td>Modificar campo de formulario</td><td>5.3</td></tr>
+    <tr><td>UC-48</td><td>Configurar formulario de pedidos</td><td>5.3</td></tr>
+    <tr><td>UC-49</td><td>Dejar una reseña</td><td>4.8</td></tr>
+    <tr><td>UC-50</td><td>Modificar una reseña</td><td>4.8</td></tr>
+    <tr><td>UC-51</td><td>Eliminar reseña</td><td>4.8</td></tr>
+    <tr><td>UC-52</td><td>Buscar reseña</td><td>3.6 / 4.8</td></tr>
+    <tr><td>UC-53</td><td>Eliminar artista de favoritos</td><td>3.8</td></tr>
+    <tr><td>UC-54</td><td>Dar de alta una etiqueta</td><td>5.5 / 6.3</td></tr>
+    <tr><td>UC-55</td><td>Modificar una etiqueta</td><td>6.3</td></tr>
+    <tr><td>UC-56</td><td>Dar de baja una etiqueta</td><td>6.3</td></tr>
+    <tr><td>UC-57</td><td>Evaluar etiquetas propuestas por artistas</td><td>6.3</td></tr>
+    <tr><td>UC-58</td><td>Gestionar categorías de etiquetas</td><td>6.3</td></tr>
+    <tr><td>UC-59</td><td>Consultar mis etiquetas y re-solicitar</td><td>5.5</td></tr>
+  </tbody>
+</table>
+
+<h3 id="ap-versiones">E. Control de versiones</h3>
+<table>
+  <thead><tr><th>Versión</th><th>Fecha</th><th>Cambios</th><th>Autora</th></tr></thead>
+  <tbody>
+    <tr><td>1.0</td><td>Noviembre de 2026</td><td>Primera edición completa: cuatro roles, referencia visual, FAQ y trazabilidad de casos de uso.</td><td>Menacho, Natalia Agustina</td></tr>
+  </tbody>
+</table>
+
+<p class="fin">Temipora — Manual de usuario · Versión 1.0 · Noviembre de 2026<br>Universidad Nacional de Misiones · Analista en Sistemas de Computación</p>
+
+</main>
+</div>
+
+<script>
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var headings = Array.prototype.slice.call(document.querySelectorAll('h2[id], h3[id], section[id]'));
+  if (!links.length || !headings.length) return;
+  var indice = document.querySelector('.sidebar details');
+  if (indice && window.innerWidth <= 900) indice.removeAttribute('open');
+  function update() {
+    var y = window.scrollY + 140;
+    var current = headings[0];
+    for (var i = 0; i < headings.length; i++) {
+      if (headings[i].offsetTop <= y) current = headings[i];
+    }
+    var id = '#' + current.id;
+    for (var j = 0; j < links.length; j++) {
+      links[j].classList.toggle('active', links[j].getAttribute('href') === id);
+    }
+  }
+  window.addEventListener('scroll', update, { passive: true });
+  window.addEventListener('resize', update);
+  update();
+})();
+</script>
+</body>
+</html>
