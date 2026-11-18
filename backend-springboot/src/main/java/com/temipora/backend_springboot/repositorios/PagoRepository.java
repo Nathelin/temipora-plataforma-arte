@@ -44,7 +44,10 @@ public interface PagoRepository
     @Query("""
         select sum(p.montoCobro) from Pago p
         where p.estado = :estado
-          and p.fechaAcreditacion between :desde and :hasta
+          and coalesce(p.fechaAcreditacion, p.fechaAprobacion,
+                p.fechaCreacion) >= :desde
+          and coalesce(p.fechaAcreditacion, p.fechaAprobacion,
+                p.fechaCreacion) < :hasta
         """)
     BigDecimal sumarMontoCobro(
         @Param("estado") EstadoPago estado,
@@ -54,7 +57,10 @@ public interface PagoRepository
     @Query("""
         select sum(p.comisionMontoCobro) from Pago p
         where p.estado = :estado
-          and p.fechaAcreditacion between :desde and :hasta
+          and coalesce(p.fechaAcreditacion, p.fechaAprobacion,
+                p.fechaCreacion) >= :desde
+          and coalesce(p.fechaAcreditacion, p.fechaAprobacion,
+                p.fechaCreacion) < :hasta
         """)
     BigDecimal sumarComisionCobro(
         @Param("estado") EstadoPago estado,
@@ -65,7 +71,10 @@ public interface PagoRepository
         select p.hitoPedido.pedido.idPedido, sum(p.montoCobro)
         from Pago p
         where p.estado = :estado
-          and p.fechaAcreditacion between :desde and :hasta
+          and coalesce(p.fechaAcreditacion, p.fechaAprobacion,
+                p.fechaCreacion) >= :desde
+          and coalesce(p.fechaAcreditacion, p.fechaAprobacion,
+                p.fechaCreacion) < :hasta
         group by p.hitoPedido.pedido.idPedido
         """)
     List<Object[]> volumenPorPedido(
@@ -119,4 +128,37 @@ public interface PagoRepository
           AND p.estado = 'APROBADO'
         """, nativeQuery = true)
     List<Object[]> netosRealesDeArtista(@Param("idArtista") Long idArtista);
+
+    /**
+     * Pagos aprobados de toda la plataforma en el período, con vendedor y
+     * servicio. Alimenta el informe de ventas y comisiones del admin.
+     */
+    @Query(value = """
+        SELECT CAST(COALESCE(p.fecha_acreditacion, p.fecha_aprobacion,
+                    p.fecha_creacion) AS date),
+               pe.id_artista,
+               u.nombre_usuario,
+               pe.id_servicio,
+               s.nombre,
+               p.monto_cobro,
+               p.comision_monto_cobro,
+               p.monto_neto_cobro,
+               COALESCE(p.arancel_mp, 0),
+               COALESCE(p.neto_recibido_mp, p.monto_neto_cobro),
+               CASE WHEN p.neto_recibido_mp IS NULL THEN 1 ELSE 0 END,
+               pe.id_pedido
+        FROM pago p
+        JOIN hito_pedido h ON h.id_hito_pedido = p.id_hito_pedido
+        JOIN pedido pe ON pe.id_pedido = h.id_pedido
+        JOIN usuario u ON u.id_usuario = pe.id_artista
+        LEFT JOIN servicio s ON s.id_servicio = pe.id_servicio
+        WHERE p.estado = 'APROBADO'
+          AND COALESCE(p.fecha_acreditacion, p.fecha_aprobacion,
+                p.fecha_creacion) >= :desde
+          AND COALESCE(p.fecha_acreditacion, p.fecha_aprobacion,
+                p.fecha_creacion) < :hasta
+        """, nativeQuery = true)
+    List<Object[]> filasInformeAdminServicios(
+        @Param("desde") LocalDateTime desde,
+        @Param("hasta") LocalDateTime hasta);
 }

@@ -35,6 +35,7 @@ import ClientLayout from '../layouts/ClientLayout.vue'
 import Inicio from '../views/Inicio.vue'
 import Explorar from '../views/Explorar.vue'
 import AdminResumen from '../views/AdminResumen.vue'
+import AdminInformeVentas from '../views/AdminInformeVentas.vue'
 import PanelResumen from '../views/PanelResumen.vue'
 import Ventas from '../views/Ventas.vue'
 import InformeVentas from '../views/InformeVentas.vue'
@@ -360,6 +361,16 @@ const routes = [
         name: 'admin-resumen',
         component: AdminResumen,
         meta: { title: 'Resumen de administración' },
+      },
+      {
+        path: 'informes',
+        redirect: '/admin/informes/ventas',
+      },
+      {
+        path: 'informes/ventas',
+        name: 'admin-informe-ventas',
+        component: AdminInformeVentas,
+        meta: { title: 'Informes - Ventas y comisiones' },
       },
       {
         path: 'usuarios',

@@ -36,8 +36,8 @@ const negocio = ref({
   volumenAnterior: 0,
   comision: 0,
   comisionAnterior: 0,
-  pedidosPagados: 0,
-  pedidosPagadosAnterior: 0,
+  operaciones: 0,
+  operacionesAnterior: 0,
   ticketPromedio: 0,
   ticketPromedioAnterior: 0,
 })
@@ -102,8 +102,8 @@ async function cargar() {
         volumenAnterior: Number(data.volumenAnterior ?? 0),
         comision: Number(data.comision ?? 0),
         comisionAnterior: Number(data.comisionAnterior ?? 0),
-        pedidosPagados: Number(data.pedidosPagados ?? 0),
-        pedidosPagadosAnterior: Number(data.pedidosPagadosAnterior ?? 0),
+        operaciones: Number(data.operaciones ?? 0),
+        operacionesAnterior: Number(data.operacionesAnterior ?? 0),
         ticketPromedio: Number(data.ticketPromedio ?? 0),
         ticketPromedioAnterior: Number(data.ticketPromedioAnterior ?? 0),
       }
@@ -363,7 +363,7 @@ onMounted(cargar)
               {{ dinero(negocio.ticketPromedio) }}
             </p>
             <p class="mt-1 text-[11px] text-cafe/45">
-              {{ negocio.pedidosPagados }} {{ negocio.pedidosPagados === 1 ? 'pedido pagado' : 'pedidos pagados' }}
+              {{ negocio.operaciones }} {{ negocio.operaciones === 1 ? 'operación' : 'operaciones' }}
             </p>
           </div>
         </div>

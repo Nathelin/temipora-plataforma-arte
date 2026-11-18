@@ -16,12 +16,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.EstadoCompraGrupo;
 import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.ResumenComunidadDTO;
 import com.temipora.backend_springboot.modelo.ResumenNegocioDTO;
 import com.temipora.backend_springboot.modelo.ResumenOperacionDTO;
+import com.temipora.backend_springboot.repositorios.CompraGrupoRepository;
 import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
 import com.temipora.backend_springboot.repositorios.PagoRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
@@ -34,6 +36,9 @@ class ResumenAdminServiceTest {
 
     @Mock
     private PagoRepository pagoRepository;
+
+    @Mock
+    private CompraGrupoRepository compraGrupoRepository;
 
     @Mock
     private PedidoRepository pedidoRepository;
@@ -50,9 +55,9 @@ class ResumenAdminServiceTest {
     @Test
     void negocio_calculaMesActualYMesAnterior() {
         LocalDateTime inicioActual = LocalDateTime.of(2026, 11, 1, 0, 0);
-        LocalDateTime finActual = LocalDateTime.of(2026, 11, 15, 23, 59, 59);
+        LocalDateTime finActual = LocalDateTime.of(2026, 11, 16, 0, 0);
         LocalDateTime inicioAnterior = LocalDateTime.of(2026, 10, 1, 0, 0);
-        LocalDateTime finAnterior = LocalDateTime.of(2026, 10, 31, 23, 59, 59);
+        LocalDateTime finAnterior = LocalDateTime.of(2026, 11, 1, 0, 0);
 
         when(pagoRepository.sumarMontoCobro(
             EstadoPago.APROBADO, inicioActual, finActual))
@@ -75,18 +80,27 @@ class ResumenAdminServiceTest {
             EstadoPago.APROBADO, inicioAnterior, finAnterior))
             .thenReturn(List.<Object[]>of(
                 new Object[] { 3L, new BigDecimal("1000.00") }));
+        when(compraGrupoRepository.sumarSubtotal(
+            EstadoCompraGrupo.PAGADO, inicioActual, finActual))
+            .thenReturn(new BigDecimal("500.00"));
+        when(compraGrupoRepository.sumarComision(
+            EstadoCompraGrupo.PAGADO, inicioActual, finActual))
+            .thenReturn(new BigDecimal("50.00"));
+        when(compraGrupoRepository.contarPagados(
+            EstadoCompraGrupo.PAGADO, inicioActual, finActual))
+            .thenReturn(2L);
 
         ResumenNegocioDTO resumen = resumenService.negocio(HOY);
 
         assertThat(resumen.periodo()).isEqualTo("2026-11");
         assertThat(resumen.moneda()).isEqualTo("ARS");
-        assertThat(resumen.volumen()).isEqualByComparingTo("1500.00");
+        assertThat(resumen.volumen()).isEqualByComparingTo("2000.00");
         assertThat(resumen.volumenAnterior()).isEqualByComparingTo("1000.00");
-        assertThat(resumen.comision()).isEqualByComparingTo("150.00");
+        assertThat(resumen.comision()).isEqualByComparingTo("200.00");
         assertThat(resumen.comisionAnterior()).isEqualByComparingTo("100.00");
-        assertThat(resumen.pedidosPagados()).isEqualTo(2);
-        assertThat(resumen.pedidosPagadosAnterior()).isEqualTo(1);
-        assertThat(resumen.ticketPromedio()).isEqualByComparingTo("750.00");
+        assertThat(resumen.operaciones()).isEqualTo(4);
+        assertThat(resumen.operacionesAnterior()).isEqualTo(1);
+        assertThat(resumen.ticketPromedio()).isEqualByComparingTo("500.00");
         assertThat(resumen.ticketPromedioAnterior()).isEqualByComparingTo("1000.00");
     }
 
@@ -106,7 +120,7 @@ class ResumenAdminServiceTest {
 
         assertThat(resumen.volumen()).isEqualByComparingTo("0.00");
         assertThat(resumen.comision()).isEqualByComparingTo("0.00");
-        assertThat(resumen.pedidosPagados()).isZero();
+        assertThat(resumen.operaciones()).isZero();
         assertThat(resumen.ticketPromedio()).isEqualByComparingTo("0.00");
     }
 

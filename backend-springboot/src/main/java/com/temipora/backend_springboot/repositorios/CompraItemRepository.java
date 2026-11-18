@@ -223,4 +223,26 @@ public interface CompraItemRepository extends JpaRepository<CompraItem, Long> {
         @Param("idArtista") Long idArtista,
         @Param("desde") LocalDateTime desde,
         @Param("hasta") LocalDateTime hasta);
+
+    /**
+     * Ítems de todos los grupos pagados de la plataforma en el período.
+     * Alimenta el desglose por producto del informe del admin.
+     */
+    @Query(value = """
+        SELECT i.id_compra_grupo,
+               i.id_producto,
+               i.titulo_producto,
+               i.cantidad,
+               i.precio_cobro,
+               i.comision_monto
+        FROM compra_item i
+        JOIN compra_grupo g ON g.id_compra_grupo = i.id_compra_grupo
+        WHERE g.estado = 'PAGADO'
+          AND g.fecha_pago >= :desde
+          AND g.fecha_pago < :hasta
+        ORDER BY i.id_compra_grupo, i.id_compra_item
+        """, nativeQuery = true)
+    List<Object[]> filasInformeAdminProductos(
+        @Param("desde") LocalDateTime desde,
+        @Param("hasta") LocalDateTime hasta);
 }

@@ -10,6 +10,7 @@ import api from '../servicios/api'
 import {
   Archive,
   Ban,
+  ChartNoAxesCombined,
   Clock,
   Coins,
   FileText,
@@ -128,9 +129,20 @@ const utilidades = [
   { nombre: 'Auditoría', to: '/admin/auditoria', icono: Clock },
 ]
 
-const resumen = { nombre: 'Resumen', to: '/admin', icono: LayoutDashboard }
+const principales = [
+  { nombre: 'Resumen', to: '/admin', icono: LayoutDashboard },
+  {
+    nombre: 'Informes',
+    to: '/admin/informes/ventas',
+    base: '/admin/informes',
+    icono: ChartNoAxesCombined,
+  },
+]
 
 const esActiva = (to) => Boolean(to) && route.path === to
+const esActivaPrincipal = (item) => item.base
+  ? route.path.startsWith(item.base)
+  : route.path === item.to
 const estaActivo = (item) => (item.rutas ? item.rutas.includes(route.path) : esActiva(item.to))
 const ariaActual = (item) => {
   if (!estaActivo(item)) return null
@@ -399,28 +411,30 @@ function cerrarSesion() {
           aria-label="Secciones de administración"
         >
           <router-link
-            :to="resumen.to"
+            v-for="item in principales"
+            :key="item.nombre"
+            :to="item.to"
             class="relative flex h-11 items-center gap-3 px-5 py-1 text-sm transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral/60"
             :class="[
-              esActiva(resumen.to) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste',
+              esActivaPrincipal(item) ? 'bg-coral/25 text-white font-medium' : 'text-inverso-contraste/65 hover:bg-white/10 hover:text-inverso-contraste',
               colapsada ? 'md:justify-center md:px-0' : '',
             ]"
-            :aria-current="esActiva(resumen.to) ? 'page' : null"
-            :aria-label="resumen.nombre"
-            :title="colapsada ? resumen.nombre : null"
+            :aria-current="esActivaPrincipal(item) ? 'page' : null"
+            :aria-label="item.nombre"
+            :title="colapsada ? item.nombre : null"
           >
             <span
-              v-if="esActiva(resumen.to)"
+              v-if="esActivaPrincipal(item)"
               class="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-coral-vivo"
               aria-hidden="true"
             ></span>
             <component
-              :is="resumen.icono"
+              :is="item.icono"
               class="h-5 w-5 shrink-0"
-              :stroke-width="esActiva(resumen.to) ? 2.2 : 1.75"
+              :stroke-width="esActivaPrincipal(item) ? 2.2 : 1.75"
               aria-hidden="true"
             />
-            <span :class="colapsada ? 'md:hidden' : ''">{{ resumen.nombre }}</span>
+            <span :class="colapsada ? 'md:hidden' : ''">{{ item.nombre }}</span>
           </router-link>
 
           <div
