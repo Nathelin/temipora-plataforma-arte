@@ -62,6 +62,25 @@ public class TerminosPlataformaService {
     }
 
     /**
+     * Obtiene la aceptación de la versión vigente para un usuario. Si no existe,
+     * la acción debe bloquearse: primero hay que aceptar los TOS actuales.
+     */
+    @Transactional(readOnly = true)
+    public AceptacionTerminosPlataforma obtenerAceptacionVigente(Long idUsuario) {
+        TerminosPlataforma actual;
+        try {
+            actual = obtenerEntidadVigente();
+        } catch (NoSuchElementException e) {
+            throw new ConflictoException(
+                "La plataforma todavía no publicó sus términos y condiciones.");
+        }
+        return aceptacionRepository
+            .findByUsuarioIdUsuarioAndVersion(idUsuario, actual.getVersion())
+            .orElseThrow(() -> new ConflictoException(
+                "Tenés que aceptar los términos de la plataforma vigentes."));
+    }
+
+    /**
      * Estado de los términos para el usuario: versión vigente y si ya la aceptó.
      * Si la plataforma no publicó términos, no hay nada pendiente.
      */

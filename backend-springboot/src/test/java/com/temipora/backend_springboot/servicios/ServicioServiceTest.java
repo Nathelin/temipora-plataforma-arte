@@ -171,9 +171,11 @@ class ServicioServiceTest {
         CriteriaBuilder cb = mock(CriteriaBuilder.class);
         Path<Object> artista = mock(Path.class);
         Path<Object> idArtista = mock(Path.class);
+        Path<Object> estadoCuenta = mock(Path.class);
 
         when(root.get("artista")).thenReturn((Path) artista);
         when(artista.get("idUsuario")).thenReturn(idArtista);
+        when(artista.get("estadoCuenta")).thenReturn((Path) estadoCuenta);
 
         captor.getValue().toPredicate(root, query, cb);
 
@@ -464,6 +466,17 @@ class ServicioServiceTest {
 
         assertThatThrownBy(() -> servicioService.reactivar(1L, 5L))
             .isInstanceOf(ConflictoException.class);
+    }
+
+    @Test
+    void obtener_artistaInactivo_lanzaServicioNoDisponible() {
+        Servicio servicio = servicioLista(1L, ModoRecepcionSolicitud.ABIERTA, 2);
+        servicio.getArtista().setEstadoCuenta(false);
+        when(servicioRepository.findByIdServicio(1L)).thenReturn(Optional.of(servicio));
+
+        assertThatThrownBy(() -> servicioService.obtener(1L, null))
+            .isInstanceOf(ServicioNoDisponibleException.class)
+            .hasMessage("Este servicio no está disponible.");
     }
 
     // ---------------------------------------------------------------

@@ -6,8 +6,8 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-//import jakarta.persistence.EnumType;
-//import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -71,12 +71,25 @@ public class Usuario {
     @Builder.Default
     private boolean estadoCuenta = true;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "preferencia_sensible", nullable = false, length = 30)
     @Builder.Default
     private EPreferenciaContenidoSensible preferenciaSensible = EPreferenciaContenidoSensible.ADVERTIR;
 
     @Column(name = "pedidos_publicos", nullable = false)
     @Builder.Default
     private boolean pedidosPublicos = false;
+
+    @Column(name = "coleccion_publica", nullable = false)
+    @Builder.Default
+    private boolean coleccionPublica = false;
+
+    @Column(name = "coleccion_sugerida_en")
+    private LocalDateTime coleccionSugeridaEn;
+
+    @Column(name = "mostrar_propietario", nullable = false)
+    @Builder.Default
+    private boolean mostrarPropietario = true;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "id_moneda_preferida")
@@ -123,6 +136,9 @@ public class Usuario {
     @Column(name = "token_baja_email", length = 64, unique = true)
     private String tokenBajaEmail;
 
+    @Column(name = "fecha_baja_voluntaria")
+    private LocalDateTime fechaBajaVoluntaria;
+
     // TODO: Ver si manejo estadoCuenta con booleano o enum........
 
     public void activar() {
@@ -131,6 +147,16 @@ public class Usuario {
 
     public void desactivar() {
         this.estadoCuenta = false;
+    }
+
+    public void marcarBajaVoluntaria(LocalDateTime fecha) {
+        this.estadoCuenta = false;
+        this.fechaBajaVoluntaria = fecha;
+    }
+
+    public void reactivarCuenta() {
+        this.estadoCuenta = true;
+        this.fechaBajaVoluntaria = null;
     }
 
     /*@ManyToOne(targetEntity = Rol.class, cascade = CascadeType.PERSIST, fetch = FetchType.LAZY)

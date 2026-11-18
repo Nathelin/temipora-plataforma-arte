@@ -21,6 +21,9 @@ import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.PerfilArtisticoDTO;
+import com.temipora.backend_springboot.modelo.Producto;
+import com.temipora.backend_springboot.modelo.ProductoFavorito;
+import com.temipora.backend_springboot.modelo.ProductoFavoritoId;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.ServicioFavorito;
@@ -28,6 +31,8 @@ import com.temipora.backend_springboot.modelo.ServicioFavoritoDTO;
 import com.temipora.backend_springboot.modelo.ServicioFavoritoId;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.ArtistaFavoritoRepository;
+import com.temipora.backend_springboot.repositorios.ProductoFavoritoRepository;
+import com.temipora.backend_springboot.repositorios.ProductoRepository;
 import com.temipora.backend_springboot.repositorios.ServicioFavoritoRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
@@ -43,7 +48,9 @@ public class FavoritoService {
 
     private final ArtistaFavoritoRepository artistaFavoritoRepository;
     private final ServicioFavoritoRepository servicioFavoritoRepository;
+    private final ProductoFavoritoRepository productoFavoritoRepository;
     private final ServicioRepository servicioRepository;
+    private final ProductoRepository productoRepository;
     private final UsuarioRepository usuarioRepository;
     private final PerfilArtisticoService perfilArtisticoService;
     private final ServicioService servicioService;
@@ -51,13 +58,17 @@ public class FavoritoService {
     public FavoritoService(
             ArtistaFavoritoRepository artistaFavoritoRepository,
             ServicioFavoritoRepository servicioFavoritoRepository,
+            ProductoFavoritoRepository productoFavoritoRepository,
             ServicioRepository servicioRepository,
+            ProductoRepository productoRepository,
             UsuarioRepository usuarioRepository,
             PerfilArtisticoService perfilArtisticoService,
             ServicioService servicioService) {
         this.artistaFavoritoRepository = artistaFavoritoRepository;
         this.servicioFavoritoRepository = servicioFavoritoRepository;
+        this.productoFavoritoRepository = productoFavoritoRepository;
         this.servicioRepository = servicioRepository;
+        this.productoRepository = productoRepository;
         this.usuarioRepository = usuarioRepository;
         this.perfilArtisticoService = perfilArtisticoService;
         this.servicioService = servicioService;
@@ -254,6 +265,53 @@ public class FavoritoService {
         return servicioFavoritoRepository
             .existsByUsuarioIdUsuarioAndServicioIdServicio(
                 usuario.getIdUsuario(), idServicio);
+    }
+
+    // ------------------------------------------------------------------
+    // Productos
+    // ------------------------------------------------------------------
+
+    @Transactional(readOnly = true)
+    public List<Long> listarIdsProductos(String nombreUsuario) {
+        Usuario usuario = obtenerUsuario(nombreUsuario);
+        return productoFavoritoRepository.findIdsProductoByUsuario(
+            usuario.getIdUsuario());
+    }
+
+    @Transactional
+    public void agregarProducto(String nombreUsuario, Long idProducto) {
+        Usuario usuario = obtenerUsuario(nombreUsuario);
+        if (productoFavoritoRepository
+                .existsByUsuarioIdUsuarioAndProductoIdProducto(
+                    usuario.getIdUsuario(), idProducto)) {
+            return;
+        }
+        Producto producto = productoRepository.findByIdProducto(idProducto)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Producto no encontrado: " + idProducto));
+        ProductoFavorito favorito = new ProductoFavorito();
+        favorito.setId(new ProductoFavoritoId(
+            usuario.getIdUsuario(), idProducto));
+        favorito.setUsuario(usuario);
+        favorito.setProducto(producto);
+        productoFavoritoRepository.save(favorito);
+    }
+
+    @Transactional
+    public void eliminarProducto(String nombreUsuario, Long idProducto) {
+        Usuario usuario = obtenerUsuario(nombreUsuario);
+        productoFavoritoRepository
+            .findByUsuarioIdUsuarioAndProductoIdProducto(
+                usuario.getIdUsuario(), idProducto)
+            .ifPresent(productoFavoritoRepository::delete);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean esFavoritoProducto(String nombreUsuario, Long idProducto) {
+        Usuario usuario = obtenerUsuario(nombreUsuario);
+        return productoFavoritoRepository
+            .existsByUsuarioIdUsuarioAndProductoIdProducto(
+                usuario.getIdUsuario(), idProducto);
     }
 
     // ------------------------------------------------------------------

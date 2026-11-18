@@ -31,9 +31,20 @@ const errorRecientes = ref('')
 let intervalo = null
 let secuencia = 0
 let cargaRecientesEnCurso = null
+let usuarioActual = localStorage.getItem('idUsuario')
+let secuenciaRecientes = 0
+let secuenciaContador = 0
 
 function haySesion() {
   return Boolean(localStorage.getItem('token'))
+}
+
+function sincronizarSesion() {
+  const id = localStorage.getItem('idUsuario')
+  if (id !== usuarioActual) {
+    usuarioActual = id
+    limpiar()
+  }
 }
 
 function aplicarContador(data) {
@@ -42,15 +53,19 @@ function aplicarContador(data) {
 }
 
 async function refrescarContador() {
+  sincronizarSesion()
   if (!haySesion()) {
     noLeidas.value = 0
     porCategoria.value = {}
     return
   }
+  const turno = ++secuenciaContador
   try {
     const res = await cargarContadorNotificaciones()
+    if (turno !== secuenciaContador) return
     aplicarContador(res.data)
   } catch (e) {
+    if (turno !== secuenciaContador) return
     if (e.response?.status === 401) {
       noLeidas.value = 0
       porCategoria.value = {}
@@ -66,6 +81,7 @@ function paramsDeLista(paginaPedida) {
 }
 
 async function cargar({ reset = true } = {}) {
+  sincronizarSesion()
   if (!haySesion()) {
     limpiar()
     return
@@ -137,6 +153,7 @@ function establecerFiltros({
 }
 
 async function cargarRecientes({ silencioso = false } = {}) {
+  sincronizarSesion()
   if (!haySesion()) {
     recientes.value = []
     return
@@ -144,6 +161,7 @@ async function cargarRecientes({ silencioso = false } = {}) {
   if (cargaRecientesEnCurso) {
     return cargaRecientesEnCurso
   }
+  const turno = ++secuenciaRecientes
   if (!silencioso) {
     cargandoRecientes.value = true
   }
@@ -152,8 +170,10 @@ async function cargarRecientes({ silencioso = false } = {}) {
   cargaRecientesEnCurso = (async () => {
     try {
       const res = await cargarNotificacionesRecientes(LIMITE_RECIENTES)
+      if (turno !== secuenciaRecientes) return
       recientes.value = res.data || []
     } catch (e) {
+      if (turno !== secuenciaRecientes) return
       if (e.response?.status === 401) {
         recientes.value = []
         return
@@ -163,8 +183,10 @@ async function cargarRecientes({ silencioso = false } = {}) {
           e.response?.data?.message || 'No se pudieron cargar las notificaciones.'
       }
     } finally {
-      cargandoRecientes.value = false
-      cargaRecientesEnCurso = null
+      if (turno === secuenciaRecientes) {
+        cargandoRecientes.value = false
+        cargaRecientesEnCurso = null
+      }
     }
   })()
 
@@ -225,6 +247,7 @@ async function marcarLeida(notificacion) {
 }
 
 async function marcarTodasLeidas() {
+  sincronizarSesion()
   if (!haySesion()) {
     return 0
   }
@@ -278,6 +301,9 @@ function limpiar() {
   categoria.value = null
   soloNoLeidas.value = false
   secuencia += 1
+  secuenciaRecientes += 1
+  secuenciaContador += 1
+  cargaRecientesEnCurso = null
 }
 
 export function useNotificacionesSistema() {
@@ -305,6 +331,7 @@ export function useNotificacionesSistema() {
     cambiarCategoria,
     alternarSoloNoLeidas,
     establecerFiltros,
+    sincronizarSesion,
     iniciarPolling,
     detenerPolling,
     limpiar,

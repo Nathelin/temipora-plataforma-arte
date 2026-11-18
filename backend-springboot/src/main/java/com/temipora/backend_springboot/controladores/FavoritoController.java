@@ -114,4 +114,40 @@ public class FavoritoController {
             "esFavorito", false,
             "message", "El servicio se eliminó de tus favoritos.");
     }
+
+    // ------------------------------------------------------------------
+    // Productos
+    // ------------------------------------------------------------------
+
+    @GetMapping("/productos/ids")
+    public List<Long> listarIdsProductos(Authentication authentication) {
+        return favoritoService.listarIdsProductos(authentication.getName());
+    }
+
+    @GetMapping("/productos/{idProducto}")
+    public Map<String, Boolean> estadoProducto(
+            @PathVariable Long idProducto,
+            Authentication authentication) {
+        return Map.of(
+            "esFavorito",
+            favoritoService.esFavoritoProducto(authentication.getName(), idProducto));
+    }
+
+    @PostMapping("/productos/{idProducto}")
+    public Map<String, Object> agregarProducto(
+            @PathVariable Long idProducto,
+            Authentication authentication) {
+        favoritoService.agregarProducto(authentication.getName(), idProducto);
+        return Map.of("esFavorito", true);
+    }
+
+    @DeleteMapping("/productos/{idProducto}")
+    public Map<String, Object> eliminarProducto(
+            @PathVariable Long idProducto,
+            Authentication authentication) {
+        favoritoService.eliminarProducto(authentication.getName(), idProducto);
+        return Map.of(
+            "esFavorito", false,
+            "message", "El producto se eliminó de tus favoritos.");
+    }
 }

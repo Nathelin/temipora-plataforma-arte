@@ -605,17 +605,7 @@ public class RecomendacionService {
     }
 
     private double jaccard(Set<Long> a, Set<Long> b) {
-        if (a == null || b == null || a.isEmpty() || b.isEmpty()) {
-            return 0;
-        }
-        int interseccion = 0;
-        for (Long valor : a) {
-            if (b.contains(valor)) {
-                interseccion++;
-            }
-        }
-        int union = a.size() + b.size() - interseccion;
-        return union <= 0 ? 0 : interseccion / (double) union;
+        return RankingSoporte.jaccard(a, b);
     }
 
     private double ratingScore(PromedioReseniasDTO promedio) {
@@ -631,30 +621,14 @@ public class RecomendacionService {
     }
 
     private double recencia(LocalDateTime ultima, int diasDecaimiento) {
-        if (ultima == null) {
-            return 0;
-        }
-        long dias = ChronoUnit.DAYS.between(ultima.toLocalDate(), LocalDate.now());
-        if (dias < 0) {
-            dias = 0;
-        }
-        return Math.max(0, 1.0 - dias / (double) Math.max(1, diasDecaimiento));
+        return RankingSoporte.recencia(ultima, diasDecaimiento);
     }
 
     private double precioSim(
             BigDecimal origen,
             BigDecimal candidato,
             BigDecimal rangoPct) {
-        if (origen == null || candidato == null || origen.signum() <= 0) {
-            return 0.5;
-        }
-        double diferencia = Math.abs(candidato.subtract(origen).doubleValue())
-            / origen.doubleValue();
-        double rango = rangoPct != null ? rangoPct.doubleValue() / 100.0 : 0.4;
-        if (rango <= 0) {
-            return diferencia == 0 ? 1 : 0;
-        }
-        return Math.max(0, 1 - diferencia / rango);
+        return RankingSoporte.precioSim(origen, candidato, rangoPct);
     }
 
     private BigDecimal precioConvertido(Servicio servicio, Moneda monedaDestino) {
@@ -743,17 +717,7 @@ public class RecomendacionService {
     private Map<Long, Double> normalizar(
             Map<Long, Long> crudo,
             Map<Long, Long> popularidad) {
-        Map<Long, Double> resultado = new HashMap<>();
-        for (Map.Entry<Long, Long> entrada : crudo.entrySet()) {
-            long total = popularidad.getOrDefault(entrada.getKey(), 0L);
-            if (total <= 0) {
-                continue;
-            }
-            resultado.put(
-                entrada.getKey(),
-                Math.min(1.0, entrada.getValue() / (double) total));
-        }
-        return resultado;
+        return RankingSoporte.normalizar(crudo, popularidad);
     }
 
     private void actualizarUltima(

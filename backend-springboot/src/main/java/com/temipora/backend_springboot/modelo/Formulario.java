@@ -41,6 +41,9 @@ public class Formulario {
     @Column(name = "es_sistema", nullable = false)
     private boolean esSistema = false;
 
+    @Column(nullable = false)
+    private boolean vigente = true;
+
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion = LocalDateTime.now();
 

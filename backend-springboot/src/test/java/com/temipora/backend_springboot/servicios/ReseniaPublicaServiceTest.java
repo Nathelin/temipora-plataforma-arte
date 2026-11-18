@@ -82,7 +82,7 @@ class ReseniaPublicaServiceTest {
     }
 
     @Test
-    void resumenPorPedidos_servicioSensible_fuerzaAnonima() {
+    void resumenPorPedidos_servicioSensibleRespetaElNombreElegido() {
         Pedido pedido = pedido(true);
         Resenia resenia = resenia(pedido, true);
         stubResumenPorPedidos(resenia, version(100L, 4, "Reservado"));
@@ -90,7 +90,21 @@ class ReseniaPublicaServiceTest {
         Map<Long, ReseniaPublicaResumenDTO> mapa =
             reseniaPublicaService.resumenPorPedidos(List.of(10L));
 
+        assertThat(mapa.get(10L).isAnonima()).isFalse();
+        assertThat(mapa.get(10L).getAutorMostrado()).isEqualTo("Cliente");
+    }
+
+    @Test
+    void resumenPorPedidos_servicioSensibleSinNombre_sigueAnonima() {
+        Pedido pedido = pedido(true);
+        Resenia resenia = resenia(pedido, false);
+        stubResumenPorPedidos(resenia, version(100L, 4, "Reservado"));
+
+        Map<Long, ReseniaPublicaResumenDTO> mapa =
+            reseniaPublicaService.resumenPorPedidos(List.of(10L));
+
         assertThat(mapa.get(10L).isAnonima()).isTrue();
+        assertThat(mapa.get(10L).getAutorMostrado()).isEqualTo("Cliente verificado");
     }
 
     @Test

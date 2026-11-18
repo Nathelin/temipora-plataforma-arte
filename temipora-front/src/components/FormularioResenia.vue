@@ -12,6 +12,11 @@ const props = defineProps({
   textoCancelar: { type: String, default: 'Cancelar' },
   anonimoForzado: { type: Boolean, default: false },
   permiteAnonimato: { type: Boolean, default: true },
+  etiquetaAnonima: { type: String, default: 'Cliente verificado' },
+  placeholderDescripcion: {
+    type: String,
+    default: 'Contá cómo fue el trabajo, la comunicación y la entrega',
+  },
 })
 
 const emit = defineEmits(['guardar', 'cancelar'])
@@ -206,7 +211,7 @@ function guardar() {
           rows="4"
           maxlength="1000"
           :class="[claseCampo, 'resize-none']"
-          placeholder="Contá cómo fue el trabajo, la comunicación y la entrega"
+          :placeholder="placeholderDescripcion"
         ></textarea>
         <p class="mt-1 text-right text-xs text-cafe/50">{{ descripcion.length }}/1000</p>
       </div>
@@ -225,12 +230,12 @@ function guardar() {
       <span>
         Mostrar mi nombre junto a la reseña
         <span v-if="anonimoForzado" class="mt-1 block text-xs leading-relaxed text-cafe/55">
-          Este servicio es de contenido sensible: la reseña se publica como
-          “Cliente verificado” y no aparece debajo de las piezas de tu galería.
+          Este contenido es sensible: la reseña se publica como
+          “{{ etiquetaAnonima }}” y no se muestra tu identidad.
         </span>
         <span v-else class="mt-1 block text-xs leading-relaxed text-cafe/55">
-          Si lo desactivás, se publica como “Cliente verificado” y no aparece
-          debajo de las piezas de tu galería.
+          Si lo desactivás, se publica como “{{ etiquetaAnonima }}” y no se
+          muestra tu identidad.
         </span>
       </span>
     </label>

@@ -9,11 +9,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -37,9 +39,12 @@ import com.temipora.backend_springboot.config.SecurityConfig;
 import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
 import com.temipora.backend_springboot.modelo.ActualizarTelefonoDTO;
+import com.temipora.backend_springboot.modelo.BajaCuentaResultadoDTO;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.QuitarTelefonoDTO;
+import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
+import com.temipora.backend_springboot.servicios.BajaCuentaService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 import com.temipora.backend_springboot.servicios.VisitaService;
 
@@ -65,6 +70,9 @@ class UsuarioControllerTest {
 
     @MockitoBean
     private VisitaService visitaService;
+
+    @MockitoBean
+    private BajaCuentaService bajaCuentaService;
 
     @MockitoBean
     private UserDetailsService userDetailsService;
@@ -451,6 +459,89 @@ class UsuarioControllerTest {
                 .andExpect(status().isBadRequest());
 
         verify(usuarioService, never()).cambiarContrasenia(any(), any());
+    }
+
+    // ---------------------------------------------------------------
+    // POST /api/usuarios/{idUsuario}/baja
+    // ---------------------------------------------------------------
+
+    @Test
+    void darDeBaja_sinToken_devuelve401YNoLlamaAlServicio() throws Exception {
+        mockMvc.perform(post("/api/usuarios/7/baja")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"contrasenia\":\"secreta123\"}"))
+                .andExpect(status().isUnauthorized());
+
+        verify(bajaCuentaService, never()).darDeBaja(any(), any());
+    }
+
+    @Test
+    void darDeBaja_tokenPropio_devuelve200YDelega() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("cliente42", ERol.CLIENTE.name());
+        when(usuarioService.nombreUsuario(7L)).thenReturn("cliente42");
+        when(bajaCuentaService.darDeBaja(7L, "secreta123"))
+                .thenReturn(new BajaCuentaResultadoDTO(
+                        "Tu cuenta quedó inactiva.",
+                        LocalDateTime.now().plusDays(30)));
+
+        mockMvc.perform(post("/api/usuarios/7/baja")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"contrasenia\":\"secreta123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Tu cuenta quedó inactiva."))
+                .andExpect(jsonPath("$.reactivarHasta").isNotEmpty());
+
+        verify(bajaCuentaService).darDeBaja(7L, "secreta123");
+    }
+
+    @Test
+    void darDeBaja_tokenDeOtroUsuario_devuelve403() throws Exception {
+        stubUsuarioConRol("intruso", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("intruso", ERol.CLIENTE.name());
+        when(usuarioService.nombreUsuario(7L)).thenReturn("CosmicCrap");
+
+        mockMvc.perform(post("/api/usuarios/7/baja")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"contrasenia\":\"secreta123\"}"))
+                .andExpect(status().isForbidden());
+
+        verify(bajaCuentaService, never()).darDeBaja(any(), any());
+    }
+
+    @Test
+    void darDeBaja_sinContrasenia_devuelve400SinLlamarAlServicio() throws Exception {
+        stubUsuarioConRol("cliente42", ERol.CLIENTE);
+        String token = jwtUtils.generarTokenAcceso("cliente42", ERol.CLIENTE.name());
+
+        mockMvc.perform(post("/api/usuarios/7/baja")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verify(bajaCuentaService, never()).darDeBaja(any(), any());
+    }
+
+    // ---------------------------------------------------------------
+    // GET /api/perfil/{nombreUsuario} — cuenta inactiva
+    // ---------------------------------------------------------------
+
+    @Test
+    void obtenerPerfil_cuentaInactiva_devuelve410() throws Exception {
+        when(usuarioService.getByNombreUsuario("baja"))
+                .thenReturn(Usuario.builder()
+                        .idUsuario(9L)
+                        .nombreUsuario("baja")
+                        .estadoCuenta(false)
+                        .build());
+
+        mockMvc.perform(get("/api/perfil/baja"))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.message")
+                        .value("Esta cuenta no está disponible."));
     }
 
     // ---------------------------------------------------------------

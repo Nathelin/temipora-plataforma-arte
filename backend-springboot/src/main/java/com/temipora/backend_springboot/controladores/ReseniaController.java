@@ -74,6 +74,46 @@ public class ReseniaController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/productos/{idProducto}/resenia")
+    @PreAuthorize("hasAnyRole('CLIENTE','ARTISTA')")
+    public ReseniaEstadoDTO estadoProducto(
+            @PathVariable Long idProducto,
+            Authentication authentication) {
+        return reseniaService.estadoProducto(
+            idProducto, idAutenticado(authentication));
+    }
+
+    @PostMapping("/productos/{idProducto}/resenia")
+    @PreAuthorize("hasAnyRole('CLIENTE','ARTISTA')")
+    public ResponseEntity<ReseniaDTO> crearProducto(
+            @PathVariable Long idProducto,
+            @Valid @RequestBody ReseniaRequest request,
+            Authentication authentication) {
+        ReseniaDTO dto = reseniaService.crearProducto(
+            idProducto, idAutenticado(authentication), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+    }
+
+    @PutMapping("/productos/{idProducto}/resenia")
+    @PreAuthorize("hasAnyRole('CLIENTE','ARTISTA')")
+    public ReseniaDTO editarProducto(
+            @PathVariable Long idProducto,
+            @Valid @RequestBody ReseniaRequest request,
+            Authentication authentication) {
+        return reseniaService.editarProducto(
+            idProducto, idAutenticado(authentication), request);
+    }
+
+    @DeleteMapping("/productos/{idProducto}/resenia")
+    @PreAuthorize("hasAnyRole('CLIENTE','ARTISTA')")
+    public ResponseEntity<Void> eliminarProducto(
+            @PathVariable Long idProducto,
+            Authentication authentication) {
+        reseniaService.eliminarProducto(
+            idProducto, idAutenticado(authentication));
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/clientes/{idCliente}/reputacion")
     @PreAuthorize("hasRole('ARTISTA')")
     public ReputacionClienteDTO reputacion(

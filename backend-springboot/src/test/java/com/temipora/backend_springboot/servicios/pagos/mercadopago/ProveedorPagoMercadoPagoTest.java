@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.HitoPedido;
+import com.temipora.backend_springboot.modelo.HitoPresupuesto;
 import com.temipora.backend_springboot.modelo.Pago;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Servicio;
@@ -211,11 +212,14 @@ class ProveedorPagoMercadoPagoTest {
         pedido.setArtista(artista);
         pedido.setServicio(servicio);
 
+        HitoPresupuesto hitoPresupuesto = new HitoPresupuesto();
+        hitoPresupuesto.setNombre("Seña");
+        hitoPresupuesto.setComisionMontoCobro(new BigDecimal("5.00"));
+
         HitoPedido hito = new HitoPedido();
         hito.setIdHitoPedido(20L);
         hito.setOrden(0);
-        hito.setNombre("Seña");
-        hito.setComisionMontoCobro(new BigDecimal("5.00"));
+        hito.setHitoPresupuesto(hitoPresupuesto);
         pedido.agregarHito(hito);
 
         Pago pago = new Pago();

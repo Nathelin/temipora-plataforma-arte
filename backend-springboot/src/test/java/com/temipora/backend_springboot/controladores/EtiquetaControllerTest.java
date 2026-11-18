@@ -67,10 +67,15 @@ class EtiquetaControllerTest {
     private final Usuario artista = usuario(20L, "dibujito");
 
     @Test
-    void selector_sinToken_devuelve401() throws Exception {
-        mockMvc.perform(get(BASE + "/selector")).andExpect(status().isUnauthorized());
+    void selector_sinToken_devuelve200() throws Exception {
+        // El catálogo de etiquetas es público: el filtro del catálogo de
+        // servicios lo necesita para un visitante anónimo.
+        when(etiquetaService.selector(null))
+                .thenReturn(List.of(dto(1L, "Acuarela", EtiquetaEstado.VALIDA)));
 
-        verify(etiquetaService, never()).selector(any());
+        mockMvc.perform(get(BASE + "/selector"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].nombre").value("Acuarela"));
     }
 
     @Test
@@ -87,8 +92,14 @@ class EtiquetaControllerTest {
     }
 
     @Test
-    void categorias_sinToken_devuelve401() throws Exception {
-        mockMvc.perform(get(BASE + "/categorias")).andExpect(status().isUnauthorized());
+    void categorias_sinToken_devuelve200() throws Exception {
+        when(etiquetaService.categoriasActivas())
+                .thenReturn(List.of(CategoriaEtiquetaDTO.builder()
+                        .idCategoriaEtiqueta(1L).nombre("Estilo").activo(true).build()));
+
+        mockMvc.perform(get(BASE + "/categorias"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].nombre").value("Estilo"));
     }
 
     @Test

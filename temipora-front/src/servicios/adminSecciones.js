@@ -1,5 +1,11 @@
 export const SECCIONES_CON_TABS = [
   {
+    id: 'informes',
+    tabs: [
+      { etiqueta: 'Ventas', to: '/admin/informes/ventas' },
+    ],
+  },
+  {
     id: 'arte',
     tabs: [
       { etiqueta: 'Medios', to: '/admin/arte/medios' },

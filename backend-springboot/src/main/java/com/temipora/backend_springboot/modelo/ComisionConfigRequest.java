@@ -26,4 +26,11 @@ public class ComisionConfigRequest {
     @Digits(integer = 3, fraction = 2,
         message = "La comisión de productos admite hasta 2 decimales.")
     private BigDecimal porcentajeProducto;
+
+    @NotNull(message = "La comisión de reventas es obligatoria.")
+    @DecimalMin(value = "0.00", message = "La comisión de reventas no puede ser negativa.")
+    @DecimalMax(value = "50.00", message = "La comisión de reventas no puede superar el 50%.")
+    @Digits(integer = 3, fraction = 2,
+        message = "La comisión de reventas admite hasta 2 decimales.")
+    private BigDecimal porcentajeReventa;
 }

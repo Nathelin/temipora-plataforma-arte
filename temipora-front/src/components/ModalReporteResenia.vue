@@ -87,7 +87,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', manejarTecla))
       </p>
 
       <div v-if="resenia" class="mt-4 rounded-xl bg-rosa/10 px-3 py-2 text-xs text-cafe/70">
-        <p class="font-semibold text-granate">{{ resenia.nombreServicio || 'Servicio' }}</p>
+        <p class="font-semibold text-granate">{{ resenia.nombreProducto || resenia.nombreServicio || 'Reseña' }}</p>
         <p>{{ autorMostrado }} · {{ resenia.calificacionGeneral }}/5</p>
       </div>
 

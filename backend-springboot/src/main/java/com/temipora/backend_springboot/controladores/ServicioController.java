@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.temipora.backend_springboot.modelo.ContenidoSensible;
+import com.temipora.backend_springboot.modelo.FacetasServicioDTO;
 import com.temipora.backend_springboot.modelo.FiltroServicioRequest;
 import com.temipora.backend_springboot.modelo.OrdenServicio;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
@@ -62,32 +65,24 @@ public class ServicioController {
 
     @GetMapping("/servicios")
     public PaginaDTO<ServicioDTO> listar(
-            @RequestParam(required = false) String nombre,
-            @RequestParam(required = false) String nombreArtista,
-            @RequestParam(required = false) Long idTipoServicio,
-            @RequestParam(required = false) Boolean sensible,
-            @RequestParam(required = false) BigDecimal precioMin,
-            @RequestParam(required = false) BigDecimal precioMax,
-            @RequestParam(required = false) Integer tiempoMaxDias,
-            @RequestParam(required = false) Boolean incluirSinCupos,
+            @ModelAttribute ParametrosFiltroServicio params,
             @RequestParam(defaultValue = "0") int pagina,
             @RequestParam(defaultValue = "24") int tamanio,
             @RequestParam(defaultValue = "RELEVANCIA") OrdenServicio orden,
             Authentication authentication) {
-        FiltroServicioRequest filtro = new FiltroServicioRequest();
-        filtro.setNombre(nombre);
-        filtro.setNombreArtista(nombreArtista);
-        filtro.setIdTipoServicio(idTipoServicio);
-        filtro.setSensible(sensible);
-        filtro.setPrecioMin(precioMin);
-        filtro.setPrecioMax(precioMax);
-        filtro.setTiempoMaxDias(tiempoMaxDias);
-        boolean incluir = incluirSinCupos == null || incluirSinCupos;
-        boolean mostrarSinCupos =
-            configuracionSustitucionService.obtener().isMostrarEnExplorar();
-        filtro.setIncluirSinCupos(incluir && mostrarSinCupos);
         return servicioService.listarActivosPaginado(
-            filtro, idVisor(authentication), pagina, tamanio, orden);
+            params.aFiltro(), idVisor(authentication), pagina, tamanio, orden);
+    }
+
+    /**
+     * Conteo de resultados por opción de filtro, con los mismos parámetros que
+     * el listado. Alimenta los números del panel de filtros.
+     */
+    @GetMapping("/servicios/facetas")
+    public FacetasServicioDTO facetas(
+            @ModelAttribute ParametrosFiltroServicio params,
+            Authentication authentication) {
+        return servicioService.facetas(params.aFiltro(), idVisor(authentication));
     }
 
     @GetMapping("/servicios/artista/{nombreUsuario}")

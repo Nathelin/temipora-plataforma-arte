@@ -12,6 +12,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
+import com.temipora.backend_springboot.servicios.CuentaSancionadaException;
+
 @Component
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
@@ -82,7 +84,11 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
         UserDetails userDetails;
         try {
-            userDetails = userDetailsService.loadUserByUsername(nombreUsuario);
+            userDetails = userDetailsService instanceof AccesoUsuarioService acceso
+                ? acceso.loadUserForSession(nombreUsuario)
+                : userDetailsService.loadUserByUsername(nombreUsuario);
+        } catch (CuentaSancionadaException e) {
+            throw new MessagingException("La cuenta está inhabilitada.");
         } catch (RuntimeException e) {
             throw new MessagingException("El usuario ya no existe.");
         }

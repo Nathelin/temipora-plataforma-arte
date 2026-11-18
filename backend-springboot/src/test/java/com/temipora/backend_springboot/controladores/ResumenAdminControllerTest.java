@@ -74,7 +74,7 @@ class ResumenAdminControllerTest {
                 .andExpect(jsonPath("$.moneda").value("ARS"))
                 .andExpect(jsonPath("$.volumen").value(1500.00))
                 .andExpect(jsonPath("$.comision").value(150.00))
-                .andExpect(jsonPath("$.pedidosPagados").value(2));
+                .andExpect(jsonPath("$.operaciones").value(2));
     }
 
     @Test

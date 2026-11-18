@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import api from '../servicios/api'
 
 const props = defineProps({
@@ -14,6 +14,7 @@ const cargando = ref(false)
 const error = ref('')
 const busqueda = ref('')
 const desplegado = ref(false)
+const indiceActivo = ref(-1)
 
 const categorias = ref([])
 const categoriasCargadas = ref(false)
@@ -52,6 +53,50 @@ const sugerencias = computed(() => {
     .filter(e => !texto || e.nombre.toLowerCase().includes(texto))
     .slice(0, 8)
 })
+
+watch(busqueda, () => {
+  indiceActivo.value = -1
+})
+
+watch(sugerencias, (lista) => {
+  if (!lista.length) {
+    indiceActivo.value = -1
+  } else if (indiceActivo.value >= lista.length) {
+    indiceActivo.value = lista.length - 1
+  }
+})
+
+function moverActivo(delta) {
+  const total = sugerencias.value.length
+  if (!total) return
+  desplegado.value = true
+  if (indiceActivo.value === -1) {
+    indiceActivo.value = delta > 0 ? 0 : total - 1
+    return
+  }
+  const siguiente = indiceActivo.value + delta
+  indiceActivo.value = siguiente < 0 ? total - 1 : siguiente >= total ? 0 : siguiente
+}
+
+function onKeydown(event) {
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    moverActivo(1)
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    moverActivo(-1)
+  } else if (event.key === 'Enter') {
+    event.preventDefault()
+    if (indiceActivo.value >= 0 && sugerencias.value[indiceActivo.value]) {
+      agregar(sugerencias.value[indiceActivo.value])
+    } else if (sugerencias.value.length) {
+      agregar(sugerencias.value[0])
+    }
+  } else if (event.key === 'Escape') {
+    desplegado.value = false
+    indiceActivo.value = -1
+  }
+}
 
 function agregar(etiqueta) {
   if (lleno.value) return
@@ -167,16 +212,19 @@ async function proponerEtiqueta() {
         class="pl-4 pr-4 block w-full rounded-lg border-0 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none disabled:opacity-60"
         @focus="desplegado = true"
         @blur="desplegado = false"
+        @keydown="onKeydown"
       />
       <ul
         v-if="desplegado && !lleno"
         class="absolute z-10 mt-1 w-full bg-blanco border border-rosa rounded-lg shadow-lg max-h-48 overflow-y-auto"
       >
-        <li v-for="e in sugerencias" :key="e.idEtiqueta">
+        <li v-for="(e, i) in sugerencias" :key="e.idEtiqueta">
           <button
             type="button"
             class="w-full text-left px-3 py-2 text-sm text-cafe hover:bg-rosa/20 flex items-center justify-between gap-2"
+            :class="i === indiceActivo ? 'bg-rosa/30' : ''"
             @mousedown.prevent="agregar(e)"
+            @mouseenter="indiceActivo = i"
           >
             <span>{{ e.nombre }}</span>
             <span class="text-xs text-cafe/40">{{ e.nombreCategoria }}</span>

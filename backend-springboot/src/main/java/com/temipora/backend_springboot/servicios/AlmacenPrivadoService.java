@@ -112,6 +112,17 @@ public class AlmacenPrivadoService {
         return new FileSystemResource(resolverParaLeer(clave));
     }
 
+    /**
+     * Tamaño en bytes del archivo guardado, sin leer su contenido.
+     */
+    public long tamano(String clave) {
+        try {
+            return Files.size(resolverParaLeer(clave));
+        } catch (IOException e) {
+            throw new IllegalStateException("No se pudo leer el archivo.", e);
+        }
+    }
+
     public boolean eliminar(String clave) {
         try {
             return Files.deleteIfExists(resolverParaLeer(clave));

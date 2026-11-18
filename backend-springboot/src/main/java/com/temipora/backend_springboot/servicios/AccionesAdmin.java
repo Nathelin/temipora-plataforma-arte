@@ -34,6 +34,24 @@ public final class AccionesAdmin {
     public static final String TIPO_PRODUCTO_BAJA = "TIPO_PRODUCTO_BAJA";
     public static final String TIPO_PRODUCTO_REACTIVAR = "TIPO_PRODUCTO_REACTIVAR";
 
+    public static final String PRODUCTO_CREAR = "PRODUCTO_CREAR";
+    public static final String PRODUCTO_BORRADOR_CREAR = "PRODUCTO_BORRADOR_CREAR";
+    public static final String PRODUCTO_BORRADOR_MODIFICAR = "PRODUCTO_BORRADOR_MODIFICAR";
+    public static final String PRODUCTO_PUBLICAR = "PRODUCTO_PUBLICAR";
+    public static final String PRODUCTO_MODIFICAR = "PRODUCTO_MODIFICAR";
+    public static final String PRODUCTO_PAUSAR = "PRODUCTO_PAUSAR";
+    public static final String PRODUCTO_REACTIVAR = "PRODUCTO_REACTIVAR";
+    public static final String PRODUCTO_ARCHIVAR = "PRODUCTO_ARCHIVAR";
+    public static final String PRODUCTO_RESTAURAR = "PRODUCTO_RESTAURAR";
+    public static final String REVENTA_PUBLICAR = "REVENTA_PUBLICAR";
+    public static final String REVENTA_EDITAR = "REVENTA_EDITAR";
+    public static final String REVENTA_CANCELAR = "REVENTA_CANCELAR";
+    public static final String REVENTA_SUSPENDER = "REVENTA_SUSPENDER";
+    public static final String COMPRA_CONFIRMAR = "COMPRA_CONFIRMAR";
+
+    public static final String LEDGER_ANCLAR = "LEDGER_ANCLAR";
+    public static final String LEDGER_ANCLAJE_CONFIRMAR = "LEDGER_ANCLAJE_CONFIRMAR";
+
     public static final String TIPO_SERVICIO_CREAR = "TIPO_SERVICIO_CREAR";
     public static final String TIPO_SERVICIO_MODIFICAR = "TIPO_SERVICIO_MODIFICAR";
     public static final String TIPO_SERVICIO_BAJA = "TIPO_SERVICIO_BAJA";
@@ -69,10 +87,16 @@ public final class AccionesAdmin {
     public static final String RESENIA_DESCARTAR_REPORTES = "RESENIA_DESCARTAR_REPORTES";
     public static final String TERMINOS_PUBLICAR = "TERMINOS_PUBLICAR";
     public static final String TERMINOS_ACEPTAR = "TERMINOS_ACEPTAR";
+    public static final String CUENTA_SANCIONAR = "CUENTA_SANCIONAR";
+    public static final String CUENTA_REVERTIR_SANCION = "CUENTA_REVERTIR_SANCION";
     public static final String USUARIO_CAMBIAR_CORREO = "USUARIO_CAMBIAR_CORREO";
     public static final String USUARIO_CAMBIAR_CONTRASENIA = "USUARIO_CAMBIAR_CONTRASENIA";
     public static final String USUARIO_CAMBIAR_TELEFONO = "USUARIO_CAMBIAR_TELEFONO";
     public static final String USUARIO_QUITAR_TELEFONO = "USUARIO_QUITAR_TELEFONO";
+    public static final String USUARIO_BAJA_VOLUNTARIA = "USUARIO_BAJA_VOLUNTARIA";
+    public static final String USUARIO_REACTIVAR_CUENTA = "USUARIO_REACTIVAR_CUENTA";
+    public static final String USUARIO_REACTIVAR_CUENTA_ADMIN = "USUARIO_REACTIVAR_CUENTA_ADMIN";
+    public static final String BAJA_CUENTA_CONFIG_ACTUALIZAR = "BAJA_CUENTA_CONFIG_ACTUALIZAR";
     public static final String LOGIN_FALLIDO = "LOGIN_FALLIDO";
     public static final String SESION_ACCESO_ENLACE = "SESION_ACCESO_ENLACE";
     public static final String SESION_ACCESO_ENLACE_FALLIDO = "SESION_ACCESO_ENLACE_FALLIDO";

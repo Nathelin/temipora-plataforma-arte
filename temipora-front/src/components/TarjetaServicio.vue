@@ -69,7 +69,7 @@ function textoEntrega(s) {
       <span class="sr-only">Ver {{ servicio.nombre }}</span>
     </router-link>
 
-    <div class="relative aspect-video w-full overflow-hidden bg-rosa/20">
+    <div class="relative aspect-[4/3] w-full overflow-hidden bg-rosa/20">
       <img
         v-if="servicio.imagenPortada"
         :src="servicio.imagenPortada"
@@ -135,7 +135,7 @@ function textoEntrega(s) {
       </button>
     </div>
 
-    <div class="flex flex-1 flex-col p-4">
+    <div class="flex flex-1 flex-col p-3.5">
       <p
         v-if="motivo"
         class="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-mantequilla/70 px-2.5 py-1 text-[11px] font-bold text-granate"
@@ -171,8 +171,8 @@ function textoEntrega(s) {
         </router-link>
       </div>
 
-      <div class="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-t border-borde/40 pt-3">
-        <p class="font-display text-lg font-extrabold leading-none text-coral">
+      <div class="mt-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-borde/40 pt-2.5">
+        <p class="font-display text-base font-extrabold leading-none text-coral">
           <span class="mr-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-cafe/45">Desde</span>
           <span :title="descuentoOferta ? 'Precio estimado con tu descuento sobre el presupuesto final' : undefined">
             {{ descuentoOferta ? precioConDescuentoMostrado : precioMostrado }}
@@ -204,7 +204,7 @@ function textoEntrega(s) {
             Nuevo
           </span>
           <span class="rounded-full bg-crema px-2 py-0.5 text-cafe/60" :title="`Entrega estimada: ${textoEntrega(servicio)}`">
-            Entrega estimada: {{ textoEntrega(servicio) }}
+            {{ textoEntrega(servicio) }}
           </span>
         </div>
       </div>

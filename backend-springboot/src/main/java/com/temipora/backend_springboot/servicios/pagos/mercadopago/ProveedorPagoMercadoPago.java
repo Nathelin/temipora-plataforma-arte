@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.servicios.pagos.mercadopago;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -74,7 +75,8 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
 
         Map<String, Object> cuerpo = new LinkedHashMap<>();
         cuerpo.put("items", List.of(Map.of(
-            "title", "Pedido " + pedido.getIdPedido() + " - " + hito.getNombre(),
+            "title", "Pedido " + pedido.getIdPedido() + " - "
+                + hito.getHitoPresupuesto().getNombre(),
             "description", "Hito " + hito.getOrden() + " de " + nombreServicio,
             "quantity", 1,
             "currency_id", pago.getMonedaCobro() != null
@@ -102,7 +104,8 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
             "idPedido", pedido.getIdPedido(),
             "idHitoPedido", hito.getIdHitoPedido()));
         if (enviarComision(hito)) {
-            cuerpo.put("marketplace_fee", hito.getComisionMontoCobro());
+            cuerpo.put("marketplace_fee",
+                hito.getHitoPresupuesto().getComisionMontoCobro());
         }
 
         LocalDateTime expira = expiracion(hito);
@@ -171,14 +174,22 @@ public class ProveedorPagoMercadoPago implements ProveedorPago {
      * pagos.mercadopago.comision-en-sandbox.
      */
     private boolean enviarComision(HitoPedido hito) {
-        return hito.getComisionMontoCobro() != null
-            && hito.getComisionMontoCobro().signum() > 0
+        BigDecimal comision = hito.getHitoPresupuesto().getComisionMontoCobro();
+        return comision != null
+            && comision.signum() > 0
             && (!sandbox || comisionEnSandbox);
     }
 
     private String urlRetorno(Pedido pedido, String resultado) {
-        return frontendUrl + "/pedidos/" + pedido.getIdPedido()
+        return baseFrontend() + "/pedidos/" + pedido.getIdPedido()
             + "?pago=" + resultado;
+    }
+
+    private String baseFrontend() {
+        if (frontendUrl == null || frontendUrl.isBlank()) {
+            return "http://localhost:5173";
+        }
+        return frontendUrl.replaceAll("/+$", "");
     }
 
     private LocalDateTime expiracion(HitoPedido hito) {

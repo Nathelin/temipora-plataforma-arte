@@ -29,6 +29,7 @@ import com.temipora.backend_springboot.config.JwtUtils;
 import com.temipora.backend_springboot.config.SecurityConfig;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.MedioDTO;
+import com.temipora.backend_springboot.modelo.TipoEntrega;
 import com.temipora.backend_springboot.servicios.MedioService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -96,7 +97,7 @@ class MedioAdminControllerTest {
         mockMvc.perform(post(BASE)
                 .header("Authorization", "Bearer " + token("admin", ERol.ADMIN))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"nombre\":\"Pintura\"}"))
+                .content("{\"nombre\":\"Pintura\",\"tipoEntrega\":\"DIGITAL\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.idMedio").value(1))
                 .andExpect(jsonPath("$.nombre").value("Pintura"));
@@ -123,7 +124,7 @@ class MedioAdminControllerTest {
         mockMvc.perform(put(BASE + "/1")
                 .header("Authorization", "Bearer " + token("admin", ERol.ADMIN))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"nombre\":\"Digital 2\"}"))
+                .content("{\"nombre\":\"Digital 2\",\"tipoEntrega\":\"DIGITAL\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nombre").value("Digital 2"));
     }
@@ -172,6 +173,7 @@ class MedioAdminControllerTest {
                 .nombre(nombre)
                 .descripcion("descripcion")
                 .observaciones(null)
+                .tipoEntrega(TipoEntrega.DIGITAL)
                 .activo(activo)
                 .build();
     }

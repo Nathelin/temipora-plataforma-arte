@@ -35,9 +35,29 @@ public class Resenia {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long idResenia;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "id_pedido", nullable = false)
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private AmbitoResenia ambito = AmbitoResenia.SERVICIO;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_pedido")
     private Pedido pedido;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_producto")
+    private Producto producto;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_compra_item")
+    private CompraItem compraItem;
+
+    @Size(max = 500, message = "Las variantes compradas no pueden superar los 500 caracteres")
+    @Column(name = "variantes_compradas", length = 500)
+    private String variantesCompradas;
+
+    @Column(name = "cantidad_variantes_compradas", nullable = false)
+    private int cantidadVariantesCompradas = 0;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "id_autor", nullable = false)
@@ -88,5 +108,9 @@ public class Resenia {
 
     public boolean estaEditada() {
         return versiones.size() > 1;
+    }
+
+    public boolean esDeProducto() {
+        return producto != null;
     }
 }

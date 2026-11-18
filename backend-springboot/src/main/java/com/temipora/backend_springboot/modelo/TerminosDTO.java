@@ -42,7 +42,9 @@ public class TerminosDTO {
 
         return TerminosDTO.builder()
             .idTerminos(terminos.getIdTerminos())
-            .idServicio(terminos.getIdServicio())
+            .idServicio(terminos.getServicio() != null
+                ? terminos.getServicio().getIdServicio()
+                : null)
             .propio(propio)
             .version(terminos.getVersion())
             .informacionGeneral(terminos.getInformacionGeneral())

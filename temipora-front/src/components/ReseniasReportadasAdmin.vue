@@ -245,11 +245,13 @@ function claseOpcion(opcion) {
                 {{ etiquetaEstadoResenia(resenia.estado) }}
               </span>
               <p class="text-sm font-semibold text-granate">
-                {{ resenia.nombreServicio || 'Servicio' }}
+                {{ resenia.nombreProducto || resenia.nombreServicio || 'Reseña' }}
               </p>
             </div>
             <p class="mt-1 text-xs text-cafe/60">
-              Pedido #{{ resenia.idPedido }} ·
+              <template v-if="resenia.idProducto">Producto #{{ resenia.idProducto }}</template>
+              <template v-else>Pedido #{{ resenia.idPedido }}</template>
+              ·
               {{ resenia.autor?.nombreUsuario ? `@${resenia.autor.nombreUsuario}` : 'Autor desconocido' }}
               <span v-if="!resenia.mostrarNombre">· publicada como anónima</span>
               · {{ formatearFecha(resenia.fechaVersion || resenia.fechaCreacion) }}

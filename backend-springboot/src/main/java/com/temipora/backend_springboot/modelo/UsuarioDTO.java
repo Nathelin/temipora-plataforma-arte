@@ -3,6 +3,7 @@ package com.temipora.backend_springboot.modelo;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.temipora.backend_springboot.servicios.TelefonoService;
 
 import lombok.AllArgsConstructor;
@@ -32,6 +33,14 @@ public class UsuarioDTO {
     private String nombrePais;
     private LocalDate fechaNacimiento;
     private boolean estadoCuenta;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private LocalDateTime fechaBajaVoluntaria;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private LocalDateTime reactivarHasta;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Boolean sancionado;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String sancionTipo;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaUltimaConexion;
     private String urlFotoPerfil;
@@ -39,12 +48,18 @@ public class UsuarioDTO {
     private String urlBanner;
     private EPreferenciaContenidoSensible preferenciaSensible;
     private boolean pedidosPublicos;
+    private boolean coleccionPublica;
+    private boolean mostrarPropietario;
     private boolean recibirEmailsPromocionales;
     private Long idMonedaPreferida;
     private String monedaPreferida;
     private String rol;
 
     public static UsuarioDTO desdeUsuario(Usuario usuario) {
+        return desdeUsuario(usuario, null);
+    }
+
+    public static UsuarioDTO desdeUsuario(Usuario usuario, Integer diasParaReactivar) {
         return UsuarioDTO.builder()
             .idUsuario(usuario.getIdUsuario())
             .nombreUsuario(usuario.getNombreUsuario())
@@ -62,6 +77,11 @@ public class UsuarioDTO {
             .nombrePais(usuario.getPais() != null ? usuario.getPais().getNombre() : null)
             .fechaNacimiento(usuario.getFechaNacimiento())
             .estadoCuenta(usuario.isEstadoCuenta())
+            .fechaBajaVoluntaria(usuario.getFechaBajaVoluntaria())
+            .reactivarHasta(usuario.getFechaBajaVoluntaria() != null
+                && diasParaReactivar != null
+                ? usuario.getFechaBajaVoluntaria().plusDays(diasParaReactivar)
+                : null)
             .fechaCreacion(usuario.getFechaCreacion())
             .fechaUltimaConexion(usuario.getFechaUltimaConexion())
             .urlFotoPerfil(usuario.getUrlFotoPerfil())
@@ -69,6 +89,8 @@ public class UsuarioDTO {
             .urlBanner(usuario.getUrlBanner())
             .preferenciaSensible(usuario.getPreferenciaSensible())
             .pedidosPublicos(usuario.isPedidosPublicos())
+            .coleccionPublica(usuario.isColeccionPublica())
+            .mostrarPropietario(usuario.isMostrarPropietario())
             .recibirEmailsPromocionales(usuario.isRecibirEmailsPromocionales())
             .idMonedaPreferida(usuario.getMonedaPreferida() != null
                 ? usuario.getMonedaPreferida().getIdMoneda() : null)

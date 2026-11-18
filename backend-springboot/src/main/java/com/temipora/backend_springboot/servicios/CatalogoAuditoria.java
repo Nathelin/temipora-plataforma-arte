@@ -40,13 +40,19 @@ public final class CatalogoAuditoria {
             AccionesAdmin.SOLICITUD_CREAR,
             AccionesAdmin.SOLICITUD_RECHAZAR,
             AccionesAdmin.SOLICITUD_CANCELAR,
-            AccionesAdmin.SOLICITUD_RETIRAR_PRESUPUESTO);
+            AccionesAdmin.SOLICITUD_RETIRAR_PRESUPUESTO,
+            AccionesAdmin.COMPRA_CONFIRMAR);
 
         registrar(CategoriaAuditoria.USUARIOS,
+            AccionesAdmin.CUENTA_SANCIONAR,
+            AccionesAdmin.CUENTA_REVERTIR_SANCION,
             AccionesAdmin.USUARIO_CAMBIAR_CORREO,
             AccionesAdmin.USUARIO_CAMBIAR_CONTRASENIA,
             AccionesAdmin.USUARIO_CAMBIAR_TELEFONO,
             AccionesAdmin.USUARIO_QUITAR_TELEFONO,
+            AccionesAdmin.USUARIO_BAJA_VOLUNTARIA,
+            AccionesAdmin.USUARIO_REACTIVAR_CUENTA,
+            AccionesAdmin.USUARIO_REACTIVAR_CUENTA_ADMIN,
             AccionesAdmin.LOGIN_FALLIDO,
             AccionesAdmin.SESION_ACCESO_ENLACE,
             AccionesAdmin.SESION_ACCESO_ENLACE_FALLIDO);
@@ -87,6 +93,19 @@ public final class CatalogoAuditoria {
             AccionesAdmin.TIPO_PRODUCTO_MODIFICAR,
             AccionesAdmin.TIPO_PRODUCTO_BAJA,
             AccionesAdmin.TIPO_PRODUCTO_REACTIVAR,
+            AccionesAdmin.PRODUCTO_CREAR,
+            AccionesAdmin.PRODUCTO_BORRADOR_CREAR,
+            AccionesAdmin.PRODUCTO_BORRADOR_MODIFICAR,
+            AccionesAdmin.PRODUCTO_PUBLICAR,
+            AccionesAdmin.PRODUCTO_MODIFICAR,
+            AccionesAdmin.PRODUCTO_PAUSAR,
+            AccionesAdmin.PRODUCTO_REACTIVAR,
+            AccionesAdmin.PRODUCTO_ARCHIVAR,
+            AccionesAdmin.PRODUCTO_RESTAURAR,
+            AccionesAdmin.REVENTA_PUBLICAR,
+            AccionesAdmin.REVENTA_EDITAR,
+            AccionesAdmin.REVENTA_CANCELAR,
+            AccionesAdmin.REVENTA_SUSPENDER,
             AccionesAdmin.TIPO_SERVICIO_CREAR,
             AccionesAdmin.TIPO_SERVICIO_MODIFICAR,
             AccionesAdmin.TIPO_SERVICIO_BAJA,
@@ -115,6 +134,7 @@ public final class CatalogoAuditoria {
             AccionesAdmin.MENSAJERIA_CONFIG_ACTUALIZAR,
             AccionesAdmin.RESENIA_CONFIG_ACTUALIZAR,
             AccionesAdmin.INACTIVIDAD_CONFIG_ACTUALIZAR,
+            AccionesAdmin.BAJA_CUENTA_CONFIG_ACTUALIZAR,
             AccionesAdmin.REACTIVACION_EJECUTAR,
             AccionesAdmin.SUSTITUCION_CONFIG_ACTUALIZAR,
             AccionesAdmin.COTIZACION_ACTUALIZAR,
@@ -132,7 +152,9 @@ public final class CatalogoAuditoria {
             AccionesAdmin.TERMINOS_ACEPTAR);
 
         registrar(CategoriaAuditoria.SISTEMA,
-            AccionesAdmin.COTIZACION_REFRESCAR);
+            AccionesAdmin.COTIZACION_REFRESCAR,
+            AccionesAdmin.LEDGER_ANCLAR,
+            AccionesAdmin.LEDGER_ANCLAJE_CONFIRMAR);
 
         criticas(
             AccionesAdmin.PRESUPUESTO_CREAR,
@@ -157,12 +179,18 @@ public final class CatalogoAuditoria {
             AccionesAdmin.SOLICITUD_RECHAZAR,
             AccionesAdmin.SOLICITUD_CANCELAR,
             AccionesAdmin.SOLICITUD_RETIRAR_PRESUPUESTO,
+            AccionesAdmin.COMPRA_CONFIRMAR,
             AccionesAdmin.TERMINOS_PUBLICAR,
             AccionesAdmin.TERMINOS_ACEPTAR,
+            AccionesAdmin.CUENTA_SANCIONAR,
+            AccionesAdmin.CUENTA_REVERTIR_SANCION,
             AccionesAdmin.USUARIO_CAMBIAR_CORREO,
             AccionesAdmin.USUARIO_CAMBIAR_CONTRASENIA,
             AccionesAdmin.USUARIO_CAMBIAR_TELEFONO,
             AccionesAdmin.USUARIO_QUITAR_TELEFONO,
+            AccionesAdmin.USUARIO_BAJA_VOLUNTARIA,
+            AccionesAdmin.USUARIO_REACTIVAR_CUENTA,
+            AccionesAdmin.USUARIO_REACTIVAR_CUENTA_ADMIN,
             AccionesAdmin.RESENIA_OCULTAR,
             AccionesAdmin.RESENIA_RESTAURAR,
             AccionesAdmin.RESENIA_DESCARTAR_REPORTES);

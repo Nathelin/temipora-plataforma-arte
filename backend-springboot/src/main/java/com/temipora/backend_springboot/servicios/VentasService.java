@@ -18,7 +18,10 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 
 import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.HitoPedido;
@@ -107,10 +110,11 @@ public class VentasService {
                 predicados.add(cb.equal(root.get("estado"), estado));
             }
             if (rango != null) {
+                Expression<LocalDateTime> fecha = expresionFechaEfectiva(
+                    root, cb);
                 predicados.add(cb.greaterThanOrEqualTo(
-                    root.<LocalDateTime>get("fechaCreacion"), rango.desde()));
-                predicados.add(cb.lessThan(
-                    root.<LocalDateTime>get("fechaCreacion"), rango.hasta()));
+                    fecha, rango.desde()));
+                predicados.add(cb.lessThan(fecha, rango.hasta()));
             }
             if (idServicio != null) {
                 predicados.add(cb.equal(
@@ -122,27 +126,48 @@ public class VentasService {
         };
     }
 
+    private Expression<LocalDateTime> expresionFechaEfectiva(
+            Root<Pago> root, CriteriaBuilder cb) {
+        Expression<LocalDateTime> acreditacion =
+            root.get("fechaAcreditacion");
+        Expression<LocalDateTime> aprobacion =
+            root.get("fechaAprobacion");
+        Expression<LocalDateTime> creacion = root.get("fechaCreacion");
+        return cb.coalesce(cb.coalesce(acreditacion, aprobacion), creacion);
+    }
+
+    private LocalDateTime fechaEfectiva(Pago pago) {
+        if (pago.getFechaAcreditacion() != null) {
+            return pago.getFechaAcreditacion();
+        }
+        if (pago.getFechaAprobacion() != null) {
+            return pago.getFechaAprobacion();
+        }
+        return pago.getFechaCreacion();
+    }
+
     private VentaDTO dto(Pago pago, Moneda mostrada) {
         HitoPedido hito = pago.getHitoPedido();
         Pedido pedido = hito.getPedido();
+        LocalDateTime fecha = fechaEfectiva(pago);
         BigDecimal netoMostrado = convertir(
-            pago.getMontoNetoCobro(), mostrada, pago.getFechaCreacion());
+            pago.getMontoNetoCobro(), mostrada, fecha);
         // El descuento lo financia Temipora: se prorratea por el monto de este
         // pago sobre el total que paga el cliente.
         BigDecimal descuentoCobro = BigDecimal.ZERO;
-        if (pedido.getDescuentoMontoCobro() != null
-                && pedido.getPrecioFinalClienteCobro() != null
-                && pedido.getPrecioFinalClienteCobro().signum() > 0
+        if (pedido.getPresupuesto().getDescuentoMontoCobro() != null
+                && pedido.getPresupuesto().getPrecioFinalClienteCobro() != null
+                && pedido.getPresupuesto().getPrecioFinalClienteCobro().signum() > 0
                 && pago.getMontoCobro() != null) {
-            descuentoCobro = pedido.getDescuentoMontoCobro()
+            descuentoCobro = pedido.getPresupuesto().getDescuentoMontoCobro()
                 .multiply(pago.getMontoCobro())
-                .divide(pedido.getPrecioFinalClienteCobro(),
+                .divide(pedido.getPresupuesto().getPrecioFinalClienteCobro(),
                     2, RoundingMode.HALF_UP);
         }
 
         return VentaDTO.builder()
             .idPago(pago.getIdPago())
-            .fecha(pago.getFechaCreacion())
+            .fecha(fecha)
             .fechaAcreditacion(pago.getFechaAcreditacion())
             .idPedido(pedido.getIdPedido())
             .nombreServicio(pedido.getServicio() != null
@@ -151,9 +176,11 @@ public class VentasService {
             .nombreUsuarioCliente(pedido.getCliente() != null
                 ? pedido.getCliente().getNombreUsuario()
                 : null)
-            .nombreHito(hito.getNombre())
+            .nombreHito(hito.getHitoPresupuesto().getNombre())
             .ordenHito(hito.getOrden())
-            .tipoHito(hito.getTipo() != null ? hito.getTipo().name() : null)
+            .tipoHito(hito.getHitoPresupuesto().getTipo() != null
+                ? hito.getHitoPresupuesto().getTipo().name()
+                : null)
             .estado(pago.getEstado() != null ? pago.getEstado().name() : null)
             .monto(pago.getMonto())
             .moneda(pago.getMoneda() != null
@@ -166,10 +193,10 @@ public class VentasService {
             .comisionMontoCobro(pago.getComisionMontoCobro())
             .montoNetoCobro(pago.getMontoNetoCobro())
             .netoMostrado(netoMostrado)
-            .descuentoPorcentaje(pedido.getDescuentoPorcentaje())
+            .descuentoPorcentaje(pedido.getPresupuesto().getDescuentoPorcentaje())
             .descuentoMontoCobro(descuentoCobro)
             .descuentoMostrado(convertir(
-                descuentoCobro, mostrada, pago.getFechaCreacion()))
+                descuentoCobro, mostrada, fecha))
             .monedaMostrada(mostrada != null ? mostrada.getCodigo() : null)
             .arancelMp(pago.getArancelMp())
             .netoRecibidoMp(pago.getNetoRecibidoMp())

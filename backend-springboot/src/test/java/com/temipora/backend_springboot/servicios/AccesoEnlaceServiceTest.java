@@ -18,12 +18,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.temipora.backend_springboot.config.ContactoPlataforma;
 import com.temipora.backend_springboot.config.JwtUtils;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.PropositoToken;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.TokenAcceso;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.SancionCuentaRepository;
 import com.temipora.backend_springboot.repositorios.TokenAccesoRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,6 +44,12 @@ class AccesoEnlaceServiceTest {
 
     @Mock
     private AuditoriaService auditoria;
+
+    @Mock
+    private SancionCuentaRepository sancionCuentaRepository;
+
+    @Mock
+    private ContactoPlataforma contacto;
 
     @InjectMocks
     private AccesoEnlaceService service;

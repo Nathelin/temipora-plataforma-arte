@@ -28,11 +28,12 @@ const tieneDatos = computed(
   () => props.precio != null && props.precio !== '',
 )
 const tieneDescuento = computed(() => Number(props.descuentoMonto) > 0)
-const etiquetaPrecio = computed(() => (
-  props.contexto === 'presupuesto'
-    ? 'Precio de la propuesta'
-    : 'Precio del pedido'
-))
+const esProducto = computed(() => props.contexto === 'producto')
+const etiquetaPrecio = computed(() => {
+  if (props.contexto === 'presupuesto') return 'Precio de la propuesta'
+  if (esProducto.value) return 'Precio de la publicación'
+  return 'Precio del pedido'
+})
 
 function formatear(valor) {
   return formatearPrecio(valor, props.moneda)
@@ -86,7 +87,7 @@ onBeforeUnmount(() => {
     >
       <div class="flex items-start justify-between gap-3">
         <h2 :id="id" class="font-display text-xl font-bold text-cafe">
-          ¿Cómo se calcula tu liquidación?
+          {{ esProducto ? '¿Cómo se calcula lo que vas a recibir?' : '¿Cómo se calcula tu liquidación?' }}
         </h2>
         <button
           ref="cerrarRef"
@@ -147,29 +148,49 @@ onBeforeUnmount(() => {
 
       <template v-else>
         <p class="mt-4 text-sm leading-relaxed text-cafe/90">
-          Cada venta se calcula así:
+          {{ esProducto ? 'Cada venta de tu producto se calcula así:' : 'Cada venta se calcula así:' }}
         </p>
         <ul class="mt-2 space-y-1 text-sm leading-relaxed text-cafe/90">
-          <li>
-            <strong class="text-cafe">El cliente paga</strong>:
-            el precio del pedido menos el descuento.
-          </li>
-          <li>
-            <strong class="text-cafe">Comisión Temipora</strong>:
-            el porcentaje que retiene la plataforma.
-          </li>
-          <li>
-            <strong class="text-cafe">Tu neto</strong>:
-            lo que queda después de la comisión Temipora.
-          </li>
-          <li>
-            <strong class="text-cafe">Arancel MercadoPago</strong>:
-            el costo del cobro; puede variar según el medio de pago y las cuotas.
-          </li>
-          <li>
-            <strong class="text-cafe">Recibís</strong>:
-            tu neto menos el arancel de MercadoPago.
-          </li>
+          <template v-if="esProducto">
+            <li>
+              <strong class="text-cafe">El comprador paga</strong>:
+              el precio que publicás.
+            </li>
+            <li>
+              <strong class="text-cafe">Comisión Temipora</strong>:
+              el porcentaje que retiene la plataforma.
+            </li>
+            <li>
+              <strong class="text-cafe">Arancel MercadoPago</strong>:
+              el costo del cobro; varía según el medio de pago y las cuotas (estimado).
+            </li>
+            <li>
+              <strong class="text-cafe">Recibís</strong>:
+              el precio menos la comisión Temipora y el arancel de MercadoPago.
+            </li>
+          </template>
+          <template v-else>
+            <li>
+              <strong class="text-cafe">El cliente paga</strong>:
+              el precio del pedido menos el descuento.
+            </li>
+            <li>
+              <strong class="text-cafe">Comisión Temipora</strong>:
+              el porcentaje que retiene la plataforma.
+            </li>
+            <li>
+              <strong class="text-cafe">Tu neto</strong>:
+              lo que queda después de la comisión Temipora.
+            </li>
+            <li>
+              <strong class="text-cafe">Arancel MercadoPago</strong>:
+              el costo del cobro; puede variar según el medio de pago y las cuotas.
+            </li>
+            <li>
+              <strong class="text-cafe">Recibís</strong>:
+              tu neto menos el arancel de MercadoPago.
+            </li>
+          </template>
         </ul>
       </template>
 
@@ -197,12 +218,21 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="mt-4 space-y-1.5 text-xs leading-relaxed text-cafe/80">
-        <p>
+        <p v-if="esProducto">
+          El arancel de MercadoPago es una estimación: el valor real depende del
+          medio de pago y de las cuotas, y se conoce al confirmarse el pago.
+        </p>
+        <p v-else>
           El arancel de MercadoPago es una estimación y puede variar según el
           medio de pago y las cuotas. Cuando MercadoPago informa el arancel
           real, “Recibís” se actualiza con ese valor.
         </p>
-        <p>
+        <p v-if="esProducto">
+          Si publicás en una moneda distinta de ARS, el cobro se procesa en ARS
+          al tipo de cambio del momento. El porcentaje no cambia, pero el monto
+          final puede variar por la cotización.
+        </p>
+        <p v-else>
           Si el plan de pagos tiene varios hitos, la comisión y el arancel se
           prorratean según el porcentaje de cada hito.
         </p>

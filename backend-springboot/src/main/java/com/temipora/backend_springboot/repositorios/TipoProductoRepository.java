@@ -11,6 +11,8 @@ public interface TipoProductoRepository extends JpaRepository<TipoProducto, Long
 
     List<TipoProducto> findAllByOrderByNombreAsc();
 
+    List<TipoProducto> findByActivoTrueOrderByNombreAsc();
+
     Optional<TipoProducto> findByIdTipoProducto(Long idTipoProducto);
 
     boolean existsByNombreIgnoreCase(String nombre);

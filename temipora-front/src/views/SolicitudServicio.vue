@@ -439,8 +439,8 @@ onBeforeUnmount(() => {
 
     <template v-else-if="solicitudPublica">
       <div v-if="paso !== 6" class="mt-5">
-        <h1 class="text-2xl text-granate">Solicitar servicio</h1>
-        <p v-if="servicio" class="mt-1 text-sm text-cafe/60">
+        <h1 class="font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">Solicitar servicio</h1>
+        <p v-if="servicio" class="mt-1 text-sm text-cafe/65">
           {{ servicio.nombre }} · por @{{ servicio.nombreArtista }}
         </p>
 
@@ -854,8 +854,8 @@ onBeforeUnmount(() => {
         <div class="flex items-start gap-3">
           <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700">✓</span>
           <div>
-            <h1 class="text-2xl text-granate">Solicitud enviada</h1>
-            <p class="mt-1 text-sm text-cafe/60">
+            <h2 class="font-display text-2xl font-extrabold text-granate">Solicitud enviada</h2>
+            <p class="mt-1 text-sm text-cafe/65">
               El artista recibió tu solicitud para “{{ servicio?.nombre }}”.
             </p>
           </div>
@@ -906,7 +906,8 @@ onBeforeUnmount(() => {
         <button
           v-if="paso < 5"
           type="button"
-          class="rounded-md bg-coral px-5 py-2.5 text-sm text-white hover:bg-rojizo transition shadow-sm"
+          class="rounded-md bg-coral px-5 py-2.5 text-sm text-white hover:bg-rojizo transition shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          :disabled="paso === 1 && (!terminosValidos || !aceptaTerminos)"
           @click="continuar"
         >
           Continuar →

@@ -49,7 +49,7 @@ import com.temipora.backend_springboot.modelo.Presupuesto;
 import com.temipora.backend_springboot.modelo.PresupuestoDTO;
 import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.SolicitudRevisionRequest;
-import com.temipora.backend_springboot.modelo.TerminosPlataforma;
+import com.temipora.backend_springboot.modelo.AceptacionTerminosPlataforma;
 import com.temipora.backend_springboot.modelo.TipoHito;
 import com.temipora.backend_springboot.modelo.UsuarioResumenDTO;
 import com.temipora.backend_springboot.repositorios.ConversacionRepository;
@@ -80,12 +80,6 @@ public class PedidoService {
     private static final String ENTIDAD_PEDIDO = "Pedido";
     private static final List<CampoAuditado> CAMPOS_PEDIDO = List.of(
         CampoAuditado.de("estado", "Estado"),
-        CampoAuditado.de("precioFinal", "Precio final"),
-        CampoAuditado.de("moneda", "Moneda"),
-        CampoAuditado.de("precioFinalCliente", "Total del cliente"),
-        CampoAuditado.de("monedaCobro", "Moneda de cobro"),
-        CampoAuditado.de("comisionPorcentaje", "Comisión (%)"),
-        CampoAuditado.de("descuentoMonto", "Descuento"),
         CampoAuditado.de("fechaInicio", "Inicio"),
         CampoAuditado.de("limiteEntrega", "Límite de entrega"),
         CampoAuditado.de("publicacionAutorizada", "Publicación autorizada"),
@@ -210,7 +204,7 @@ public class PedidoService {
                     ? null
                     : pedidoExistente.getHitos().get(0);
                 if (primero != null
-                        && primero.getTipo() == TipoHito.SENA
+                        && primero.getHitoPresupuesto().getTipo() == TipoHito.SENA
                         && primero.getEstadoPago() == EstadoPagoHito.PENDIENTE
                         && pagoRepository
                             .findFirstByHitoPedidoIdHitoPedidoAndEstado(
@@ -218,7 +212,7 @@ public class PedidoService {
                             .isEmpty()) {
                     pagoService.iniciarPago(primero, pedidoExistente);
                 } else if (primero != null
-                        && primero.getTipo() == TipoHito.ENTREGA) {
+                        && primero.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
                     pagoService.cancelarPendientes(primero);
                     iniciarPedidoSinPago(pedidoExistente, LocalDateTime.now());
                 }
@@ -247,12 +241,9 @@ public class PedidoService {
                 "El presupuesto no tiene un plan de pagos.");
         }
 
-        TerminosPlataforma terminos = null;
-        try {
-            terminos = terminosPlataformaService.obtenerEntidadVigente();
-        } catch (NoSuchElementException ignored) {
-            // La plataforma puede no tener términos publicados; no bloquea el pago.
-        }
+        AceptacionTerminosPlataforma aceptacionTerminos =
+            terminosPlataformaService.obtenerAceptacionVigente(
+                solicitud.getCliente().getIdUsuario());
 
         Pedido pedido = new Pedido();
         pedido.setSolicitud(solicitud);
@@ -261,40 +252,12 @@ public class PedidoService {
         pedido.setArtista(solicitud.getArtista());
         pedido.setServicio(solicitud.getServicio());
         pedido.setEstado(EstadoPedido.PENDIENTE_PAGO);
-        pedido.setPrecioFinal(presupuesto.getPrecioFinal());
-        pedido.setPrecioFinalCobro(presupuesto.getPrecioFinalCobro());
-        pedido.setMoneda(presupuesto.getMoneda());
-        pedido.setMonedaCobro(presupuesto.getMonedaCobro());
-        pedido.setCotizacionCobro(presupuesto.getCotizacionCobro());
-        pedido.setComisionPorcentaje(presupuesto.getComisionPorcentaje());
-        pedido.setOfertaReactivacion(presupuesto.getOfertaReactivacion());
-        pedido.setDescuentoPorcentaje(presupuesto.getDescuentoPorcentaje());
-        pedido.setDescuentoMonto(presupuesto.getDescuentoMonto());
-        pedido.setDescuentoMontoCobro(presupuesto.getDescuentoMontoCobro());
-        pedido.setPrecioFinalCliente(presupuesto.getPrecioFinalCliente());
-        pedido.setPrecioFinalClienteCobro(
-            presupuesto.getPrecioFinalClienteCobro());
-        if (terminos != null) {
-            pedido.setTerminosPlataformaVersion(terminos.getVersion());
-            pedido.setTerminosPlataformaSnapshot(terminos.getContenido());
-        }
+        pedido.setAceptacionTerminosPlataforma(aceptacionTerminos);
 
         for (HitoPresupuesto hitoPresupuesto : presupuesto.getHitos()) {
             HitoPedido hito = new HitoPedido();
             hito.setHitoPresupuesto(hitoPresupuesto);
             hito.setOrden(hitoPresupuesto.getOrden());
-            hito.setNombre(hitoPresupuesto.getNombre());
-            hito.setDescripcion(hitoPresupuesto.getDescripcion());
-            hito.setPorcentaje(hitoPresupuesto.getPorcentaje());
-            hito.setTipo(hitoPresupuesto.getTipo());
-            hito.setRequiereEntrega(hitoPresupuesto.isRequiereEntrega());
-            hito.setMonto(hitoPresupuesto.getMonto());
-            hito.setMontoCobro(hitoPresupuesto.getMontoCobro());
-            hito.setComisionMonto(hitoPresupuesto.getComisionMonto());
-            hito.setComisionMontoCobro(
-                hitoPresupuesto.getComisionMontoCobro());
-            hito.setMontoNeto(hitoPresupuesto.getMontoNeto());
-            hito.setMontoNetoCobro(hitoPresupuesto.getMontoNetoCobro());
             if (hitoPresupuesto.getTipo() == TipoHito.SENA) {
                 hito.setFechaLimitePago(
                     ahora.plusDays(hitoFlujoService.diasPagoCuota()));
@@ -304,7 +267,7 @@ public class PedidoService {
 
         pedidoRepository.save(pedido);
         HitoPedido primero = pedido.getHitos().get(0);
-        if (primero.getTipo() == TipoHito.SENA) {
+        if (primero.getHitoPresupuesto().getTipo() == TipoHito.SENA) {
             pagoService.iniciarPago(primero, pedido);
         } else {
             pagoService.cancelarPendientes(primero);
@@ -375,7 +338,7 @@ public class PedidoService {
         if (pedido.getEstado() != EstadoPedido.EN_CURSO) {
             throw new ConflictoException("El pedido no está en curso.");
         }
-        if (!hito.isRequiereEntrega()) {
+        if (!hito.getHitoPresupuesto().isRequiereEntrega()) {
             throw new ConflictoException("Esta cuota no requiere un entregable.");
         }
         if (hito.getEstadoEntrega() != EstadoEntregaHito.NO_INICIADO
@@ -383,7 +346,7 @@ public class PedidoService {
                 && hito.getEstadoEntrega() != EstadoEntregaHito.CON_REVISION) {
             throw new ConflictoException("Este hito ya fue entregado.");
         }
-        if (hito.getTipo() == TipoHito.ENTREGA) {
+        if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
             HitoPedido anterior = hitoAnterior(pedido, hito);
             if (anterior != null && !esAprobado(anterior)) {
                 throw new ConflictoException(
@@ -403,7 +366,7 @@ public class PedidoService {
         hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
         hito.setFechaEntrega(ahora);
         hito.setFechaLimiteAprobacion(null);
-        if (hito.getTipo() == TipoHito.ENTREGA) {
+        if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
             hito.setFechaLimitePago(
                 ahora.plusDays(hitoFlujoService.diasPagoCuota()));
         } else {
@@ -413,7 +376,7 @@ public class PedidoService {
         hitoPedidoRepository.save(hito);
         auditoria.registrar(
             AccionesAdmin.ENTREGA_CREAR, ENTIDAD_ENTREGA, entrega.getIdEntrega(),
-            "Entregó el hito '" + hito.getNombre() + "' del pedido #"
+            "Entregó el hito '" + hito.getHitoPresupuesto().getNombre() + "' del pedido #"
                 + pedido.getIdPedido() + " (" + archivos.size() + " archivo(s))",
             null, entrega, CAMPOS_ENTREGA);
         notificarEntrega(pedido, hito);
@@ -434,7 +397,7 @@ public class PedidoService {
                 "Hito no encontrado: " + idHito));
         validarHitoDelPedido(pedido, hito);
 
-        if (hito.getTipo() == TipoHito.ENTREGA) {
+        if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
             throw new ConflictoException(
                 "La entrega final se aprueba al pagar la última cuota.");
         }
@@ -453,7 +416,7 @@ public class PedidoService {
         hitoPedidoRepository.save(hito);
         auditoria.registrar(
             AccionesAdmin.HITO_APROBAR, ENTIDAD_HITO, hito.getIdHitoPedido(),
-            "Aprobó el hito '" + hito.getNombre() + "' del pedido #"
+            "Aprobó el hito '" + hito.getHitoPresupuesto().getNombre() + "' del pedido #"
                 + pedido.getIdPedido(),
             antesHito, hito, CAMPOS_HITO);
         HitoPedido siguiente = hitoFlujoService.habilitarSiguiente(
@@ -494,7 +457,7 @@ public class PedidoService {
         Snapshot antesHito = Snapshot.de(hito, CAMPOS_HITO);
         hito.setEstadoEntrega(EstadoEntregaHito.CON_REVISION);
         hito.setFechaLimiteAprobacion(null);
-        if (hito.getTipo() == TipoHito.ENTREGA) {
+        if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
             hito.setFechaLimitePago(null);
         }
         hitoPedidoRepository.save(hito);
@@ -504,9 +467,9 @@ public class PedidoService {
         auditoria.registrar(
             AccionesAdmin.HITO_REVISION, ENTIDAD_HITO, hito.getIdHitoPedido(),
             motivo != null
-                ? "Solicitó una revisión del hito '" + hito.getNombre()
+                ? "Solicitó una revisión del hito '" + hito.getHitoPresupuesto().getNombre()
                     + "'. Motivo: " + motivo
-                : "Solicitó una revisión del hito '" + hito.getNombre() + "'",
+                : "Solicitó una revisión del hito '" + hito.getHitoPresupuesto().getNombre() + "'",
             antesHito, hito, CAMPOS_HITO);
         notificarRevision(pedido, hito, motivo);
         return construirDTO(pedido, idCliente);
@@ -836,7 +799,7 @@ public class PedidoService {
             return Sort.by(Sort.Direction.ASC, "limiteEntrega");
         }
         if (ORDEN_MONTO.equals(valor)) {
-            return Sort.by(Sort.Direction.DESC, "precioFinalCobro");
+            return Sort.by(Sort.Direction.DESC, "presupuesto.precioFinalCobro");
         }
         return Sort.by(Sort.Direction.DESC, "fechaCreacion");
     }
@@ -849,7 +812,7 @@ public class PedidoService {
         }
         if (ORDEN_MONTO.equals(valor)) {
             return Comparator.comparing(
-                Pedido::getPrecioFinalCobro,
+                (Pedido pedido) -> pedido.getPresupuesto().getPrecioFinalCobro(),
                 Comparator.nullsLast(Comparator.<BigDecimal>reverseOrder()));
         }
         return Comparator.comparing(
@@ -903,16 +866,16 @@ public class PedidoService {
             }
 
             boolean muestraOrigen = PresupuestoDTO.mismaMoneda(
-                mostrada, pedido.getMoneda());
+                mostrada, pedido.getPresupuesto().getMoneda());
             boolean muestraCobro = !muestraOrigen
                 && PresupuestoDTO.mismaMoneda(
-                    mostrada, pedido.getMonedaCobro());
+                    mostrada, pedido.getPresupuesto().getMonedaCobro());
             BigDecimal factorCobro = mostrada != null
                 ? monedaVistaService.factorCobroAMostrada(mostrada, ahora)
                 : null;
             BigDecimal factorOrigen = mostrada != null
                 ? monedaVistaService.factorOrigenAMostrada(
-                    pedido.getMoneda(), mostrada, ahora)
+                    pedido.getPresupuesto().getMoneda(), mostrada, ahora)
                 : null;
 
             for (HitoPedido hito : pedido.getHitos()) {
@@ -937,12 +900,8 @@ public class PedidoService {
                     porVencer++;
                 }
                 if (hito.getEstadoPago() == EstadoPagoHito.PENDIENTE) {
-                    porCobrar = sumar(porCobrar, netoMostrado(
-                        hito,
-                        muestraOrigen,
-                        muestraCobro,
-                        factorCobro,
-                        factorOrigen));
+                    porCobrar = sumar(porCobrar,
+                        hito.getHitoPresupuesto().getMontoNetoCobro());
                 }
 
                 int prioridad = revision ? 0
@@ -1004,25 +963,7 @@ public class PedidoService {
             conRevision,
             porVencer,
             porCobrar,
-            mostrada != null ? mostrada.getCodigo() : null);
-    }
-
-    public BigDecimal netoMostradoDe(
-            HitoPedido hito, Moneda mostrada, LocalDateTime fecha) {
-        Pedido pedido = hito.getPedido();
-        boolean muestraOrigen = PresupuestoDTO.mismaMoneda(
-            mostrada, pedido.getMoneda());
-        boolean muestraCobro = !muestraOrigen && PresupuestoDTO.mismaMoneda(
-            mostrada, pedido.getMonedaCobro());
-        BigDecimal factorCobro = mostrada != null
-            ? monedaVistaService.factorCobroAMostrada(mostrada, fecha)
-            : null;
-        BigDecimal factorOrigen = mostrada != null
-            ? monedaVistaService.factorOrigenAMostrada(
-                pedido.getMoneda(), mostrada, fecha)
-            : null;
-        return netoMostrado(
-            hito, muestraOrigen, muestraCobro, factorCobro, factorOrigen);
+            monedaVistaService.CODIGO_COBRO);
     }
 
     private int urgenciaPedido(PedidoResumenDTO resumen) {
@@ -1038,30 +979,6 @@ public class PedidoService {
         return 3;
     }
 
-    private BigDecimal netoMostrado(
-            HitoPedido hito,
-            boolean muestraOrigen,
-            boolean muestraCobro,
-            BigDecimal factorCobro,
-            BigDecimal factorOrigen) {
-        BigDecimal neto = hito.getMontoNeto();
-        BigDecimal netoCobro = hito.getMontoNetoCobro();
-        if (neto == null) {
-            neto = hito.getMonto() != null && hito.getComisionMonto() != null
-                ? hito.getMonto().subtract(hito.getComisionMonto())
-                : hito.getMonto();
-        }
-        if (netoCobro == null) {
-            netoCobro = hito.getMontoCobro() != null
-                    && hito.getComisionMontoCobro() != null
-                ? hito.getMontoCobro().subtract(hito.getComisionMontoCobro())
-                : hito.getMontoCobro();
-        }
-        return PresupuestoDTO.totalMostrado(
-            neto, netoCobro, muestraOrigen, muestraCobro,
-            factorCobro, factorOrigen);
-    }
-
     @Transactional
     public int aprobarAutomaticamente() {
         LocalDateTime ahora = LocalDateTime.now();
@@ -1073,7 +990,7 @@ public class PedidoService {
             HitoPedido hito = hitoPedidoRepository
                 .findByIdHitoPedidoForUpdate(candidato.getIdHitoPedido())
                 .orElse(null);
-            if (hito == null || hito.getTipo() == TipoHito.ENTREGA
+            if (hito == null || hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA
                     || hito.getEstadoEntrega() != EstadoEntregaHito.ENTREGADO
                     || hito.getFechaLimiteAprobacion() == null
                     || !hito.getFechaLimiteAprobacion().isBefore(ahora)) {
@@ -1096,7 +1013,7 @@ public class PedidoService {
             auditoria.registrarSistema(
                 AccionesAdmin.HITO_APROBAR_AUTOMATICO, ENTIDAD_HITO,
                 hito.getIdHitoPedido(),
-                "Aprobó automáticamente el hito '" + hito.getNombre()
+                "Aprobó automáticamente el hito '" + hito.getHitoPresupuesto().getNombre()
                     + "' del pedido #" + pedido.getIdPedido());
             if (siguiente == null) {
                 pedidoCierreService.finalizar(pedido, ahora);
@@ -1157,7 +1074,7 @@ public class PedidoService {
             auditoria.registrarSistema(
                 AccionesAdmin.HITO_VENCER, ENTIDAD_HITO,
                 hito.getIdHitoPedido(),
-                "Venció el pago del hito '" + hito.getNombre()
+                "Venció el pago del hito '" + hito.getHitoPresupuesto().getNombre()
                     + "' del pedido #" + pedido.getIdPedido()
                     + "; el pedido quedó impago");
             expirados++;
@@ -1178,12 +1095,12 @@ public class PedidoService {
         LocalDateTime ahora = LocalDateTime.now();
         Moneda mostrada = monedaVistaService.preferidaDe(idVista);
         boolean muestraOrigen = PresupuestoDTO.mismaMoneda(
-            mostrada, pedido.getMoneda());
+            mostrada, pedido.getPresupuesto().getMoneda());
         boolean muestraCobro = !muestraOrigen && PresupuestoDTO.mismaMoneda(
-            mostrada, pedido.getMonedaCobro());
+            mostrada, pedido.getPresupuesto().getMonedaCobro());
         BigDecimal factorOrigen = mostrada != null
             ? monedaVistaService.factorOrigenAMostrada(
-                pedido.getMoneda(), mostrada, ahora)
+                pedido.getPresupuesto().getMoneda(), mostrada, ahora)
             : null;
         BigDecimal factorCobro = mostrada != null
             ? monedaVistaService.factorCobroAMostrada(mostrada, ahora)
@@ -1234,12 +1151,12 @@ public class PedidoService {
             boolean puedeSolicitarRevision = esCliente
                 && hito.getEstadoEntrega() == EstadoEntregaHito.ENTREGADO;
             boolean incluirEntrega = esArtista || esAdmin
-                || hito.getTipo() != TipoHito.ENTREGA
+                || hito.getHitoPresupuesto().getTipo() != TipoHito.ENTREGA
                 || hito.getEstadoPago() == EstadoPagoHito.PAGADO;
             boolean incluirOriginal = esArtista || esAdmin
                 || hito.getEstadoPago() == EstadoPagoHito.PAGADO;
             boolean hitoAprobado = esAprobado(hito)
-                || (hito.getTipo() == TipoHito.ENTREGA
+                || (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA
                     && hito.getEstadoPago() == EstadoPagoHito.PAGADO);
             List<EntregaHitoDTO> entregasDto = entregasPorHito
                 .getOrDefault(hito.getIdHitoPedido(), List.of()).stream()
@@ -1269,26 +1186,29 @@ public class PedidoService {
                 factorCobro,
                 factorOrigen));
 
-            comision = sumar(comision, hito.getComisionMonto());
-            comisionCobro = sumar(comisionCobro, hito.getComisionMontoCobro());
-            neto = sumar(neto, hito.getMontoNeto());
-            netoCobro = sumar(netoCobro, hito.getMontoNetoCobro());
+            comision = sumar(comision,
+                hito.getHitoPresupuesto().getComisionMonto());
+            comisionCobro = sumar(comisionCobro,
+                hito.getHitoPresupuesto().getComisionMontoCobro());
+            neto = sumar(neto, hito.getHitoPresupuesto().getMontoNeto());
+            netoCobro = sumar(netoCobro,
+                hito.getHitoPresupuesto().getMontoNetoCobro());
         }
 
-        BigDecimal finalCliente = pedido.getPrecioFinalCliente();
+        BigDecimal finalCliente = pedido.getPresupuesto().getPrecioFinalCliente();
         if (finalCliente == null || finalCliente.signum() == 0) {
-            finalCliente = pedido.getPrecioFinal();
+            finalCliente = pedido.getPresupuesto().getPrecioFinal();
         }
-        BigDecimal finalClienteCobro = pedido.getPrecioFinalClienteCobro();
+        BigDecimal finalClienteCobro = pedido.getPresupuesto().getPrecioFinalClienteCobro();
         if (finalClienteCobro == null || finalClienteCobro.signum() == 0) {
-            finalClienteCobro = pedido.getPrecioFinalCobro();
+            finalClienteCobro = pedido.getPresupuesto().getPrecioFinalCobro();
         }
 
-        BigDecimal comisionNominal = pedido.getPrecioFinal()
+        BigDecimal comisionNominal = pedido.getPresupuesto().getPrecioFinal()
             .subtract(neto)
             .max(BigDecimal.ZERO)
             .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal comisionNominalCobro = pedido.getPrecioFinalCobro()
+        BigDecimal comisionNominalCobro = pedido.getPresupuesto().getPrecioFinalCobro()
             .subtract(netoCobro)
             .max(BigDecimal.ZERO)
             .setScale(2, RoundingMode.HALF_UP);
@@ -1309,21 +1229,21 @@ public class PedidoService {
             .fechaInicio(pedido.getFechaInicio())
             .limiteEntrega(pedido.getLimiteEntrega())
             .finalizadoEn(pedido.getFinalizadoEn())
-            .precioFinal(pedido.getPrecioFinal())
-            .precioFinalCobro(pedido.getPrecioFinalCobro())
+            .precioFinal(pedido.getPresupuesto().getPrecioFinal())
+            .precioFinalCobro(pedido.getPresupuesto().getPrecioFinalCobro())
             .precioFinalMostrado(PresupuestoDTO.totalMostrado(
-                pedido.getPrecioFinal(),
-                pedido.getPrecioFinalCobro(),
+                pedido.getPresupuesto().getPrecioFinal(),
+                pedido.getPresupuesto().getPrecioFinalCobro(),
                 muestraOrigen,
                 muestraCobro,
                 factorCobro,
                 factorOrigen))
-            .descuentoPorcentaje(pedido.getDescuentoPorcentaje())
-            .descuentoMonto(pedido.getDescuentoMonto())
-            .descuentoMontoCobro(pedido.getDescuentoMontoCobro())
+            .descuentoPorcentaje(pedido.getPresupuesto().getDescuentoPorcentaje())
+            .descuentoMonto(pedido.getPresupuesto().getDescuentoMonto())
+            .descuentoMontoCobro(pedido.getPresupuesto().getDescuentoMontoCobro())
             .descuentoMostrado(PresupuestoDTO.totalMostrado(
-                pedido.getDescuentoMonto(),
-                pedido.getDescuentoMontoCobro(),
+                pedido.getPresupuesto().getDescuentoMonto(),
+                pedido.getPresupuesto().getDescuentoMontoCobro(),
                 muestraOrigen,
                 muestraCobro,
                 factorCobro,
@@ -1337,20 +1257,20 @@ public class PedidoService {
                 muestraCobro,
                 factorCobro,
                 factorOrigen))
-            .moneda(pedido.getMoneda() != null
-                ? pedido.getMoneda().getCodigo()
+            .moneda(pedido.getPresupuesto().getMoneda() != null
+                ? pedido.getPresupuesto().getMoneda().getCodigo()
                 : null)
-            .monedaCobro(pedido.getMonedaCobro() != null
-                ? pedido.getMonedaCobro().getCodigo()
+            .monedaCobro(pedido.getPresupuesto().getMonedaCobro() != null
+                ? pedido.getPresupuesto().getMonedaCobro().getCodigo()
                 : null)
             .monedaMostrada(mostrada != null
                 ? mostrada.getCodigo()
-                : (pedido.getMoneda() != null
-                    ? pedido.getMoneda().getCodigo()
+                : (pedido.getPresupuesto().getMoneda() != null
+                    ? pedido.getPresupuesto().getMoneda().getCodigo()
                     : null))
-            .cotizacionCobro(pedido.getCotizacionCobro())
+            .cotizacionCobro(pedido.getPresupuesto().getCotizacionCobro())
             .comisionPorcentaje(incluirComision
-                ? pedido.getComisionPorcentaje()
+                ? pedido.getPresupuesto().getComisionPorcentaje()
                 : null)
             .comisionMonto(incluirComision ? comision : null)
             .comisionMontoCobro(incluirComision ? comisionCobro : null)
@@ -1385,9 +1305,13 @@ public class PedidoService {
                     factorCobro,
                     factorOrigen)
                 : null)
-            .terminosPlataformaVersion(pedido.getTerminosPlataformaVersion())
+            .terminosPlataformaVersion(pedido.getAceptacionTerminosPlataforma() != null
+                ? pedido.getAceptacionTerminosPlataforma().getVersion()
+                : null)
             .terminosPlataformaAceptadosEn(
-                pedido.getTerminosPlataformaAceptadosEn())
+                pedido.getAceptacionTerminosPlataforma() != null
+                    ? pedido.getAceptacionTerminosPlataforma().getFechaAceptacion()
+                    : null)
             .hitos(hitosDto)
             .dibujos(pedido.getSolicitud().getItems().stream()
                 .map(DibujoResumenDTO::desdeItem)
@@ -1430,12 +1354,12 @@ public class PedidoService {
         LocalDateTime ahora = LocalDateTime.now();
         Moneda mostrada = monedaVistaService.preferidaDe(idVista);
         boolean muestraOrigen = PresupuestoDTO.mismaMoneda(
-            mostrada, pedido.getMoneda());
+            mostrada, pedido.getPresupuesto().getMoneda());
         boolean muestraCobro = !muestraOrigen && PresupuestoDTO.mismaMoneda(
-            mostrada, pedido.getMonedaCobro());
+            mostrada, pedido.getPresupuesto().getMonedaCobro());
         BigDecimal factorOrigen = mostrada != null
             ? monedaVistaService.factorOrigenAMostrada(
-                pedido.getMoneda(), mostrada, ahora)
+                pedido.getPresupuesto().getMoneda(), mostrada, ahora)
             : null;
         BigDecimal factorCobro = mostrada != null
             ? monedaVistaService.factorCobroAMostrada(mostrada, ahora)
@@ -1443,8 +1367,8 @@ public class PedidoService {
         HitoPedido proximo = proximoHito(pedido);
         BigDecimal montoMostrado = proximo != null
             ? PresupuestoDTO.totalMostrado(
-                proximo.getMonto(),
-                proximo.getMontoCobro(),
+                proximo.getHitoPresupuesto().getMonto(),
+                proximo.getHitoPresupuesto().getMontoCobro(),
                 muestraOrigen,
                 muestraCobro,
                 factorCobro,
@@ -1462,13 +1386,16 @@ public class PedidoService {
                 : null)
             .fechaCreacion(pedido.getFechaCreacion())
             .limiteEntrega(pedido.getLimiteEntrega())
-            .precioFinalCobro(pedido.getPrecioFinalCobro())
-            .monedaCobro(pedido.getMonedaCobro() != null
-                ? pedido.getMonedaCobro().getCodigo()
+            .precioFinalCobro(pedido.getPresupuesto().getPrecioFinalCobro())
+            .monedaCobro(pedido.getPresupuesto().getMonedaCobro() != null
+                ? pedido.getPresupuesto().getMonedaCobro().getCodigo()
                 : null)
-            .proximoHitoNombre(proximo != null ? proximo.getNombre() : null)
-            .proximoHitoTipo(proximo != null && proximo.getTipo() != null
-                ? proximo.getTipo().name()
+            .proximoHitoNombre(proximo != null
+                ? proximo.getHitoPresupuesto().getNombre()
+                : null)
+            .proximoHitoTipo(proximo != null
+                    && proximo.getHitoPresupuesto().getTipo() != null
+                ? proximo.getHitoPresupuesto().getTipo().name()
                 : null)
             .proximoHitoEstado(proximo != null
                     && proximo.getEstadoEntrega() != null
@@ -1477,8 +1404,8 @@ public class PedidoService {
             .proximoHitoMontoMostrado(montoMostrado)
             .monedaMostrada(mostrada != null
                 ? mostrada.getCodigo()
-                : (pedido.getMoneda() != null
-                    ? pedido.getMoneda().getCodigo()
+                : (pedido.getPresupuesto().getMoneda() != null
+                    ? pedido.getPresupuesto().getMoneda().getCodigo()
                     : null))
             .rolVista(esArtista ? "ARTISTA" : "CLIENTE")
             .hitosTotales(pedido.getHitos().size())
@@ -1573,7 +1500,7 @@ public class PedidoService {
                 .anyMatch(pago -> pago.getEstado() == EstadoPago.PENDIENTE)) {
             return false;
         }
-        if (hito.getTipo() == TipoHito.ENTREGA) {
+        if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
             return hito.getEstadoEntrega() == EstadoEntregaHito.ENTREGADO;
         }
         if (hito.getOrden() == null || hito.getOrden() == 0) {
@@ -1592,7 +1519,7 @@ public class PedidoService {
                 .anyMatch(pago -> pago.getEstado() == EstadoPago.PENDIENTE)) {
             return "Ya hay un pago pendiente de confirmación para esta cuota.";
         }
-        if (hito.getTipo() == TipoHito.ENTREGA) {
+        if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
             return "La entrega final todavía no está disponible para pagar.";
         }
         if (hito.getOrden() != null && hito.getOrden() > 0) {
@@ -1608,7 +1535,7 @@ public class PedidoService {
         if (pedido.getEstado() != EstadoPedido.EN_CURSO) {
             return false;
         }
-        if (!hito.isRequiereEntrega()) {
+        if (!hito.getHitoPresupuesto().isRequiereEntrega()) {
             return false;
         }
         if (hito.getEstadoEntrega() != EstadoEntregaHito.NO_INICIADO
@@ -1616,7 +1543,7 @@ public class PedidoService {
                 && hito.getEstadoEntrega() != EstadoEntregaHito.CON_REVISION) {
             return false;
         }
-        if (hito.getTipo() == TipoHito.ENTREGA) {
+        if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
             HitoPedido anterior = hitoAnterior(pedido, hito);
             boolean anteriorOk = anterior == null || esAprobado(anterior);
             return anteriorOk
@@ -1626,7 +1553,7 @@ public class PedidoService {
     }
 
     private boolean puedeAprobar(HitoPedido hito) {
-        return hito.getTipo() != TipoHito.ENTREGA
+        return hito.getHitoPresupuesto().getTipo() != TipoHito.ENTREGA
             && hito.getEstadoEntrega() == EstadoEntregaHito.ENTREGADO;
     }
 
@@ -1682,7 +1609,7 @@ public class PedidoService {
     }
 
     private void notificarEntrega(Pedido pedido, HitoPedido hito) {
-        boolean entregaFinal = hito.getTipo() == TipoHito.ENTREGA;
+        boolean entregaFinal = hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA;
         notificacionService.crearParaUsuario(
             pedido.getCliente().getIdUsuario(),
             entregaFinal ? NOTIF_ENTREGA_LISTA : NOTIF_HITO_ENTREGADO,
@@ -1690,7 +1617,7 @@ public class PedidoService {
             entregaFinal
                 ? "El artista terminó el pedido de '" + nombreServicio(pedido)
                     + "'. Pagá la última cuota para recibir el archivo final."
-                : "El artista entregó '" + hito.getNombre()
+                : "El artista entregó '" + hito.getHitoPresupuesto().getNombre()
                     + "' del pedido de '" + nombreServicio(pedido)
                     + "'. Revisalo y aprobalo.",
             pedido.getIdPedido(),
@@ -1706,9 +1633,9 @@ public class PedidoService {
             ? "Hito aprobado automáticamente"
             : "Hito aprobado";
         String descripcion = automatico
-            ? "Se aprobó automáticamente '" + hito.getNombre()
+            ? "Se aprobó automáticamente '" + hito.getHitoPresupuesto().getNombre()
                 + "' del pedido de '" + nombreServicio(pedido) + "'."
-            : "El cliente aprobó '" + hito.getNombre()
+            : "El cliente aprobó '" + hito.getHitoPresupuesto().getNombre()
                 + "' del pedido de '" + nombreServicio(pedido) + "'.";
         notificacionService.crearParaUsuario(
             pedido.getArtista().getIdUsuario(),
@@ -1728,7 +1655,7 @@ public class PedidoService {
             pedido.getArtista().getIdUsuario(),
             NOTIF_HITO_CON_REVISION,
             "Revisión solicitada",
-            "El cliente pidió una revisión de '" + hito.getNombre()
+            "El cliente pidió una revisión de '" + hito.getHitoPresupuesto().getNombre()
                 + "' del pedido de '" + nombreServicio(pedido)
                 + "'. Motivo: "
                 + (motivo != null ? motivo : "no especificado") + ".",
@@ -1751,7 +1678,7 @@ public class PedidoService {
 
     private void notificarImpago(Pedido pedido, HitoPedido hito) {
         String descripcion = "El pedido de '" + nombreServicio(pedido)
-            + "' se cerró porque no se pagó '" + hito.getNombre() + "'.";
+            + "' se cerró porque no se pagó '" + hito.getHitoPresupuesto().getNombre() + "'.";
         notificacionService.crearParaUsuario(
             pedido.getCliente().getIdUsuario(),
             NOTIF_PEDIDO_IMPAGO, "Pedido sin pago", descripcion,

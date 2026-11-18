@@ -18,6 +18,7 @@ public interface ArtistaFavoritoRepository extends JpaRepository<ArtistaFavorito
         SELECT f FROM ArtistaFavorito f
         JOIN f.artista a
         WHERE f.usuario.idUsuario = :idUsuario
+          AND a.estadoCuenta = true
           AND (:q IS NULL
                OR LOWER(a.nombreUsuario) LIKE :q
                OR LOWER(COALESCE(a.nombreDisplay, '')) LIKE :q)
@@ -26,6 +27,7 @@ public interface ArtistaFavoritoRepository extends JpaRepository<ArtistaFavorito
         SELECT COUNT(f) FROM ArtistaFavorito f
         JOIN f.artista a
         WHERE f.usuario.idUsuario = :idUsuario
+          AND a.estadoCuenta = true
           AND (:q IS NULL
                OR LOWER(a.nombreUsuario) LIKE :q
                OR LOWER(COALESCE(a.nombreDisplay, '')) LIKE :q)

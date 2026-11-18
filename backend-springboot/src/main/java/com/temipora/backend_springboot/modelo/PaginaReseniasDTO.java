@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.modelo;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import lombok.AllArgsConstructor;
@@ -18,4 +19,7 @@ public class PaginaReseniasDTO {
     private ResumenReseniasDTO resumen;
     private PaginaDTO<ReseniaPublicaDTO> pagina;
     private List<FiltroReseniaServicioDTO> servicios;
+
+    @Builder.Default
+    private List<FiltroReseniaProductoDTO> productos = new ArrayList<>();
 }

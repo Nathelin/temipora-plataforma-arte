@@ -39,6 +39,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const enPanel = computed(() => route.path.startsWith('/panel'))
 const idPedido = computed(() => Number(route.params.idPedido))
 
 const pedido = ref(null)
@@ -457,6 +458,14 @@ async function cargarPortfolioVerificado(data = pedido.value) {
   }
 }
 
+async function actualizarPedido(data) {
+  if (!data) return
+  pedido.value = data
+  if (puedeVerResenias.value) {
+    await cargarResenias()
+  }
+}
+
 async function cargarResenias() {
   if (!puedeVerResenias.value) return
   cargandoResenias.value = true
@@ -546,7 +555,7 @@ async function ejecutar(accion, mensaje) {
   procesando.value = true
   try {
     const res = await accion()
-    if (res?.data) pedido.value = res.data
+    if (res?.data) await actualizarPedido(res.data)
     exito(mensaje)
     return true
   } catch (e) {
@@ -570,7 +579,7 @@ async function sincronizarPagoPendiente() {
   if (!pendiente) return
   try {
     const res = await api.post(`/pagos/${pendiente.idPago}/sincronizar`)
-    if (res.data) pedido.value = res.data
+    if (res.data) await actualizarPedido(res.data)
   } catch {
     // Si el proveedor no responde, seguimos con el polling normal.
   }
@@ -620,7 +629,7 @@ async function pagarHito(hito) {
 
 async function refrescarPedido() {
   const res = await api.get(`/pedidos/${idPedido.value}`)
-  pedido.value = res.data
+  await actualizarPedido(res.data)
 }
 
 async function procesarRetornoPago() {
@@ -797,8 +806,7 @@ function volver() {
     router.push({ name: 'pedidos-admin' })
     return
   }
-  const enPanel = route.path.startsWith('/panel')
-  router.push({ name: enPanel ? 'panel-pedidos' : 'pedidos' })
+  router.push({ name: enPanel.value ? 'panel-pedidos' : 'pedidos' })
 }
 
 function abrirChat() {
@@ -814,7 +822,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
+  <div :class="enPanel ? '' : 'mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-10'">
     <button
       type="button"
       class="text-sm font-medium text-cafe/70 transition hover:text-coral"

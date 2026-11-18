@@ -5,15 +5,22 @@ import api from '../servicios/api'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import { cargarGaleria as cargarGaleriaApi, ocultarPublicacionPedido } from '../servicios/galeria'
+import {
+  cargarColeccion as cargarColeccionApi,
+  cambiarVisibilidadCompra,
+  marcarSugerenciaColeccionVista,
+} from '../servicios/coleccion'
 import { formatearFecha } from '../servicios/pedidos'
 import TarjetaServicio from '../components/TarjetaServicio.vue'
+import TarjetaProducto from '../components/TarjetaProducto.vue'
+import { cargarProductosDeArtista } from '../servicios/productos'
 import ImagenGaleria from '../components/ImagenGaleria.vue'
-import ResumenResenias from '../components/ResumenResenias.vue'
 import ListaResenias from '../components/ListaResenias.vue'
 import ValoracionEstrellas from '../components/ValoracionEstrellas.vue'
 import {
   cargarReseniasArtista as cargarReseniasArtistaApi,
   cargarResumenReseniasArtista as cargarResumenReseniasArtistaApi,
+  formatearPromedio,
 } from '../servicios/resenias'
 import ModalSolicitudMensaje from '../components/ModalSolicitudMensaje.vue'
 import {
@@ -42,6 +49,7 @@ const perfil = ref({
 
 const cargandoPerfil = ref(true)
 const errorCarga = ref('')
+const perfilNoDisponible = ref(false)
 
 const { exito, error: notificarError } = useNotificaciones()
 const esFavorito = ref(false)
@@ -60,14 +68,35 @@ const visorGaleria = reactive({ abierto: false, indice: 0 })
 const archivoGaleriaIndice = ref(0)
 const imagenGaleriaVisible = ref(false)
 
+const coleccionProductos = ref(null)
+const cargandoColeccionProductos = ref(false)
+const cargandoMasColeccion = ref(false)
+const errorColeccion = ref('')
+const actualizandoColeccion = ref(false)
+const filtrosColeccion = reactive({ idArtista: '' })
+const paginaColeccion = ref(0)
+const TAMANIO_COLECCION = 12
+const alcanceColeccion = ref('TODO')
+const sugerenciaVisible = ref(false)
+const guardandoVisibilidad = ref(false)
+
+const OPCIONES_ALCANCE = [
+  { value: 'TODO', label: 'Todo' },
+  { value: 'PEDIDOS', label: 'Pedidos' },
+  { value: 'PRODUCTOS', label: 'Productos' },
+]
+
 const resumenReseniasArtista = ref(null)
 const reseniasArtista = ref([])
 const paginaReseniasArtista = ref(null)
 const cargandoReseniasArtista = ref(false)
 const errorReseniasArtista = ref('')
 const serviciosResenias = ref([])
+const productosResenias = ref([])
 const filtrosReseniasArtista = reactive({
+  tipo: 'TODOS',
   idServicio: '',
+  idProducto: '',
   calificacion: '',
   orden: 'RECIENTES',
 })
@@ -75,12 +104,15 @@ const filtrosReseniasArtista = reactive({
 async function cargarPerfil() {
   cargandoPerfil.value = true
   errorCarga.value = ''
+  perfilNoDisponible.value = false
   esFavorito.value = false
   cargandoEstadoFavorito.value = false
   actualizandoFavorito.value = false
   resumenReseniasArtista.value = null
   reseniasArtista.value = []
   paginaReseniasArtista.value = null
+  serviciosResenias.value = []
+  productosResenias.value = []
   try {
     const nombreUsuario = route.params.nombreUsuario
     const res = await api.get(`/perfil/${nombreUsuario}`)
@@ -99,6 +131,7 @@ async function cargarPerfil() {
         cargarEtiquetasPortfolio(),
         cargarTiposArte(),
         cargarServicios(),
+        cargarProductos(),
         cargarResumenResenias(),
       ])
       if (route.query.tab === 'resenas') {
@@ -108,10 +141,15 @@ async function cargarPerfil() {
     } else {
       totalPortfolio.value = 0
       etiquetasPortfolio.value = []
-      await cargarGaleria(true)
+      await Promise.all([cargarGaleria(true), cargarColeccion(true)])
     }
   } catch (e) {
-    errorCarga.value = 'No se pudo cargar el perfil.'
+    if (e.response?.status === 410) {
+      perfilNoDisponible.value = true
+      errorCarga.value = ''
+    } else {
+      errorCarga.value = 'No se pudo cargar el perfil.'
+    }
   } finally {
     cargandoPerfil.value = false
   }
@@ -148,7 +186,7 @@ async function cargarGaleria(reset = true) {
   }
 
   try {
-    const params = { pagina: paginaGaleria.value, tamanio: TAMANIO_GALERIA }
+    const params = { pagina: paginaGaleria.value, tamanio: tamanioGaleria.value }
     if (filtrosGaleria.idServicio !== '') params.idServicio = filtrosGaleria.idServicio
     if (filtrosGaleria.idArtista !== '') params.idArtista = filtrosGaleria.idArtista
 
@@ -255,6 +293,183 @@ async function alternarVisibilidadPedido(pieza) {
       || 'No se pudo cambiar la visibilidad del pedido.')
   } finally {
     actualizandoGaleria.value = false
+  }
+}
+
+// ---------------------------------------------------------------
+// Colección de productos comprados
+// ---------------------------------------------------------------
+
+const productosColeccion = computed(
+  () => coleccionProductos.value?.productos?.contenido || [],
+)
+const totalProductosColeccion = computed(
+  () => Number(coleccionProductos.value?.productos?.totalElementos || 0),
+)
+const hayFiltroColeccion = computed(() => filtrosColeccion.idArtista !== '')
+
+const galeriaVisible = computed(() => Boolean(galeria.value?.visible))
+const productosVisible = computed(() => Boolean(coleccionProductos.value?.visible))
+const esDuenioProductos = computed(
+  () => Boolean(coleccionProductos.value?.esDuenio),
+)
+
+const duenioDelPerfil = computed(
+  () => Boolean(galeria.value?.esDuenio || coleccionProductos.value?.esDuenio),
+)
+
+const mostrarPedidos = computed(() => {
+  if (alcanceColeccion.value === 'PRODUCTOS') return false
+  return duenioDelPerfil.value || galeriaVisible.value
+})
+
+const mostrarProductos = computed(() => {
+  if (alcanceColeccion.value === 'PEDIDOS') return false
+  return duenioDelPerfil.value || productosVisible.value
+})
+
+const hayAlgoPublico = computed(
+  () => galeriaVisible.value || productosVisible.value,
+)
+
+const puedeOfrecerAlcance = computed(
+  () => duenioDelPerfil.value
+    || (galeriaVisible.value && productosVisible.value),
+)
+
+// En "Todo" cada sección arranca con dos filas de tarjetas; el resto se pide
+// con "Cargar más". Al filtrar por una sola sección se usa el tamaño completo.
+const TAMANIO_DOS_FILAS = 6
+
+const tamanioGaleria = computed(
+  () => (alcanceColeccion.value === 'TODO' ? TAMANIO_DOS_FILAS : TAMANIO_GALERIA),
+)
+const tamanioColeccion = computed(
+  () => (alcanceColeccion.value === 'TODO'
+    ? TAMANIO_DOS_FILAS
+    : TAMANIO_COLECCION),
+)
+
+function cambiarAlcance(valor) {
+  if (alcanceColeccion.value === valor) return
+  alcanceColeccion.value = valor
+  Promise.all([cargarGaleria(true), cargarColeccion(true)])
+}
+
+async function cargarColeccion(reset = true) {
+  if (!perfil.value.nombreUsuario) return
+  if (reset) {
+    paginaColeccion.value = 0
+    cargandoColeccionProductos.value = true
+    errorColeccion.value = ''
+  } else {
+    cargandoMasColeccion.value = true
+  }
+
+  try {
+    const params = {
+      pagina: paginaColeccion.value,
+      tamanio: tamanioColeccion.value,
+    }
+    if (filtrosColeccion.idArtista !== '') {
+      params.idArtista = filtrosColeccion.idArtista
+    }
+
+    const res = await cargarColeccionApi(perfil.value.nombreUsuario, params)
+    const pagina = res.data?.productos || {}
+    const nuevas = pagina.contenido || []
+    const actuales = coleccionProductos.value?.productos?.contenido || []
+
+    coleccionProductos.value = {
+      ...res.data,
+      productos: {
+        ...pagina,
+        contenido: reset ? nuevas : [...actuales, ...nuevas],
+      },
+    }
+
+    sugerenciaVisible.value = Boolean(res.data?.sugerenciaPendiente)
+    if (sugerenciaVisible.value) descartarSugerencia()
+  } catch (e) {
+    if (reset) {
+      coleccionProductos.value = null
+      errorColeccion.value = e.response?.data?.message
+        || 'No se pudo cargar la colección.'
+    }
+  } finally {
+    cargandoColeccionProductos.value = false
+    cargandoMasColeccion.value = false
+  }
+}
+
+function cargarMasColeccion() {
+  if (cargandoMasColeccion.value
+      || !coleccionProductos.value?.productos?.hayMas) return
+  paginaColeccion.value += 1
+  cargarColeccion(false)
+}
+
+function cambiarFiltroColeccion() {
+  cargarColeccion(true)
+}
+
+function limpiarFiltroColeccion() {
+  filtrosColeccion.idArtista = ''
+  cargarColeccion(true)
+}
+
+async function descartarSugerencia() {
+  try {
+    await marcarSugerenciaColeccionVista()
+  } catch {
+    // Si falla, el aviso se vuelve a mostrar la próxima vez.
+  }
+}
+
+async function hacerColeccionPublica() {
+  if (guardandoVisibilidad.value) return
+  guardandoVisibilidad.value = true
+  try {
+    const idUsuario = perfil.value.idUsuario
+    await api.put(`/usuarios/${idUsuario}/perfil`, {
+      pedidosPublicos: true,
+      coleccionPublica: true,
+    })
+    exito('Tu colección ya es pública.')
+    sugerenciaVisible.value = false
+    await Promise.all([cargarGaleria(true), cargarColeccion(true)])
+  } catch (e) {
+    notificarError(e.response?.data?.message
+      || 'No se pudo hacer pública la colección.')
+  } finally {
+    guardandoVisibilidad.value = false
+  }
+}
+
+function textoContenidoSensible(producto) {
+  const tipos = producto?.contenidosSensibles || []
+  return tipos.map((t) => ETIQUETAS_SENSIBLE[t] || t).join(' · ')
+}
+
+function tituloProductoColeccion(producto) {
+  return producto?.tituloProducto || 'Producto'
+}
+
+async function alternarVisibilidadProducto(producto) {
+  if (!producto?.idCompraItem || actualizandoColeccion.value) return
+  const ocultar = !producto.oculto
+  actualizandoColeccion.value = true
+  try {
+    await cambiarVisibilidadCompra(producto.idCompraItem, ocultar)
+    exito(ocultar
+      ? 'Ocultaste este producto de tu colección.'
+      : 'Este producto vuelve a mostrarse en tu colección.')
+    await cargarColeccion(true)
+  } catch (e) {
+    notificarError(e.response?.data?.message
+      || 'No se pudo cambiar la visibilidad del producto.')
+  } finally {
+    actualizandoColeccion.value = false
   }
 }
 
@@ -371,6 +586,21 @@ async function cargarServicios() {
   }
 }
 
+async function cargarProductos() {
+  const nombre = perfil.value.nombreUsuario
+  if (perfil.value.rol !== 'ARTISTA' || !nombre) return
+  try {
+    const data = await cargarProductosDeArtista(nombre)
+    if (perfil.value.nombreUsuario === nombre) {
+      perfil.value.productos = data
+    }
+  } catch {
+    if (perfil.value.nombreUsuario === nombre) {
+      perfil.value.productos = []
+    }
+  }
+}
+
 function limpiarFiltros() {
   const f = filtros.value
   if (!hayFiltrosActivos.value && (f.orden || 'RECIENTE') === 'RECIENTE') return
@@ -410,6 +640,15 @@ watch(() => route.params.nombreUsuario, () => {
   visorGaleria.abierto = false
   archivoGaleriaIndice.value = 0
   imagenGaleriaVisible.value = false
+  coleccionProductos.value = null
+  cargandoColeccionProductos.value = false
+  cargandoMasColeccion.value = false
+  errorColeccion.value = ''
+  actualizandoColeccion.value = false
+  filtrosColeccion.idArtista = ''
+  paginaColeccion.value = 0
+  alcanceColeccion.value = 'TODO'
+  sugerenciaVisible.value = false
 })
 
 watch(() => route.params.nombreUsuario, cargarPerfil, { immediate: true })
@@ -445,9 +684,13 @@ async function cargarReseniasDeArtista(pagina = 0) {
       pagina,
       tamanio: 10,
       orden: filtrosReseniasArtista.orden || 'RECIENTES',
+      tipo: filtrosReseniasArtista.tipo || 'TODOS',
     }
     if (filtrosReseniasArtista.idServicio) {
       params.idServicio = Number(filtrosReseniasArtista.idServicio)
+    }
+    if (filtrosReseniasArtista.idProducto) {
+      params.idProducto = Number(filtrosReseniasArtista.idProducto)
     }
     if (filtrosReseniasArtista.calificacion) {
       params.calificacion = Number(filtrosReseniasArtista.calificacion)
@@ -460,6 +703,7 @@ async function cargarReseniasDeArtista(pagina = 0) {
     paginaReseniasArtista.value = data.pagina || null
     resumenReseniasArtista.value = data.resumen || null
     serviciosResenias.value = data.servicios || []
+    productosResenias.value = data.productos || []
   } catch (e) {
     errorReseniasArtista.value = e.response?.data?.message
       || 'No se pudieron cargar las reseñas.'
@@ -477,7 +721,9 @@ function irAResenias() {
 }
 
 function cambiarFiltrosResenias(filtros) {
+  filtrosReseniasArtista.tipo = filtros.tipo || 'TODOS'
   filtrosReseniasArtista.idServicio = filtros.idServicio ?? ''
+  filtrosReseniasArtista.idProducto = filtros.idProducto ?? ''
   filtrosReseniasArtista.calificacion = filtros.calificacion ?? ''
   filtrosReseniasArtista.orden = filtros.orden || 'RECIENTES'
   void cargarReseniasDeArtista(0)
@@ -851,6 +1097,21 @@ function irASubirImagen(imagen = null) {
     <div v-if="cargandoPerfil" class="max-w-screen-2xl mx-auto px-4 sm:px-8 py-16 text-center text-cafe/60">
       Cargando perfil...
     </div>
+    <div
+      v-else-if="perfilNoDisponible"
+      class="mx-auto max-w-xl rounded-2xl border border-rosa/60 bg-blanco px-6 py-12 text-center"
+    >
+      <p class="font-display text-lg font-bold text-granate">Esta cuenta no está disponible.</p>
+      <p class="mt-2 text-sm leading-relaxed text-cafe/70">
+        La persona dio de baja su cuenta o ya no está activa en Temipora.
+      </p>
+      <router-link
+        to="/explorar"
+        class="mt-4 inline-block text-sm font-medium text-coral transition hover:text-rojizo"
+      >
+        ← Explorar artistas
+      </router-link>
+    </div>
     <div v-else-if="errorCarga" class="max-w-screen-2xl mx-auto px-4 sm:px-8 py-16 text-center text-rojizo">
       {{ errorCarga }}
     </div>
@@ -984,6 +1245,19 @@ function irASubirImagen(imagen = null) {
               @click="irAResenias"
             >
               Reseñas
+              <span
+                v-if="resumenReseniasArtista?.hayDatos"
+                class="ml-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
+                :class="tabActiva === 'resenas'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-rosa/40 text-granate'"
+              >
+                <span aria-hidden="true">★</span>
+                {{ formatearPromedio(resumenReseniasArtista.promedio) }}
+                <span class="font-normal opacity-80">
+                  ({{ resumenReseniasArtista.cantidad }})
+                </span>
+              </span>
             </button>
           </div>
 
@@ -1164,17 +1438,6 @@ function irASubirImagen(imagen = null) {
             </div>
 
             <div v-if="tabActiva === 'servicios'" class="mt-6">
-              <div
-                v-if="resumenReseniasArtista?.hayDatos"
-                class="mb-6 rounded-2xl border border-rosa/50 bg-blanco p-5"
-              >
-                <ResumenResenias
-                  :resumen="resumenReseniasArtista"
-                  compacto
-                  clickable
-                  @ver-todas="irAResenias"
-                />
-              </div>
               <p v-if="cargandoServicios && !perfil.servicios.length" class="text-sm text-cafe/60 py-8 text-center">
                 Cargando servicios...
               </p>
@@ -1201,16 +1464,43 @@ function irASubirImagen(imagen = null) {
             <p v-if="!perfil.productos.length" class="rounded-3xl border border-dashed border-borde bg-superficie px-6 py-14 text-center text-sm text-cafe/60">
               Este artista todavía no tiene productos publicados.
             </p>
-            <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div v-for="p in perfil.productos" :key="p.id" class="rounded-[22px] border border-borde/60 bg-superficie p-5 shadow-sm">
-                <h3 class="text-granate">{{ p.titulo }}</h3>
-                <p class="text-sm text-cafe/70 mt-1">{{ p.descripcion }}</p>
-                <p class="text-sm text-rojizo mt-3">{{ p.precio }}</p>
-              </div>
+            <div v-else class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              <TarjetaProducto
+                v-for="producto in perfil.productos"
+                :key="producto.idProducto"
+                :producto="producto"
+              />
             </div>
           </div>
           <div v-if="tabActiva === 'resenas'" class="mt-6">
+            <div class="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 class="font-display text-2xl font-bold text-granate">Reseñas</h2>
+                <p class="mt-1 text-sm text-cafe/55">
+                  Servicios y productos de este artista.
+                </p>
+              </div>
+              <div
+                v-if="resumenReseniasArtista?.hayDatos"
+                class="flex items-center gap-2"
+              >
+                <ValoracionEstrellas
+                  :model-value="Math.round(Number(resumenReseniasArtista.promedio || 0))"
+                  readonly
+                  tamano="sm"
+                  etiqueta="Promedio del artista"
+                />
+                <span class="font-display text-3xl font-extrabold text-granate">
+                  {{ formatearPromedio(resumenReseniasArtista.promedio) }}
+                </span>
+                <span class="text-sm text-cafe/55">
+                  ({{ resumenReseniasArtista.cantidad }})
+                </span>
+              </div>
+            </div>
+
             <ListaResenias
+              class="mt-5"
               :resenias="reseniasArtista"
               :resumen="resumenReseniasArtista"
               :pagina="paginaReseniasArtista"
@@ -1218,8 +1508,11 @@ function irASubirImagen(imagen = null) {
               :error="errorReseniasArtista"
               :filtros="filtrosReseniasArtista"
               :servicios="serviciosResenias"
+              :productos="productosResenias"
               mostrar-filtro-servicio
+              mostrar-filtro-producto
               mostrar-servicio
+              :mostrar-resumen="false"
               @cambiar-filtros="cambiarFiltrosResenias"
               @cambiar-pagina="cambiarPaginaResenias"
             />
@@ -1228,46 +1521,103 @@ function irASubirImagen(imagen = null) {
 
         <template v-else>
           <div class="flex flex-wrap items-center justify-between gap-3 border-b border-borde/50 pb-1.5 pt-1.5">
-            <div class="flex flex-wrap items-center gap-2">
-              <button class="rounded-full bg-coral px-5 py-2.5 text-sm font-semibold text-white shadow-sm">
-                Galería de pedidos
-              </button>
-            </div>
+            <span class="rounded-full bg-coral px-5 py-2.5 text-sm font-semibold text-white shadow-sm">
+              Colección
+            </span>
             <router-link
               v-if="esDuenio"
               :to="{ name: 'configuracion-privacidad' }"
               class="text-sm font-semibold text-coral transition hover:text-rojizo"
             >
-              Privacidad de la galería
+              Privacidad de la colección
             </router-link>
           </div>
 
-          <div class="mt-6">
+          <div class="mt-3 space-y-3">
             <div
-              v-if="esDuenio && galeria && !galeria.visible"
+              v-if="puedeOfrecerAlcance"
+              class="inline-flex flex-wrap items-center gap-0.5 rounded-full bg-crema p-0.5 leading-none"
+              role="group"
+              aria-label="Qué mostrar en la colección"
+            >
+              <button
+                v-for="opcion in OPCIONES_ALCANCE"
+                :key="opcion.value"
+                type="button"
+                class="rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none transition"
+                :class="alcanceColeccion === opcion.value
+                  ? 'bg-blanco text-granate shadow-sm'
+                  : 'text-cafe/60 hover:text-granate'"
+                :aria-pressed="alcanceColeccion === opcion.value"
+                @click="cambiarAlcance(opcion.value)"
+              >
+                {{ opcion.label }}
+              </button>
+            </div>
+
+            <div
+              v-if="esDuenio && sugerenciaVisible"
+              class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-coral/40 bg-coral/5 px-4 py-3"
+            >
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-granate">
+                  Ya tenés compras para mostrar
+                </p>
+                <p class="mt-0.5 text-sm leading-relaxed text-cafe/70">
+                  Podés hacer pública tu colección para que otros vean las piezas que compraste.
+                  Siempre podés ocultar compras puntuales.
+                </p>
+              </div>
+              <div class="flex shrink-0 flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  :disabled="guardandoVisibilidad"
+                  class="inline-flex min-h-9 items-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo disabled:opacity-50"
+                  @click="hacerColeccionPublica"
+                >
+                  {{ guardandoVisibilidad ? 'Guardando…' : 'Hacer pública' }}
+                </button>
+                <button
+                  type="button"
+                  class="inline-flex min-h-9 items-center rounded-full border border-borde/60 bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+                  @click="sugerenciaVisible = false"
+                >
+                  Ahora no
+                </button>
+              </div>
+            </div>
+
+            <div
+              v-if="!esDuenio && !hayAlgoPublico"
               class="rounded-2xl border border-durazno bg-durazno/20 p-4 sm:p-5"
             >
-              <p class="text-sm font-semibold text-granate">Tu galería está privada</p>
+              <p class="text-sm font-semibold text-granate">Colección privada</p>
               <p class="mt-1 text-sm leading-relaxed text-cafe/70">
-                Solo vos podés ver estas piezas. Podés activar la visibilidad pública.
+                @{{ perfil.nombreUsuario }} decidió no compartir su colección.
               </p>
-              <router-link
-                :to="{ name: 'configuracion-privacidad' }"
-                class="mt-3 inline-flex min-h-9 items-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
-              >
-                Activar galería
-              </router-link>
+            </div>
+          </div>
+
+          <div v-if="mostrarPedidos" class="mt-4">
+            <div
+              v-if="mostrarProductos || totalGaleria"
+              class="mb-2 flex flex-wrap items-baseline justify-between gap-2"
+            >
+              <h3 v-if="mostrarProductos" class="font-display text-base font-bold text-granate">Pedidos</h3>
+              <p v-if="totalGaleria" class="text-xs text-cafe/55">
+                {{ piezasGaleria.length }} de {{ totalGaleria }}
+              </p>
             </div>
 
             <div
               v-if="galeria && (galeria.servicios?.length || galeria.artistas?.length)"
-              class="mt-4 flex flex-wrap items-end gap-3 rounded-2xl border border-borde/60 bg-superficie p-4"
+              class="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-borde/60 bg-superficie px-3 py-2"
             >
-              <label class="flex min-w-44 flex-col gap-1 text-xs font-medium text-cafe/60">
+              <label class="flex min-w-40 items-center gap-1.5 text-[11px] font-medium text-cafe/60">
                 Servicio
                 <select
                   v-model="filtrosGaleria.idServicio"
-                  class="rounded-xl border-0 bg-crema px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-borde/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                  class="rounded-lg border-0 bg-crema px-2 py-1 text-xs text-cafe shadow-sm ring-1 ring-inset ring-borde/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
                   @change="cambiarFiltroGaleria"
                 >
                   <option value="">Todos</option>
@@ -1280,11 +1630,11 @@ function irASubirImagen(imagen = null) {
                   </option>
                 </select>
               </label>
-              <label class="flex min-w-44 flex-col gap-1 text-xs font-medium text-cafe/60">
+              <label class="flex min-w-40 items-center gap-1.5 text-[11px] font-medium text-cafe/60">
                 Artista
                 <select
                   v-model="filtrosGaleria.idArtista"
-                  class="rounded-xl border-0 bg-crema px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-borde/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                  class="rounded-lg border-0 bg-crema px-2 py-1 text-xs text-cafe shadow-sm ring-1 ring-inset ring-borde/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
                   @change="cambiarFiltroGaleria"
                 >
                   <option value="">Todos</option>
@@ -1300,17 +1650,14 @@ function irASubirImagen(imagen = null) {
               <button
                 v-if="hayFiltrosGaleria"
                 type="button"
-                class="inline-flex min-h-10 items-center rounded-full border border-borde/60 bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+                class="inline-flex min-h-7 items-center rounded-full border border-borde/60 bg-blanco px-2.5 text-[11px] font-semibold text-granate transition hover:bg-rosa/20"
                 @click="limpiarFiltrosGaleria"
               >
                 Limpiar
               </button>
-              <p v-if="totalGaleria" class="ml-auto text-sm text-cafe/60">
-                Mostrando {{ piezasGaleria.length }} de {{ totalGaleria }} piezas
-              </p>
             </div>
 
-            <div v-if="cargandoGaleria" class="mt-6 space-y-3" role="status" aria-live="polite">
+            <div v-if="cargandoGaleria" class="mt-3 space-y-3" role="status" aria-live="polite">
               <span class="sr-only">Cargando galería...</span>
               <div
                 v-for="n in 3"
@@ -1321,21 +1668,14 @@ function irASubirImagen(imagen = null) {
 
             <p
               v-else-if="errorGaleria"
-              class="mt-6 rounded-2xl border border-rojizo/25 bg-rojizo/5 px-4 py-6 text-center text-sm text-rojizo"
+              class="mt-3 rounded-2xl border border-rojizo/25 bg-rojizo/5 px-4 py-4 text-center text-sm text-rojizo"
             >
               {{ errorGaleria }}
             </p>
 
             <p
-              v-else-if="galeria && !galeria.visible && !galeria.esDuenio"
-              class="mt-6 rounded-3xl border border-dashed border-borde bg-superficie px-6 py-14 text-center text-sm text-cafe/60"
-            >
-              Galería privada. @{{ perfil.nombreUsuario }} decidió no compartir sus pedidos.
-            </p>
-
-            <p
               v-else-if="!piezasGaleria.length"
-              class="mt-6 rounded-3xl border border-dashed border-borde bg-superficie px-6 py-14 text-center text-sm text-cafe/60"
+              class="mt-3 rounded-2xl border border-dashed border-borde bg-superficie px-5 py-8 text-center text-sm text-cafe/60"
             >
               <template v-if="hayFiltrosGaleria">
                 No hay piezas que coincidan con los filtros.
@@ -1355,7 +1695,7 @@ function irASubirImagen(imagen = null) {
               </template>
             </p>
 
-            <div v-else class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div v-else class="mt-3 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               <article
                 v-for="(pieza, indice) in piezasGaleria"
                 :key="pieza.idPieza"
@@ -1463,7 +1803,7 @@ function irASubirImagen(imagen = null) {
               </article>
             </div>
 
-            <div v-if="galeria?.piezas?.hayMas" class="mt-6 text-center">
+            <div v-if="galeria?.piezas?.hayMas" class="mt-4 text-center">
               <button
                 type="button"
                 :disabled="cargandoMasGaleria"
@@ -1471,6 +1811,234 @@ function irASubirImagen(imagen = null) {
                 @click="cargarMasGaleria"
               >
                 {{ cargandoMasGaleria ? 'Cargando...' : 'Cargar más' }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="mostrarProductos" class="mt-5">
+            <div
+              v-if="mostrarPedidos || totalProductosColeccion"
+              class="mb-2 flex flex-wrap items-baseline justify-between gap-2"
+            >
+              <h3 v-if="mostrarPedidos" class="font-display text-base font-bold text-granate">Productos</h3>
+              <p v-if="totalProductosColeccion" class="text-xs text-cafe/55">
+                {{ productosColeccion.length }} de {{ totalProductosColeccion }}
+              </p>
+            </div>
+
+            <div
+              v-if="coleccionProductos && coleccionProductos.artistas?.length"
+              class="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-borde/60 bg-superficie px-3 py-2"
+            >
+              <label class="flex min-w-40 items-center gap-1.5 text-[11px] font-medium text-cafe/60">
+                Artista
+                <select
+                  v-model="filtrosColeccion.idArtista"
+                  class="rounded-lg border-0 bg-crema px-2 py-1 text-xs text-cafe shadow-sm ring-1 ring-inset ring-borde/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+                  @change="cambiarFiltroColeccion"
+                >
+                  <option value="">Todos</option>
+                  <option
+                    v-for="artista in coleccionProductos.artistas"
+                    :key="artista.id"
+                    :value="artista.id"
+                  >
+                    {{ artista.nombre }} (@{{ artista.nombreUsuario }})
+                  </option>
+                </select>
+              </label>
+              <button
+                v-if="hayFiltroColeccion"
+                type="button"
+                class="inline-flex min-h-7 items-center rounded-full border border-borde/60 bg-blanco px-2.5 text-[11px] font-semibold text-granate transition hover:bg-rosa/20"
+                @click="limpiarFiltroColeccion"
+              >
+                Limpiar
+              </button>
+            </div>
+
+            <div v-if="cargandoColeccionProductos" class="mt-3 space-y-3" role="status" aria-live="polite">
+              <span class="sr-only">Cargando colección...</span>
+              <div
+                v-for="n in 3"
+                :key="n"
+                class="h-40 animate-pulse rounded-2xl border border-rosa/40 bg-blanco"
+              ></div>
+            </div>
+
+            <p
+              v-else-if="errorColeccion"
+              class="mt-3 rounded-2xl border border-rojizo/25 bg-rojizo/5 px-4 py-4 text-center text-sm text-rojizo"
+            >
+              {{ errorColeccion }}
+            </p>
+
+            <p
+              v-else-if="!productosColeccion.length"
+              class="mt-3 rounded-2xl border border-dashed border-borde bg-superficie px-5 py-8 text-center text-sm text-cafe/60"
+            >
+              <template v-if="hayFiltroColeccion">
+                No hay productos que coincidan con el filtro.
+                <button
+                  type="button"
+                  class="ml-1 font-semibold text-coral underline transition hover:text-rojizo"
+                  @click="limpiarFiltroColeccion"
+                >
+                  Limpiar filtro
+                </button>
+              </template>
+              <template v-else-if="esDuenioProductos">
+                Todavía no hay compras para mostrar. Cuando pagues un producto, va a aparecer acá.
+              </template>
+              <template v-else>
+                Todavía no hay productos para mostrar.
+              </template>
+            </p>
+
+            <div v-else class="mt-3 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <article
+                v-for="producto in productosColeccion"
+                :key="producto.idCompraItem"
+                class="overflow-hidden rounded-[22px] border border-borde/60 bg-superficie shadow-[0_10px_26px_rgba(74,29,46,0.07)] transition hover:border-coral/40"
+              >
+                <router-link
+                  v-if="producto.idProducto"
+                  :to="{ name: 'producto-publico', params: { id: producto.idProducto } }"
+                  class="group block"
+                >
+                  <div class="relative aspect-4/3 overflow-hidden bg-rosa/20">
+                    <img
+                      v-if="producto.imagenUrl"
+                      :src="producto.imagenUrl"
+                      :alt="tituloProductoColeccion(producto)"
+                      class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                      :class="producto.requiereAdvertencia ? 'blur-[18px] scale-105' : ''"
+                    />
+                    <span
+                      v-if="producto.requiereAdvertencia"
+                      class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-granate/25 px-4 text-center text-white"
+                      :title="`Contenido sensible: ${textoContenidoSensible(producto) || 'sin detallar'}`"
+                    >
+                      <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                      </svg>
+                      <span class="text-xs font-semibold drop-shadow">Contenido sensible</span>
+                    </span>
+                    <span
+                      v-if="producto.esPiezaUnica"
+                      class="absolute bottom-3 left-3 rounded-full bg-mantequilla px-2.5 py-1 text-[11px] font-bold text-tinta shadow-sm"
+                    >
+                      Pieza única
+                    </span>
+                    <span
+                      v-else-if="producto.esReventa"
+                      class="absolute bottom-3 left-3 rounded-full bg-coral px-2.5 py-1 text-[11px] font-bold text-white shadow-sm"
+                    >
+                      Reventa
+                    </span>
+                    <span
+                      v-if="producto.oculto"
+                      class="absolute left-3 top-3 rounded-full bg-granate/80 px-2.5 py-1 text-[11px] font-semibold text-white"
+                    >
+                      Oculto
+                    </span>
+                    <span
+                      v-if="producto.estadoProducto && !producto.productoDisponible"
+                      class="absolute right-3 top-3 rounded-full bg-superficie/95 px-2.5 py-1 text-[11px] font-bold text-granate ring-1 ring-borde/70 backdrop-blur-sm"
+                    >
+                      {{ producto.estadoProducto === 'ARCHIVADO' ? 'Archivado' : 'No disponible' }}
+                    </span>
+                  </div>
+                </router-link>
+
+                <div class="p-4">
+                  <h3 class="truncate text-base font-semibold text-granate">
+                    {{ tituloProductoColeccion(producto) }}
+                  </h3>
+                  <p v-if="producto.nombreVariante" class="mt-0.5 truncate text-sm text-cafe/65">
+                    {{ producto.nombreVariante }}
+                  </p>
+                  <div class="mt-3 flex items-center gap-2">
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-rosa text-xs font-bold text-granate">
+                      <img
+                        v-if="producto.artista?.urlFotoPerfil"
+                        :src="producto.artista.urlFotoPerfil"
+                        alt=""
+                        class="h-full w-full object-cover"
+                      />
+                      <template v-else>
+                        {{ (producto.artista?.nombreUsuario || '?').charAt(0).toUpperCase() }}
+                      </template>
+                    </span>
+                    <router-link
+                      :to="{ name: 'perfil', params: { nombreUsuario: producto.artista?.nombreUsuario } }"
+                      class="truncate text-sm font-semibold text-coral transition hover:text-rojizo"
+                    >
+                      @{{ producto.artista?.nombreUsuario }}
+                    </router-link>
+                  </div>
+                  <p v-if="producto.fechaCompra" class="mt-2 text-xs text-cafe/50">
+                    Comprado el {{ formatearFecha(producto.fechaCompra) }}
+                  </p>
+
+                  <div
+                    v-if="producto.resenia"
+                    class="mt-3 rounded-xl border border-rosa/40 bg-rosa/5 px-3 py-2"
+                  >
+                    <div class="flex flex-wrap items-center gap-2">
+                      <ValoracionEstrellas
+                        :model-value="producto.resenia.calificacionGeneral"
+                        readonly
+                        tamano="sm"
+                        etiqueta="Tu reseña del producto"
+                      />
+                      <span class="text-xs font-semibold text-granate">
+                        {{ producto.resenia.calificacionGeneral }}/5
+                      </span>
+                      <span class="text-xs text-cafe/50">
+                        · {{ producto.resenia.autorMostrado }}
+                      </span>
+                    </div>
+                    <p
+                      v-if="producto.resenia.descripcion"
+                      class="mt-1 line-clamp-2 text-xs leading-relaxed text-cafe/70"
+                    >
+                      {{ producto.resenia.descripcion }}
+                    </p>
+                  </div>
+
+                  <div
+                    v-if="esDuenioProductos"
+                    class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-borde/50 pt-3"
+                  >
+                    <button
+                      type="button"
+                      :disabled="actualizandoColeccion"
+                      class="inline-flex min-h-8 items-center rounded-full border border-borde/60 bg-blanco px-3 text-xs font-semibold text-granate transition hover:bg-rosa/20 disabled:opacity-50"
+                      @click="alternarVisibilidadProducto(producto)"
+                    >
+                      {{ producto.oculto ? 'Mostrar' : 'Ocultar' }}
+                    </button>
+                    <router-link
+                      v-if="producto.idProducto"
+                      :to="{ name: 'producto-publico', params: { id: producto.idProducto } }"
+                      class="text-xs font-semibold text-cafe/60 transition hover:text-granate"
+                    >
+                      Ver producto
+                    </router-link>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <div v-if="coleccionProductos?.productos?.hayMas" class="mt-4 text-center">
+              <button
+                type="button"
+                :disabled="cargandoMasColeccion"
+                class="inline-flex min-h-10 items-center justify-center rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition hover:bg-rosa/20 disabled:opacity-50"
+                @click="cargarMasColeccion"
+              >
+                {{ cargandoMasColeccion ? 'Cargando...' : 'Cargar más' }}
               </button>
             </div>
           </div>

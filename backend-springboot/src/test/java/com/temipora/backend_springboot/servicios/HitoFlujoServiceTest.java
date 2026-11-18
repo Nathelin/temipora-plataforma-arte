@@ -2,7 +2,6 @@ package com.temipora.backend_springboot.servicios;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.HitoPedido;
+import com.temipora.backend_springboot.modelo.HitoPresupuesto;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.TipoHito;
@@ -52,8 +52,8 @@ class HitoFlujoServiceTest {
     @Test
     void habilitarSiguiente_cuota_seteaVencimientoYNotifica() {
         HitoPedido siguiente = hito(2);
-        siguiente.setTipo(TipoHito.CUOTA);
-        siguiente.setNombre("Cuota 2");
+        siguiente.getHitoPresupuesto().setTipo(TipoHito.CUOTA);
+        siguiente.getHitoPresupuesto().setNombre("Cuota 2");
         when(hitoPedidoRepository
             .findFirstByPedidoIdPedidoAndOrdenGreaterThanOrderByOrdenAsc(10L, 1))
             .thenReturn(Optional.of(siguiente));
@@ -65,14 +65,15 @@ class HitoFlujoServiceTest {
         assertThat(siguiente.getFechaLimitePago()).isEqualTo(ahora().plusDays(5));
         verify(hitoPedidoRepository).save(siguiente);
         verify(notificacionService).crearParaUsuario(
-            eq(2L), eq("CUOTA_PENDIENTE"), anyString(), anyString(),
+            eq(2L), eq("CUOTA_PENDIENTE"), eq("Cuota habilitada"),
+            eq("Se habilitó el pago de 'Cuota 2' del pedido de 'Retrato'."),
             eq(10L), eq("PEDIDO"));
     }
 
     @Test
     void habilitarSiguiente_entrega_noNotificaNiGuarda() {
         HitoPedido siguiente = hito(2);
-        siguiente.setTipo(TipoHito.ENTREGA);
+        siguiente.getHitoPresupuesto().setTipo(TipoHito.ENTREGA);
         when(hitoPedidoRepository
             .findFirstByPedidoIdPedidoAndOrdenGreaterThanOrderByOrdenAsc(10L, 1))
             .thenReturn(Optional.of(siguiente));
@@ -89,7 +90,7 @@ class HitoFlujoServiceTest {
     @Test
     void habilitarSiguiente_pedidoSinServicio_usaTextoGenerico() {
         HitoPedido siguiente = hito(2);
-        siguiente.setTipo(TipoHito.CUOTA);
+        siguiente.getHitoPresupuesto().setTipo(TipoHito.CUOTA);
         when(hitoPedidoRepository
             .findFirstByPedidoIdPedidoAndOrdenGreaterThanOrderByOrdenAsc(10L, 1))
             .thenReturn(Optional.of(siguiente));
@@ -100,7 +101,8 @@ class HitoFlujoServiceTest {
         service.habilitarSiguiente(pedido, hito(1), ahora());
 
         verify(notificacionService).crearParaUsuario(
-            eq(2L), eq("CUOTA_PENDIENTE"), anyString(), anyString(),
+            eq(2L), eq("CUOTA_PENDIENTE"), eq("Cuota habilitada"),
+            eq("Se habilitó el pago de 'Hito 2' del pedido de 'tu pedido'."),
             eq(10L), eq("PEDIDO"));
     }
 
@@ -140,10 +142,14 @@ class HitoFlujoServiceTest {
     }
 
     private HitoPedido hito(int orden) {
+        HitoPresupuesto hitoPresupuesto = new HitoPresupuesto();
+        hitoPresupuesto.setOrden(orden);
+        hitoPresupuesto.setNombre("Hito " + orden);
+        hitoPresupuesto.setTipo(TipoHito.CUOTA);
+
         HitoPedido hito = new HitoPedido();
         hito.setOrden(orden);
-        hito.setNombre("Hito " + orden);
-        hito.setTipo(TipoHito.CUOTA);
+        hito.setHitoPresupuesto(hitoPresupuesto);
         return hito;
     }
 

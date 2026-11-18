@@ -22,11 +22,13 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findByNombreUsuario(String nombreUsuario);
     Optional<Usuario> findByNombreUsuarioIgnoreCase(String nombreUsuario);
     Optional<Usuario> findByCorreo(String correo);
+    Optional<Usuario> findByCorreoIgnoreCase(String correo);
     Optional<Usuario> findByTelefono(String telefono);
     Optional<Usuario> findByTokenBajaEmail(String tokenBajaEmail);
     List<Usuario> findByRol_Nombre(ERol nombre);
     boolean existsByNombreUsuario(String nombreUsuario);
     boolean existsByNombreUsuarioIgnoreCase(String nombreUsuario);
+    boolean existsByCorreoIgnoreCase(String correo);
     boolean existsByRol_Nombre(ERol nombre);
 
     @Query("""

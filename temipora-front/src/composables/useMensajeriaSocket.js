@@ -5,6 +5,7 @@ const conectado = ref(false)
 const handlers = new Set()
 
 let cliente = null
+let intentosReconexion = 0
 
 function urlSocket() {
   const protocolo = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -30,6 +31,7 @@ function conectar() {
     },
     onConnect: () => {
       conectado.value = true
+      intentosReconexion = 0
       nuevo.subscribe('/usuario/cola/mensajeria', (frame) => {
         let evento
         try {
@@ -51,6 +53,13 @@ function conectar() {
     },
     onWebSocketClose: () => {
       conectado.value = false
+      intentosReconexion += 1
+      // Backoff acotado: 1s, 2s, 4s... hasta 30s. Evita martillar el túnel
+      // cuando el backend está reiniciándose.
+      nuevo.reconnectDelay = Math.min(
+        30000,
+        1000 * 2 ** Math.min(intentosReconexion, 5),
+      )
     },
     onStompError: () => {
       conectado.value = false
@@ -92,6 +101,32 @@ function enviarEscribiendo(idConversacion) {
   } catch {
     return false
   }
+}
+
+async function reconectarAhora() {
+  if (!localStorage.getItem('token')) return
+  const activo = cliente
+  cliente = null
+  conectado.value = false
+  if (activo) {
+    try {
+      await activo.deactivate()
+    } catch {
+      // La conexión ya estaba cerrada.
+    }
+  }
+  conectar()
+}
+
+if (typeof window !== 'undefined') {
+  // Al volver del bfcache el WebSocket puede quedar muerto aunque stomp
+  // siga marcado como activo. Forzamos una conexión nueva.
+  window.addEventListener('pageshow', (evento) => {
+    if (evento.persisted) void reconectarAhora()
+  })
+  window.addEventListener('online', () => {
+    if (!conectado.value) void reconectarAhora()
+  })
 }
 
 export function useMensajeriaSocket() {

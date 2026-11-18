@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../components/Login.vue'
 import Usuarios from '../components/Usuarios.vue'
+import SancionesAdmin from '../components/SancionesAdmin.vue'
+import AnclajeAdmin from '../components/AnclajeAdmin.vue'
 import TiposAdmin from '../components/TiposAdmin.vue'
 import EtiquetasAdmin from '../components/EtiquetasAdmin.vue'
 import CategoriasEtiquetaAdmin from '../components/CategoriasEtiquetaAdmin.vue'
@@ -15,6 +17,7 @@ import ComisionAdmin from '../components/ComisionAdmin.vue'
 import PromocionesAdmin from '../components/PromocionesAdmin.vue'
 import SustitucionesAdmin from '../components/SustitucionesAdmin.vue'
 import PedidoConfigAdmin from '../components/PedidoConfigAdmin.vue'
+import ConfiguracionBajaCuentaAdmin from '../components/ConfiguracionBajaCuentaAdmin.vue'
 import ConfiguracionMensajeriaAdmin from '../components/ConfiguracionMensajeriaAdmin.vue'
 import TerminosPlataformaAdmin from '../components/TerminosPlataformaAdmin.vue'
 import CriteriosReseniaAdmin from '../components/CriteriosReseniaAdmin.vue'
@@ -30,9 +33,12 @@ import ConfiguracionLayout from '../layouts/ConfiguracionLayout.vue'
 import ArtistLayout from '../layouts/ArtistLayout.vue'
 import ClientLayout from '../layouts/ClientLayout.vue'
 import Inicio from '../views/Inicio.vue'
+import Explorar from '../views/Explorar.vue'
 import AdminResumen from '../views/AdminResumen.vue'
+import AdminInformeVentas from '../views/AdminInformeVentas.vue'
 import PanelResumen from '../views/PanelResumen.vue'
 import Ventas from '../views/Ventas.vue'
+import InformeVentas from '../views/InformeVentas.vue'
 import Perfil from '../views/Perfil.vue'
 import Favoritos from '../views/Favoritos.vue'
 import FavoritosArtistas from '../views/FavoritosArtistas.vue'
@@ -64,6 +70,18 @@ import PortfolioSubir from '../views/PortfolioSubir.vue'
 import MisServicios from '../views/MisServicios.vue'
 import ServicioForm from '../views/ServicioForm.vue'
 import ServicioSolicitudes from '../views/ServicioSolicitudes.vue'
+import MisProductos from '../views/MisProductos.vue'
+import ProductoForm from '../views/ProductoForm.vue'
+import ProductoDetalle from '../views/ProductoDetalle.vue'
+import ProductoPublico from '../views/ProductoPublico.vue'
+import Productos from '../views/Productos.vue'
+import Reventas from '../views/Reventas.vue'
+import ReventaPublica from '../views/ReventaPublica.vue'
+import MiReventa from '../views/MiReventa.vue'
+import Carrito from '../views/Carrito.vue'
+import MisCompras from '../views/MisCompras.vue'
+import CompraDetalle from '../views/CompraDetalle.vue'
+import CertificadoPublico from '../views/CertificadoPublico.vue'
 import ServiciosArchivados from '../views/ServiciosArchivados.vue'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useConfirmacionSalida } from '../composables/useConfirmacionSalida'
@@ -78,8 +96,41 @@ const routes = [
         name: 'inicio', 
         component: Inicio,
         meta: { title: 'Temipora - inicio' }  },
-      { path: 'productos', redirect: '/' },
-      { path: 'servicios', name: 'servicios', component: Servicios,
+      { path: 'explorar', name: 'explorar', component: Explorar,
+        meta: { title: 'Explorar' }
+      },
+      { path: 'productos', name: 'productos', component: Productos,
+        meta: { title: 'Productos' }
+      },
+      { path: 'productos/:id', name: 'producto-publico', component: ProductoPublico,
+        props: (route) => ({ id: Number(route.params.id) }),
+        meta: { title: 'Detalle del producto' }
+      },
+      { path: 'reventas', name: 'reventas', component: Reventas,
+        meta: { title: 'Reventas' }
+      },
+      { path: 'reventas/:id', name: 'reventa-publica', component: ReventaPublica,
+        props: (route) => ({ id: Number(route.params.id) }),
+        meta: { title: 'Detalle de la reventa' }
+      },
+      { path: 'certificado/:codigo', name: 'certificado-publico', component: CertificadoPublico,
+        props: (route) => ({ codigo: String(route.params.codigo) }),
+        meta: { title: (route) => `Certificado ${route.params.codigo}` }
+      },
+      {
+        path: 'carrito',
+        name: 'carrito',
+        component: Carrito,
+        meta: {
+          title: 'Carrito',
+          requiresAuth: true,
+          requiresComprador: true,
+        },
+      },
+      {
+        path: 'servicios',
+        name: 'servicios',
+        component: Servicios,
         meta: { title: 'Servicios' }
       },
       { path: 'servicios/:id', name: 'servicio-detalle', component: ServicioDetalle,
@@ -148,18 +199,51 @@ const routes = [
         meta: { title: 'Notificaciones', requiresAuth: true },
       },
       {
-        path: 'solicitudes',
+        path: 'mi-actividad',
         component: ClientLayout,
         meta: { requiresAuth: true },
         children: [
+          { path: '', redirect: { name: 'compras' } },
           {
-            path: '',
+            path: '/compras',
+            name: 'compras',
+            component: MisCompras,
+            meta: { title: 'Mis compras', requiresComprador: true },
+          },
+          {
+            path: '/compras/:id',
+            name: 'compra-detalle',
+            component: CompraDetalle,
+            meta: { title: 'Detalle de compra', requiresComprador: true },
+          },
+          {
+            path: '/reventa',
+            name: 'mi-reventa',
+            component: MiReventa,
+            meta: { title: 'Reventa', requiresComprador: true },
+          },
+          {
+            path: '/pedidos',
+            name: 'pedidos',
+            component: Pedidos,
+            meta: { title: 'Mis pedidos' },
+          },
+          {
+            path: '/pedidos/:idPedido',
+            name: 'pedido-detalle',
+            component: PedidoDetalle,
+            meta: {
+              title: (route) => `Pedido #${route.params.idPedido}`,
+            },
+          },
+          {
+            path: '/solicitudes',
             name: 'solicitudes',
             component: Solicitudes,
             meta: { title: 'Mis solicitudes' },
           },
           {
-            path: ':idSolicitud',
+            path: '/solicitudes/:idSolicitud',
             name: 'solicitud-detalle',
             component: SolicitudDetalle,
             meta: {
@@ -179,27 +263,6 @@ const routes = [
         },
       },
       {
-        path: 'pedidos',
-        component: ClientLayout,
-        meta: { requiresAuth: true },
-        children: [
-          {
-            path: '',
-            name: 'pedidos',
-            component: Pedidos,
-            meta: { title: 'Mis pedidos' },
-          },
-          {
-            path: ':idPedido',
-            name: 'pedido-detalle',
-            component: PedidoDetalle,
-            meta: {
-              title: (route) => `Pedido #${route.params.idPedido}`,
-            },
-          },
-        ],
-      },
-      {
         path: 'solicitudes/:idSolicitud/resultado',
         name: 'solicitud-resultado',
         component: CierreDetalle,
@@ -211,7 +274,7 @@ const routes = [
         component: CierreDetalle,
         meta: { title: 'Resultado del pedido' },
       },
-      { path: 'mis-compras', redirect: { name: 'pedidos' } },
+      { path: 'mis-compras', redirect: { name: 'compras' } },
       {
         path: 'mensajes',
         name: 'mensajes',
@@ -238,12 +301,17 @@ const routes = [
           { path: 'servicios/crear', name: 'servicio-crear', component: ServicioForm, meta: { title: 'Crear servicio' } },
           { path: 'servicios/:id/editar', name: 'servicio-editar', component: ServicioForm, meta: { title: 'Editar servicio' } },
           { path: 'servicios/:id/solicitudes', name: 'servicio-solicitudes', component: ServicioSolicitudes, meta: { title: 'Solicitudes del servicio' } },
+          { path: 'productos', name: 'mis-productos', component: MisProductos, meta: { title: 'Mis productos' } },
+          { path: 'productos/crear', name: 'producto-crear', component: ProductoForm, meta: { title: 'Crear producto' } },
+          { path: 'productos/:id/editar', name: 'producto-editar', component: ProductoForm, meta: { title: 'Editar producto' } },
+          { path: 'productos/:id', name: 'producto-previa', component: ProductoDetalle, meta: { title: 'Vista previa del producto' } },
           { path: 'solicitudes', name: 'panel-solicitudes', component: Solicitudes, meta: { title: 'Solicitudes' } },
           { path: 'solicitudes/:idSolicitud', name: 'panel-solicitud-detalle', component: SolicitudDetalle, meta: { title: 'Solicitud' } },
           { path: 'solicitudes/:idSolicitud/presupuesto', name: 'presupuesto-crear', component: PresupuestoForm, meta: { title: 'Enviar presupuesto' } },
           { path: 'pedidos', name: 'panel-pedidos', component: Pedidos, meta: { title: 'Pedidos' } },
           { path: 'pedidos/:idPedido', name: 'panel-pedido-detalle', component: PedidoDetalle, meta: { title: 'Pedido' } },
           { path: 'ventas', name: 'panel-ventas', component: Ventas, meta: { title: 'Ventas' } },
+          { path: 'informes', name: 'panel-informes', component: InformeVentas, meta: { title: 'Informe de ventas' } },
           { path: 'mensajes', name: 'panel-mensajes', component: Mensajes, meta: { title: 'Mensajes' } },
           { path: 'mensajes/:nombreUsuario', name: 'panel-conversacion', component: Conversacion, meta: { title: 'Conversación' } },
           { path: 'formulario-pedidos', name: 'panel-formulario-pedidos', component: ConfiguracionFormularioPedidos, meta: { title: 'Formulario de pedidos' } },
@@ -275,7 +343,8 @@ const routes = [
           { path: 'apariencia', name: 'configuracion-apariencia', component: ConfiguracionApariencia, meta: { title: 'Configuración - Apariencia' } },
           { path: 'privacidad', name: 'configuracion-privacidad', component: ConfiguracionPrivacidad, meta: { title: 'Configuración - Privacidad' } },
           { path: 'cuenta', name: 'configuracion-cuenta', component: ConfiguracionCuenta, meta: { title: 'Configuración - Cuenta' } },
-          { path: 'cobros', name: 'configuracion-cobros', component: ConfiguracionCobros, meta: { title: 'Configuración - Formas de cobro', requiresArtist: true } },
+          { path: 'pagos-y-cobros', name: 'configuracion-pagos-y-cobros', component: ConfiguracionCobros, meta: { title: 'Configuración - Pagos y cobros', requiresAuth: true } },
+          { path: 'cobros', redirect: { name: 'configuracion-pagos-y-cobros' } },
         ],
       },
       { path: 'about', redirect: '/' },
@@ -294,10 +363,32 @@ const routes = [
         meta: { title: 'Resumen de administración' },
       },
       {
+        path: 'informes',
+        redirect: '/admin/informes/ventas',
+      },
+      {
+        path: 'informes/ventas',
+        name: 'admin-informe-ventas',
+        component: AdminInformeVentas,
+        meta: { title: 'Informes - Ventas y comisiones' },
+      },
+      {
         path: 'usuarios',
         name: 'usuarios',
         component: Usuarios,
         meta: { title: 'Usuarios registrados' },
+      },
+      {
+        path: 'sanciones',
+        name: 'admin-sanciones',
+        component: SancionesAdmin,
+        meta: { title: 'Sanciones de cuentas' },
+      },
+      {
+        path: 'anclaje',
+        name: 'admin-anclaje',
+        component: AnclajeAdmin,
+        meta: { title: 'Anclaje en Bitcoin' },
       },
       {
         path: 'tipos/producto',
@@ -422,6 +513,12 @@ const routes = [
         meta: { title: 'Hitos y pedidos' },
       },
       {
+        path: 'ajustes/bajas-cuenta',
+        name: 'bajas-cuenta-admin',
+        component: ConfiguracionBajaCuentaAdmin,
+        meta: { title: 'Bajas de cuenta' },
+      },
+      {
         path: 'ajustes/mensajeria',
         name: 'configuracion-mensajeria-admin',
         component: ConfiguracionMensajeriaAdmin,
@@ -470,7 +567,13 @@ const router = createRouter({
 
 const { subidaEnCurso, publicadasEnSesion, proteccionActiva } = useSubirImagen()
 const { pedir } = useConfirmacionSalida()
-const { hayCambios: hayCambiosConfig, mensaje: mensajeConfig, limpiar: limpiarConfig } = useCambiosSinGuardar()
+const {
+  hayCambios: hayCambiosConfig,
+  mensaje: mensajeConfig,
+  textoAlternativo: alternativaConfig,
+  limpiar: limpiarConfig,
+  ejecutarAlternativa: ejecutarAlternativaConfig,
+} = useCambiosSinGuardar()
 
 router.beforeEach(async (to, from) => {
   const saliendoDeSubir = from.path === '/panel/portfolio' && to.path !== from.path
@@ -494,8 +597,7 @@ router.beforeEach(async (to, from) => {
 })
 
 router.beforeEach(async (to, from) => {
-  const saliendoDeConfig = from.path.startsWith('/configuracion') && to.path !== from.path
-  if (!saliendoDeConfig || !hayCambiosConfig.value) {
+  if (to.path === from.path || !hayCambiosConfig.value) {
     return true
   }
 
@@ -503,6 +605,10 @@ router.beforeEach(async (to, from) => {
     titulo: '¿Salir sin guardar?',
     textoConfirmar: 'Salir sin guardar',
     textoCancelar: 'Seguir editando',
+    textoAlternativo: alternativaConfig.value || undefined,
+    alAlternar: alternativaConfig.value
+      ? () => ejecutarAlternativaConfig()
+      : undefined,
   })
   if (permitir) limpiarConfig()
   return permitir

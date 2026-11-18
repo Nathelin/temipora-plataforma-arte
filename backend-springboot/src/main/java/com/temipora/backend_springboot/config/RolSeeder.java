@@ -1,10 +1,9 @@
 package com.temipora.backend_springboot.config;
 
-import java.util.Arrays;
-
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.Rol;
@@ -21,18 +20,33 @@ public class RolSeeder implements CommandLineRunner {
     }
 
     @Override
+    @Transactional
     public void run(String... args) {
-        Arrays.stream(ERol.values()).forEach(this::crearSiNoExiste);
+        // La jerarquía se crea de abajo hacia arriba para poder referenciar al padre.
+        Rol cliente = crearSiNoExiste(ERol.CLIENTE, null);
+        Rol artista = crearSiNoExiste(ERol.ARTISTA, cliente);
+        crearSiNoExiste(ERol.ADMIN, artista);
     }
 
-    private void crearSiNoExiste(ERol nombreRol) {
-        if (rolRepository.findByNombre(nombreRol).isEmpty()) {
-            Rol rol = Rol.builder()
+    private Rol crearSiNoExiste(ERol nombreRol, Rol rolPadre) {
+        Rol rol = rolRepository.findByNombre(nombreRol).orElseGet(() -> {
+            Rol nuevo = Rol.builder()
                 .nombre(nombreRol)
                 .estado(true)
+                .rolPadre(rolPadre)
                 .build();
-            rolRepository.save(rol);
             System.out.println("RolSeeder: rol " + nombreRol + " creado.");
+            return rolRepository.save(nuevo);
+        });
+
+        boolean padreDesactualizado = rolPadre != null
+            && (rol.getRolPadre() == null
+                || !rolPadre.getIdRol().equals(rol.getRolPadre().getIdRol()));
+        if (padreDesactualizado) {
+            rol.setRolPadre(rolPadre);
+            rol = rolRepository.save(rol);
+            System.out.println("RolSeeder: jerarquía de " + nombreRol + " actualizada.");
         }
+        return rol;
     }
 }

@@ -29,6 +29,7 @@ import com.temipora.backend_springboot.modelo.EnvioEmail;
 import com.temipora.backend_springboot.modelo.EstadoEmailCierre;
 import com.temipora.backend_springboot.modelo.EstadoEnvioEmail;
 import com.temipora.backend_springboot.modelo.MotivoSustitucion;
+import com.temipora.backend_springboot.modelo.SancionCuenta;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
 import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.SustitucionOpcionDTO;
@@ -53,6 +54,8 @@ class CierreEmailProcesadorTest {
     private EnvioEmailService envioEmailService;
     @Mock
     private AccesoEnlaceService accesoEnlaceService;
+    @Mock
+    private SancionService sancionService;
 
     @InjectMocks
     private CierreEmailProcesador procesador;
@@ -98,6 +101,20 @@ class CierreEmailProcesadorTest {
 
         assertThat(enviado).isFalse();
         assertThat(fila.getEstado()).isEqualTo(EstadoEmailCierre.OMITIDO);
+        verify(envioEmailService, never()).enviar(
+            any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void procesar_usuarioSancionado_noEnviaCorreo() {
+        Usuario usuario = usuario("a@mail.com");
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(usuario));
+        when(sancionService.obtenerVigente(1L))
+            .thenReturn(Optional.of(new SancionCuenta()));
+
+        boolean enviado = procesador.procesar(1L);
+
+        assertThat(enviado).isFalse();
         verify(envioEmailService, never()).enviar(
             any(), any(), any(), any(), any(), any(), any());
     }

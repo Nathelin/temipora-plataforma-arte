@@ -1,8 +1,10 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { useSesion } from '../composables/useSesion'
+import { obtenerContacto } from '../servicios/contacto'
+import { formatearFecha, formatearFechaHora } from '../servicios/fechas'
 import fondo from '../assets/fondos/prueba.png'
 import welcomeLogo from '../assets/welcome logo.png'
 
@@ -14,6 +16,105 @@ const contrasenia = ref('')
 const error = ref('')
 const cargando = ref(false)
 const verContrasenia = ref(false)
+const inhabilitada = ref(null)
+const baja = ref(null)
+const avisoBaja = ref(null)
+const reactivando = ref(false)
+const errorBaja = ref('')
+const contactoRespaldo = ref('')
+
+const contactoVisible = computed(
+  () => baja.value?.contacto
+    || inhabilitada.value?.contacto
+    || contactoRespaldo.value
+    || 'temiporasupport@gmail.com',
+)
+
+function cargarInhabilitada() {
+  try {
+    const raw = sessionStorage.getItem('cuentaInhabilitada')
+    if (!raw) return
+    const datos = JSON.parse(raw)
+    if (datos?.codigo === 'CUENTA_DE_BAJA') {
+      baja.value = datos
+      inhabilitada.value = null
+      return
+    }
+    inhabilitada.value = datos
+    baja.value = null
+  } catch {
+    inhabilitada.value = null
+    baja.value = null
+  }
+}
+
+function cargarAvisoBaja() {
+  try {
+    const raw = sessionStorage.getItem('cuentaBaja')
+    if (!raw) return
+    avisoBaja.value = JSON.parse(raw)
+    sessionStorage.removeItem('cuentaBaja')
+  } catch {
+    avisoBaja.value = null
+  }
+}
+
+function formatearFechaFin(valor) {
+  return formatearFechaHora(valor)
+}
+
+async function reactivarCuenta() {
+  errorBaja.value = ''
+
+  if (!nombreUsuario.value.trim()) {
+    errorBaja.value = 'Ingresá tu nombre de usuario.'
+    return
+  }
+  if (!contrasenia.value) {
+    errorBaja.value = 'Ingresá tu contraseña para reactivar tu cuenta.'
+    return
+  }
+
+  reactivando.value = true
+  try {
+    const res = await api.post('/auth/reactivar-cuenta', {
+      nombreUsuario: nombreUsuario.value.trim(),
+      contrasenia: contrasenia.value,
+    })
+
+    guardarSesion(res.data)
+    sessionStorage.removeItem('cuentaInhabilitada')
+    sessionStorage.removeItem('cuentaBaja')
+    baja.value = null
+    avisoBaja.value = null
+
+    const rol = res.data.rol
+    if (rol === 'ADMIN') {
+      router.push({ name: 'admin-resumen' })
+    } else {
+      router.push({ name: 'explorar' })
+    }
+  } catch (e) {
+    const data = e.response?.data
+    if (e.response?.status === 403 && data?.codigo === 'REACTIVACION_VENCIDA') {
+      baja.value = {
+        ...baja.value,
+        puedeReactivar: false,
+        reactivarHasta: data.reactivarHasta || baja.value?.reactivarHasta || null,
+        contacto: data.contacto || baja.value?.contacto || '',
+        message: data.message || '',
+      }
+    } else {
+      errorBaja.value = data?.message || 'No se pudo reactivar la cuenta.'
+    }
+  } finally {
+    reactivando.value = false
+  }
+}
+
+function alInhabilitar() {
+  cargarInhabilitada()
+}
 
 async function iniciarSesion() {
   error.value = ''
@@ -26,6 +127,11 @@ async function iniciarSesion() {
 
     const rol = res.data.rol
     guardarSesion(res.data)
+    sessionStorage.removeItem('cuentaInhabilitada')
+    inhabilitada.value = null
+    baja.value = null
+    avisoBaja.value = null
+    errorBaja.value = ''
 
     const redirect = route.query.redirect
     if (redirect) {
@@ -33,14 +139,50 @@ async function iniciarSesion() {
     } else if (rol === 'ADMIN') {
       router.push({ name: 'admin-resumen' })
     } else {
-      router.push({ name: 'servicios' })
+      // Clientes y artistas entran directo al descubrimiento.
+      router.push({ name: 'explorar' })
     }
   } catch (e) {
-    error.value = 'Nombre de usuario o contraseña incorrecta.'
+    const data = e.response?.data
+    if (e.response?.status === 403 && data?.codigo === 'CUENTA_DE_BAJA') {
+      baja.value = {
+        codigo: data.codigo,
+        fechaBaja: data.fechaBaja || null,
+        reactivarHasta: data.reactivarHasta || null,
+        puedeReactivar: data.puedeReactivar !== false,
+        contacto: data.contacto || '',
+        message: data.message || '',
+      }
+      inhabilitada.value = null
+      errorBaja.value = ''
+    } else if (e.response?.status === 403
+        && (data?.codigo === 'CUENTA_SANCIONADA' || data?.codigo === 'CUENTA_INACTIVA')) {
+      inhabilitada.value = {
+        codigo: data.codigo,
+        motivo: data.motivo || '',
+        contacto: data.contacto || '',
+        fechaFin: data.fechaFin || null,
+        message: data.message || '',
+      }
+      baja.value = null
+    } else {
+      error.value = 'Nombre de usuario o contraseña incorrecta.'
+    }
   } finally {
     cargando.value = false
   }
 }
+
+onMounted(async () => {
+  cargarInhabilitada()
+  cargarAvisoBaja()
+  window.addEventListener('cuenta-inhabilitada', alInhabilitar)
+  contactoRespaldo.value = await obtenerContacto()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('cuenta-inhabilitada', alInhabilitar)
+})
 </script>
 
 <template>
@@ -55,6 +197,20 @@ async function iniciarSesion() {
           Inicia sesión
         </h2>
         <p class="text-center text-sm text-cafe/60 mt-1">Nos alegra verte de nuevo</p>
+      </div>
+
+      <div
+        v-if="avisoBaja"
+        class="mt-5 rounded-xl border border-coral/40 bg-coral/10 px-4 py-3 text-sm text-granate"
+        role="status"
+      >
+        <p class="font-semibold">Tu cuenta quedó inactiva.</p>
+        <p v-if="avisoBaja.reactivarHasta" class="mt-1">
+          Podés reactivarla hasta el {{ formatearFecha(avisoBaja.reactivarHasta) }} iniciando sesión.
+        </p>
+        <p v-else class="mt-1">
+          Podés reactivarla iniciando sesión dentro del plazo configurado.
+        </p>
       </div>
 
       <form class="space-y-2 sm:pt-5" @submit.prevent="iniciarSesion">
@@ -97,6 +253,59 @@ async function iniciarSesion() {
               {{ verContrasenia ? 'Ocultar' : 'Ver' }}
             </button>
           </div>
+        </div>
+
+        <div
+          v-if="inhabilitada"
+          class="rounded-xl border border-rojizo/30 bg-rosa/40 px-4 py-3 text-sm text-granate"
+          role="alert"
+        >
+          <p class="font-semibold text-rojizo">
+            {{ inhabilitada.message || 'Tu cuenta está inhabilitada.' }}
+          </p>
+          <p v-if="inhabilitada.motivo" class="mt-1">
+            <span class="font-semibold">Motivo:</span> {{ inhabilitada.motivo }}
+          </p>
+          <p v-if="inhabilitada.fechaFin" class="mt-1">
+            La sanción finaliza el {{ formatearFechaFin(inhabilitada.fechaFin) }}.
+          </p>
+          <p class="mt-1">
+            Si creés que es un error, escribinos a
+            <a :href="`mailto:${contactoVisible}`" class="underline">
+              {{ contactoVisible }}
+            </a>.
+          </p>
+        </div>
+
+        <div
+          v-if="baja"
+          class="rounded-xl border border-rojizo/30 bg-durazno/30 px-4 py-3 text-sm text-granate"
+          role="alert"
+        >
+          <p class="font-semibold text-rojizo">Tu cuenta está dada de baja.</p>
+          <p v-if="baja.fechaBaja" class="mt-1">
+            La dimos de baja el {{ formatearFecha(baja.fechaBaja) }}.
+          </p>
+          <p v-if="baja.puedeReactivar && baja.reactivarHasta" class="mt-1">
+            Podés reactivarla hasta el {{ formatearFecha(baja.reactivarHasta) }}.
+          </p>
+          <p v-else class="mt-1">
+            El plazo para reactivarla venció. Escribinos a
+            <a :href="`mailto:${contactoVisible}`" class="underline">{{ contactoVisible }}</a>.
+          </p>
+          <button
+            v-if="baja.puedeReactivar"
+            type="button"
+            :disabled="reactivando"
+            class="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-coral px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-rojizo disabled:cursor-not-allowed disabled:opacity-50"
+            @click="reactivarCuenta"
+          >
+            {{ reactivando ? 'Reactivando...' : 'Reactivar mi cuenta' }}
+          </button>
+          <p v-if="baja.puedeReactivar" class="mt-2 text-xs text-cafe/70">
+            Usamos el nombre de usuario y la contraseña que ingresaste arriba.
+          </p>
+          <p v-if="errorBaja" class="mt-2 text-sm text-rojizo">{{ errorBaja }}</p>
         </div>
 
         <p v-if="error" class="rounded-md bg-rosa/40 px-3 py-2 text-sm text-rojizo">

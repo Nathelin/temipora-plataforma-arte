@@ -1,3 +1,5 @@
+import { formatearFechaHora } from './fechas'
+
 export const ETIQUETAS_ACCION = {
   ETIQUETA_CREAR: 'Creó una etiqueta',
   ETIQUETA_MODIFICAR: 'Modificó una etiqueta',
@@ -25,6 +27,20 @@ export const ETIQUETAS_ACCION = {
   TIPO_PRODUCTO_MODIFICAR: 'Modificó un tipo de producto',
   TIPO_PRODUCTO_BAJA: 'Dio de baja un tipo de producto',
   TIPO_PRODUCTO_REACTIVAR: 'Reactivó un tipo de producto',
+  PRODUCTO_CREAR: 'Creó un producto',
+  PRODUCTO_BORRADOR_CREAR: 'Creó un borrador de producto',
+  PRODUCTO_BORRADOR_MODIFICAR: 'Modificó un borrador de producto',
+  PRODUCTO_PUBLICAR: 'Publicó un producto',
+  PRODUCTO_MODIFICAR: 'Modificó un producto',
+  PRODUCTO_PAUSAR: 'Pausó un producto',
+  PRODUCTO_REACTIVAR: 'Reactivó un producto',
+  PRODUCTO_ARCHIVAR: 'Archivó un producto',
+  PRODUCTO_RESTAURAR: 'Restauró un producto',
+  REVENTA_PUBLICAR: 'Publicó una pieza en reventa',
+  REVENTA_EDITAR: 'Cambió el precio de una reventa',
+  REVENTA_CANCELAR: 'Canceló una reventa',
+  REVENTA_SUSPENDER: 'Suspendió una reventa',
+  COMPRA_CONFIRMAR: 'Confirmó el pago de una compra',
   TIPO_SERVICIO_CREAR: 'Creó un tipo de servicio',
   TIPO_SERVICIO_MODIFICAR: 'Modificó un tipo de servicio',
   TIPO_SERVICIO_BAJA: 'Dio de baja un tipo de servicio',
@@ -45,6 +61,7 @@ export const ETIQUETAS_ACCION = {
   RESENIA_CONFIG_ACTUALIZAR: 'Actualizó la configuración de reseñas',
   INACTIVIDAD_CONFIG_ACTUALIZAR: 'Actualizó las promociones por inactividad',
   REACTIVACION_EJECUTAR: 'Ejecutó las promociones por inactividad',
+  SUSTITUCION_CONFIG_ACTUALIZAR: 'Actualizó las sustituciones',
   COTIZACION_ACTUALIZAR: 'Actualizó la cotización',
   COTIZACION_REFRESCAR: 'Actualizó la cotización desde la API',
   RESENIA_CREAR: 'Dejó una reseña',
@@ -60,13 +77,22 @@ export const ETIQUETAS_ACCION = {
   USUARIO_CAMBIAR_CONTRASENIA: 'Cambió su contraseña',
   USUARIO_CAMBIAR_TELEFONO: 'Cambió su teléfono',
   USUARIO_QUITAR_TELEFONO: 'Quitó su teléfono',
+  USUARIO_BAJA_VOLUNTARIA: 'Dio de baja su cuenta voluntariamente',
+  USUARIO_REACTIVAR_CUENTA: 'Reactivó su cuenta desde el inicio de sesión',
+  USUARIO_REACTIVAR_CUENTA_ADMIN: 'Reactivó la cuenta de un usuario',
+  BAJA_CUENTA_CONFIG_ACTUALIZAR: 'Actualizó el plazo para reactivar cuentas',
+  CUENTA_SANCIONAR: 'Inhabilitó una cuenta',
+  CUENTA_REVERTIR_SANCION: 'Revirtió una sanción de cuenta',
   LOGIN_FALLIDO: 'Intento de inicio de sesión fallido',
+  SESION_ACCESO_ENLACE: 'Ingresó con un enlace de acceso',
+  SESION_ACCESO_ENLACE_FALLIDO: 'Falló el acceso con un enlace',
   SERVICIO_CREAR: 'Creó un servicio',
   SERVICIO_MODIFICAR: 'Modificó un servicio',
   SERVICIO_PAUSAR: 'Pausó un servicio',
   SERVICIO_REACTIVAR: 'Reactivó un servicio',
   SERVICIO_ARCHIVAR: 'Dio de baja definitiva un servicio',
   SERVICIO_RESTAURAR: 'Restauró un servicio archivado',
+  SERVICIO_MODO_AUTOMATICO: 'Cambió el modo de recepción de un servicio',
   PRESUPUESTO_CREAR: 'Envió un presupuesto',
   PEDIDO_CREAR: 'Aceptó un presupuesto y creó un pedido',
   PEDIDO_CANCELAR: 'Canceló un pedido',
@@ -115,12 +141,17 @@ export const ETIQUETAS_ENTIDAD = {
   ConfiguracionMensajeria: 'Mensajería',
   ConfiguracionResenia: 'Configuración de reseñas',
   ConfiguracionInactividad: 'Promociones',
+  ConfiguracionBajaCuenta: 'Plazo de reactivación de cuentas',
+  ConfiguracionSustitucion: 'Sustituciones',
   Resenia: 'Reseña',
   TerminosPlataforma: 'Términos de la plataforma',
   Servicio: 'Servicio',
+  Producto: 'Producto',
+  PublicacionReventa: 'Publicación de reventa',
   CriterioResenia: 'Criterio de evaluación',
   ConfiguracionCotizacion: 'Cotización',
   Pedido: 'Pedido',
+  Compra: 'Compra',
   Presupuesto: 'Presupuesto',
   Solicitud: 'Solicitud de servicio',
   Pago: 'Pago',
@@ -128,6 +159,7 @@ export const ETIQUETAS_ENTIDAD = {
   HitoPedido: 'Hito del pedido',
   ReporteResenia: 'Reporte de reseña',
   Usuario: 'Usuario',
+  SancionCuenta: 'Sanción de cuenta',
 }
 
 export const ETIQUETAS_CATEGORIA = {
@@ -147,11 +179,6 @@ export const ETIQUETAS_ORIGEN = {
   CLIENTE: 'Cliente',
   SISTEMA: 'Sistema',
 }
-
-const fechaAbsoluta = new Intl.DateTimeFormat('es', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-})
 
 const fechaRelativa = new Intl.RelativeTimeFormat('es', {
   numeric: 'auto',
@@ -177,10 +204,7 @@ export function nombreOrigen(codigo) {
 }
 
 export function formatearFecha(valor) {
-  if (!valor) return '—'
-  const fecha = new Date(valor)
-  if (Number.isNaN(fecha.getTime())) return '—'
-  return fechaAbsoluta.format(fecha)
+  return formatearFechaHora(valor) || '—'
 }
 
 export function formatearFechaRelativa(valor) {

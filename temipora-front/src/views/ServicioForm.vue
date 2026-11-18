@@ -777,6 +777,7 @@ async function guardar() {
     }
 
     estadoGuardado.value = instantanea()
+    limpiarCambios()
     irAlListado()
   } catch (e) {
     errorGuardado.value = e.response?.data?.message || 'No se pudo guardar el servicio.'
@@ -818,14 +819,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8">
+  <div>
     <button type="button" class="text-sm text-granate hover:text-coral transition" @click="irAlListado">
       ← Volver a mis servicios
     </button>
 
     <div class="mx-auto mt-4 text-center">
-      <h1 class="text-2xl text-granate sm:text-3xl">{{ tituloPagina }}</h1>
-      <p class="mt-2 text-sm text-cafe/60">{{ subtituloPagina }}</p>
+      <h1 class="font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">{{ tituloPagina }}</h1>
+      <p class="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-cafe/65">{{ subtituloPagina }}</p>
     </div>
 
     <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>

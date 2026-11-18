@@ -22,13 +22,17 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.AmbitoResenia;
+import com.temipora.backend_springboot.modelo.CompraGrupo;
+import com.temipora.backend_springboot.modelo.CompraItem;
 import com.temipora.backend_springboot.modelo.ConfiguracionResenia;
 import com.temipora.backend_springboot.modelo.CriterioResenia;
 import com.temipora.backend_springboot.modelo.EscalaCriterio;
+import com.temipora.backend_springboot.modelo.EstadoCompraGrupo;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.EstadoResenia;
 import com.temipora.backend_springboot.modelo.EtiquetaReputacion;
 import com.temipora.backend_springboot.modelo.Pedido;
+import com.temipora.backend_springboot.modelo.Producto;
 import com.temipora.backend_springboot.modelo.ReputacionClienteDTO;
 import com.temipora.backend_springboot.modelo.Resenia;
 import com.temipora.backend_springboot.modelo.ReseniaDTO;
@@ -38,9 +42,11 @@ import com.temipora.backend_springboot.modelo.ReseniaValorRequest;
 import com.temipora.backend_springboot.modelo.ReseniaVersion;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.CompraItemRepository;
 import com.temipora.backend_springboot.repositorios.CriterioReseniaRepository;
 import com.temipora.backend_springboot.repositorios.OpcionCriterioRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
+import com.temipora.backend_springboot.repositorios.ProductoRepository;
 import com.temipora.backend_springboot.repositorios.ReseniaRepository;
 import com.temipora.backend_springboot.repositorios.SolicitudRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
@@ -53,6 +59,12 @@ class ReseniaServiceTest {
 
     @Mock
     private PedidoRepository pedidoRepository;
+
+    @Mock
+    private ProductoRepository productoRepository;
+
+    @Mock
+    private CompraItemRepository compraItemRepository;
 
     @Mock
     private UsuarioRepository usuarioRepository;
@@ -467,6 +479,180 @@ class ReseniaServiceTest {
     }
 
     // -----------------------------------------------------------------
+    // producto
+    // -----------------------------------------------------------------
+
+    @Test
+    void crearProducto_compraPagada_creaReseniaYNotificaAlArtista() {
+        Producto producto = producto(50L, "Obra original");
+        CompraItem compra = compra(LocalDateTime.now().minusDays(1));
+        when(productoRepository.findByIdProducto(50L))
+            .thenReturn(Optional.of(producto));
+        when(compraItemRepository
+            .findFirstByProductoIdProductoAndGrupoCompraClienteIdUsuarioAndGrupoEstadoOrderByGrupoFechaPagoDesc(
+                50L, 10L, EstadoCompraGrupo.PAGADO))
+            .thenReturn(Optional.of(compra));
+        when(configuracionService.obtener()).thenReturn(config(30, 3, 3));
+        when(reseniaRepository.existsByProductoIdProductoAndAutorIdUsuario(50L, 10L))
+            .thenReturn(false);
+        when(usuarioRepository.findByIdUsuario(10L))
+            .thenReturn(Optional.of(usuario(10L, "cliente10")));
+        when(criterioRepository
+            .findByActivoTrueAndAmbitoOrderByOrdenAscNombreAsc(AmbitoResenia.PRODUCTO))
+            .thenReturn(List.of(criterio(3L, AmbitoResenia.PRODUCTO,
+                EscalaCriterio.ESTRELLAS, true)));
+        when(reseniaRepository.save(any(Resenia.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        ReseniaDTO dto = reseniaService.crearProducto(50L, 10L,
+            request(5, List.of(valor(3L, 5)), List.of()));
+
+        assertThat(dto.getDireccion()).isEqualTo(AmbitoResenia.PRODUCTO);
+        assertThat(dto.getIdProducto()).isEqualTo(50L);
+        assertThat(dto.getNombreProducto()).isEqualTo("Obra original");
+        assertThat(dto.getNombreVariante()).isEqualTo("Original");
+        assertThat(dto.isCompraVerificada()).isTrue();
+
+        verify(notificacionService).crearParaUsuario(
+            eq(20L), eq("RESENIA_PRODUCTO_RECIBIDA"), anyString(), anyString(),
+            eq(50L), eq("PRODUCTO"));
+    }
+
+    @Test
+    void crearProducto_sinCompraPagada_lanzaError() {
+        when(productoRepository.findByIdProducto(50L))
+            .thenReturn(Optional.of(producto(50L, "Obra original")));
+        when(compraItemRepository
+            .findFirstByProductoIdProductoAndGrupoCompraClienteIdUsuarioAndGrupoEstadoOrderByGrupoFechaPagoDesc(
+                50L, 10L, EstadoCompraGrupo.PAGADO))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> reseniaService.crearProducto(50L, 10L,
+                request(5, List.of(), List.of())))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("compraron");
+    }
+
+    @Test
+    void crearProducto_fueraDeLaVentana_lanzaError() {
+        when(productoRepository.findByIdProducto(50L))
+            .thenReturn(Optional.of(producto(50L, "Obra original")));
+        when(compraItemRepository
+            .findFirstByProductoIdProductoAndGrupoCompraClienteIdUsuarioAndGrupoEstadoOrderByGrupoFechaPagoDesc(
+                50L, 10L, EstadoCompraGrupo.PAGADO))
+            .thenReturn(Optional.of(compra(LocalDateTime.now().minusDays(40))));
+        when(configuracionService.obtener()).thenReturn(config(30, 3, 3));
+
+        assertThatThrownBy(() -> reseniaService.crearProducto(50L, 10L,
+                request(5, List.of(), List.of())))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("venció");
+    }
+
+    @Test
+    void estadoProducto_compradorDentroDeVentana_permiteCrear() {
+        when(productoRepository.findByIdProducto(50L))
+            .thenReturn(Optional.of(producto(50L, "Obra original")));
+        when(configuracionService.obtener()).thenReturn(config(30, 3, 3));
+        when(reseniaRepository
+            .findByProductoIdProductoAndAutorIdUsuario(50L, 10L))
+            .thenReturn(Optional.empty());
+        when(compraItemRepository
+            .findFirstByProductoIdProductoAndGrupoCompraClienteIdUsuarioAndGrupoEstadoOrderByGrupoFechaPagoDesc(
+                50L, 10L, EstadoCompraGrupo.PAGADO))
+            .thenReturn(Optional.of(compra(LocalDateTime.now().minusDays(1))));
+
+        ReseniaEstadoDTO estado = reseniaService.estadoProducto(50L, 10L);
+
+        assertThat(estado.getDireccion()).isEqualTo(AmbitoResenia.PRODUCTO);
+        assertThat(estado.isPuedeCrear()).isTrue();
+        assertThat(estado.getFechaLimiteCreacion()).isNotNull();
+    }
+
+    @Test
+    void estadoProducto_sinCompra_noPermiteCrear() {
+        when(productoRepository.findByIdProducto(50L))
+            .thenReturn(Optional.of(producto(50L, "Obra original")));
+        when(configuracionService.obtener()).thenReturn(config(30, 3, 3));
+        when(reseniaRepository
+            .findByProductoIdProductoAndAutorIdUsuario(50L, 10L))
+            .thenReturn(Optional.empty());
+        when(compraItemRepository
+            .findFirstByProductoIdProductoAndGrupoCompraClienteIdUsuarioAndGrupoEstadoOrderByGrupoFechaPagoDesc(
+                50L, 10L, EstadoCompraGrupo.PAGADO))
+            .thenReturn(Optional.empty());
+
+        ReseniaEstadoDTO estado = reseniaService.estadoProducto(50L, 10L);
+
+        assertThat(estado.isPuedeCrear()).isFalse();
+        assertThat(estado.getMotivoNoDisponible()).contains("compraron");
+    }
+
+    @Test
+    void crearProducto_contenidoSensible_permiteMostrarElNombre() {
+        Producto producto = producto(50L, "Obra sensible");
+        producto.setContenidoSensible(true);
+        when(productoRepository.findByIdProducto(50L))
+            .thenReturn(Optional.of(producto));
+        when(compraItemRepository
+            .findFirstByProductoIdProductoAndGrupoCompraClienteIdUsuarioAndGrupoEstadoOrderByGrupoFechaPagoDesc(
+                50L, 10L, EstadoCompraGrupo.PAGADO))
+            .thenReturn(Optional.of(compra(LocalDateTime.now().minusDays(1))));
+        when(configuracionService.obtener()).thenReturn(config(30, 3, 3));
+        when(reseniaRepository.existsByProductoIdProductoAndAutorIdUsuario(50L, 10L))
+            .thenReturn(false);
+        when(usuarioRepository.findByIdUsuario(10L))
+            .thenReturn(Optional.of(usuario(10L, "cliente10")));
+        when(criterioRepository
+            .findByActivoTrueAndAmbitoOrderByOrdenAscNombreAsc(AmbitoResenia.PRODUCTO))
+            .thenReturn(List.of());
+        when(reseniaRepository.save(any(Resenia.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        ReseniaRequest request = request(5, List.of(), List.of());
+        request.setMostrarNombre(true);
+
+        ReseniaDTO dto = reseniaService.crearProducto(50L, 10L, request);
+
+        assertThat(dto.isMostrarNombre()).isTrue();
+    }
+
+    @Test
+    void crearProducto_conVariasVariantes_guardaElResumenDeVariantes() {
+        Producto producto = producto(50L, "Obra original");
+        CompraItem compra = compra(LocalDateTime.now().minusDays(1));
+        CompraItem otra = compra(LocalDateTime.now().minusDays(2));
+        otra.setNombreVariante("Edición limitada");
+        when(productoRepository.findByIdProducto(50L))
+            .thenReturn(Optional.of(producto));
+        when(compraItemRepository
+            .findFirstByProductoIdProductoAndGrupoCompraClienteIdUsuarioAndGrupoEstadoOrderByGrupoFechaPagoDesc(
+                50L, 10L, EstadoCompraGrupo.PAGADO))
+            .thenReturn(Optional.of(compra));
+        when(compraItemRepository.findPagadosDeProducto(
+            50L, 10L, EstadoCompraGrupo.PAGADO))
+            .thenReturn(List.of(compra, otra));
+        when(configuracionService.obtener()).thenReturn(config(30, 3, 3));
+        when(reseniaRepository.existsByProductoIdProductoAndAutorIdUsuario(50L, 10L))
+            .thenReturn(false);
+        when(usuarioRepository.findByIdUsuario(10L))
+            .thenReturn(Optional.of(usuario(10L, "cliente10")));
+        when(criterioRepository
+            .findByActivoTrueAndAmbitoOrderByOrdenAscNombreAsc(AmbitoResenia.PRODUCTO))
+            .thenReturn(List.of());
+        when(reseniaRepository.save(any(Resenia.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        ReseniaDTO dto = reseniaService.crearProducto(50L, 10L,
+            request(5, List.of(), List.of()));
+
+        assertThat(dto.getCantidadVariantesCompradas()).isEqualTo(2);
+        assertThat(dto.getVariantesCompradas())
+            .contains("Original")
+            .contains("Edición limitada");
+    }
+
+    // -----------------------------------------------------------------
     // helpers
     // -----------------------------------------------------------------
 
@@ -490,6 +676,24 @@ class ReseniaServiceTest {
         pedido.setServicio(servicio("Retrato digital"));
         pedido.setFinalizadoEn(finalizadoEn);
         return pedido;
+    }
+
+    private Producto producto(Long id, String titulo) {
+        Producto producto = new Producto();
+        producto.setIdProducto(id);
+        producto.setTitulo(titulo);
+        producto.setArtista(usuario(20L, "artista20"));
+        return producto;
+    }
+
+    private CompraItem compra(LocalDateTime fechaPago) {
+        CompraGrupo grupo = new CompraGrupo();
+        grupo.setEstado(EstadoCompraGrupo.PAGADO);
+        grupo.setFechaPago(fechaPago);
+        CompraItem item = new CompraItem();
+        item.setGrupo(grupo);
+        item.setNombreVariante("Original");
+        return item;
     }
 
     private Servicio servicio(String nombre) {

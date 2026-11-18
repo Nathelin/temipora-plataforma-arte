@@ -15,9 +15,11 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.temipora.backend_springboot.modelo.ReactivarCuentaRequest;
 import com.temipora.backend_springboot.modelo.RegistroUsuarioDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
+import com.temipora.backend_springboot.servicios.BajaCuentaService;
 import com.temipora.backend_springboot.servicios.LimpiezaArchivosService;
 import com.temipora.backend_springboot.servicios.StorageService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
@@ -32,12 +34,15 @@ public class AuthController {
     private final UsuarioService usuarioService;
     private final StorageService storageService;
     private final LimpiezaArchivosService limpiezaArchivosService;
+    private final BajaCuentaService bajaCuentaService;
 
     public AuthController(UsuarioService usuarioService, StorageService storageService,
-            LimpiezaArchivosService limpiezaArchivosService) {
+            LimpiezaArchivosService limpiezaArchivosService,
+            BajaCuentaService bajaCuentaService) {
         this.usuarioService = usuarioService;
         this.storageService = storageService;
         this.limpiezaArchivosService = limpiezaArchivosService;
+        this.bajaCuentaService = bajaCuentaService;
     }
 
     @PostMapping("/auth/registrarse")
@@ -52,6 +57,14 @@ public class AuthController {
 
         Usuario usuario = usuarioService.registrarUsuario(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(UsuarioDTO.desdeUsuario(usuario));
+    }
+
+    @PostMapping("/auth/reactivar-cuenta")
+    public ResponseEntity<Map<String, Object>> reactivarCuenta(
+            @Valid @RequestBody ReactivarCuentaRequest dto) {
+        return ResponseEntity.ok(
+            bajaCuentaService.reactivarConCredenciales(
+                dto.getNombreUsuario(), dto.getContrasenia()));
     }
 
     @PostMapping("/upload")

@@ -46,6 +46,7 @@ public class CierreEmailProcesador {
     private final EmailPlantillaService emailPlantillaService;
     private final EnvioEmailService envioEmailService;
     private final AccesoEnlaceService accesoEnlaceService;
+    private final SancionService sancionService;
 
     public CierreEmailProcesador(
             EmailCierrePendienteRepository repository,
@@ -54,7 +55,8 @@ public class CierreEmailProcesador {
             SustitucionService sustitucionService,
             EmailPlantillaService emailPlantillaService,
             EnvioEmailService envioEmailService,
-            AccesoEnlaceService accesoEnlaceService) {
+            AccesoEnlaceService accesoEnlaceService,
+            SancionService sancionService) {
         this.repository = repository;
         this.usuarioRepository = usuarioRepository;
         this.configuracionService = configuracionService;
@@ -62,6 +64,7 @@ public class CierreEmailProcesador {
         this.emailPlantillaService = emailPlantillaService;
         this.envioEmailService = envioEmailService;
         this.accesoEnlaceService = accesoEnlaceService;
+        this.sancionService = sancionService;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -72,6 +75,12 @@ public class CierreEmailProcesador {
                 || usuario.getCorreo() == null
                 || usuario.getCorreo().isBlank()) {
             omitirPendientes(idUsuario);
+            return false;
+        }
+
+        // Los correos de cierre son automáticos: no se envían mientras la
+        // cuenta esté atravesando una sanción vigente.
+        if (sancionService.obtenerVigente(idUsuario).isPresent()) {
             return false;
         }
 

@@ -10,12 +10,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.EstadoCompraGrupo;
 import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.ResumenComunidadDTO;
 import com.temipora.backend_springboot.modelo.ResumenNegocioDTO;
 import com.temipora.backend_springboot.modelo.ResumenOperacionDTO;
+import com.temipora.backend_springboot.repositorios.CompraGrupoRepository;
 import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
 import com.temipora.backend_springboot.repositorios.PagoRepository;
 import com.temipora.backend_springboot.repositorios.PedidoRepository;
@@ -25,16 +27,19 @@ import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 public class ResumenAdminService {
 
     private final PagoRepository pagoRepository;
+    private final CompraGrupoRepository compraGrupoRepository;
     private final PedidoRepository pedidoRepository;
     private final HitoPedidoRepository hitoPedidoRepository;
     private final UsuarioRepository usuarioRepository;
 
     public ResumenAdminService(
             PagoRepository pagoRepository,
+            CompraGrupoRepository compraGrupoRepository,
             PedidoRepository pedidoRepository,
             HitoPedidoRepository hitoPedidoRepository,
             UsuarioRepository usuarioRepository) {
         this.pagoRepository = pagoRepository;
+        this.compraGrupoRepository = compraGrupoRepository;
         this.pedidoRepository = pedidoRepository;
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.usuarioRepository = usuarioRepository;
@@ -59,8 +64,8 @@ public class ResumenAdminService {
             anterior.volumen,
             actual.comision,
             anterior.comision,
-            actual.pedidos,
-            anterior.pedidos,
+            actual.operaciones,
+            anterior.operaciones,
             actual.ticket,
             anterior.ticket);
     }
@@ -95,19 +100,34 @@ public class ResumenAdminService {
 
     private DatosPeriodo datos(LocalDate desde, LocalDate hasta) {
         LocalDateTime inicio = desde.atStartOfDay();
-        LocalDateTime fin = hasta.atTime(23, 59, 59);
-        BigDecimal volumen = ceroSiNulo(pagoRepository.sumarMontoCobro(
-            EstadoPago.APROBADO, inicio, fin));
-        BigDecimal comision = ceroSiNulo(pagoRepository.sumarComisionCobro(
-            EstadoPago.APROBADO, inicio, fin));
-        List<Object[]> porPedido = pagoRepository.volumenPorPedido(
-            EstadoPago.APROBADO, inicio, fin);
-        long pedidos = porPedido.size();
-        BigDecimal ticket = pedidos > 0
+        LocalDateTime fin = hasta.plusDays(1).atStartOfDay();
+
+        BigDecimal volumenServicios = ceroSiNulo(
+            pagoRepository.sumarMontoCobro(
+                EstadoPago.APROBADO, inicio, fin));
+        BigDecimal comisionServicios = ceroSiNulo(
+            pagoRepository.sumarComisionCobro(
+                EstadoPago.APROBADO, inicio, fin));
+        long pedidos = pagoRepository.volumenPorPedido(
+            EstadoPago.APROBADO, inicio, fin).size();
+
+        BigDecimal volumenProductos = ceroSiNulo(
+            compraGrupoRepository.sumarSubtotal(
+                EstadoCompraGrupo.PAGADO, inicio, fin));
+        BigDecimal comisionProductos = ceroSiNulo(
+            compraGrupoRepository.sumarComision(
+                EstadoCompraGrupo.PAGADO, inicio, fin));
+        long grupos = compraGrupoRepository.contarPagados(
+            EstadoCompraGrupo.PAGADO, inicio, fin);
+
+        BigDecimal volumen = volumenServicios.add(volumenProductos);
+        BigDecimal comision = comisionServicios.add(comisionProductos);
+        long operaciones = pedidos + grupos;
+        BigDecimal ticket = operaciones > 0
             ? volumen.divide(
-                BigDecimal.valueOf(pedidos), 2, RoundingMode.HALF_UP)
+                BigDecimal.valueOf(operaciones), 2, RoundingMode.HALF_UP)
             : BigDecimal.ZERO.setScale(2);
-        return new DatosPeriodo(volumen, comision, pedidos, ticket);
+        return new DatosPeriodo(volumen, comision, operaciones, ticket);
     }
 
     private BigDecimal ceroSiNulo(BigDecimal valor) {
@@ -117,7 +137,7 @@ public class ResumenAdminService {
     private record DatosPeriodo(
             BigDecimal volumen,
             BigDecimal comision,
-            long pedidos,
+            long operaciones,
             BigDecimal ticket) {
     }
 }

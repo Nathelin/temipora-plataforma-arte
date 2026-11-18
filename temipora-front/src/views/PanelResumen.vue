@@ -10,6 +10,7 @@ import { usePanelArtista } from '../composables/usePanelArtista'
 import ItemAtencionPanel from '../components/ItemAtencionPanel.vue'
 import FilaPedidoActivo from '../components/FilaPedidoActivo.vue'
 import ReputacionChip from '../components/ReputacionChip.vue'
+import PageHeader from '../components/PageHeader.vue'
 
 const router = useRouter()
 const nombreUsuario = localStorage.getItem('nombreUsuario') || ''
@@ -314,7 +315,7 @@ const atenciones = computed(() => {
       clave: 'cobros',
       titulo: 'Conectá tu cuenta de cobros',
       detalle: 'Sin MercadoPago no vas a poder cobrar tus pedidos.',
-      to: '/configuracion/cobros',
+      to: '/configuracion/pagos-y-cobros',
       icono: ICONOS.cobros,
       tono: 'alerta',
       meta: 'Acción requerida',
@@ -444,18 +445,13 @@ onMounted(() => {
 
 <template>
   <div>
-    <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-coral">Tu espacio de trabajo</p>
-        <h1 class="mt-1 font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">
-          {{ nombreUsuario ? `Hola, @${nombreUsuario}` : 'Mi panel' }}
-        </h1>
-        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-cafe/65">
-          {{ resumenTexto }}
-        </p>
-      </div>
-
-      <div class="flex flex-wrap gap-2">
+    <PageHeader
+      eyebrow="Tu espacio de trabajo"
+      :titulo="nombreUsuario ? `Hola, @${nombreUsuario}` : 'Mi panel'"
+      :descripcion="resumenTexto"
+      :nivel="2"
+    >
+      <template #acciones>
         <router-link
           to="/panel/servicios/crear"
           class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white shadow-[0_8px_20px_var(--sombra-acento)] transition hover:bg-rojizo"
@@ -468,8 +464,8 @@ onMounted(() => {
         >
           Ver mi perfil público
         </router-link>
-      </div>
-    </header>
+      </template>
+    </PageHeader>
 
     <div v-if="cargando" class="mt-8 space-y-6" role="status" aria-live="polite">
       <span class="sr-only">Cargando resumen...</span>

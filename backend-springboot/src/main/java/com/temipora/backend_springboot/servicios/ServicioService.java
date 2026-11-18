@@ -22,11 +22,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import com.temipora.backend_springboot.modelo.ContenidoSensible;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
+import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.EtiquetaEstado;
+import com.temipora.backend_springboot.modelo.FacetasServicioDTO;
 import com.temipora.backend_springboot.modelo.FiltroServicioRequest;
 import com.temipora.backend_springboot.modelo.Medio;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
@@ -214,7 +217,7 @@ public class ServicioService {
             base = base.and((root, query, cb) ->
                 cb.notEqual(root.get("artista").get("idUsuario"), viewerId));
         }
-        base = aplicarFiltros(base, filtro);
+        base = aplicarFiltros(base, filtro, moneda);
 
         List<Long> idsDisponibles = idsSegunSpec(base.and(disponibleAhora()));
         boolean incluirSinCupos = filtro == null
@@ -223,6 +226,15 @@ public class ServicioService {
         List<Long> idsSinCupos = incluirSinCupos
             ? idsSegunSpec(base.and(noDisponibleAhora()))
             : List.of();
+
+        // La valoración se calcula fuera de SQL (reseniaPublicaService), así que se
+        // filtra sobre los ids antes de paginar para no romper los totales.
+        // Si el catálogo crece, este es el punto a mover a SQL.
+        BigDecimal valoracionMinima = filtro != null ? filtro.getValoracionMinima() : null;
+        if (valoracionMinima != null) {
+            idsDisponibles = filtrarPorValoracion(idsDisponibles, valoracionMinima);
+            idsSinCupos = filtrarPorValoracion(idsSinCupos, valoracionMinima);
+        }
 
         int totalDisponibles = idsDisponibles.size();
         int total = totalDisponibles + idsSinCupos.size();
@@ -274,7 +286,174 @@ public class ServicioService {
             .build();
     }
 
+    /**
+     * Orden "más recientes": fecha de creación descendente y, a igual fecha,
+     * id descendente para que el resultado sea estable.
+     *
+     * nullsFirst combinado con reversed deja las fechas nulas al final del
+     * orden descendente. La columna es NOT NULL, pero el id es el desempate
+     * que evita resultados indeterminados entre dos altas del mismo instante.
+     */
+    static Comparator<Servicio> comparadorRecientes() {
+        return Comparator.comparing(
+                Servicio::getFechaCreacion,
+                Comparator.nullsFirst(Comparator.naturalOrder()))
+            .reversed()
+            .thenComparing(Servicio::getIdServicio, Comparator.reverseOrder());
+    }
+
     private record Ordenados(List<Servicio> items, boolean personalizado) {
+    }
+
+    /**
+     * Conteo de resultados por opción de filtro.
+     *
+     * Regla central: cada faceta se calcula con todos los filtros activos
+     * EXCEPTO el de su propia dimensión. Si se aplicara el filtro propio, al
+     * elegir un medio todas las demás opciones de medio darían cero y el panel
+     * quedaría inutilizable.
+     *
+     * Hoy se resuelve trayendo los ids y agregando en memoria, igual que el
+     * resto del servicio. Si el catálogo crece, este es el punto a mover a
+     * GROUP BY en SQL y cachear por combinación de filtros.
+     */
+    @Transactional(readOnly = true)
+    public FacetasServicioDTO facetas(FiltroServicioRequest filtro, Long viewerId) {
+        EPreferenciaContenidoSensible pref = preferenciaDe(viewerId);
+        boolean ocultarSensibles = pref == EPreferenciaContenidoSensible.OCULTAR;
+        Moneda moneda = monedaPreferidaDe(viewerId);
+
+        Specification<Servicio> base = activos(ocultarSensibles);
+        if (viewerId != null) {
+            base = base.and((root, query, cb) ->
+                cb.notEqual(root.get("artista").get("idUsuario"), viewerId));
+        }
+
+        FacetasServicioDTO salida = new FacetasServicioDTO();
+        // Omitir una dimensión que no tiene filtro activo es idéntico a no
+        // omitir ninguna, así que se reutiliza el mismo resultado en vez de
+        // repetir la consulta por cada faceta.
+        final FiltroServicioRequest filtroFinal = filtro;
+        final Specification<Servicio> baseFinal = base;
+        final Moneda monedaFinal = moneda;
+        Map<Dimension, List<Servicio>> cache = new HashMap<>();
+        java.util.function.Function<Dimension, List<Servicio>> cargar = dimension -> {
+            Dimension clave = tieneFiltroActivo(filtroFinal, dimension) ? dimension : null;
+            return cache.computeIfAbsent(clave,
+                k -> aplicarYListar(baseFinal, filtroFinal, monedaFinal, k));
+        };
+        salida.setTipos(facetasPor(cargar.apply(Dimension.TIPOS), Dimension.TIPOS));
+        salida.setMedios(facetasPor(cargar.apply(Dimension.MEDIOS), Dimension.MEDIOS));
+        salida.setEtiquetas(facetasPor(cargar.apply(Dimension.ETIQUETAS), Dimension.ETIQUETAS));
+        salida.setContenidosSensibles(facetasPor(
+            cargar.apply(Dimension.CONTENIDOS_SENSIBLES), Dimension.CONTENIDOS_SENSIBLES));
+
+        Map<String, Long> disponibilidad = new LinkedHashMap<>();
+        List<Servicio> paraDisponibilidad = cargar.apply(Dimension.LISTA_ESPERA);
+        disponibilidad.put("abiertos", paraDisponibilidad.stream()
+            .filter(this::servicioDisponibleAhora).count());
+        disponibilidad.put("sinCupos", paraDisponibilidad.stream()
+            .filter(s -> !servicioDisponibleAhora(s)).count());
+        salida.setDisponibilidad(disponibilidad);
+
+        // La moneda sólo aporta cuando hay más de una: si no, no discrimina.
+        Map<String, Long> monedas = new LinkedHashMap<>();
+        for (Servicio s : cargar.apply(Dimension.MONEDA_DECLARADA)) {
+            if (s.getMoneda() != null && s.getMoneda().getCodigo() != null) {
+                monedas.merge(s.getMoneda().getCodigo(), 1L, Long::sum);
+            }
+        }
+        if (monedas.size() > 1) {
+            salida.setMonedas(monedas);
+        }
+
+        return salida;
+    }
+
+    private boolean tieneFiltroActivo(FiltroServicioRequest f, Dimension dimension) {
+        if (f == null) {
+            return false;
+        }
+        return switch (dimension) {
+            case TIPOS -> tieneElementos(f.getIdsTiposServicio()) || f.getIdTipoServicio() != null;
+            case MEDIOS -> tieneElementos(f.getIdsMedios());
+            case ETIQUETAS -> tieneElementos(f.getIdsEtiquetas())
+                || tieneElementos(f.getIdsEtiquetasExcluidas());
+            case CONTENIDOS_SENSIBLES -> tieneElementos(f.getContenidosSensibles())
+                || tieneElementos(f.getExcluirContenidosSensibles());
+            case LISTA_ESPERA -> Boolean.TRUE.equals(f.getSoloConListaEspera());
+            case MONEDA_DECLARADA -> hayTexto(f.getMonedaDeclarada());
+            case PRECIO -> f.getPrecioMin() != null || f.getPrecioMax() != null;
+            case TIEMPO -> f.getTiempoMaxDias() != null;
+        };
+    }
+
+    private Map<String, Long> facetasPor(List<Servicio> servicios, Dimension dimension) {
+        Map<String, Long> conteos = new LinkedHashMap<>();
+        for (Servicio s : servicios) {
+            switch (dimension) {
+                case TIPOS -> {
+                    if (s.getTipoServicio() != null) {
+                        conteos.merge(String.valueOf(s.getTipoServicio().getIdTipoServicio()),
+                            1L, Long::sum);
+                    }
+                }
+                case MEDIOS -> {
+                    if (s.getMedio() != null) {
+                        conteos.merge(String.valueOf(s.getMedio().getIdMedio()), 1L, Long::sum);
+                    }
+                }
+                case ETIQUETAS -> {
+                    if (s.getEtiquetas() == null) break;
+                    for (ServicioEtiqueta se : s.getEtiquetas()) {
+                        Etiqueta etiqueta = se.getEtiqueta();
+                        // Sólo etiquetas vigentes: un comprador no debe ver
+                        // pendientes, rechazadas ni inactivas.
+                        if (etiqueta == null || etiqueta.getEstado() != EtiquetaEstado.VALIDA) {
+                            continue;
+                        }
+                        conteos.merge(String.valueOf(etiqueta.getIdEtiqueta()), 1L, Long::sum);
+                    }
+                }
+                case CONTENIDOS_SENSIBLES -> {
+                    if (s.getContenidosSensibles() == null) break;
+                    for (ContenidoSensible contenido : s.getContenidosSensibles()) {
+                        conteos.merge(contenido.name(), 1L, Long::sum);
+                    }
+                }
+                default -> {
+                    // Dimensiones sin conteo por opción.
+                }
+            }
+        }
+        return conteos;
+    }
+
+    private List<Servicio> aplicarYListar(
+            Specification<Servicio> base,
+            FiltroServicioRequest filtro,
+            Moneda moneda,
+            Dimension omitir) {
+        // Las etiquetas y su categoría son LAZY y se recorren al contar, así que
+        // se traen en la misma consulta. Sin esto, cada servicio dispara sus
+        // propios SELECT (N+1) al calcular las facetas.
+        Specification<Servicio> conEtiquetas = (root, query, cb) -> {
+            query.distinct(true);
+            root.fetch("etiquetas", JoinType.LEFT)
+                .fetch("etiqueta", JoinType.LEFT)
+                .fetch("categoria", JoinType.LEFT);
+            return cb.conjunction();
+        };
+        Specification<Servicio> spec = aplicarFiltros(base, filtro, moneda, omitir)
+            .and(conEtiquetas);
+        return servicioRepository.findAll(spec, Sort.by(Sort.Direction.ASC, "nombre"));
+    }
+
+    private boolean servicioDisponibleAhora(Servicio servicio) {
+        return servicio.getEstado() == EstadoServicio.PUBLICADO
+            && servicio.getModoRecepcion() == ModoRecepcionSolicitud.ABIERTA
+            && servicio.getCupos() != null
+            && servicio.getCupos() > 0;
     }
 
     private Ordenados ordenar(
@@ -324,6 +503,8 @@ public class ServicioService {
             }
             ordenados.sort(comparator.thenComparing(
                 Servicio::getNombre, String.CASE_INSENSITIVE_ORDER));
+        } else if (orden == OrdenServicio.RECIENTES) {
+            ordenados.sort(comparadorRecientes());
         }
         return new Ordenados(ordenados, personalizado);
     }
@@ -575,12 +756,16 @@ public class ServicioService {
 
     private Specification<Servicio> activos(boolean ocultarSensibles) {
         return (root, query, cb) -> {
+            var artistaActivo = cb.isTrue(root.get("artista").get("estadoCuenta"));
             if (ocultarSensibles) {
                 return cb.and(
                     cb.equal(root.get("estado"), EstadoServicio.PUBLICADO),
+                    artistaActivo,
                     cb.isFalse(root.get("contenidoSensible")));
             }
-            return cb.equal(root.get("estado"), EstadoServicio.PUBLICADO);
+            return cb.and(
+                cb.equal(root.get("estado"), EstadoServicio.PUBLICADO),
+                artistaActivo);
         };
     }
 
@@ -762,7 +947,37 @@ public class ServicioService {
             && !esDuenio;
     }
 
+    /**
+     * Dimensión de filtrado. Se usa para calcular los conteos de una faceta
+     * aplicando el resto de los filtros pero omitiendo el de su propia
+     * dimensión: si no, al elegir "Acuarela" todas las demás opciones de medio
+     * quedarían en cero.
+     */
+    private enum Dimension {
+        TIPOS,
+        MEDIOS,
+        ETIQUETAS,
+        CONTENIDOS_SENSIBLES,
+        LISTA_ESPERA,
+        MONEDA_DECLARADA,
+        PRECIO,
+        TIEMPO
+    }
+
     private Specification<Servicio> aplicarFiltros(Specification<Servicio> spec, FiltroServicioRequest f) {
+        return aplicarFiltros(spec, f, null, null);
+    }
+
+    private Specification<Servicio> aplicarFiltros(
+            Specification<Servicio> spec, FiltroServicioRequest f, Moneda monedaVista) {
+        return aplicarFiltros(spec, f, monedaVista, null);
+    }
+
+    private Specification<Servicio> aplicarFiltros(
+            Specification<Servicio> spec,
+            FiltroServicioRequest f,
+            Moneda monedaVista,
+            Dimension omitir) {
         if (f == null) {
             return spec;
         }
@@ -775,31 +990,208 @@ public class ServicioService {
                 cb.like(cb.lower(root.get("artista").get("nombreUsuario")),
                     "%" + f.getNombreArtista().trim().toLowerCase() + "%"));
         }
-        if (f.getIdTipoServicio() != null) {
-            spec = spec.and((root, query, cb) ->
-                cb.equal(root.get("tipoServicio").get("idTipoServicio"), f.getIdTipoServicio()));
+        if (hayTexto(f.getTextoLibre())) {
+            String patron = "%" + f.getTextoLibre().trim().toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.or(
+                cb.like(cb.lower(root.get("nombre")), patron),
+                cb.like(cb.lower(root.get("descripcion")), patron)));
+        }
+        if (omitir != Dimension.TIPOS) {
+            if (tieneElementos(f.getIdsTiposServicio())) {
+                List<Long> ids = f.getIdsTiposServicio();
+                spec = spec.and((root, query, cb) ->
+                    root.get("tipoServicio").get("idTipoServicio").in(ids));
+            } else if (f.getIdTipoServicio() != null) {
+                spec = spec.and((root, query, cb) ->
+                    cb.equal(root.get("tipoServicio").get("idTipoServicio"), f.getIdTipoServicio()));
+            }
         }
         if (f.getSensible() != null) {
             boolean sensible = f.getSensible();
             spec = spec.and((root, query, cb) ->
                 cb.equal(root.get("contenidoSensible"), sensible));
         }
-        if (f.getPrecioMin() != null) {
-            BigDecimal min = f.getPrecioMin();
+        if (omitir != Dimension.MEDIOS && tieneElementos(f.getIdsMedios())) {
+            List<Long> ids = f.getIdsMedios();
             spec = spec.and((root, query, cb) ->
-                cb.greaterThanOrEqualTo(root.get("precioBase"), min));
+                root.get("medio").get("idMedio").in(ids));
         }
-        if (f.getPrecioMax() != null) {
-            BigDecimal max = f.getPrecioMax();
+        if (omitir != Dimension.CONTENIDOS_SENSIBLES
+                && tieneElementos(f.getContenidosSensibles())) {
+            List<ContenidoSensible> contenidos = f.getContenidosSensibles();
+            spec = spec.and((root, query, cb) -> {
+                query.distinct(true);
+                return root.join("contenidosSensibles").in(contenidos);
+            });
+        }
+        if (omitir != Dimension.CONTENIDOS_SENSIBLES
+                && tieneElementos(f.getExcluirContenidosSensibles())) {
+            List<ContenidoSensible> excluidos = f.getExcluirContenidosSensibles();
+            spec = spec.and((root, query, cb) -> {
+                Subquery<Long> conContenido = query.subquery(Long.class);
+                Root<Servicio> s = conContenido.from(Servicio.class);
+                jakarta.persistence.criteria.Join<Servicio, ContenidoSensible> join =
+                    s.join("contenidosSensibles");
+                conContenido.select(s.get("idServicio"));
+                conContenido.where(join.in(excluidos));
+                return cb.not(root.get("idServicio").in(conContenido));
+            });
+        }
+        if (omitir != Dimension.ETIQUETAS && tieneElementos(f.getIdsEtiquetas())) {
+            List<Long> ids = f.getIdsEtiquetas();
+            spec = spec.and((root, query, cb) -> {
+                query.distinct(true);
+                return root.join("etiquetas").get("etiqueta").get("idEtiqueta").in(ids);
+            });
+        }
+        if (omitir != Dimension.ETIQUETAS && tieneElementos(f.getIdsEtiquetasExcluidas())) {
+            List<Long> excluidas = f.getIdsEtiquetasExcluidas();
+            spec = spec.and((root, query, cb) -> {
+                Subquery<Long> conEtiqueta = query.subquery(Long.class);
+                Root<Servicio> s = conEtiqueta.from(Servicio.class);
+                conEtiqueta.select(s.get("idServicio"));
+                conEtiqueta.where(
+                    s.join("etiquetas").get("etiqueta").get("idEtiqueta").in(excluidas));
+                return cb.not(root.get("idServicio").in(conEtiqueta));
+            });
+        }
+        if (omitir != Dimension.LISTA_ESPERA && Boolean.TRUE.equals(f.getSoloConListaEspera())) {
+            spec = spec.and((root, query, cb) -> cb.isTrue(root.get("permiteListaEspera")));
+        }
+        if (omitir != Dimension.MONEDA_DECLARADA && hayTexto(f.getMonedaDeclarada())) {
+            String codigo = f.getMonedaDeclarada().trim().toUpperCase();
             spec = spec.and((root, query, cb) ->
-                cb.lessThanOrEqualTo(root.get("precioBase"), max));
+                cb.equal(cb.upper(root.get("moneda").get("codigo")), codigo));
         }
-        if (f.getTiempoMaxDias() != null) {
+        if (omitir != Dimension.PRECIO
+                && (f.getPrecioMin() != null || f.getPrecioMax() != null)) {
+            spec = spec.and(precioEnRango(f.getPrecioMin(), f.getPrecioMax(), monedaVista));
+        }
+        if (omitir != Dimension.TIEMPO && f.getTiempoMaxDias() != null) {
             Integer dias = f.getTiempoMaxDias();
             spec = spec.and((root, query, cb) ->
                 cb.lessThanOrEqualTo(root.get("tiempoEntregaDias"), dias));
         }
         return spec;
+    }
+
+    /**
+     * Rango de precio evaluado en la moneda en la que el usuario ve los precios.
+     *
+     * Un servicio cargado en otra moneda debe entrar o salir según su precio
+     * convertido, que es el mismo que muestra la tarjeta. Se resuelve con un OR
+     * por moneda (hoy ARS y USD) dividiendo el rango por el factor vigente, en
+     * lugar de una subconsulta correlacionada por fila.
+     *
+     * Si una moneda no tiene factor de conversión, sus servicios quedan fuera
+     * del rango (nunca se comparan precios de monedas distintas), pero siguen
+     * visibles cuando no hay rango cargado.
+     */
+    private Specification<Servicio> precioEnRango(
+            BigDecimal precioMin, BigDecimal precioMax, Moneda monedaVista) {
+        if (monedaVista == null) {
+            // Sin moneda de referencia se mantiene el comportamiento histórico.
+            return (root, query, cb) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                if (precioMin != null) {
+                    predicates.add(cb.greaterThanOrEqualTo(root.get("precioBase"), precioMin));
+                }
+                if (precioMax != null) {
+                    predicates.add(cb.lessThanOrEqualTo(root.get("precioBase"), precioMax));
+                }
+                return cb.and(predicates.toArray(new Predicate[0]));
+            };
+        }
+
+        LocalDateTime ahora = LocalDateTime.now();
+        Map<Long, BigDecimal> factores = new HashMap<>();
+        for (Moneda origen : monedaService.activas()) {
+            BigDecimal factor = origen.getIdMoneda().equals(monedaVista.getIdMoneda())
+                ? BigDecimal.ONE
+                : conversionMonedaService.factor(origen, monedaVista, ahora);
+            if (factor != null && factor.signum() > 0) {
+                factores.put(origen.getIdMoneda(), factor);
+            }
+        }
+        if (factores.isEmpty()) {
+            return (root, query, cb) -> cb.conjunction();
+        }
+
+        Map<Long, RangoPrecio> rangos = rangosPorMoneda(precioMin, precioMax, factores);
+        return (root, query, cb) -> {
+            List<Predicate> porMoneda = new ArrayList<>();
+            for (Map.Entry<Long, RangoPrecio> entrada : rangos.entrySet()) {
+                RangoPrecio rango = entrada.getValue();
+                List<Predicate> condiciones = new ArrayList<>();
+                condiciones.add(cb.equal(root.get("moneda").get("idMoneda"), entrada.getKey()));
+                if (rango.minimo() != null) {
+                    condiciones.add(cb.greaterThanOrEqualTo(root.get("precioBase"), rango.minimo()));
+                }
+                if (rango.maximo() != null) {
+                    condiciones.add(cb.lessThanOrEqualTo(root.get("precioBase"), rango.maximo()));
+                }
+                porMoneda.add(cb.and(condiciones.toArray(new Predicate[0])));
+            }
+            return cb.or(porMoneda.toArray(new Predicate[0]));
+        };
+    }
+
+    /** Rango de precio expresado en la moneda en la que está cargado el servicio. */
+    record RangoPrecio(BigDecimal minimo, BigDecimal maximo) {
+    }
+
+    /**
+     * Convierte un rango de precio pedido en la moneda del usuario al equivalente
+     * en cada moneda del catálogo.
+     *
+     * Un servicio de USD 20 con factor 1000 se muestra como ARS 20.000. Para que
+     * entre en el rango ARS 10.000–30.000 hay que comparar su precio base contra
+     * USD 10–30, es decir el rango dividido por el factor.
+     */
+    static Map<Long, RangoPrecio> rangosPorMoneda(
+            BigDecimal precioMin,
+            BigDecimal precioMax,
+            Map<Long, BigDecimal> factores) {
+        Map<Long, RangoPrecio> rangos = new LinkedHashMap<>();
+        for (Map.Entry<Long, BigDecimal> entrada : factores.entrySet()) {
+            BigDecimal factor = entrada.getValue();
+            BigDecimal minimo = precioMin == null
+                ? null
+                : precioMin.divide(factor, 2, RoundingMode.HALF_UP);
+            BigDecimal maximo = precioMax == null
+                ? null
+                : precioMax.divide(factor, 2, RoundingMode.HALF_UP);
+            rangos.put(entrada.getKey(), new RangoPrecio(minimo, maximo));
+        }
+        return rangos;
+    }
+
+    private boolean tieneElementos(Collection<?> valores) {
+        return valores != null && !valores.isEmpty();
+    }
+
+    /**
+     * Deja solo los servicios cuyo promedio de reseñas alcanza el mínimo pedido.
+     * Los servicios sin reseñas quedan afuera: no hay valoración que cumplir.
+     */
+    private List<Long> filtrarPorValoracion(List<Long> ids, BigDecimal minimo) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, PromedioReseniasDTO> promedios =
+            reseniaPublicaService.promediosPorServicios(ids);
+        if (promedios == null || promedios.isEmpty()) {
+            return List.of();
+        }
+        return ids.stream()
+            .filter(id -> {
+                PromedioReseniasDTO promedio = promedios.get(id);
+                return promedio != null
+                    && promedio.getCantidad() > 0
+                    && promedio.getPromedio() != null
+                    && promedio.getPromedio().compareTo(minimo) >= 0;
+            })
+            .toList();
     }
 
     private boolean hayTexto(String valor) {
@@ -817,6 +1209,13 @@ public class ServicioService {
         if (servicio.getEstado() == EstadoServicio.ARCHIVADO
                 || (!esDuenio && servicio.getEstado() != EstadoServicio.PUBLICADO)) {
             throw new NoSuchElementException("Servicio no encontrado: " + idServicio);
+        }
+        boolean esAdmin = viewerId != null && usuarioRepository.findByIdUsuario(viewerId)
+            .map(u -> u.getRol() != null && u.getRol().getNombre() == ERol.ADMIN)
+            .orElse(false);
+        if (!esDuenio && !esAdmin && servicio.getArtista() != null
+                && !servicio.getArtista().isEstadoCuenta()) {
+            throw new ServicioNoDisponibleException("Este servicio no está disponible.");
         }
         if (!esDuenio && pref == EPreferenciaContenidoSensible.OCULTAR && servicio.isContenidoSensible()) {
             throw new NoSuchElementException("Servicio no encontrado: " + idServicio);

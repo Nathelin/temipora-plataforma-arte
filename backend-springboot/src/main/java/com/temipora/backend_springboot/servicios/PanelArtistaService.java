@@ -1,8 +1,11 @@
 package com.temipora.backend_springboot.servicios;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 
@@ -11,14 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.ContadorMensajesDTO;
 import com.temipora.backend_springboot.modelo.DineroPanelDTO;
-import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
-import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.MetricasPanelDTO;
-import com.temipora.backend_springboot.modelo.Moneda;
 import com.temipora.backend_springboot.modelo.PanelArtistaResumenDTO;
 import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
-import com.temipora.backend_springboot.repositorios.HitoPedidoRepository;
+import com.temipora.backend_springboot.repositorios.CompraGrupoRepository;
+import com.temipora.backend_springboot.repositorios.PagoRepository;
 import com.temipora.backend_springboot.servicios.pagos.mercadopago.MercadoPagoOAuthService;
 
 @Service
@@ -34,30 +35,29 @@ public class PanelArtistaService {
 
     private final SolicitudServicioService solicitudServicioService;
     private final PedidoService pedidoService;
-    private final HitoPedidoRepository hitoPedidoRepository;
+    private final PagoRepository pagoRepository;
+    private final CompraGrupoRepository compraGrupoRepository;
     private final ConversacionService conversacionService;
     private final MercadoPagoOAuthService mercadoPagoOAuthService;
-    private final MonedaVistaService monedaVistaService;
 
     public PanelArtistaService(
             SolicitudServicioService solicitudServicioService,
             PedidoService pedidoService,
-            HitoPedidoRepository hitoPedidoRepository,
+            PagoRepository pagoRepository,
+            CompraGrupoRepository compraGrupoRepository,
             ConversacionService conversacionService,
-            MercadoPagoOAuthService mercadoPagoOAuthService,
-            MonedaVistaService monedaVistaService) {
+            MercadoPagoOAuthService mercadoPagoOAuthService) {
         this.solicitudServicioService = solicitudServicioService;
         this.pedidoService = pedidoService;
-        this.hitoPedidoRepository = hitoPedidoRepository;
+        this.pagoRepository = pagoRepository;
+        this.compraGrupoRepository = compraGrupoRepository;
         this.conversacionService = conversacionService;
         this.mercadoPagoOAuthService = mercadoPagoOAuthService;
-        this.monedaVistaService = monedaVistaService;
     }
 
     @Transactional(readOnly = true)
     public PanelArtistaResumenDTO resumen(Long idArtista) {
         LocalDateTime ahora = LocalDateTime.now();
-        Moneda mostrada = monedaVistaService.preferidaDe(idArtista);
 
         List<SolicitudResumenDTO> recibidas =
             solicitudServicioService.listarRecibidasEnEstados(
@@ -112,7 +112,7 @@ public class PanelArtistaService {
                 .presupuestosPorVencer(porVencer.size())
                 .hitosPorVencer(actividad.hitosPorVencer())
                 .build())
-            .dinero(dinero(idArtista, actividad, mostrada, ahora))
+            .dinero(dinero(idArtista, actividad, ahora))
             .mensajesNoLeidos(contador.getNoLeidos())
             .solicitudesMensajePendientes(
                 contador.getSolicitudesPendientes())
@@ -131,32 +131,65 @@ public class PanelArtistaService {
     private DineroPanelDTO dinero(
             Long idArtista,
             PedidoService.ActividadArtista actividad,
-            Moneda mostrada,
             LocalDateTime ahora) {
-        List<HitoPedido> pagados = hitoPedidoRepository
-            .findPagadosDeArtista(idArtista, EstadoPagoHito.PAGADO);
         YearMonth mes = YearMonth.from(ahora);
         BigDecimal total = BigDecimal.ZERO;
         BigDecimal delMes = BigDecimal.ZERO;
 
-        for (HitoPedido hito : pagados) {
-            BigDecimal neto = pedidoService.netoMostradoDe(
-                hito, mostrada, ahora);
-            if (neto == null) {
-                continue;
-            }
+        for (Object[] fila : pagoRepository.netosRealesDeArtista(idArtista)) {
+            BigDecimal neto = decimal(fila[0]);
+            LocalDateTime fecha = fecha(fila[1]);
             total = total.add(neto);
-            if (hito.getFechaPago() != null
-                    && YearMonth.from(hito.getFechaPago()).equals(mes)) {
+            if (fecha != null && YearMonth.from(fecha).equals(mes)) {
+                delMes = delMes.add(neto);
+            }
+        }
+
+        for (Object[] fila : compraGrupoRepository
+                .netosRealesDeArtista(idArtista)) {
+            BigDecimal neto = decimal(fila[0]);
+            LocalDateTime fecha = fecha(fila[1]);
+            total = total.add(neto);
+            if (fecha != null && YearMonth.from(fecha).equals(mes)) {
                 delMes = delMes.add(neto);
             }
         }
 
         return DineroPanelDTO.builder()
             .porCobrar(actividad.porCobrar())
-            .cobradoMes(delMes)
-            .cobradoTotal(total)
-            .monedaMostrada(mostrada != null ? mostrada.getCodigo() : null)
+            .cobradoMes(delMes.setScale(2, RoundingMode.HALF_UP))
+            .cobradoTotal(total.setScale(2, RoundingMode.HALF_UP))
+            .monedaMostrada(MonedaVistaService.CODIGO_COBRO)
             .build();
+    }
+
+    private static BigDecimal decimal(Object valor) {
+        if (valor == null) {
+            return BigDecimal.ZERO;
+        }
+        if (valor instanceof BigDecimal decimal) {
+            return decimal;
+        }
+        if (valor instanceof Number numero) {
+            return new BigDecimal(numero.toString());
+        }
+        return new BigDecimal(valor.toString());
+    }
+
+    private static LocalDateTime fecha(Object valor) {
+        if (valor instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toLocalDateTime();
+        }
+        if (valor instanceof LocalDateTime fechaHora) {
+            return fechaHora;
+        }
+        if (valor instanceof LocalDate fecha) {
+            return fecha.atStartOfDay();
+        }
+        if (valor instanceof java.util.Date fecha) {
+            return LocalDateTime.ofInstant(
+                fecha.toInstant(), ZoneId.systemDefault());
+        }
+        return null;
     }
 }

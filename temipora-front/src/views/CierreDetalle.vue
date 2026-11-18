@@ -11,6 +11,7 @@ import {
 import { formatearPrecio } from '../servicios/moneda'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import { useAccesoEnlace } from '../composables/useAccesoEnlace'
+import PageHeader from '../components/PageHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -259,17 +260,12 @@ onMounted(async () => {
     </div>
 
     <template v-else>
-      <header class="mt-4 max-w-3xl">
-        <span class="inline-block -rotate-2 rounded-full bg-mantequilla px-4 py-1.5 text-sm font-bold text-tinta shadow-sm">
-          El proceso terminó
-        </span>
-        <h1 class="mt-4 font-display text-4xl font-extrabold tracking-[-0.03em] text-granate sm:text-5xl">
-          {{ detalle.titulo }}
-        </h1>
-        <p class="mt-3 text-lg leading-relaxed text-cafe/75">
-          {{ detalle.detalle }}
-        </p>
-      </header>
+      <PageHeader
+        class="mt-4"
+        eyebrow="El proceso terminó"
+        :titulo="detalle.titulo"
+        :descripcion="detalle.detalle"
+      />
 
       <section
         v-if="servicio"

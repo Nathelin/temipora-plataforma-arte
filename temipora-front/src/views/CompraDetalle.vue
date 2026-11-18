@@ -1,0 +1,865 @@
+<script setup>
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import LedgerCompraItem from '../components/LedgerCompraItem.vue'
+import FormularioResenia from '../components/FormularioResenia.vue'
+import TarjetaResenia from '../components/TarjetaResenia.vue'
+import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+import { useNotificaciones } from '../composables/useNotificaciones'
+import { formatearPrecio } from '../servicios/moneda'
+import { guardarArchivo } from '../servicios/descargas'
+import {
+  cargarCriterios,
+  cargarEstadoReseniaProducto,
+  crearReseniaProducto,
+  editarReseniaProducto,
+  eliminarReseniaProducto,
+} from '../servicios/resenias'
+import {
+  cancelarGrupo,
+  cargarCompra,
+  confirmarPagoSimulado,
+  descargarCompra,
+  estadoCompraDe,
+  estadoGrupoDe,
+  pagarGrupo,
+  rechazarPagoSimulado,
+  sincronizarCompra,
+} from '../servicios/compras'
+
+const route = useRoute()
+const router = useRouter()
+const { exito, error: toastError } = useNotificaciones()
+
+const idCompra = computed(() => Number(route.params.id))
+const compra = ref(null)
+const cargando = ref(true)
+const error = ref('')
+const pagando = ref(null)
+const sincronizando = ref(false)
+const pagoSimulado = ref(null)
+const descargandoTodo = ref(false)
+const ahora = ref(Date.now())
+const grupoCancelar = ref(null)
+const cancelando = ref(false)
+const criteriosProducto = ref([])
+const estadosResenia = ref({})
+const reseniaEnEdicion = ref(null)
+const guardandoResenia = ref(false)
+const reseniaAEliminar = ref(null)
+const eliminandoResenia = ref(false)
+let intervaloPago = null
+
+const grupos = computed(() => compra.value?.grupos || [])
+const estado = computed(() => estadoCompraDe(compra.value?.estado))
+const portada = computed(() => {
+  for (const grupo of grupos.value) {
+    for (const item of grupo.items || []) {
+      if (item.imagenUrl) return item.imagenUrl
+    }
+  }
+  return null
+})
+const totalProductos = computed(() => {
+  const productos = new Set()
+  for (const grupo of grupos.value) {
+    for (const item of grupo.items || []) {
+      if (item.idProducto) productos.add(item.idProducto)
+    }
+  }
+  return productos.size
+})
+
+const gruposAbiertos = ref(new Set())
+let compraAcordeonId = null
+
+function esGrupoAbierto(grupo) {
+  return gruposAbiertos.value.has(grupo.idCompraGrupo)
+}
+
+function alternarGrupo(grupo) {
+  const id = grupo.idCompraGrupo
+  const siguiente = new Set(gruposAbiertos.value)
+  if (siguiente.has(id)) siguiente.delete(id)
+  else siguiente.add(id)
+  gruposAbiertos.value = siguiente
+}
+
+function inicializarAcordeon() {
+  const idCompraActual = compra.value?.idCompra
+  if (idCompraActual === compraAcordeonId) return
+  compraAcordeonId = idCompraActual
+  gruposAbiertos.value = grupos.value.length
+    ? new Set([grupos.value[0].idCompraGrupo])
+    : new Set()
+}
+
+const productosReseniables = computed(() => {
+  const mapa = new Map()
+  for (const grupo of grupos.value) {
+    if (grupo.estado !== 'PAGADO') continue
+    for (const item of grupo.items || []) {
+      if (!item.idProducto) continue
+      let producto = mapa.get(item.idProducto)
+      if (!producto) {
+        producto = {
+          idProducto: item.idProducto,
+          titulo: item.tituloProducto,
+          imagenUrl: item.imagenUrl,
+          variantes: new Set(),
+          items: [],
+        }
+        mapa.set(item.idProducto, producto)
+      }
+      producto.items.push(item)
+      const variante = String(item.nombreVariante || '').trim()
+      if (variante) producto.variantes.add(variante)
+    }
+  }
+  return [...mapa.values()].map((producto) => ({
+    ...producto,
+    variantes: [...producto.variantes],
+  }))
+})
+
+function estadoDeProducto(idProducto) {
+  return estadosResenia.value[idProducto] || null
+}
+
+async function cargarResenias() {
+  const ids = productosReseniables.value.map((producto) => producto.idProducto)
+  if (!ids.length) {
+    estadosResenia.value = {}
+    return
+  }
+  const [criteriosRes, estadosRes] = await Promise.all([
+    cargarCriterios('PRODUCTO').catch(() => null),
+    Promise.all(ids.map((id) => cargarEstadoReseniaProducto(id).catch(() => null))),
+  ])
+  criteriosProducto.value = criteriosRes?.data || []
+  const mapa = {}
+  ids.forEach((id, indice) => {
+    mapa[id] = estadosRes[indice]?.data || null
+  })
+  estadosResenia.value = mapa
+}
+
+async function recargarEstadoProducto(idProducto) {
+  try {
+    const res = await cargarEstadoReseniaProducto(idProducto)
+    estadosResenia.value = {
+      ...estadosResenia.value,
+      [idProducto]: res.data,
+    }
+  } catch {
+    // Se conserva el estado anterior si la recarga falla.
+  }
+}
+
+function abrirFormulario(idProducto) {
+  reseniaEnEdicion.value = idProducto
+}
+
+function cerrarFormulario() {
+  if (guardandoResenia.value) return
+  reseniaEnEdicion.value = null
+}
+
+async function guardarResenia(idProducto, payload) {
+  if (guardandoResenia.value) return
+  guardandoResenia.value = true
+  const eraEdicion = Boolean(estadoDeProducto(idProducto)?.miResenia)
+  try {
+    if (eraEdicion) {
+      await editarReseniaProducto(idProducto, payload)
+    } else {
+      await crearReseniaProducto(idProducto, payload)
+    }
+    exito(eraEdicion ? 'Reseña actualizada.' : 'Reseña publicada.')
+    reseniaEnEdicion.value = null
+    await recargarEstadoProducto(idProducto)
+  } catch (e) {
+    toastError(e.response?.data?.message || 'No se pudo guardar la reseña.')
+  } finally {
+    guardandoResenia.value = false
+  }
+}
+
+function pedirEliminarResenia(idProducto, titulo) {
+  reseniaAEliminar.value = { idProducto, titulo }
+}
+
+function cerrarEliminarResenia() {
+  if (!eliminandoResenia.value) reseniaAEliminar.value = null
+}
+
+async function confirmarEliminarResenia() {
+  if (!reseniaAEliminar.value || eliminandoResenia.value) return
+  eliminandoResenia.value = true
+  const { idProducto } = reseniaAEliminar.value
+  try {
+    await eliminarReseniaProducto(idProducto)
+    reseniaAEliminar.value = null
+    exito('Eliminaste tu reseña.')
+    await recargarEstadoProducto(idProducto)
+  } catch (e) {
+    toastError(e.response?.data?.message || 'No se pudo eliminar la reseña.')
+  } finally {
+    eliminandoResenia.value = false
+  }
+}
+
+async function cargar() {
+  cargando.value = true
+  error.value = ''
+  try {
+    compra.value = await cargarCompra(idCompra.value)
+    inicializarAcordeon()
+    if (route.query.pago) {
+      await sincronizar(true)
+      const limpia = { ...route.query }
+      delete limpia.pago
+      router.replace({ query: limpia })
+      if (compra.value?.estado === 'PAGA') {
+        exito('Pago acreditado. La compra ya está completa.')
+      }
+    }
+    await cargarResenias()
+  } catch (e) {
+    error.value = e.response?.status === 404
+      ? 'No encontramos esta compra en tu cuenta. Verificá que hayas iniciado sesión con el usuario que la hizo.'
+      : e.response?.status === 403
+        ? 'No tenés acceso a esta compra.'
+        : (e.response?.data?.message || 'No se pudo cargar la compra.')
+  } finally {
+    cargando.value = false
+  }
+}
+
+async function pagar(grupo) {
+  if (pagando.value) return
+  pagando.value = grupo.idCompraGrupo
+  try {
+    const pago = await pagarGrupo(idCompra.value, grupo.idCompraGrupo)
+    if (pago.instruccion && /^https?:\/\//.test(pago.instruccion)) {
+      window.location.href = pago.instruccion
+      return
+    }
+    pagoSimulado.value = pago
+    exito('Pago simulado creado. Confirmalo desde esta pantalla.')
+  } catch (e) {
+    toastError(e.response?.data?.message || 'No se pudo iniciar el pago.')
+  } finally {
+    pagando.value = null
+  }
+}
+
+async function confirmarSimulado() {
+  if (!pagoSimulado.value) return
+  try {
+    compra.value = await confirmarPagoSimulado(pagoSimulado.value.idIntentoCobro)
+    pagoSimulado.value = null
+    exito('Pago simulado confirmado.')
+    await cargarResenias()
+  } catch (e) {
+    toastError(e.response?.data?.message || 'No se pudo confirmar el pago.')
+  }
+}
+
+async function rechazarSimulado() {
+  if (!pagoSimulado.value) return
+  try {
+    compra.value = await rechazarPagoSimulado(pagoSimulado.value.idIntentoCobro)
+    pagoSimulado.value = null
+    toastError('Pago simulado rechazado.')
+  } catch (e) {
+    toastError(e.response?.data?.message || 'No se pudo rechazar el pago.')
+  }
+}
+
+async function sincronizar(silencioso = false) {
+  if (sincronizando.value) return
+  sincronizando.value = true
+  try {
+    compra.value = await sincronizarCompra(idCompra.value)
+    await cargarResenias()
+    if (!silencioso) exito('Estado actualizado.')
+  } catch (e) {
+    if (!silencioso) {
+      toastError(e.response?.data?.message || 'No se pudo actualizar el estado.')
+    }
+  } finally {
+    sincronizando.value = false
+  }
+}
+
+async function descargarTodo() {
+  if (descargandoTodo.value) return
+  descargandoTodo.value = true
+  try {
+    const { blob, nombre } = await descargarCompra(idCompra.value)
+    guardarArchivo(blob, nombre)
+  } catch (e) {
+    toastError(e.response?.data?.message || 'No se pudo descargar la compra.')
+  } finally {
+    descargandoTodo.value = false
+  }
+}
+
+function tiempoRestante(grupo) {
+  if (!grupo?.reservaExpiraEn) return ''
+  const fin = new Date(grupo.reservaExpiraEn).getTime()
+  if (!Number.isFinite(fin)) return ''
+  const restante = Math.max(0, fin - ahora.value)
+  const totalSegundos = Math.floor(restante / 1000)
+  const minutos = Math.floor(totalSegundos / 60)
+  const segundos = totalSegundos % 60
+  return `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`
+}
+
+function pedirCancelar(grupo) {
+  if (!grupo?.puedeCancelar) return
+  grupoCancelar.value = grupo
+}
+
+function cerrarCancelar() {
+  if (!cancelando.value) grupoCancelar.value = null
+}
+
+async function confirmarCancelar() {
+  if (!grupoCancelar.value || cancelando.value) return
+  cancelando.value = true
+  try {
+    compra.value = await cancelarGrupo(
+      idCompra.value, grupoCancelar.value.idCompraGrupo)
+    grupoCancelar.value = null
+    exito('Compra cancelada. La reserva quedó liberada.')
+  } catch (e) {
+    toastError(e.response?.data?.message || 'No se pudo cancelar la compra.')
+  } finally {
+    cancelando.value = false
+  }
+}
+
+function fecha(valor) {
+  if (!valor) return '—'
+  try {
+    return new Intl.DateTimeFormat('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(valor))
+  } catch {
+    return valor
+  }
+}
+
+onMounted(() => {
+  cargar()
+  intervaloPago = window.setInterval(() => {
+    ahora.value = Date.now()
+  }, 1000)
+})
+
+onBeforeUnmount(() => {
+  if (intervaloPago) {
+    window.clearInterval(intervaloPago)
+  }
+})
+</script>
+
+<template>
+  <div class="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
+    <router-link
+      to="/compras"
+      class="text-sm text-granate transition hover:text-coral"
+    >
+      ← Volver a mis compras
+    </router-link>
+
+    <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando...</p>
+    <p v-else-if="error" class="mt-8 rounded-xl border border-rojizo/30 bg-rojizo/5 px-4 py-3 text-sm text-rojizo">
+      {{ error }}
+    </p>
+
+    <template v-else-if="compra">
+      <section class="mt-4 rounded-[22px] border border-borde/60 bg-superficie p-5 shadow-sm">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div class="flex min-w-0 items-start gap-4">
+            <img
+              v-if="portada"
+              :src="portada"
+              alt=""
+              class="h-20 w-20 shrink-0 rounded-2xl border border-borde/50 object-cover"
+            />
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-3">
+                <h1 class="font-display text-2xl font-bold text-granate">
+                  Compra #{{ compra.idCompra }}
+                </h1>
+                <span
+                  class="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
+                  :class="estado.clase"
+                >
+                  {{ estado.texto }}
+                </span>
+              </div>
+              <p class="mt-1 text-sm text-cafe/55">
+                {{ fecha(compra.fechaCreacion) }}
+              </p>
+              <p class="mt-1 text-xs text-cafe/50">
+                {{ totalProductos }} producto(s) · {{ grupos.length }} artista(s)
+              </p>
+            </div>
+          </div>
+          <div class="flex flex-col items-start gap-2 sm:items-end">
+            <div class="text-left sm:text-right">
+              <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/45">
+                Total pagado
+              </p>
+              <p class="font-display text-2xl font-extrabold text-coral">
+                {{ formatearPrecio(compra.total, compra.moneda || 'ARS') }}
+              </p>
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <button
+                v-if="compra.puedeDescargar"
+                type="button"
+                class="rounded-lg bg-coral px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rojizo disabled:opacity-50"
+                :disabled="descargandoTodo"
+                @click="descargarTodo"
+              >
+                {{ descargandoTodo ? 'Preparando...' : 'Descargar todo' }}
+              </button>
+              <button
+                type="button"
+                class="rounded-lg border border-rosa px-3 py-1.5 text-xs font-medium text-granate transition hover:bg-rosa/20 disabled:opacity-50"
+                :disabled="sincronizando"
+                @click="sincronizar(false)"
+              >
+                {{ sincronizando ? 'Actualizando...' : 'Sincronizar estado' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="mt-6 space-y-5">
+        <section
+          v-for="grupo in grupos"
+          :key="grupo.idCompraGrupo"
+          class="rounded-[22px] border border-borde/60 bg-superficie p-5 shadow-sm"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <img
+                v-if="grupo.urlFotoArtista"
+                :src="grupo.urlFotoArtista"
+                alt=""
+                class="h-8 w-8 rounded-full object-cover ring-1 ring-borde/50"
+              />
+              <div>
+                <router-link
+                  v-if="grupo.esReventa ? grupo.nombreVendedor : grupo.nombreArtista"
+                  :to="{ name: 'perfil', params: { nombreUsuario: grupo.esReventa ? grupo.nombreVendedor : grupo.nombreArtista } }"
+                  class="text-sm font-semibold text-cafe/75 transition hover:text-coral"
+                >
+                  @{{ grupo.esReventa ? grupo.nombreVendedor : grupo.nombreArtista }}
+                </router-link>
+                <p v-else class="text-sm font-semibold text-cafe/75">
+                  {{ grupo.esReventa ? 'Revendedor' : 'Artista original' }}
+                </p>
+                <p class="text-xs text-cafe/50">
+                  <span
+                    v-if="grupo.esReventa"
+                    class="mr-1 rounded-full bg-coral/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-coral"
+                  >
+                    Reventa
+                  </span>
+                  {{ grupo.esReventa ? 'Revendedor' : 'Artista original' }} · {{ grupo.items.length }} ítem(s)
+                </p>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-3">
+              <span
+                class="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
+                :class="estadoGrupoDe(grupo.estado).clase"
+              >
+                {{ estadoGrupoDe(grupo.estado).texto }}
+              </span>
+              <p class="font-display text-lg font-bold text-granate">
+                {{ formatearPrecio(grupo.subtotal, grupo.moneda || 'ARS') }}
+              </p>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 rounded-full border border-rosa bg-blanco px-3 py-1.5 text-xs font-semibold text-cafe transition hover:bg-rosa/20"
+                :aria-expanded="esGrupoAbierto(grupo)"
+                :aria-controls="`grupo-items-${grupo.idCompraGrupo}`"
+                @click="alternarGrupo(grupo)"
+              >
+                {{ esGrupoAbierto(grupo)
+                  ? 'Ocultar productos'
+                  : `Ver ${grupo.items.length} ${grupo.items.length === 1 ? 'producto' : 'productos'}` }}
+                <svg
+                  class="h-3.5 w-3.5 transition-transform"
+                  :class="{ 'rotate-180': esGrupoAbierto(grupo) }"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <p v-if="grupo.mensajePago" class="mt-2 text-xs text-cafe/60">
+            {{ grupo.mensajePago }}
+          </p>
+
+          <div
+            v-show="esGrupoAbierto(grupo)"
+            :id="`grupo-items-${grupo.idCompraGrupo}`"
+            class="mt-4 divide-y divide-rosa/40"
+          >
+            <article
+              v-for="item in grupo.items"
+              :key="item.idCompraItem"
+              class="py-4"
+            >
+              <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div class="flex min-w-0 items-start gap-3">
+                  <img
+                    v-if="item.imagenUrl"
+                    :src="item.imagenUrl"
+                    alt=""
+                    class="h-20 w-20 shrink-0 rounded-xl border border-borde/50 object-cover"
+                  />
+                  <span
+                    v-else
+                    class="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-rosa/30 text-granate"
+                    aria-hidden="true"
+                  >
+                    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007Z" />
+                    </svg>
+                  </span>
+
+                  <div class="min-w-0">
+                    <p class="font-display text-base font-bold text-granate">
+                      {{ item.tituloProducto }}
+                    </p>
+                    <p class="mt-0.5 text-sm text-cafe/60">
+                      {{ item.nombreVariante }} · {{ item.cantidad }} unidad(es)
+                    </p>
+                    <p v-if="item.esReventa && item.nombreArtistaOriginal" class="mt-0.5 text-[11px] text-cafe/45">
+                      Obra original de @{{ item.nombreArtistaOriginal }}
+                    </p>
+                    <p class="mt-1 text-[11px] text-cafe/45">
+                      {{ item.tipoEntrega === 'DIGITAL'
+                        ? 'Entrega digital'
+                        : (item.esReventa
+                          ? 'Pieza física · envío coordinado con el revendedor'
+                          : 'Pieza física · envío coordinado con el artista') }}
+                      · {{ item.estadoEntrega === 'ENTREGADO' ? 'Entregado' : 'Pendiente de entrega' }}
+                    </p>
+                    <p
+                      v-if="item.tieneLedger"
+                      class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-coral/25 bg-coral/10 px-2.5 py-0.5 text-[11px] font-semibold text-coral"
+                    >
+                      Certificado de procedencia
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+                  <p class="font-display text-base font-bold text-coral">
+                    {{ formatearPrecio(item.precioTotalCobro ?? item.precioCobro, compra.moneda || 'ARS') }}
+                  </p>
+                  <p v-if="item.cantidad > 1" class="text-[11px] text-cafe/45">
+                    {{ formatearPrecio(item.precioCobro, compra.moneda || 'ARS') }} c/u
+                  </p>
+                  <span
+                    v-if="item.puedeDescargar"
+                    class="inline-flex max-w-48 items-center justify-center rounded-full border border-rosa bg-blanco px-3 py-1 text-[11px] font-semibold text-granate"
+                  >
+                    Incluye {{ item.tipoEntrega === 'DIGITAL' ? 'archivo digital' : 'imagen de la pieza' }}
+                  </span>
+                  <span v-else-if="item.motivoNoDescarga" class="max-w-48 text-right text-[11px] text-cafe/45">
+                    {{ item.motivoNoDescarga }}
+                  </span>
+                </div>
+              </div>
+
+              <details class="mt-3 rounded-xl border border-rosa/40 bg-rosa/5 px-4 py-3">
+                <summary class="cursor-pointer text-xs font-semibold text-granate">
+                  Ver detalles de la compra
+                </summary>
+                <div class="mt-3 grid gap-2 text-xs text-cafe/65 sm:grid-cols-2">
+                  <p><span class="font-semibold text-cafe/80">ID de compra:</span> {{ compra.idCompra }}</p>
+                  <p><span class="font-semibold text-cafe/80">ID de ítem:</span> {{ item.idCompraItem }}</p>
+                  <p v-if="item.sha256Archivo" class="break-all sm:col-span-2">
+                    <span class="font-semibold text-cafe/80">Huella SHA-256 del archivo:</span>
+                    <span class="font-mono">{{ item.sha256Archivo }}</span>
+                  </p>
+                  <p><span class="font-semibold text-cafe/80">Producto:</span> #{{ item.idProducto }}</p>
+                  <p><span class="font-semibold text-cafe/80">Variante:</span> #{{ item.idVariante }}</p>
+                  <p v-if="item.fechaEntrega">
+                    <span class="font-semibold text-cafe/80">Entregado:</span> {{ fecha(item.fechaEntrega) }}
+                  </p>
+                  <p v-if="item.sha256Archivo" class="break-all sm:col-span-2">
+                    <span class="font-semibold text-cafe/80">SHA-256 del archivo:</span>
+                    <span class="font-mono">{{ item.sha256Archivo }}</span>
+                  </p>
+                </div>
+
+                <div v-if="item.licencia" class="mt-4 border-t border-rosa/40 pt-3">
+                  <p class="text-xs font-semibold text-granate">Licencia adquirida</p>
+                  <p class="mt-1 text-xs text-cafe/65">
+                    Versión {{ item.licencia.version }} · ID {{ item.licencia.idLicenciaProducto }}
+                  </p>
+                  <ul v-if="item.licencia.derechos?.length" class="mt-2 flex flex-wrap gap-1.5">
+                    <li
+                      v-for="derecho in item.licencia.derechos"
+                      :key="derecho.idDerechoTermino || derecho.codigo"
+                      class="rounded-full border border-rosa/60 bg-blanco px-2 py-0.5 text-[11px] text-cafe/70"
+                    >
+                      {{ derecho.nombre || derecho.codigo }}
+                    </li>
+                  </ul>
+                  <p class="mt-2 text-xs text-cafe/60">
+                    {{ item.licencia.permiteModificaciones ? 'Permite modificaciones' : 'No permite modificaciones' }}
+                    · {{ item.licencia.requiereCredito ? 'Requiere crédito' : 'No requiere crédito' }}
+                  </p>
+                  <p v-if="item.licencia.textoAdicional" class="mt-2 whitespace-pre-line text-xs text-cafe/60">
+                    {{ item.licencia.textoAdicional }}
+                  </p>
+                </div>
+
+                <p v-if="item.tieneLedger" class="mt-4 border-t border-rosa/40 pt-3 text-xs text-cafe/60">
+                  Esta pieza tiene un certificado de procedencia verificado.
+                </p>
+              </details>
+
+              <LedgerCompraItem
+                v-if="item.tieneLedger"
+                :id-compra="compra.idCompra"
+                :item="item"
+              />
+            </article>
+          </div>
+
+          <div
+            v-if="grupo.estado === 'PENDIENTE'"
+            class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rosa/50 bg-rosa/10 px-4 py-3"
+          >
+            <p v-if="grupo.reservaExpiraEn" class="text-xs text-cafe/70">
+              Te quedan
+              <strong class="text-granate">{{ tiempoRestante(grupo) }}</strong>
+              para completar el pago.
+            </p>
+            <p v-else class="text-xs text-cafe/60">
+              Reserva pendiente de confirmación.
+            </p>
+            <button
+              v-if="grupo.puedeCancelar"
+              type="button"
+              class="rounded-lg border border-rojizo/40 px-3 py-1.5 text-xs font-semibold text-rojizo transition hover:bg-rojizo/10"
+              @click="pedirCancelar(grupo)"
+            >
+              Cancelar compra
+            </button>
+            <p v-else-if="grupo.motivoNoCancelar" class="text-xs text-cafe/55">
+              {{ grupo.motivoNoCancelar }}
+            </p>
+          </div>
+
+          <div v-if="grupo.puedePagar" class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-rosa/40 pt-4">
+            <p class="text-xs text-cafe/55">
+              {{ grupo.esReventa
+                ? 'El pago se acredita directo a la cuenta del revendedor.'
+                : 'El pago se acredita directo a la cuenta del artista.' }}
+            </p>
+            <button
+              type="button"
+              class="rounded-lg bg-coral px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rojizo disabled:opacity-50"
+              :disabled="pagando === grupo.idCompraGrupo"
+              @click="pagar(grupo)"
+            >
+              {{ pagando === grupo.idCompraGrupo ? 'Iniciando...' : 'Pagar' }}
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <section v-if="productosReseniables.length" class="mt-6 space-y-4">
+        <h2 class="font-display text-xl font-bold text-granate">
+          Reseñas de productos
+        </h2>
+
+        <article
+          v-for="producto in productosReseniables"
+          :key="producto.idProducto"
+          class="rounded-[22px] border border-borde/60 bg-superficie p-5 shadow-sm"
+        >
+          <div class="flex items-start gap-3">
+            <img
+              v-if="producto.imagenUrl"
+              :src="producto.imagenUrl"
+              alt=""
+              class="h-16 w-16 shrink-0 rounded-xl border border-borde/50 object-cover"
+            />
+            <div class="min-w-0">
+              <p class="font-display text-base font-bold text-granate">
+                {{ producto.titulo }}
+              </p>
+              <p v-if="producto.variantes.length === 1" class="mt-1 text-xs text-cafe/60">
+                Compraste la variante
+                <strong class="text-cafe/80">{{ producto.variantes[0] }}</strong>.
+              </p>
+              <p v-else-if="producto.variantes.length > 1" class="mt-1 text-xs text-cafe/60">
+                Compraste
+                <strong class="text-cafe/80">{{ producto.variantes.length }} variantes</strong>:
+                {{ producto.variantes.join(' · ') }}.
+              </p>
+              <p
+                v-if="producto.variantes.length > 1"
+                class="mt-2 rounded-lg bg-rosa/10 px-3 py-2 text-xs leading-relaxed text-cafe/70"
+              >
+                La reseña es del producto y se publica
+                <strong>una sola vez</strong>, aunque hayas comprado varias variantes.
+              </p>
+            </div>
+          </div>
+
+          <div v-if="estadoDeProducto(producto.idProducto)" class="mt-4">
+            <FormularioResenia
+              v-if="reseniaEnEdicion === producto.idProducto"
+              :criterios="criteriosProducto"
+              :resenia="estadoDeProducto(producto.idProducto).miResenia"
+              :guardando="guardandoResenia"
+              :titulo="estadoDeProducto(producto.idProducto).miResenia
+                ? 'Editar tu reseña'
+                : 'Reseñar este producto'"
+              descripcion-ayuda="Solo evaluás la pieza: calidad, fidelidad a lo publicado y presentación."
+              :texto-guardar="estadoDeProducto(producto.idProducto).miResenia
+                ? 'Guardar la única edición'
+                : 'Publicar reseña'"
+              :anonimo-forzado="estadoDeProducto(producto.idProducto).anonimoForzado"
+              etiqueta-anonima="Comprador verificado"
+              placeholder-descripcion="Contá cómo es la pieza, su calidad y si coincide con lo publicado"
+              @guardar="guardarResenia(producto.idProducto, $event)"
+              @cancelar="cerrarFormulario"
+            />
+
+            <template v-else>
+              <TarjetaResenia
+                v-if="estadoDeProducto(producto.idProducto).miResenia"
+                :resenia="estadoDeProducto(producto.idProducto).miResenia"
+                titulo="Tu reseña del producto"
+                :puede-editar="estadoDeProducto(producto.idProducto).puedeEditar"
+                :puede-eliminar="estadoDeProducto(producto.idProducto).puedeEliminar"
+                :fecha-limite-edicion="estadoDeProducto(producto.idProducto).fechaLimiteEdicion"
+                @editar="abrirFormulario(producto.idProducto)"
+                @eliminar="pedirEliminarResenia(producto.idProducto, producto.titulo)"
+              />
+
+              <div
+                v-if="!estadoDeProducto(producto.idProducto).miResenia
+                  && estadoDeProducto(producto.idProducto).puedeCrear"
+                class="flex flex-wrap items-center justify-between gap-3"
+              >
+                <div>
+                  <p class="text-sm font-semibold text-granate">
+                    Reseñá este producto
+                  </p>
+                  <p class="text-xs text-cafe/55">
+                    La reseña queda vinculada a tu compra.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="rounded-lg bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-rojizo"
+                  @click="abrirFormulario(producto.idProducto)"
+                >
+                  Escribir reseña
+                </button>
+              </div>
+
+              <p
+                v-if="estadoDeProducto(producto.idProducto).motivoNoDisponible"
+                class="mt-2 text-xs text-cafe/50"
+              >
+                {{ estadoDeProducto(producto.idProducto).motivoNoDisponible }}
+              </p>
+            </template>
+          </div>
+        </article>
+      </section>
+
+      <div
+        v-if="pagoSimulado"
+        class="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-xl rounded-2xl border border-coral/40 bg-superficie p-5 shadow-2xl sm:inset-x-auto sm:right-6"
+      >
+        <p class="font-display text-base font-bold text-granate">
+          Pago simulado
+        </p>
+        <p class="mt-1 text-sm text-cafe/65">
+          {{ pagoSimulado.instruccion }}
+        </p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            class="rounded-lg bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-rojizo"
+            @click="confirmarSimulado"
+          >
+            Confirmar pago
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-rojizo/40 px-4 py-2 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10"
+            @click="rechazarSimulado"
+          >
+            Rechazar
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <ModalConfirmacion
+      :abierto="!!grupoCancelar"
+      titulo="Cancelar compra"
+      mensaje="Se libera la reserva y el producto vuelve a estar disponible. No se puede deshacer."
+      texto-confirmar="Cancelar compra"
+      texto-cancelar="Volver"
+      destructivo
+      @confirmar="confirmarCancelar"
+      @cerrar="cerrarCancelar"
+    >
+      <p v-if="cancelando" class="mt-3 text-sm text-cafe/60">
+        Cancelando...
+      </p>
+    </ModalConfirmacion>
+
+    <ModalConfirmacion
+      :abierto="!!reseniaAEliminar"
+      titulo="Eliminar tu reseña"
+      :mensaje="reseniaAEliminar
+        ? `La reseña de “${reseniaAEliminar.titulo}” dejará de ser visible. El historial se conserva y no vas a poder volver a reseñar este producto.`
+        : ''"
+      texto-confirmar="Eliminar reseña"
+      texto-cancelar="Volver"
+      destructivo
+      @confirmar="confirmarEliminarResenia"
+      @cerrar="cerrarEliminarResenia"
+    >
+      <p v-if="eliminandoResenia" class="mt-3 text-sm text-cafe/60">
+        Eliminando...
+      </p>
+    </ModalConfirmacion>
+  </div>
+</template>

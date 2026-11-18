@@ -45,8 +45,9 @@ public interface ReporteReseniaRepository
     @Query(value = """
         SELECT rr FROM ReporteResenia rr
         JOIN FETCH rr.resenia r
-        JOIN FETCH r.pedido p
+        LEFT JOIN FETCH r.pedido p
         LEFT JOIN FETCH p.servicio s
+        LEFT JOIN FETCH r.producto prod
         JOIN FETCH r.autor a
         JOIN FETCH rr.reportante rep
         LEFT JOIN FETCH rr.resueltoPor res

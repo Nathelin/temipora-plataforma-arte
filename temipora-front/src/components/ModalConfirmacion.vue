@@ -6,6 +6,7 @@ defineProps({
   textoConfirmar: { type: String, default: 'Confirmar' },
   textoCancelar: { type: String, default: 'Cancelar' },
   destructivo: { type: Boolean, default: false },
+  confirmarHabilitado: { type: Boolean, default: true },
 })
 
 defineEmits(['confirmar', 'cerrar'])
@@ -36,7 +37,8 @@ defineEmits(['confirmar', 'cerrar'])
         </button>
         <button
           type="button"
-          class="rounded-md px-5 py-2.5 text-sm text-white shadow-sm transition"
+          :disabled="!confirmarHabilitado"
+          class="rounded-md px-5 py-2.5 text-sm text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-40"
           :class="destructivo ? 'bg-rojizo hover:bg-granate' : 'bg-coral hover:bg-rojizo'"
           @click="$emit('confirmar')"
         >

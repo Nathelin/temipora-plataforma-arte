@@ -77,13 +77,27 @@ class ComisionServiceTest {
 
         assertThat(dto.getPorcentajeServicio()).isEqualByComparingTo("12.50");
         assertThat(dto.getPorcentajeProducto()).isEqualByComparingTo("8.75");
+        assertThat(dto.getPorcentajeReventa()).isEqualByComparingTo("10.00");
         assertThat(dto.getFechaActualizacion()).isNotNull();
     }
 
+    @Test
+    void actualizar_rechazaComisionDeReventaNegativa() {
+        assertThatThrownBy(() -> comisionService.actualizar(
+            request("10.00", "10.00", "-1.00")))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("reventas");
+    }
+
     private ComisionConfigRequest request(String servicio, String producto) {
+        return request(servicio, producto, "10.00");
+    }
+
+    private ComisionConfigRequest request(String servicio, String producto, String reventa) {
         ComisionConfigRequest request = new ComisionConfigRequest();
         request.setPorcentajeServicio(new BigDecimal(servicio));
         request.setPorcentajeProducto(new BigDecimal(producto));
+        request.setPorcentajeReventa(new BigDecimal(reventa));
         return request;
     }
 }

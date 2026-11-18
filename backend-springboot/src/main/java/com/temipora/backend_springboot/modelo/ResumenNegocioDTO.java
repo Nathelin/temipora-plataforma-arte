@@ -9,8 +9,8 @@ public record ResumenNegocioDTO(
         BigDecimal volumenAnterior,
         BigDecimal comision,
         BigDecimal comisionAnterior,
-        long pedidosPagados,
-        long pedidosPagadosAnterior,
+        long operaciones,
+        long operacionesAnterior,
         BigDecimal ticketPromedio,
         BigDecimal ticketPromedioAnterior) {
 }

@@ -46,7 +46,7 @@ public interface NotificacionUsuarioRepository extends JpaRepository<Notificacio
         JOIN FETCH nu.notificacion n
         JOIN FETCH n.tipoNotificacion
         WHERE nu.usuario.idUsuario = :idUsuario
-        ORDER BY nu.leida ASC, n.fechaCreacion DESC, n.idNotificacion DESC
+        ORDER BY n.fechaCreacion DESC, n.idNotificacion DESC
         """)
     List<NotificacionUsuario> listarRecientes(
             @Param("idUsuario") Long idUsuario,

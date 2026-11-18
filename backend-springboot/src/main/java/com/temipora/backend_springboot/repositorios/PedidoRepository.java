@@ -111,7 +111,7 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
           and exists (
               select h from HitoPedido h
               where h.pedido = p
-                and h.requiereEntrega = true
+                and h.hitoPresupuesto.requiereEntrega = true
                 and h.estadoEntrega in :estadosEntrega)
           and (:idServicio is null or s.idServicio = :idServicio)
           and (:patron = ''

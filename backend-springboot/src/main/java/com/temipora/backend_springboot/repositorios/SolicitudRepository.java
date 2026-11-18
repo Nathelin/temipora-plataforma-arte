@@ -52,6 +52,12 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long> {
     long countByServicioIdServicioAndEstadoIn(
             Long idServicio, Collection<EstadoSolicitud> estados);
 
+    long countByClienteIdUsuarioAndEstadoIn(
+            Long idCliente, Collection<EstadoSolicitud> estados);
+
+    long countByArtistaIdUsuarioAndEstadoIn(
+            Long idArtista, Collection<EstadoSolicitud> estados);
+
     @Query("""
         SELECT s.servicio.idServicio, COUNT(s)
         FROM Solicitud s

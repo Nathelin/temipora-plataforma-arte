@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.config;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -23,6 +24,8 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import com.temipora.backend_springboot.config.filters.JwtAuthenticationFilter;
 import com.temipora.backend_springboot.config.filters.JwtAuthorizationFilter;
+import com.temipora.backend_springboot.config.filters.TerminosAceptadosFilter;
+import com.temipora.backend_springboot.servicios.ConfiguracionBajaCuentaService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
 import java.util.List;
@@ -34,18 +37,33 @@ public class SecurityConfig {
 
     private final JwtUtils jwtUtils;
     private final UserDetailsService userDetailsService;
+    private final ObjectProvider<TerminosAceptadosFilter> terminosAceptadosFilterProvider;
 
-    public SecurityConfig(JwtUtils jwtUtils, UserDetailsService userDetailsService) {
+    @org.springframework.beans.factory.annotation.Value(
+        "${temipora.contacto.email:temiporasupport@gmail.com}")
+    private String contactoEmail;
+
+    public SecurityConfig(
+            JwtUtils jwtUtils,
+            UserDetailsService userDetailsService,
+            ObjectProvider<TerminosAceptadosFilter> terminosAceptadosFilterProvider) {
         this.jwtUtils = jwtUtils;
         this.userDetailsService = userDetailsService;
+        this.terminosAceptadosFilterProvider = terminosAceptadosFilterProvider;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
             AuthenticationManager authenticationManager,
-            UsuarioService usuarioService) throws Exception {
+            UsuarioService usuarioService,
+            PasswordEncoder passwordEncoder,
+            ObjectProvider<ConfiguracionBajaCuentaService> configuracionBajaCuentaProvider)
+            throws Exception {
 
-        JwtAuthenticationFilter jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtUtils, usuarioService);
+        ContactoPlataforma contactoPlataforma = new ContactoPlataforma(contactoEmail);
+        JwtAuthenticationFilter jwtAuthenticationFilter =
+            new JwtAuthenticationFilter(jwtUtils, usuarioService, passwordEncoder,
+                configuracionBajaCuentaProvider.getIfAvailable(), contactoPlataforma);
         jwtAuthenticationFilter.setFilterProcessesUrl("/api/auth/login");
         jwtAuthenticationFilter.setAuthenticationManager(authenticationManager);
 
@@ -62,6 +80,9 @@ public class SecurityConfig {
                     "/api/auth/registrarse",
                     "/api/auth/acceso",
                     "/api/auth/acceso/**",
+                    "/api/auth/reactivar-cuenta",
+                    "/api/configuracion-baja-cuenta",
+                    "/api/contacto",
                     "/api/upload",
                     "/api/checkNombreUsuario",
                     "/uploads/**",
@@ -73,10 +94,19 @@ public class SecurityConfig {
                     "/images/**",
                     "/error",
                     "/api/servicios/**",
+                    "/api/productos/**",
+                    "/api/reventas/**",
+                    "/api/certificados/**",
+                    "/api/tipos-producto",
+                    "/api/tipos-servicio",
+                    "/api/medios",
+                    "/api/etiquetas/selector",
+                    "/api/etiquetas/categorias",
                     "/api/sustituciones",
                     "/api/perfil/**",
                     "/api/portfolio/**",
                     "/api/galeria/**",
+                    "/api/coleccion/**",
                     "/api/resenias/**",
                     "/api/terminos-plataforma",
                     "/api/comisiones/**",
@@ -84,6 +114,7 @@ public class SecurityConfig {
                     "/api/ofertas/campana/**",
                     "/api/emails/baja/**",
                     "/api/pagos/mercadopago/webhook",
+                    "/api/pagos/mercadopago/webhook-compras",
                     "/api/pagos/mercadopago/oauth/callback"
                 ).permitAll()
                 .anyRequest().authenticated()
@@ -98,8 +129,15 @@ public class SecurityConfig {
                 })
             )
             .addFilter(jwtAuthenticationFilter)
-            .addFilterBefore(new JwtAuthorizationFilter(jwtUtils, userDetailsService),
+            .addFilterBefore(new JwtAuthorizationFilter(jwtUtils, userDetailsService, contactoPlataforma),
                     UsernamePasswordAuthenticationFilter.class);
+
+        TerminosAceptadosFilter terminosAceptadosFilter =
+            terminosAceptadosFilterProvider.getIfAvailable();
+        if (terminosAceptadosFilter != null) {
+            http.addFilterAfter(terminosAceptadosFilter,
+                UsernamePasswordAuthenticationFilter.class);
+        }
 
         return http.build();
     }
@@ -111,10 +149,13 @@ public class SecurityConfig {
             "http://localhost:5173",
             "https://*.ngrok-free.dev",
             "https://*.ngrok-free.app",
-            "https://*.trycloudflare.com"
+            "https://*.trycloudflare.com",
+            "https://*.devtunnels.ms"
         ));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of(
+            "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
+        config.setExposedHeaders(List.of("Content-Disposition"));
         config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

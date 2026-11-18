@@ -27,7 +27,10 @@ import com.temipora.backend_springboot.modelo.CampanaReactivacion;
 import com.temipora.backend_springboot.modelo.ConfiguracionComision;
 import com.temipora.backend_springboot.modelo.ConfiguracionInactividad;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
+import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.Moneda;
+import com.temipora.backend_springboot.modelo.Rol;
+import com.temipora.backend_springboot.modelo.SancionCuenta;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.ServicioImagen;
 import com.temipora.backend_springboot.modelo.Usuario;
@@ -68,6 +71,9 @@ class ReactivacionProcesadorTest {
     @Mock
     private AccesoEnlaceService accesoEnlaceService;
 
+    @Mock
+    private SancionService sancionService;
+
     @InjectMocks
     private ReactivacionProcesador procesador;
 
@@ -91,6 +97,39 @@ class ReactivacionProcesadorTest {
             .thenReturn(Optional.of(usuario(1L, false, true, EPreferenciaContenidoSensible.ADVERTIR)));
 
         assertThat(procesar()).isZero();
+    }
+
+    @Test
+    void procesar_administrador_devuelveCeroSinCampanaNiCorreo() {
+        Usuario admin = usuario(1L, true, true,
+            EPreferenciaContenidoSensible.ADVERTIR);
+        admin.setRol(Rol.builder().nombre(ERol.ADMIN).build());
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(admin));
+
+        assertThat(procesar()).isZero();
+
+        verify(campanaRepository, never()).save(any());
+        verify(notificacionService, never()).crearParaUsuario(
+            any(), any(), any(), any(), any(), any());
+        verify(envioEmailService, never()).enviar(
+            any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void procesar_usuarioSancionado_devuelveCeroSinCampanaNiCorreo() {
+        when(usuarioRepository.findByIdUsuario(1L))
+            .thenReturn(Optional.of(usuario(1L, true, true,
+                EPreferenciaContenidoSensible.ADVERTIR)));
+        when(sancionService.obtenerVigente(1L))
+            .thenReturn(Optional.of(new SancionCuenta()));
+
+        assertThat(procesar()).isZero();
+
+        verify(campanaRepository, never()).save(any());
+        verify(notificacionService, never()).crearParaUsuario(
+            any(), any(), any(), any(), any(), any());
+        verify(envioEmailService, never()).enviar(
+            any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -287,6 +326,7 @@ class ReactivacionProcesadorTest {
             .estadoCuenta(estado)
             .recibirEmailsPromocionales(emails)
             .preferenciaSensible(pref)
+            .rol(Rol.builder().nombre(ERol.CLIENTE).build())
             .build();
     }
 

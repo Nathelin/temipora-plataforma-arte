@@ -51,7 +51,7 @@ class FormularioServiceTest {
     @Test
     void obtenerGlobal_existente_devuelveElDelArtista() {
         Formulario form = formulario(false, List.of(pregunta(tipo(1L, "TEXTO"), "¿Qué querés?", 0)));
-        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalse(5L))
+        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalseAndVigenteTrue(5L))
             .thenReturn(Optional.of(form));
 
         FormularioDTO dto = formularioService.obtenerGlobal(5L);
@@ -64,7 +64,7 @@ class FormularioServiceTest {
     @Test
     void obtenerGlobal_sinGlobal_devuelveElDelSistema() {
         Formulario sistema = formulario(true, List.of(pregunta(tipo(4L, "ENCABEZADO"), "Datos de tu pedido", 0)));
-        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalse(5L))
+        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalseAndVigenteTrue(5L))
             .thenReturn(Optional.empty());
         when(formularioRepository.findFirstByEsSistemaTrue()).thenReturn(Optional.of(sistema));
 
@@ -82,7 +82,7 @@ class FormularioServiceTest {
     void obtenerServicio_conFormularioPropio_devuelvePropio() {
         Formulario propio = formulario(false, List.of(pregunta(tipo(1L, "TEXTO"), "Solo para este servicio", 0)));
         propio.setIdServicio(7L);
-        when(formularioRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioAndVigenteTrue(5L, 7L))
             .thenReturn(Optional.of(propio));
 
         FormularioDTO dto = formularioService.obtenerServicio(7L, 5L);
@@ -95,9 +95,9 @@ class FormularioServiceTest {
     @Test
     void obtenerServicio_sinFormularioPropio_devuelveElGlobal() {
         Formulario global = formulario(false, List.of(pregunta(tipo(1L, "TEXTO"), "Global", 0)));
-        when(formularioRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioAndVigenteTrue(5L, 7L))
             .thenReturn(Optional.empty());
-        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalse(5L))
+        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalseAndVigenteTrue(5L))
             .thenReturn(Optional.of(global));
 
         FormularioDTO dto = formularioService.obtenerServicio(7L, 5L);
@@ -110,7 +110,7 @@ class FormularioServiceTest {
     void guardarServicio_creaFormularioPropio() {
         TipoCampo texto = tipo(1L, "TEXTO");
         when(tipoCampoRepository.findByIdTipoCampo(1L)).thenReturn(Optional.of(texto));
-        when(formularioRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioAndVigenteTrue(5L, 7L))
             .thenReturn(Optional.empty());
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(formularioRepository.save(any(Formulario.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -124,15 +124,17 @@ class FormularioServiceTest {
     }
 
     @Test
-    void eliminarServicio_borraElFormularioPropio() {
+    void eliminarServicio_desactivaElFormularioPropioSinBorrarSolicitudes() {
         Formulario propio = formulario(false, List.of());
         propio.setIdServicio(7L);
-        when(formularioRepository.findByArtistaIdUsuarioAndIdServicio(5L, 7L))
+        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioAndVigenteTrue(5L, 7L))
             .thenReturn(Optional.of(propio));
 
         formularioService.eliminarServicio(7L, 5L);
 
-        verify(formularioRepository).delete(propio);
+        assertThat(propio.isVigente()).isFalse();
+        verify(formularioRepository).save(propio);
+        verify(formularioRepository, never()).delete(any(Formulario.class));
     }
 
     // ---------------------------------------------------------------
@@ -143,7 +145,7 @@ class FormularioServiceTest {
     void guardarGlobal_creaFormularioConPreguntasYOrden() {
         TipoCampo texto = tipo(1L, "TEXTO");
         when(tipoCampoRepository.findByIdTipoCampo(1L)).thenReturn(Optional.of(texto));
-        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalse(5L))
+        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalseAndVigenteTrue(5L))
             .thenReturn(Optional.empty());
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(formularioRepository.save(any(Formulario.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -165,7 +167,7 @@ class FormularioServiceTest {
     void guardarGlobal_casillas_ordenaYOcultaOpcionesVacias() {
         TipoCampo casillas = tipo(2L, "CASILLAS");
         when(tipoCampoRepository.findByIdTipoCampo(2L)).thenReturn(Optional.of(casillas));
-        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalse(5L))
+        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalseAndVigenteTrue(5L))
             .thenReturn(Optional.empty());
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(formularioRepository.save(any(Formulario.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -179,20 +181,43 @@ class FormularioServiceTest {
     }
 
     @Test
-    void guardarGlobal_actualizaFormularioExistente() {
+    void guardarGlobal_versionaSinModificarElFormularioAnterior() {
         TipoCampo texto = tipo(1L, "TEXTO");
         Formulario existente = formulario(false, List.of(pregunta(texto, "Vieja", 0)));
         when(tipoCampoRepository.findByIdTipoCampo(1L)).thenReturn(Optional.of(texto));
-        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalse(5L))
+        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalseAndVigenteTrue(5L))
             .thenReturn(Optional.of(existente));
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
         when(formularioRepository.save(any(Formulario.class))).thenAnswer(inv -> inv.getArgument(0));
 
         FormularioDTO dto = formularioService.guardarGlobal(5L,
             request(List.of(preguntaRequest(1L, "Nueva", true, null))));
 
+        assertThat(existente.isVigente()).isFalse();
+        assertThat(existente.getPreguntas().get(0).getEnunciado()).isEqualTo("Vieja");
         assertThat(dto.getPreguntas()).hasSize(1);
         assertThat(dto.getPreguntas().get(0).getEnunciado()).isEqualTo("Nueva");
-        verify(usuarioRepository, never()).findByIdUsuario(any());
+        verify(usuarioRepository).findByIdUsuario(5L);
+    }
+
+    @Test
+    void guardarServicio_versionaSinModificarElFormularioAnterior() {
+        TipoCampo texto = tipo(1L, "TEXTO");
+        Formulario existente = formulario(false, List.of(pregunta(texto, "Vieja", 0)));
+        existente.setIdServicio(7L);
+        when(tipoCampoRepository.findByIdTipoCampo(1L)).thenReturn(Optional.of(texto));
+        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioAndVigenteTrue(5L, 7L))
+            .thenReturn(Optional.of(existente));
+        when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.of(usuario(5L)));
+        when(formularioRepository.save(any(Formulario.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        FormularioDTO dto = formularioService.guardarServicio(7L, 5L,
+            request(List.of(preguntaRequest(1L, "Nueva del servicio", true, null))));
+
+        assertThat(existente.isVigente()).isFalse();
+        assertThat(existente.getPreguntas().get(0).getEnunciado()).isEqualTo("Vieja");
+        assertThat(dto.isPropio()).isTrue();
+        assertThat(dto.getPreguntas().get(0).getEnunciado()).isEqualTo("Nueva del servicio");
     }
 
     @Test
@@ -237,7 +262,7 @@ class FormularioServiceTest {
     void guardarGlobal_artistaInexistente_lanzaNoSuchElement() {
         TipoCampo texto = tipo(1L, "TEXTO");
         when(tipoCampoRepository.findByIdTipoCampo(1L)).thenReturn(Optional.of(texto));
-        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalse(5L))
+        when(formularioRepository.findByArtistaIdUsuarioAndIdServicioIsNullAndEsSistemaFalseAndVigenteTrue(5L))
             .thenReturn(Optional.empty());
         when(usuarioRepository.findByIdUsuario(5L)).thenReturn(Optional.empty());
 

@@ -65,7 +65,8 @@ class ReseniaPublicaControllerTest {
     void listarArtista_sinToken_devuelve200() throws Exception {
         when(usuarioService.getByNombreUsuario("ana")).thenReturn(usuario());
         when(reseniaPublicaService.listarArtista(
-            eq(5L), any(), any(), eq("RECIENTES"), eq(0), eq(10)))
+            eq(5L), any(), any(), any(), any(),
+            eq("RECIENTES"), eq(0), eq(10)))
             .thenReturn(pagina());
 
         mockMvc.perform(get("/api/perfil/ana/resenias"))

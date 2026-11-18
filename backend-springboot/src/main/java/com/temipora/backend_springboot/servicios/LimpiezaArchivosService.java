@@ -8,6 +8,8 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 
 import com.temipora.backend_springboot.repositorios.ImagenRepository;
+import com.temipora.backend_springboot.repositorios.ProductoImagenRepository;
+import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
 import com.temipora.backend_springboot.repositorios.RespuestaRepository;
 import com.temipora.backend_springboot.repositorios.ServicioImagenRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
@@ -25,19 +27,25 @@ public class LimpiezaArchivosService {
     private final RespuestaRepository respuestaRepository;
     private final ServicioRepository servicioRepository;
     private final ServicioImagenRepository servicioImagenRepository;
+    private final ProductoImagenRepository productoImagenRepository;
+    private final ProductoVarianteRepository productoVarianteRepository;
 
     public LimpiezaArchivosService(StorageService storageService,
             ImagenRepository imagenRepository,
             UsuarioRepository usuarioRepository,
             RespuestaRepository respuestaRepository,
             ServicioRepository servicioRepository,
-            ServicioImagenRepository servicioImagenRepository) {
+            ServicioImagenRepository servicioImagenRepository,
+            ProductoImagenRepository productoImagenRepository,
+            ProductoVarianteRepository productoVarianteRepository) {
         this.storageService = storageService;
         this.imagenRepository = imagenRepository;
         this.usuarioRepository = usuarioRepository;
         this.respuestaRepository = respuestaRepository;
         this.servicioRepository = servicioRepository;
         this.servicioImagenRepository = servicioImagenRepository;
+        this.productoImagenRepository = productoImagenRepository;
+        this.productoVarianteRepository = productoVarianteRepository;
     }
 
     /**
@@ -79,6 +87,8 @@ public class LimpiezaArchivosService {
             .forEach(referenciadas::add);
         servicioRepository.findImagenesPortada().forEach(referenciadas::add);
         servicioImagenRepository.findUrls().forEach(referenciadas::add);
+        productoImagenRepository.findUrls().forEach(referenciadas::add);
+        productoVarianteRepository.findUrlsImagen().forEach(referenciadas::add);
         return storageService.eliminarHuerfanos(referenciadas::contains, ANTIGUEDAD_HUERFANOS);
     }
 
@@ -87,6 +97,8 @@ public class LimpiezaArchivosService {
             || usuarioRepository.existeUrlEnPerfil(url)
             || respuestaRepository.existsByRespuestaAndTipoCampoCodigo(url, TIPO_CAMPO_IMAGEN)
             || servicioRepository.existsByImagenPortada(url)
-            || servicioImagenRepository.existsByUrl(url);
+            || servicioImagenRepository.existsByUrl(url)
+            || productoImagenRepository.existsByUrl(url)
+            || productoVarianteRepository.existsByImagenUrl(url);
     }
 }

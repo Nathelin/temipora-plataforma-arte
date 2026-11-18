@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.temipora.backend_springboot.modelo.CampanaReactivacion;
 import com.temipora.backend_springboot.modelo.ConfiguracionInactividad;
 import com.temipora.backend_springboot.modelo.EPreferenciaContenidoSensible;
+import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EstadoCampanaReactivacion;
 import com.temipora.backend_springboot.modelo.EstadoOfertaReactivacion;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
@@ -57,6 +58,7 @@ public class ReactivacionProcesador {
     private final EmailPlantillaService emailPlantillaService;
     private final MonedaService monedaService;
     private final AccesoEnlaceService accesoEnlaceService;
+    private final SancionService sancionService;
 
     @Value("${temipora.mail.base-url:http://localhost:5173}")
     private String baseUrl;
@@ -71,7 +73,8 @@ public class ReactivacionProcesador {
             EnvioEmailService envioEmailService,
             EmailPlantillaService emailPlantillaService,
             MonedaService monedaService,
-            AccesoEnlaceService accesoEnlaceService) {
+            AccesoEnlaceService accesoEnlaceService,
+            SancionService sancionService) {
         this.usuarioRepository = usuarioRepository;
         this.solicitudRepository = solicitudRepository;
         this.comisionService = comisionService;
@@ -82,6 +85,7 @@ public class ReactivacionProcesador {
         this.emailPlantillaService = emailPlantillaService;
         this.monedaService = monedaService;
         this.accesoEnlaceService = accesoEnlaceService;
+        this.sancionService = sancionService;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -93,6 +97,17 @@ public class ReactivacionProcesador {
         Usuario usuario = usuarioRepository.findByIdUsuario(idUsuario)
             .orElse(null);
         if (usuario == null || !usuario.isEstadoCuenta()) {
+            return 0;
+        }
+
+        // Las promociones son para clientes/artistas, nunca para administradores.
+        if (usuario.getRol() == null
+                || usuario.getRol().getNombre() == ERol.ADMIN) {
+            return 0;
+        }
+
+        // No generar promociones ni correos automáticos para cuentas sancionadas.
+        if (sancionService.obtenerVigente(idUsuario).isPresent()) {
             return 0;
         }
 

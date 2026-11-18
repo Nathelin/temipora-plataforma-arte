@@ -20,7 +20,13 @@ import lombok.Setter;
 public class ReseniaPublicaDTO {
 
     private Long idResenia;
+    private Long idProducto;
     private String nombreServicio;
+    private String nombreProducto;
+    private String nombreVariante;
+    private boolean compraVerificada;
+    private String variantesCompradas;
+    private int cantidadVariantesCompradas;
     private int calificacionGeneral;
     private String descripcion;
     private LocalDateTime fechaVersion;

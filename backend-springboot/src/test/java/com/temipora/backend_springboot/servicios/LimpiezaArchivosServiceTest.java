@@ -19,6 +19,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.repositorios.ImagenRepository;
+import com.temipora.backend_springboot.repositorios.ProductoImagenRepository;
+import com.temipora.backend_springboot.repositorios.ProductoVarianteRepository;
 import com.temipora.backend_springboot.repositorios.RespuestaRepository;
 import com.temipora.backend_springboot.repositorios.ServicioImagenRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
@@ -44,6 +46,12 @@ class LimpiezaArchivosServiceTest {
 
     @Mock
     private ServicioImagenRepository servicioImagenRepository;
+
+    @Mock
+    private ProductoImagenRepository productoImagenRepository;
+
+    @Mock
+    private ProductoVarianteRepository productoVarianteRepository;
 
     @InjectMocks
     private LimpiezaArchivosService limpieza;

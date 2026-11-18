@@ -24,6 +24,7 @@ public interface GaleriaRepository
         join fetch p.artista
         where p.cliente.idUsuario = :idCliente
           and p.estado = :estado
+          and p.artista.estadoCuenta = true
           and p.publicacionAutorizada = true
           and (:esDuenio = true
                or (p.cliente.pedidosPublicos = true
@@ -52,6 +53,7 @@ public interface GaleriaRepository
         join s.pedido p
         where p.cliente.idUsuario = :idCliente
           and p.estado = :estado
+          and p.artista.estadoCuenta = true
           and p.publicacionAutorizada = true
           and (:esDuenio = true
                or (p.cliente.pedidosPublicos = true
@@ -89,6 +91,7 @@ public interface GaleriaRepository
         join s.pedido p
         where p.cliente.idUsuario = :idCliente
           and p.estado = :estado
+          and p.artista.estadoCuenta = true
           and p.publicacionAutorizada = true
           and (:esDuenio = true
                or (p.cliente.pedidosPublicos = true
@@ -121,6 +124,7 @@ public interface GaleriaRepository
         join s.pedido p
         where p.cliente.idUsuario = :idCliente
           and p.estado = :estado
+          and p.artista.estadoCuenta = true
           and p.publicacionAutorizada = true
           and (:esDuenio = true
                or (p.cliente.pedidosPublicos = true

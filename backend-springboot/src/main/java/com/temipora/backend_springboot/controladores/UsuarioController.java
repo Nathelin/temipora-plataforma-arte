@@ -11,6 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,10 +22,14 @@ import com.temipora.backend_springboot.modelo.ActualizarContraseniaDTO;
 import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
 import com.temipora.backend_springboot.modelo.ActualizarTelefonoDTO;
+import com.temipora.backend_springboot.modelo.BajaCuentaRequest;
+import com.temipora.backend_springboot.modelo.BajaCuentaResultadoDTO;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.QuitarTelefonoDTO;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
+import com.temipora.backend_springboot.servicios.BajaCuentaService;
+import com.temipora.backend_springboot.servicios.ServicioNoDisponibleException;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 import com.temipora.backend_springboot.servicios.VisitaService;
 
@@ -36,12 +41,15 @@ public class UsuarioController {
 
 	private final UsuarioService usuarioService;
 	private final VisitaService visitaService;
+	private final BajaCuentaService bajaCuentaService;
 
 	public UsuarioController(
 			UsuarioService usuarioService,
-			VisitaService visitaService) {
+			VisitaService visitaService,
+			BajaCuentaService bajaCuentaService) {
 		this.usuarioService = usuarioService;
 		this.visitaService = visitaService;
+		this.bajaCuentaService = bajaCuentaService;
 	}
 
 	@GetMapping("/usuarios")
@@ -61,6 +69,10 @@ public class UsuarioController {
 			@PathVariable String nombreUsuario,
 			Authentication authentication) {
 		Usuario usuario = usuarioService.getByNombreUsuario(nombreUsuario);
+		if (!usuario.isEstadoCuenta()) {
+			throw new ServicioNoDisponibleException(
+				"Esta cuenta no está disponible.");
+		}
 		Long viewerId = idAutenticado(authentication);
 		if (viewerId != null
 				&& usuario.getRol() != null
@@ -123,6 +135,18 @@ public class UsuarioController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return ResponseEntity.ok(usuarioService.quitarTelefono(idUsuario, dto));
+    }
+
+    @PostMapping("/usuarios/{idUsuario}/baja")
+    public ResponseEntity<BajaCuentaResultadoDTO> darDeBaja(
+            @PathVariable Long idUsuario,
+            @Valid @RequestBody BajaCuentaRequest dto,
+            Authentication authentication) {
+        if (esOtroUsuario(idUsuario, authentication)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(
+            bajaCuentaService.darDeBaja(idUsuario, dto.getContrasenia()));
     }
 
     @PutMapping("/usuarios/{idUsuario}/contrasenia")

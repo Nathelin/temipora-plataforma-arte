@@ -3,30 +3,45 @@
 package com.temipora.backend_springboot.config.filters;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.temipora.backend_springboot.config.AccesoUsuarioService;
+import com.temipora.backend_springboot.config.ContactoPlataforma;
 import com.temipora.backend_springboot.config.JwtUtils;
+import com.temipora.backend_springboot.servicios.CuentaDeBajaException;
+import com.temipora.backend_springboot.servicios.CuentaSancionadaException;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import tools.jackson.databind.ObjectMapper;
 
 
 public class JwtAuthorizationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final UserDetailsService userDetailsService;
+    private final ContactoPlataforma contacto;
 
-    public JwtAuthorizationFilter(JwtUtils jwtUtils, UserDetailsService userDetailsService) {
+    public JwtAuthorizationFilter(
+            JwtUtils jwtUtils,
+            UserDetailsService userDetailsService,
+            ContactoPlataforma contacto) {
         this.jwtUtils = jwtUtils;
         this.userDetailsService = userDetailsService;
+        this.contacto = contacto;
     }
 
     @Override
@@ -42,17 +57,93 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
                 String nombreUsuario = jwtUtils.obtenerNombreUsuarioToken(token);
 
                 if (nombreUsuario != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    UserDetails userDetails = userDetailsService.loadUserByUsername(nombreUsuario);
+                    UserDetails userDetails;
+                    try {
+                        userDetails = userDetailsService instanceof AccesoUsuarioService acceso
+                            ? acceso.loadUserForSession(nombreUsuario)
+                            : userDetailsService.loadUserByUsername(nombreUsuario);
+                    } catch (CuentaSancionadaException sancionada) {
+                        escribir403(response, "CUENTA_SANCIONADA",
+                            sancionada.getMotivo(), sancionada.getContacto(),
+                            sancionada.getFechaFin());
+                        return;
+                    } catch (CuentaDeBajaException deBaja) {
+                        escribirBaja(response, deBaja);
+                        return;
+                    } catch (DisabledException deshabilitada) {
+                        escribir403(response, "CUENTA_INACTIVA", null, contacto.getEmail(), null);
+                        return;
+                    } catch (UsernameNotFoundException inexistente) {
+                        userDetails = null;
+                    }
 
-                    UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
-                    auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    if (userDetails != null) {
+                        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities());
+                        auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                    SecurityContextHolder.getContext().setAuthentication(auth);
+                        SecurityContextHolder.getContext().setAuthentication(auth);
+                    }
                 }
             }
         }
 
         chain.doFilter(request, response);
+    }
+
+    private void escribir403(
+            HttpServletResponse response,
+            String codigo,
+            String motivo,
+            String contactoPlataforma,
+            LocalDateTime fechaFin) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("codigo", codigo);
+        if (motivo != null) {
+            body.put("motivo", motivo);
+        }
+        if (contactoPlataforma != null) {
+            body.put("contacto", contactoPlataforma);
+        }
+        if (fechaFin != null) {
+            body.put("fechaFin", fechaFin.toString());
+        }
+        body.put("message", "CUENTA_SANCIONADA".equals(codigo)
+            ? "Tu cuenta se encuentra inhabilitada."
+            : "Tu cuenta se encuentra desactivada.");
+
+        response.getWriter().write(new ObjectMapper().writeValueAsString(body));
+        response.getWriter().flush();
+    }
+
+    private void escribirBaja(
+            HttpServletResponse response,
+            CuentaDeBajaException deBaja) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("codigo", "CUENTA_DE_BAJA");
+        if (deBaja.getFechaBaja() != null) {
+            body.put("fechaBaja", deBaja.getFechaBaja().toString());
+        }
+        if (deBaja.getReactivarHasta() != null) {
+            body.put("reactivarHasta", deBaja.getReactivarHasta().toString());
+        }
+        body.put("puedeReactivar", deBaja.isPuedeReactivar());
+        if (deBaja.getContacto() != null) {
+            body.put("contacto", deBaja.getContacto());
+        }
+        body.put("message", deBaja.isPuedeReactivar()
+            ? "Tu cuenta está dada de baja."
+            : "El plazo para reactivar tu cuenta venció.");
+
+        response.getWriter().write(new ObjectMapper().writeValueAsString(body));
+        response.getWriter().flush();
     }
 }

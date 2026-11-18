@@ -29,6 +29,7 @@ const disponibilidad = ref(null)
 const terminosValidos = ref(false)
 const cargando = ref(true)
 const error = ref('')
+const noDisponible = ref(false)
 const autenticado = ref(!!localStorage.getItem('token'))
 const rol = ref(localStorage.getItem('rol') || '')
 const esFavorito = ref(false)
@@ -228,7 +229,7 @@ const esSoloEspera = computed(
 )
 
 const etiquetaCola = computed(() =>
-  esSoloEspera.value ? 'Unirme a la lista de espera' : 'Lista de espera',
+  esSoloEspera.value ? 'Lista de espera' : 'Lista de espera',
 )
 
 const tituloCola = computed(() =>
@@ -492,6 +493,7 @@ async function cargarArtista() {
 async function cargar() {
   cargando.value = true
   error.value = ''
+  noDisponible.value = false
   try {
     const res = await api.get(`/servicios/${route.params.id}/solicitud-publica`)
     aplicarSolicitudPublica(res.data)
@@ -509,7 +511,12 @@ async function cargar() {
         !!terminos.value?.idTerminos &&
         Number(terminos.value?.version || 0) > 0
     } catch (e2) {
-      error.value = e2.response?.data?.message || 'No se pudo cargar el servicio.'
+      if (e2.response?.status === 410) {
+        noDisponible.value = true
+        error.value = ''
+      } else {
+        error.value = e2.response?.data?.message || 'No se pudo cargar el servicio.'
+      }
     }
   } finally {
     cargando.value = false
@@ -624,6 +631,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
 <template>
   <div class="mx-auto max-w-screen-2xl px-4 py-8 sm:px-8 sm:py-10">
     <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando servicio...</p>
+    <div
+      v-else-if="noDisponible"
+      class="mx-auto max-w-xl rounded-2xl border border-rosa/60 bg-blanco px-6 py-12 text-center"
+    >
+      <p class="font-display text-lg font-bold text-granate">Este servicio no está disponible.</p>
+      <p class="mt-2 text-sm leading-relaxed text-cafe/70">
+        El artista dio de baja su cuenta o el servicio ya no está publicado.
+      </p>
+      <button
+        type="button"
+        class="mt-4 inline-block text-sm font-medium text-coral transition hover:text-rojizo"
+        @click="irAServicios"
+      >
+        ← Ver otros servicios
+      </button>
+    </div>
     <p v-else-if="error" class="py-16 text-center text-rojizo">{{ error }}</p>
 
     <template v-else-if="servicio">

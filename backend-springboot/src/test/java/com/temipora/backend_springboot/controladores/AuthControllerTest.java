@@ -13,6 +13,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDateTime;
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +34,10 @@ import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.RegistroUsuarioDTO;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.servicios.BajaCuentaService;
+import com.temipora.backend_springboot.servicios.CredencialesInvalidasException;
 import com.temipora.backend_springboot.servicios.FormatoArchivoInvalidoException;
+import com.temipora.backend_springboot.servicios.ReactivacionVencidaException;
 import com.temipora.backend_springboot.servicios.LimpiezaArchivosService;
 import com.temipora.backend_springboot.servicios.StorageService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
@@ -56,6 +62,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private LimpiezaArchivosService limpiezaArchivosService;
+
+    @MockitoBean
+    private BajaCuentaService bajaCuentaService;
 
     @MockitoBean
     private UserDetailsService userDetailsService;
@@ -222,6 +231,65 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/checkNombreUsuario").param("nombreUsuario", "cosmiq"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.disponible").value(false));
+    }
+
+    // ---------------------------------------------------------------
+    // POST /api/auth/reactivar-cuenta
+    // ---------------------------------------------------------------
+
+    @Test
+    void reactivarCuenta_credencialesValidas_devuelve200ConSesion() throws Exception {
+        when(bajaCuentaService.reactivarConCredenciales("cosmiq", "Secreta123"))
+                .thenReturn(Map.of(
+                        "token", "token-123",
+                        "rol", "CLIENTE",
+                        "NombreUsuario", "cosmiq"));
+
+        mockMvc.perform(post("/api/auth/reactivar-cuenta")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nombreUsuario\":\"cosmiq\",\"contrasenia\":\"Secreta123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("token-123"))
+                .andExpect(jsonPath("$.rol").value("CLIENTE"))
+                .andExpect(jsonPath("$.NombreUsuario").value("cosmiq"));
+    }
+
+    @Test
+    void reactivarCuenta_sinContrasenia_devuelve400SinLlamarAlServicio() throws Exception {
+        mockMvc.perform(post("/api/auth/reactivar-cuenta")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nombreUsuario\":\"cosmiq\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").exists());
+
+        verify(bajaCuentaService, never()).reactivarConCredenciales(any(), any());
+    }
+
+    @Test
+    void reactivarCuenta_plazoVencido_devuelve403ConCodigo() throws Exception {
+        when(bajaCuentaService.reactivarConCredenciales("cosmiq", "Secreta123"))
+                .thenThrow(new ReactivacionVencidaException(
+                        "soporte@temipora.com", LocalDateTime.now().minusDays(1)));
+
+        mockMvc.perform(post("/api/auth/reactivar-cuenta")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nombreUsuario\":\"cosmiq\",\"contrasenia\":\"Secreta123\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.codigo").value("REACTIVACION_VENCIDA"))
+                .andExpect(jsonPath("$.contacto").value("soporte@temipora.com"));
+    }
+
+    @Test
+    void reactivarCuenta_credencialesInvalidas_devuelve401() throws Exception {
+        when(bajaCuentaService.reactivarConCredenciales("cosmiq", "mala"))
+                .thenThrow(new CredencialesInvalidasException());
+
+        mockMvc.perform(post("/api/auth/reactivar-cuenta")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nombreUsuario\":\"cosmiq\",\"contrasenia\":\"mala\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message")
+                        .value("Nombre de usuario o contraseña incorrecta."));
     }
 
     // ---------------------------------------------------------------

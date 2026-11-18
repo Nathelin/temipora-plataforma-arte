@@ -84,17 +84,18 @@ public class HitoPedidoDTO {
             boolean muestraCobro,
             BigDecimal factorCobroDestino,
             BigDecimal factorOrigenDestino) {
+        HitoPresupuesto origen = hito.getHitoPresupuesto();
         BigDecimal montoMostrado = PresupuestoDTO.totalMostrado(
-            hito.getMonto(),
-            hito.getMontoCobro(),
+            origen.getMonto(),
+            origen.getMontoCobro(),
             muestraOrigen,
             muestraCobro,
             factorCobroDestino,
             factorOrigenDestino);
         BigDecimal comisionMostrada = incluirComision
             ? PresupuestoDTO.totalMostrado(
-                hito.getComisionMonto(),
-                hito.getComisionMontoCobro(),
+                origen.getComisionMonto(),
+                origen.getComisionMontoCobro(),
                 muestraOrigen,
                 muestraCobro,
                 factorCobroDestino,
@@ -102,8 +103,8 @@ public class HitoPedidoDTO {
             : null;
         BigDecimal netoMostrado = incluirComision
             ? PresupuestoDTO.totalMostrado(
-                hito.getMontoNeto(),
-                hito.getMontoNetoCobro(),
+                origen.getMontoNeto(),
+                origen.getMontoNetoCobro(),
                 muestraOrigen,
                 muestraCobro,
                 factorCobroDestino,
@@ -116,20 +117,20 @@ public class HitoPedidoDTO {
                 ? hito.getPedido().getIdPedido()
                 : null)
             .orden(hito.getOrden())
-            .nombre(hito.getNombre())
-            .descripcion(hito.getDescripcion())
-            .porcentaje(hito.getPorcentaje())
-            .tipo(hito.getTipo() != null ? hito.getTipo().name() : null)
-            .requiereEntrega(hito.isRequiereEntrega())
-            .monto(hito.getMonto())
-            .montoCobro(hito.getMontoCobro())
+            .nombre(origen.getNombre())
+            .descripcion(origen.getDescripcion())
+            .porcentaje(origen.getPorcentaje())
+            .tipo(origen.getTipo() != null ? origen.getTipo().name() : null)
+            .requiereEntrega(origen.isRequiereEntrega())
+            .monto(origen.getMonto())
+            .montoCobro(origen.getMontoCobro())
             .montoMostrado(montoMostrado)
-            .comisionMonto(incluirComision ? hito.getComisionMonto() : null)
+            .comisionMonto(incluirComision ? origen.getComisionMonto() : null)
             .comisionMontoCobro(incluirComision
-                ? hito.getComisionMontoCobro() : null)
+                ? origen.getComisionMontoCobro() : null)
             .comisionMontoMostrado(comisionMostrada)
-            .montoNeto(incluirComision ? hito.getMontoNeto() : null)
-            .montoNetoCobro(incluirComision ? hito.getMontoNetoCobro() : null)
+            .montoNeto(incluirComision ? origen.getMontoNeto() : null)
+            .montoNetoCobro(incluirComision ? origen.getMontoNetoCobro() : null)
             .montoNetoMostrado(netoMostrado)
             .estadoPago(hito.getEstadoPago() != null
                 ? hito.getEstadoPago().name()

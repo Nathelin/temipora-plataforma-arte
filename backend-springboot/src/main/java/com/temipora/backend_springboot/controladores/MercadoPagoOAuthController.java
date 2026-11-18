@@ -41,7 +41,7 @@ public class MercadoPagoOAuthController {
     }
 
     @GetMapping("/inicio")
-    @PreAuthorize("hasRole('ARTISTA')")
+    @PreAuthorize("hasAnyRole('CLIENTE','ARTISTA')")
     public Map<String, String> inicio(Authentication authentication) {
         return Map.of("url", oauthService.urlAutorizacion(
             idAutenticado(authentication)));
@@ -58,27 +58,36 @@ public class MercadoPagoOAuthController {
                     "Falta el código de autorización.");
             }
             oauthService.procesarCallback(code, state);
-            destino = frontendUrl
-                + "/configuracion/cobros?mp=ok";
+            destino = urlPagosYCobros("ok");
         } catch (RuntimeException e) {
             log.warn("No se pudo conectar la cuenta de MercadoPago: {}",
                 e.getMessage());
-            destino = frontendUrl
-                + "/configuracion/cobros?mp=error";
+            destino = urlPagosYCobros("error");
         }
         return ResponseEntity.status(HttpStatus.FOUND)
             .location(URI.create(destino))
             .build();
     }
 
+    /**
+     * El frontendUrl puede venir con barra final; si no se normaliza, el
+     * navegador recibe "//configuracion/..." y vue-router lo rechaza.
+     */
+    private String urlPagosYCobros(String resultado) {
+        String base = frontendUrl != null && !frontendUrl.isBlank()
+            ? frontendUrl.replaceAll("/+$", "")
+            : "http://localhost:5173";
+        return base + "/configuracion/pagos-y-cobros?mp=" + resultado;
+    }
+
     @GetMapping("/estado")
-    @PreAuthorize("hasRole('ARTISTA')")
+    @PreAuthorize("hasAnyRole('CLIENTE','ARTISTA')")
     public CuentaCobroDTO estado(Authentication authentication) {
         return oauthService.estado(idAutenticado(authentication));
     }
 
     @DeleteMapping
-    @PreAuthorize("hasRole('ARTISTA')")
+    @PreAuthorize("hasAnyRole('CLIENTE','ARTISTA')")
     public ResponseEntity<Void> desconectar(Authentication authentication) {
         oauthService.desconectar(idAutenticado(authentication));
         return ResponseEntity.noContent().build();

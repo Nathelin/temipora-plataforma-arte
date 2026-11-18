@@ -18,13 +18,24 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.Usuario;
+import com.temipora.backend_springboot.repositorios.SancionCuentaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
+import com.temipora.backend_springboot.servicios.ConfiguracionBajaCuentaService;
 
 @ExtendWith(MockitoExtension.class)
 class DetallesUsuarioServiceTest {
 
     @Mock
     private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private SancionCuentaRepository sancionCuentaRepository;
+
+    @Mock
+    private ConfiguracionBajaCuentaService configuracionBajaCuentaService;
+
+    @Mock
+    private ContactoPlataforma contacto;
 
     @InjectMocks
     private DetallesUsuarioService detallesUsuarioService;
@@ -45,7 +56,7 @@ class DetallesUsuarioServiceTest {
     }
 
     @Test
-    void loadUserByUsername_rolAdmin_authorityRoleAdmin() {
+    void loadUserByUsername_rolAdmin_expandeJerarquia() {
         when(usuarioRepository.findByNombreUsuarioIgnoreCase("Cosmiq"))
                 .thenReturn(Optional.of(usuarioConRol("Cosmiq", ERol.ADMIN)));
 
@@ -53,11 +64,11 @@ class DetallesUsuarioServiceTest {
 
         assertThat(detalles.getAuthorities())
                 .extracting(GrantedAuthority::getAuthority)
-                .containsExactly("ROLE_ADMIN");
+                .containsExactly("ROLE_ADMIN", "ROLE_ARTISTA", "ROLE_CLIENTE");
     }
 
     @Test
-    void loadUserByUsername_rolArtista_authorityRoleArtista() {
+    void loadUserByUsername_rolArtista_expandeJerarquia() {
         when(usuarioRepository.findByNombreUsuarioIgnoreCase("Artista777"))
                 .thenReturn(Optional.of(usuarioConRol("Artista777", ERol.ARTISTA)));
 
@@ -65,7 +76,7 @@ class DetallesUsuarioServiceTest {
 
         assertThat(detalles.getAuthorities())
                 .extracting(GrantedAuthority::getAuthority)
-                .containsExactly("ROLE_ARTISTA");
+                .containsExactly("ROLE_ARTISTA", "ROLE_CLIENTE");
     }
 
     @Test
@@ -78,13 +89,22 @@ class DetallesUsuarioServiceTest {
     }
 
     private Usuario usuarioConRol(String nombreUsuario, ERol rol) {
+        Rol cliente = Rol.builder().idRol(3L).nombre(ERol.CLIENTE).build();
+        Rol artista = Rol.builder().idRol(2L).nombre(ERol.ARTISTA).rolPadre(cliente).build();
+        Rol admin = Rol.builder().idRol(1L).nombre(ERol.ADMIN).rolPadre(artista).build();
+        Rol asignado = switch (rol) {
+            case ADMIN -> admin;
+            case ARTISTA -> artista;
+            case CLIENTE -> cliente;
+        };
+
         return Usuario.builder()
                 .idUsuario(1L)
                 .nombreUsuario(nombreUsuario)
                 .correo(nombreUsuario + "@mail.com")
                 .contrasenia("$2a$10$hasheado")
                 .estadoCuenta(true)
-                .rol(Rol.builder().idRol(1L).nombre(rol).build())
+                .rol(asignado)
                 .build();
     }
 }

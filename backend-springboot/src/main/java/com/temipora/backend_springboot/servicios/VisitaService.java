@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.repositorios.VisitaArtistaRepository;
+import com.temipora.backend_springboot.repositorios.VisitaProductoRepository;
 import com.temipora.backend_springboot.repositorios.VisitaServicioRepository;
 
 /**
@@ -23,12 +24,15 @@ public class VisitaService {
 
     private final VisitaArtistaRepository visitaArtistaRepository;
     private final VisitaServicioRepository visitaServicioRepository;
+    private final VisitaProductoRepository visitaProductoRepository;
 
     public VisitaService(
             VisitaArtistaRepository visitaArtistaRepository,
-            VisitaServicioRepository visitaServicioRepository) {
+            VisitaServicioRepository visitaServicioRepository,
+            VisitaProductoRepository visitaProductoRepository) {
         this.visitaArtistaRepository = visitaArtistaRepository;
         this.visitaServicioRepository = visitaServicioRepository;
+        this.visitaProductoRepository = visitaProductoRepository;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -54,6 +58,19 @@ public class VisitaService {
         } catch (RuntimeException e) {
             log.warn("No se pudo registrar la visita del usuario {} al servicio {}",
                 idUsuario, idServicio, e);
+        }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void registrarProducto(Long idUsuario, Long idProducto) {
+        if (idUsuario == null || idProducto == null) {
+            return;
+        }
+        try {
+            visitaProductoRepository.registrar(idUsuario, idProducto);
+        } catch (RuntimeException e) {
+            log.warn("No se pudo registrar la visita del usuario {} al producto {}",
+                idUsuario, idProducto, e);
         }
     }
 }

@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -41,6 +43,11 @@ public class Medio {
     @Size(max = 500, message = "Las observaciones no pueden superar los 500 caracteres")
     @Column(length = 500)
     private String observaciones;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_entrega", nullable = false, length = 20)
+    private TipoEntrega tipoEntrega = TipoEntrega.DIGITAL;
 
     @Builder.Default
     @Column(nullable = false)

@@ -10,10 +10,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.EstadoSancion;
+import com.temipora.backend_springboot.modelo.SancionCuenta;
 import com.temipora.backend_springboot.modelo.ActualizarContraseniaDTO;
 import com.temipora.backend_springboot.modelo.ActualizarCorreoDTO;
 import com.temipora.backend_springboot.modelo.ActualizarPerfilDTO;
@@ -26,6 +29,7 @@ import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.modelo.UsuarioDTO;
 import com.temipora.backend_springboot.repositorios.PaisRepository;
 import com.temipora.backend_springboot.repositorios.RolRepository;
+import com.temipora.backend_springboot.repositorios.SancionCuentaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 @Service
@@ -38,31 +42,41 @@ public class UsuarioService {
         CampoAuditado.de("telefono", "Teléfono"));
 
     private final UsuarioRepository usuarioRepository;
+    private final SancionCuentaRepository sancionCuentaRepository;
     private final PasswordEncoder passwordEncoder;
     private final RolRepository rolRepository;
     private final PaisRepository paisRepository;
     private final TelefonoService telefonoService;
     private final MonedaService monedaService;
     private final AuditoriaService auditoria;
+    private final TerminosPlataformaService terminosPlataformaService;
+    private final ConfiguracionBajaCuentaService configuracionBajaCuentaService;
 
     public UsuarioService(
             UsuarioRepository usuarioRepository,
+            SancionCuentaRepository sancionCuentaRepository,
             PasswordEncoder passwordEncoder,
             RolRepository rolRepository,
             PaisRepository paisRepository,
             TelefonoService telefonoService,
             MonedaService monedaService,
-            AuditoriaService auditoria) {
+            AuditoriaService auditoria,
+            TerminosPlataformaService terminosPlataformaService,
+            ConfiguracionBajaCuentaService configuracionBajaCuentaService) {
 
         this.usuarioRepository = usuarioRepository;
+        this.sancionCuentaRepository = sancionCuentaRepository;
         this.passwordEncoder = passwordEncoder;
         this.rolRepository = rolRepository;
         this.paisRepository = paisRepository;
         this.telefonoService = telefonoService;
         this.monedaService = monedaService;
         this.auditoria = auditoria;
+        this.terminosPlataformaService = terminosPlataformaService;
+        this.configuracionBajaCuentaService = configuracionBajaCuentaService;
     }
 
+    @Transactional
     public Usuario registrarUsuario(RegistroUsuarioDTO dto) {
 
         if (dto.getRol() == ERol.ADMIN) {
@@ -75,6 +89,11 @@ public class UsuarioService {
                     + " años para crear una cuenta en Temipora.");
         }
 
+        String correo = dto.getCorreo().trim();
+        if (usuarioRepository.existsByCorreoIgnoreCase(correo)) {
+            throw new IllegalArgumentException("Ya existe una cuenta con ese correo.");
+        }
+
         Rol rol = rolRepository
                 .findByNombre(dto.getRol())
                 .orElseThrow(() -> new IllegalStateException("El rol " + dto.getRol() + " no existe"));
@@ -83,7 +102,7 @@ public class UsuarioService {
                 .nombreUsuario(dto.getNombreUsuario())
                 .nombre(dto.getNombre())
                 .apellido(dto.getApellido())
-                .correo(dto.getCorreo())
+                .correo(correo)
                 .contrasenia(passwordEncoder.encode(dto.getContrasenia()))
                 .fechaNacimiento(dto.getFechaNacimiento())
                 .biografia(dto.getBiografia())
@@ -94,7 +113,15 @@ public class UsuarioService {
                 .rol(rol)
                 .build();
 
-        return usuarioRepository.save(usuario);
+        Usuario guardado = usuarioRepository.save(usuario);
+
+        Integer versionTerminos = dto.getVersionTerminos();
+        if (versionTerminos == null) {
+            versionTerminos = terminosPlataformaService.obtenerEntidadVigente().getVersion();
+        }
+        terminosPlataformaService.aceptar(guardado.getIdUsuario(), versionTerminos);
+
+        return guardado;
     }
 
     public boolean existeNombreUsuario(String nombreUsuario) {
@@ -152,6 +179,12 @@ public class UsuarioService {
         if (dto.getPedidosPublicos() != null) {
             usuario.setPedidosPublicos(dto.getPedidosPublicos());
         }
+        if (dto.getColeccionPublica() != null) {
+            usuario.setColeccionPublica(dto.getColeccionPublica());
+        }
+        if (dto.getMostrarPropietario() != null) {
+            usuario.setMostrarPropietario(dto.getMostrarPropietario());
+        }
         if (dto.getRecibirEmailsPromocionales() != null) {
             usuario.setRecibirEmailsPromocionales(
                 dto.getRecibirEmailsPromocionales());
@@ -169,14 +202,44 @@ public class UsuarioService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public Page<UsuarioDTO> obtenerUsuariosPaginados(String nombreUsuario, String correo, Boolean estadoCuenta, ERol rol, Pageable pageable) {
-        return usuarioRepository.findByFilters(
+        Page<Usuario> page = usuarioRepository.findByFilters(
                 aPatronBusqueda(nombreUsuario),
                 aPatronBusqueda(correo),
                 estadoCuenta,
                 rol,
-                pageable)
-                .map(UsuarioDTO::desdeUsuario);
+                pageable);
+
+        List<Long> ids = page.getContent().stream()
+                .map(Usuario::getIdUsuario)
+                .toList();
+        java.util.Map<Long, SancionCuenta> vigentes = new java.util.HashMap<>();
+        if (!ids.isEmpty()) {
+            for (SancionCuenta sancion : sancionCuentaRepository.findVigentesByUsuarioIds(
+                    ids, EstadoSancion.ACTIVA, LocalDateTime.now())) {
+                vigentes.put(sancion.getUsuario().getIdUsuario(), sancion);
+            }
+        }
+
+        int diasParaReactivar = configuracionBajaCuentaService.diasParaReactivar();
+        return page.map(usuario -> {
+            UsuarioDTO dto = UsuarioDTO.desdeUsuario(usuario, diasParaReactivar);
+            SancionCuenta sancion = vigentes.get(usuario.getIdUsuario());
+            if (sancion != null) {
+                dto.setSancionado(true);
+                dto.setSancionTipo(sancion.getTipo().name());
+            }
+            return dto;
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<SancionCuenta> sancionVigente(Long idUsuario) {
+        return sancionCuentaRepository.findVigentesByUsuarioId(
+                idUsuario, EstadoSancion.ACTIVA, LocalDateTime.now())
+                .stream()
+                .findFirst();
     }
 
     public String nombreUsuario(Long idUsuario) {
@@ -196,7 +259,7 @@ public class UsuarioService {
 
         String nuevoCorreo = dto.getCorreo().trim();
 
-        usuarioRepository.findByCorreo(nuevoCorreo)
+        usuarioRepository.findByCorreoIgnoreCase(nuevoCorreo)
                 .filter(otro -> !otro.getIdUsuario().equals(idUsuario))
                 .ifPresent(otro -> {
                     throw new IllegalArgumentException("Ya existe una cuenta con ese correo.");

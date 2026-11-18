@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { acceptImagenes, validarImagen, procesarImagen, LIMITES_IMAGEN } from '../servicios/archivos'
@@ -24,6 +24,7 @@ const correo = ref('')
 const contrasenia = ref('')
 const confirmarContrasenia = ref('')
 const acceptaTOS = ref(false)
+const versionTerminos = ref(null)
 const verContrasenia = ref(false)
 const verConfirmar = ref(false)
 const nombreUsuarioEnUso = ref(false)
@@ -47,6 +48,15 @@ const error = ref('')
 const errores = ref([])
 const fase = ref('')
 const progreso = ref(0)
+
+onMounted(async () => {
+  try {
+    const res = await api.get('/terminos-plataforma')
+    versionTerminos.value = res.data?.version ?? null
+  } catch {
+    versionTerminos.value = null
+  }
+})
 
 function actualizarFechaNacimiento(event) {
   const digitos = event.target.value.replace(/\D/g, '').slice(0, 8)
@@ -225,6 +235,7 @@ async function registrarse() {
       contrasenia: contrasenia.value,
       confirmarContrasenia: confirmarContrasenia.value,
       acceptaTOS: acceptaTOS.value,
+      versionTerminos: versionTerminos.value,
       nombre: nombre.value,
       apellido: apellido.value,
       fechaNacimiento: obtenerFechaNacimientoIso(),

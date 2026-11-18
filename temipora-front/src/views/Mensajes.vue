@@ -9,6 +9,7 @@ import {
   previewMensaje,
 } from '../servicios/mensajes'
 import { useMensajes } from '../composables/useMensajes'
+import PageHeader from '../components/PageHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -200,26 +201,27 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
-    <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-coral">Tu actividad</p>
-        <h1 class="mt-1 font-display text-3xl font-extrabold tracking-[-0.02em] text-granate sm:text-4xl">
-          Mensajes
-        </h1>
-        <p class="mt-2 text-sm text-cafe/65">
-          Solicitudes para contactar y conversaciones privadas entre artistas y clientes.
-        </p>
-      </div>
-      <span
-        v-if="!cargando && !error"
-        class="inline-flex self-start rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral sm:self-auto"
-      >
-        {{ total }} {{ total === 1 ? 'conversación' : 'conversaciones' }}
-      </span>
-    </header>
+  <div :class="enPanel ? '' : 'mx-auto max-w-5xl px-4 py-8 sm:px-8 sm:py-10'">
+    <PageHeader
+      :eyebrow="enPanel ? 'Tu espacio de trabajo' : 'Tu actividad'"
+      titulo="Mensajes"
+      descripcion="Solicitudes para contactar y conversaciones privadas entre artistas y clientes."
+      :nivel="enPanel ? 2 : 1"
+    >
+      <template #acciones>
+        <span
+          v-if="!cargando && !error"
+          class="inline-flex self-start rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-xs font-semibold text-coral sm:self-auto"
+        >
+          {{ total }} {{ total === 1 ? 'conversación' : 'conversaciones' }}
+        </span>
+      </template>
+    </PageHeader>
 
-    <div class="-mx-4 mt-5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+    <div
+      class="mt-5 overflow-x-auto pb-1"
+      :class="enPanel ? '' : '-mx-4 px-4 sm:mx-0 sm:px-0'"
+    >
       <div class="inline-flex min-w-full rounded-full border border-rosa bg-blanco p-1" role="tablist" aria-label="Bandejas de mensajes">
         <button
           v-for="vista in VISTAS"

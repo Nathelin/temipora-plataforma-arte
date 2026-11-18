@@ -15,6 +15,7 @@ import com.temipora.backend_springboot.modelo.ConfiguracionResenia;
 import com.temipora.backend_springboot.modelo.CriterioResenia;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EscalaCriterio;
+import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.EstadoReporteResenia;
 import com.temipora.backend_springboot.modelo.EstadoResenia;
 import com.temipora.backend_springboot.modelo.OpcionCriterio;
@@ -46,6 +47,23 @@ class ReseniaQueriesTest {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Test
+    void consultasDeArtistaConProductos_ejecutanSinError() {
+        Page<com.temipora.backend_springboot.modelo.Resenia> pagina =
+            reseniaRepository.findPublicasPorArtista(
+                999999L, null, null, true, true, null, "RECIENTES",
+                EstadoResenia.PUBLICADA, EstadoPedido.FINALIZADO,
+                PageRequest.of(0, 5));
+        assertThat(pagina).isNotNull();
+
+        assertThat(reseniaRepository.resumenConteoPromedio(
+            null, 999999L, EstadoResenia.PUBLICADA, EstadoPedido.FINALIZADO))
+            .isNotNull();
+        assertThat(reseniaRepository.distribucionPublica(
+            null, 999999L, EstadoResenia.PUBLICADA, EstadoPedido.FINALIZADO))
+            .isNotNull();
+    }
 
     @Test
     void seeds_hayCriteriosActivosParaServicioYCliente() {

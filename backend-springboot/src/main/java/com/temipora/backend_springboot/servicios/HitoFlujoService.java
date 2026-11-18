@@ -48,14 +48,15 @@ public class HitoFlujoService {
         if (siguiente == null) {
             return null;
         }
-        if (siguiente.getTipo() != TipoHito.ENTREGA) {
+        if (siguiente.getHitoPresupuesto().getTipo() != TipoHito.ENTREGA) {
             siguiente.setFechaLimitePago(ahora.plusDays(diasPagoCuota()));
             hitoPedidoRepository.save(siguiente);
             notificacionService.crearParaUsuario(
                 pedido.getCliente().getIdUsuario(),
                 NOTIFICACION_CUOTA_PENDIENTE,
                 "Cuota habilitada",
-                "Se habilitó el pago de '" + siguiente.getNombre()
+                "Se habilitó el pago de '"
+                    + siguiente.getHitoPresupuesto().getNombre()
                     + "' del pedido de '" + nombreServicio(pedido) + "'.",
                 pedido.getIdPedido(),
                 TIPO_REFERENCIA_PEDIDO);
