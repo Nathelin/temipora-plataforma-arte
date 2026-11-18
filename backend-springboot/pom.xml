@@ -176,6 +176,17 @@
 							<goal>check</goal>
 						</goals>
 						<configuration>
+							<!-- La cobertura se mide sobre la lógica de negocio.
+							     Quedan fuera los adaptadores HTTP, las tareas
+							     programadas, la integración con OpenTimestamps y
+							     los filtros de seguridad, que se validan por
+							     integración y no con tests unitarios. -->
+							<excludes>
+								<exclude>com/temipora/backend_springboot/controladores/**</exclude>
+								<exclude>com/temipora/backend_springboot/tareas/**</exclude>
+								<exclude>com/temipora/backend_springboot/servicios/opentimestamps/**</exclude>
+								<exclude>com/temipora/backend_springboot/config/filters/**</exclude>
+							</excludes>
 							<rules>
 								<rule>
 									<element>BUNDLE</element>
