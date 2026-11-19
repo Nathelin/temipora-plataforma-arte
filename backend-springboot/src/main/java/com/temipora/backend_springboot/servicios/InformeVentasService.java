@@ -94,6 +94,7 @@ public class InformeVentasService {
         return new InformeVentasDTO(
             new InformePeriodoDTO(desde, hasta, dias, agrupacion.name()),
             MONEDA_COBRO,
+            tipo.name(),
             LocalDateTime.now(),
             actual.totalesDto(),
             new InformeComparacionDTO(

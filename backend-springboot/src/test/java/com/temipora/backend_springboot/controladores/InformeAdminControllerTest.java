@@ -122,6 +122,7 @@ class InformeAdminControllerTest {
             new InformePeriodoDTO(LocalDate.of(2026, 11, 1),
                 LocalDate.of(2026, 11, 30), 30, "DIA"),
             "ARS",
+            "TODOS",
             LocalDateTime.now(),
             new InformeAdminTotalesDTO(
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,

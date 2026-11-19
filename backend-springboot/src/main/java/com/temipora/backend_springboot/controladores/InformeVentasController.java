@@ -18,6 +18,7 @@ import com.temipora.backend_springboot.modelo.InformeVentasDTO;
 import com.temipora.backend_springboot.servicios.InformePdfService;
 import com.temipora.backend_springboot.servicios.InformeVentasService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
+import com.temipora.backend_springboot.servicios.informes.FormatoPdf;
 
 @RestController
 @RequestMapping("/api/panel-artista/informes")
@@ -62,8 +63,9 @@ public class InformeVentasController {
             informe, authentication.getName());
 
         ContentDisposition disposition = ContentDisposition.attachment()
-            .filename("informe-ventas-" + informe.periodo().desde()
-                + "_" + informe.periodo().hasta() + ".pdf",
+            .filename("informe-ventas-"
+                + FormatoPdf.fechaArchivo(informe.periodo().desde()) + "_al_"
+                + FormatoPdf.fechaArchivo(informe.periodo().hasta()) + ".pdf",
                 StandardCharsets.UTF_8)
             .build();
 

@@ -99,6 +99,7 @@ public class InformeAdminService {
         return new InformeAdminDTO(
             new InformePeriodoDTO(desde, hasta, dias, agrupacion.name()),
             MONEDA_COBRO,
+            tipo.name(),
             LocalDateTime.now(),
             actual.totales.dto(),
             new InformeAdminComparacionDTO(

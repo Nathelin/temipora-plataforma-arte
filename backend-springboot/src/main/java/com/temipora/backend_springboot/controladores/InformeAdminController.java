@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.temipora.backend_springboot.modelo.InformeAdminDTO;
 import com.temipora.backend_springboot.servicios.InformeAdminPdfService;
 import com.temipora.backend_springboot.servicios.InformeAdminService;
+import com.temipora.backend_springboot.servicios.informes.FormatoPdf;
 
 @RestController
 @RequestMapping("/api/admin/informes")
@@ -54,8 +55,8 @@ public class InformeAdminController {
 
         ContentDisposition disposition = ContentDisposition.attachment()
             .filename("informe-ventas-comisiones-"
-                + informe.periodo().desde() + "_"
-                + informe.periodo().hasta() + ".pdf",
+                + FormatoPdf.fechaArchivo(informe.periodo().desde()) + "_al_"
+                + FormatoPdf.fechaArchivo(informe.periodo().hasta()) + ".pdf",
                 StandardCharsets.UTF_8)
             .build();
 
