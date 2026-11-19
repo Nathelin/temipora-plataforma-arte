@@ -80,7 +80,7 @@ final class EncabezadoPiePdf extends PdfPageEventHelper {
         ColumnText.showTextAligned(lienzo, Element.ALIGN_LEFT,
             new Phrase(etiqueta, EstiloPdf.CHICO),
             derecha - RESERVA_TOTAL - anchoEtiqueta, abajo, 0);
-        lienzo.addTemplate(totalPaginas, derecha - RESERVA_TOTAL, abajo - 1);
+        lienzo.addTemplate(totalPaginas, derecha - RESERVA_TOTAL, abajo);
     }
 
     @Override

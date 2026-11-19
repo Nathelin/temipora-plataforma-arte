@@ -47,10 +47,9 @@ public class ConstanciaService {
             "Generado", FormatoPdf.fechaHora(LocalDateTime.now()));
 
         importes(documento, pedido, moneda);
-        planDePagos(documento, pedido);
+        planDePagos(documento, pedido, moneda);
         entregas(documento, pedido);
         pagos(documento, pedido);
-        notas(documento);
 
         return documento.cerrar();
     }
@@ -108,8 +107,9 @@ public class ConstanciaService {
             destacada, "Concepto", "Importe (" + moneda + ")");
     }
 
-    private void planDePagos(DocumentoPdf documento, PedidoDTO pedido) {
-        documento.seccion("2", "Plan de pagos");
+    private void planDePagos(
+            DocumentoPdf documento, PedidoDTO pedido, String moneda) {
+        documento.seccion("2", "Plan de pagos", "importes en " + moneda);
 
         List<HitoPedidoDTO> hitos = pedido.getHitos() != null
             ? pedido.getHitos() : List.of();
@@ -181,7 +181,7 @@ public class ConstanciaService {
                         : "";
                     documento.parrafoChico("   · " + dibujo
                         + FormatoPdf.texto(archivo.getNombre())
-                        + " | sha256=" + FormatoPdf.texto(
+                        + " · huella SHA-256: " + FormatoPdf.texto(
                             archivo.getSha256()));
                 }
             }
@@ -229,14 +229,6 @@ public class ConstanciaService {
             tabla.fila(fila);
         }
         documento.tabla(tabla);
-    }
-
-    private void notas(DocumentoPdf documento) {
-        documento.seccion("5", "Notas");
-        documento.nota("1", "Los hashes SHA-256 permiten verificar la "
-            + "integridad de los archivos entregados.");
-        documento.nota("2", "La comisión, el arancel y el neto del artista "
-            + "solo se incluyen en la copia del artista y del administrador.");
     }
 
     private String usuario(UsuarioResumenDTO usuario) {

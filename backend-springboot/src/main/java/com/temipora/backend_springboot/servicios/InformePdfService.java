@@ -7,7 +7,6 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.temipora.backend_springboot.modelo.InformeItemDTO;
-import com.temipora.backend_springboot.modelo.InformeSerieDTO;
 import com.temipora.backend_springboot.modelo.InformeTotalesDTO;
 import com.temipora.backend_springboot.modelo.InformeVentasDTO;
 import com.temipora.backend_springboot.servicios.informes.DocumentoPdf;
@@ -43,8 +42,7 @@ public class InformePdfService {
 
         resumen(documento, informe, moneda);
         comparacion(documento, informe, moneda);
-        detalle(documento, informe);
-        notas(documento);
+        detalle(documento, informe, moneda);
 
         return documento.cerrar();
     }
@@ -52,7 +50,9 @@ public class InformePdfService {
     private void resumen(
             DocumentoPdf documento, InformeVentasDTO informe, String moneda) {
         InformeTotalesDTO totales = informe.totales();
-        documento.seccion("1", "Resumen");
+        documento.seccion("1", "Resumen del período");
+        documento.parrafo("Este informe resume tus ventas cobradas en el "
+            + "período y cómo se compone el importe que recibís.");
         documento.indicadores(
             new String[] { "Operaciones", "Unidades", "Ticket promedio" },
             new String[] { String.valueOf(totales.operaciones()),
@@ -71,7 +71,7 @@ public class InformePdfService {
 
     private void comparacion(
             DocumentoPdf documento, InformeVentasDTO informe, String moneda) {
-        documento.seccion("2", "Comparación");
+        documento.seccion("2", "Comparación con el período anterior");
         var anterior = informe.comparacion();
         if (anterior == null) {
             documento.parrafo(
@@ -93,8 +93,8 @@ public class InformePdfService {
     }
 
     private void detalle(
-            DocumentoPdf documento, InformeVentasDTO informe) {
-        documento.seccion("3", "Detalle por ítem");
+            DocumentoPdf documento, InformeVentasDTO informe, String moneda) {
+        documento.seccion("3", "Ventas por ítem", "importes en " + moneda);
 
         List<InformeItemDTO> items = informe.items() != null
             ? informe.items() : List.of();
@@ -105,9 +105,10 @@ public class InformePdfService {
 
         TablaPdf tabla = new TablaPdf(
             new String[] { "Tipo", "Ítem", "Unid.", "Oper.", "Bruto",
-                "Comisión", "Arancel", "Neto", "Part." },
-            new float[] { 0.95f, 2.5f, 0.7f, 0.7f, 1.2f, 1.2f, 1.1f, 1.2f,
-                0.75f },
+                "Comisión", "Arancel MercadoPago", "Neto percibido",
+                "Part. del neto" },
+            new float[] { 0.95f, 2.2f, 0.7f, 0.7f, 1.2f, 1.2f, 1.25f, 1.2f,
+                0.9f },
             new boolean[] { false, false, true, true, true, true, true, true,
                 true });
 
@@ -124,17 +125,6 @@ public class InformePdfService {
                 FormatoPdf.numero(item.participacion()) + "%");
         }
         documento.tabla(tabla);
-
-        List<InformeSerieDTO> serie = informe.serie() != null
-            ? informe.serie() : List.of();
-        long cobros = serie.stream().mapToLong(InformeSerieDTO::cobros).sum();
-        documento.caption("Cobros registrados en el período: " + cobros + ".");
-    }
-
-    private void notas(DocumentoPdf documento) {
-        documento.seccion("4", "Notas");
-        documento.nota("1", "El neto percibido es el importe que el medio de "
-            + "pago liquidó realmente para cada operación.");
     }
 
     private String referencia(InformeVentasDTO informe) {

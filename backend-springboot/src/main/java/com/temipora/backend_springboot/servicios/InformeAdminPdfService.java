@@ -44,10 +44,9 @@ public class InformeAdminPdfService {
 
         resumen(documento, informe, moneda);
         comparacion(documento, informe, moneda);
-        porTipo(documento, informe);
-        porVendedor(documento, informe);
-        porItem(documento, informe);
-        notas(documento);
+        porTipo(documento, informe, moneda);
+        porVendedor(documento, informe, moneda);
+        porItem(documento, informe, moneda);
 
         return documento.cerrar();
     }
@@ -55,7 +54,10 @@ public class InformeAdminPdfService {
     private void resumen(
             DocumentoPdf documento, InformeAdminDTO informe, String moneda) {
         InformeAdminTotalesDTO totales = informe.totales();
-        documento.seccion("1", "Resumen");
+        documento.seccion("1", "Resumen del período");
+        documento.parrafo("Este informe resume las ventas cobradas en el "
+            + "período y cómo se reparte ese importe entre los artistas y "
+            + "Temipora.");
         documento.indicadores(
             new String[] { "Operaciones", "Unidades", "Ticket promedio" },
             new String[] { String.valueOf(totales.operaciones()),
@@ -75,7 +77,7 @@ public class InformeAdminPdfService {
 
     private void comparacion(
             DocumentoPdf documento, InformeAdminDTO informe, String moneda) {
-        documento.seccion("2", "Comparación");
+        documento.seccion("2", "Comparación con el período anterior");
         var anterior = informe.comparacion();
         if (anterior == null) {
             documento.parrafo(
@@ -99,8 +101,9 @@ public class InformeAdminPdfService {
     }
 
     private void porTipo(
-            DocumentoPdf documento, InformeAdminDTO informe) {
-        documento.seccion("3", "Por tipo");
+            DocumentoPdf documento, InformeAdminDTO informe, String moneda) {
+        documento.seccion("3", "Ventas por tipo de ítem",
+            "importes en " + moneda);
         List<InformeAdminTipoDTO> tipos = informe.tipos() != null
             ? informe.tipos() : List.of();
         if (tipos.isEmpty()) {
@@ -110,7 +113,7 @@ public class InformeAdminPdfService {
 
         TablaPdf tabla = new TablaPdf(
             new String[] { "Tipo", "Oper.", "Unid.", "Volumen", "Comisión",
-                "Neto artistas", "Arancel" },
+                "Neto a artistas", "Arancel MercadoPago" },
             new float[] { 1.5f, 0.8f, 0.8f, 1.5f, 1.45f, 1.5f, 1.3f },
             new boolean[] { false, true, true, true, true, true, true });
 
@@ -144,8 +147,9 @@ public class InformeAdminPdfService {
     }
 
     private void porVendedor(
-            DocumentoPdf documento, InformeAdminDTO informe) {
-        documento.seccion("4", "Por vendedor y artista");
+            DocumentoPdf documento, InformeAdminDTO informe, String moneda) {
+        documento.seccion("4", "Ventas por vendedor y artista",
+            "importes en " + moneda);
         List<InformeAdminVendedorDTO> vendedores = informe.vendedores() != null
             ? informe.vendedores() : List.of();
         if (vendedores.isEmpty()) {
@@ -156,7 +160,7 @@ public class InformeAdminPdfService {
 
         TablaPdf tabla = new TablaPdf(
             new String[] { "Vendedor / artista", "Oper.", "Unid.", "Volumen",
-                "Comisión", "Neto artistas", "Arancel" },
+                "Comisión", "Neto a artistas", "Arancel MercadoPago" },
             new float[] { 2.5f, 0.75f, 0.75f, 1.4f, 1.35f, 1.45f, 1.25f },
             new boolean[] { false, true, true, true, true, true, true });
 
@@ -190,8 +194,9 @@ public class InformeAdminPdfService {
     }
 
     private void porItem(
-            DocumentoPdf documento, InformeAdminDTO informe) {
-        documento.seccion("5", "Por ítem del catálogo");
+            DocumentoPdf documento, InformeAdminDTO informe, String moneda) {
+        documento.seccion("5", "Ventas por ítem del catálogo",
+            "importes en " + moneda);
         List<InformeAdminItemDTO> items = informe.items() != null
             ? informe.items() : List.of();
         if (items.isEmpty()) {
@@ -201,7 +206,7 @@ public class InformeAdminPdfService {
 
         TablaPdf tabla = new TablaPdf(
             new String[] { "Tipo", "Ítem", "Oper.", "Unid.", "Volumen",
-                "Comisión", "Neto artistas", "Arancel" },
+                "Comisión", "Neto a artistas", "Arancel MercadoPago" },
             new float[] { 0.95f, 2.45f, 0.7f, 0.7f, 1.3f, 1.25f, 1.3f,
                 1.1f },
             new boolean[] { false, false, true, true, true, true, true, true });
@@ -217,13 +222,6 @@ public class InformeAdminPdfService {
                 FormatoPdf.monto(item.arancel()));
         }
         documento.tabla(tabla);
-    }
-
-    private void notas(DocumentoPdf documento) {
-        documento.seccion("6", "Notas");
-        documento.nota("1", "La comisión es el ingreso de Temipora por el uso "
-            + "de la plataforma.");
-        documento.nota("2", "El arancel es el que informa el medio de pago.");
     }
 
     private String referencia(InformeAdminDTO informe) {

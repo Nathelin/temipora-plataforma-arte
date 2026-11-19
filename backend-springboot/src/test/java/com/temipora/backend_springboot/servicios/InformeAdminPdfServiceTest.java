@@ -39,11 +39,14 @@ class InformeAdminPdfServiceTest {
             .contains("Resumen de la plataforma")
             .contains("ADM-20261101-20261130")
             .contains("Volumen procesado")
-            .contains("Por tipo")
-            .contains("Por vendedor y artista")
-            .contains("Por ítem del catálogo")
-            .contains("Notas")
+            .contains("Ventas por tipo de ítem")
+            .contains("Ventas por vendedor y artista")
+            .contains("Ventas por ítem del catálogo")
+            .contains("importes en ARS")
             .contains("Total")
+            .contains("Arancel MercadoPago")
+            .contains("Neto liquidado a artistas")
+            .doesNotContain("Notas")
             .containsPattern("Página\\s+1\\s+de\\s*" + paginas);
 
         assertThat(paginas).isEqualTo(1);

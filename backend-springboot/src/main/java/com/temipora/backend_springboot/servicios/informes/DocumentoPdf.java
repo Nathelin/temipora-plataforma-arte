@@ -110,19 +110,43 @@ public final class DocumentoPdf {
     }
 
     public DocumentoPdf seccion(String numero, String titulo) {
-        Phrase frase = new Phrase();
-        frase.add(new Chunk(numero + "   ", EstiloPdf.SECCION_NUMERO));
-        frase.add(new Chunk(titulo, EstiloPdf.SECCION));
+        return seccion(numero, titulo, null);
+    }
 
-        PdfPTable tabla = new PdfPTable(1);
+    public DocumentoPdf seccion(
+            String numero, String titulo, String detalle) {
+        PdfPTable tabla = new PdfPTable(detalle == null ? 1 : 2);
+        if (detalle != null) {
+            try {
+                tabla.setWidths(new float[] { 4f, 1.3f });
+            } catch (DocumentException e) {
+                throw new IllegalStateException(
+                    "No se pudo definir el encabezado de la sección.", e);
+            }
+        }
         tabla.setWidthPercentage(100);
-        PdfPCell celda = new PdfPCell(frase);
+
+        PdfPCell celda = new PdfPCell(fraseSeccion(numero, titulo));
         celda.setBorder(Rectangle.BOTTOM);
         celda.setBorderColor(EstiloPdf.ROSA);
         celda.setBorderWidth(0.8f);
         celda.setPadding(0);
         celda.setPaddingBottom(4);
         tabla.addCell(celda);
+
+        if (detalle != null) {
+            PdfPCell extra = new PdfPCell(
+                new Phrase(detalle, EstiloPdf.CHICO));
+            extra.setBorder(Rectangle.BOTTOM);
+            extra.setBorderColor(EstiloPdf.ROSA);
+            extra.setBorderWidth(0.8f);
+            extra.setPadding(0);
+            extra.setPaddingBottom(4);
+            extra.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            extra.setVerticalAlignment(Element.ALIGN_BOTTOM);
+            tabla.addCell(extra);
+        }
+
         tabla.setSpacingBefore(7);
         tabla.setSpacingAfter(6);
         agregar(tabla);
@@ -222,16 +246,11 @@ public final class DocumentoPdf {
         return this;
     }
 
-    public DocumentoPdf nota(String numero, String texto) {
-        Paragraph parrafo = new Paragraph();
-        parrafo.setLeading(11);
-        parrafo.setIndentationLeft(12);
-        parrafo.setFirstLineIndent(-12);
-        parrafo.setSpacingAfter(4);
-        parrafo.add(new Chunk(numero + ".   ", EstiloPdf.VALOR_FUERTE));
-        parrafo.add(new Chunk(texto, EstiloPdf.CHICO));
-        agregar(parrafo);
-        return this;
+    private static Phrase fraseSeccion(String numero, String titulo) {
+        Phrase frase = new Phrase();
+        frase.add(new Chunk(numero + "   ", EstiloPdf.SECCION_NUMERO));
+        frase.add(new Chunk(titulo, EstiloPdf.SECCION));
+        return frase;
     }
 
     private void agregar(Element elemento) {

@@ -26,6 +26,7 @@ class InformePdfServiceTest {
     @Test
     void generaUnPdfConEncabezadoPieYSecciones() throws Exception {
         byte[] pdf = servicio.generar(informeConItems(), "artista");
+        int paginas = paginas(pdf);
 
         assertThat(texto(pdf))
             .contains("Temipora")
@@ -34,13 +35,16 @@ class InformePdfServiceTest {
             .contains("Referencia")
             .contains("VEN-20261101-20261130")
             .contains("Productos y servicios")
-            .contains("Resumen")
-            .contains("Comparación")
-            .contains("Detalle por ítem")
-            .contains("Notas")
+            .contains("Resumen del período")
+            .contains("Comparación con el período anterior")
+            .contains("Ventas por ítem")
+            .contains("importes en ARS")
             .contains("Neto percibido")
+            .contains("Arancel MercadoPago")
+            .contains("Part. del")
             .contains("01/11/2026")
-            .containsPattern("Página\\s+1\\s+de\\s*1");
+            .doesNotContain("Notas")
+            .containsPattern("Página\\s+1\\s+de\\s*" + paginas);
     }
 
     @Test
@@ -164,6 +168,15 @@ class InformePdfServiceTest {
             0,
             List.of(),
             items);
+    }
+
+    private int paginas(byte[] pdf) throws Exception {
+        PdfReader lector = new PdfReader(pdf);
+        try {
+            return lector.getNumberOfPages();
+        } finally {
+            lector.close();
+        }
     }
 
     private String texto(byte[] pdf) throws Exception {
