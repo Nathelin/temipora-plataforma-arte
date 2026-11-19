@@ -58,14 +58,23 @@ public class InformePdfService {
             new String[] { String.valueOf(totales.operaciones()),
                 String.valueOf(totales.unidades()),
                 FormatoPdf.monto(totales.ticketPromedio()) });
+        BigDecimal bruto = totales.bruto() != null
+            ? totales.bruto() : BigDecimal.ZERO;
+        BigDecimal comision = totales.comision() != null
+            ? totales.comision() : BigDecimal.ZERO;
+        BigDecimal netoArtista = bruto.subtract(comision);
+        BigDecimal liquidado = totales.netoPercibido() != null
+            ? totales.netoPercibido() : BigDecimal.ZERO;
+
         documento.resumen(
-            new String[] { "Ventas brutas", "Comisión Temipora",
-                "Arancel MercadoPago", "Costo de cobro", "Neto percibido" },
-            new String[] { FormatoPdf.monto(totales.bruto()),
-                FormatoPdf.monto(totales.comision()),
-                FormatoPdf.monto(totales.arancel()),
-                FormatoPdf.monto(totales.costoCobro()),
-                FormatoPdf.monto(totales.netoPercibido()) },
+            new String[] { "Ingresó por ventas",
+                "Temipora cobró (comisión)", "Neto para vos",
+                "MercadoPago descontó", "Se te pagó" },
+            new String[] { FormatoPdf.monto(bruto),
+                FormatoPdf.resta(comision),
+                FormatoPdf.monto(netoArtista),
+                FormatoPdf.resta(netoArtista.subtract(liquidado)),
+                FormatoPdf.monto(liquidado) },
             4, "Concepto", "Importe (" + moneda + ")");
     }
 

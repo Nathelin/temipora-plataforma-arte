@@ -2,8 +2,10 @@
 import { computed, onMounted, ref } from 'vue'
 import AdminPageHeader from '../components/admin/AdminPageHeader.vue'
 import AdminTabs from '../components/admin/AdminTabs.vue'
+import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import SerieAdmin from '../components/SerieAdmin.vue'
 import { useNotificaciones } from '../composables/useNotificaciones'
+import { conciliarMercadoPago } from '../servicios/adminPagos'
 import { descargarInformeAdminPdf, obtenerInformeAdmin } from '../servicios/adminInformes'
 import { guardarArchivo } from '../servicios/descargas'
 import { formatearPrecio } from '../servicios/moneda'
@@ -45,6 +47,8 @@ const informe = ref(null)
 const cargando = ref(true)
 const error = ref('')
 const descargando = ref(false)
+const modalConciliacion = ref(false)
+const conciliando = ref(false)
 
 const dias = computed(() => {
   const inicio = new Date(`${desde.value}T00:00:00`)
@@ -216,6 +220,42 @@ async function descargar() {
   }
 }
 
+function abrirConciliacion() {
+  if (conciliando.value) return
+  modalConciliacion.value = true
+}
+
+function resumenConciliacion(resultado) {
+  const partes = [
+    `${resultado.revisados} revisadas`,
+    `${resultado.completados} completadas`,
+  ]
+  if (resultado.sinDatos) {
+    partes.push(`${resultado.sinDatos} sin datos en MercadoPago`)
+  }
+  if (resultado.errores) {
+    partes.push(`${resultado.errores} con error`)
+  }
+  return `Conciliación: ${partes.join(', ')}.`
+}
+
+async function conciliar() {
+  conciliando.value = true
+  try {
+    const resultado = await conciliarMercadoPago()
+    modalConciliacion.value = false
+    exito(resultado.revisados
+      ? resumenConciliacion(resultado)
+      : 'No había operaciones pendientes de conciliar.')
+    await cargar()
+  } catch (e) {
+    notificarError(e.response?.data?.message
+      || 'No se pudo conciliar con MercadoPago.')
+  } finally {
+    conciliando.value = false
+  }
+}
+
 onMounted(cargar)
 </script>
 
@@ -228,14 +268,24 @@ onMounted(cargar)
       descripcion="Ventas de la plataforma en un período y las comisiones que generaron, con cortes por tipo, vendedor e ítem."
     >
       <template #acciones>
-        <button
-          type="button"
-          class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition-colors hover:bg-rojizo disabled:opacity-50 motion-reduce:transition-none"
-          :disabled="descargando || cargando || rangoInvalido"
-          @click="descargar"
-        >
-          {{ descargando ? 'Generando PDF...' : 'Descargar PDF' }}
-        </button>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            class="inline-flex min-h-10 items-center justify-center rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition-colors hover:bg-rosa/20 disabled:opacity-50 motion-reduce:transition-none"
+            :disabled="conciliando || cargando"
+            @click="abrirConciliacion"
+          >
+            {{ conciliando ? 'Conciliando...' : 'Conciliar MercadoPago' }}
+          </button>
+          <button
+            type="button"
+            class="inline-flex min-h-10 items-center justify-center rounded-full bg-coral px-5 text-sm font-semibold text-white transition-colors hover:bg-rojizo disabled:opacity-50 motion-reduce:transition-none"
+            :disabled="descargando || cargando || rangoInvalido"
+            @click="descargar"
+          >
+            {{ descargando ? 'Generando PDF...' : 'Descargar PDF' }}
+          </button>
+        </div>
       </template>
     </AdminPageHeader>
 
@@ -551,5 +601,15 @@ onMounted(cargar)
         informado por el medio de pago y se muestra como referencia.
       </p>
     </template>
+
+    <ModalConfirmacion
+      :abierto="modalConciliacion"
+      titulo="Conciliar con MercadoPago"
+      mensaje="Se consultan en MercadoPago las operaciones aprobadas que no tienen informado el arancel o el neto liquidado. Solo se completan esos datos: no se modifican montos, comisiones ni estados. Puede tardar unos segundos."
+      texto-confirmar="Conciliar"
+      :confirmar-habilitado="!conciliando"
+      @confirmar="conciliar"
+      @cerrar="modalConciliacion = false"
+    />
   </div>
 </template>

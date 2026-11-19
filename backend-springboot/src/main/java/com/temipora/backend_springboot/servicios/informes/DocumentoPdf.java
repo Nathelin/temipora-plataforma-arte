@@ -216,6 +216,14 @@ public final class DocumentoPdf {
             int destacada,
             String encabezadoConcepto,
             String encabezadoImporte) {
+        return resumen(encabezadoConcepto, encabezadoImporte,
+            new Grupo(null, conceptos, valores, destacada));
+    }
+
+    public DocumentoPdf resumen(
+            String encabezadoConcepto,
+            String encabezadoImporte,
+            Grupo... grupos) {
         PdfPTable tabla = new PdfPTable(2);
         try {
             tabla.setWidths(new float[] { 3f, 1f });
@@ -228,14 +236,28 @@ public final class DocumentoPdf {
         tabla.addCell(celdaEncabezado(encabezadoConcepto, false));
         tabla.addCell(celdaEncabezado(encabezadoImporte, true));
 
-        for (int indice = 0; indice < conceptos.length; indice++) {
-            boolean resaltada = indice == destacada;
-            tabla.addCell(celdaResumen(conceptos[indice], resaltada, false));
-            tabla.addCell(celdaResumen(valores[indice], resaltada, true));
+        for (Grupo grupo : grupos) {
+            if (grupo.etiqueta() != null && !grupo.etiqueta().isBlank()) {
+                tabla.addCell(celdaGrupo(grupo.etiqueta()));
+            }
+            for (int indice = 0; indice < grupo.conceptos().length; indice++) {
+                boolean resaltada = indice == grupo.destacada();
+                tabla.addCell(celdaResumen(
+                    grupo.conceptos()[indice], resaltada, false));
+                tabla.addCell(celdaResumen(
+                    grupo.valores()[indice], resaltada, true));
+            }
         }
         tabla.setSpacingAfter(8);
         agregar(tabla);
         return this;
+    }
+
+    public record Grupo(
+            String etiqueta,
+            String[] conceptos,
+            String[] valores,
+            int destacada) {
     }
 
     public DocumentoPdf tabla(TablaPdf tabla) {
@@ -269,6 +291,19 @@ public final class DocumentoPdf {
         celda.setBorderColor(EstiloPdf.ROSA);
         celda.setBorderWidth(0.5f);
         celda.setPadding(4);
+        return celda;
+    }
+
+    private static PdfPCell celdaGrupo(String etiqueta) {
+        PdfPCell celda = new PdfPCell(
+            new Phrase(etiqueta, EstiloPdf.ETIQUETA));
+        celda.setColspan(2);
+        celda.setBackgroundColor(EstiloPdf.CREMA);
+        celda.setBorder(Rectangle.BOTTOM);
+        celda.setBorderColor(EstiloPdf.ROSA);
+        celda.setBorderWidth(0.5f);
+        celda.setPadding(4);
+        celda.setPaddingTop(6);
         return celda;
     }
 

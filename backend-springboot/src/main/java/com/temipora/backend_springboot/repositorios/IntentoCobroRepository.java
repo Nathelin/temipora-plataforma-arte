@@ -29,4 +29,14 @@ public interface IntentoCobroRepository extends JpaRepository<IntentoCobro, Long
     @Query("SELECT i FROM IntentoCobro i WHERE i.idIntentoCobro = :id")
     Optional<IntentoCobro> findByIdIntentoCobroForUpdate(
             @Param("id") Long id);
+
+    @Query("""
+        select i.idIntentoCobro from IntentoCobro i
+        where i.estado = :estado
+          and i.idPagoExterno is not null
+          and (i.netoRecibidoMp is null or i.arancelMp is null)
+        order by i.idIntentoCobro
+        """)
+    List<Long> idsPendientesDeConciliar(
+        @Param("estado") EstadoIntentoCobro estado);
 }

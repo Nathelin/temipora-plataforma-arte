@@ -46,6 +46,13 @@ public final class FormatoPdf {
             : new DecimalFormat("#,##0.00").format(valor);
     }
 
+    public static String resta(BigDecimal valor) {
+        if (valor == null) {
+            return VACIO;
+        }
+        return (valor.signum() >= 0 ? "-" : "+") + monto(valor.abs());
+    }
+
     public static String numero(Number valor) {
         return valor == null ? VACIO
             : new DecimalFormat("#,##0.##").format(valor);

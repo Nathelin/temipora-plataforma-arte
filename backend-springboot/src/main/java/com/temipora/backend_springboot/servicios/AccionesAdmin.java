@@ -124,6 +124,7 @@ public final class AccionesAdmin {
     public static final String PAGO_INICIAR = "PAGO_INICIAR";
     public static final String PAGO_CONFIRMAR = "PAGO_CONFIRMAR";
     public static final String PAGO_ESTADO_ACTUALIZAR = "PAGO_ESTADO_ACTUALIZAR";
+    public static final String PAGO_CONCILIAR = "PAGO_CONCILIAR";
     public static final String PAGO_RECHAZAR = "PAGO_RECHAZAR";
     public static final String SOLICITUD_CREAR = "SOLICITUD_CREAR";
     public static final String SOLICITUD_RECHAZAR = "SOLICITUD_RECHAZAR";

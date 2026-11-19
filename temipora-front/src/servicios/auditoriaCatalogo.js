@@ -110,6 +110,7 @@ export const ETIQUETAS_ACCION = {
   PAGO_INICIAR: 'Inició un pago',
   PAGO_CONFIRMAR: 'Confirmó un pago',
   PAGO_ESTADO_ACTUALIZAR: 'Actualizó el estado de un pago',
+  PAGO_CONCILIAR: 'Concilió los importes de un pago con MercadoPago',
   PAGO_RECHAZAR: 'Rechazó un pago',
   SOLICITUD_CREAR: 'Envió una solicitud de servicio',
   SOLICITUD_RECHAZAR: 'Rechazó una solicitud de servicio',

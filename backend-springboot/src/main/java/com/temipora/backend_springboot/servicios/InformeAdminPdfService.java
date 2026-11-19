@@ -64,15 +64,25 @@ public class InformeAdminPdfService {
                 String.valueOf(totales.unidades()),
                 FormatoPdf.monto(totales.ticketPromedio()) });
         documento.resumen(
-            new String[] { "Volumen procesado",
-                "Ingresos de la plataforma (comisión)", "Neto a artistas",
-                "Arancel MercadoPago", "Neto liquidado a artistas" },
+            new String[] { "Ingresó por ventas",
+                "La plataforma cobró (comisión Temipora)",
+                "Neto para los artistas", "MercadoPago descontó",
+                "Se les pagó a los artistas" },
             new String[] { FormatoPdf.monto(totales.volumen()),
-                FormatoPdf.monto(totales.comision()),
+                FormatoPdf.resta(totales.comision()),
                 FormatoPdf.monto(totales.netoArtistas()),
-                FormatoPdf.monto(totales.arancel()),
+                FormatoPdf.resta(descuentoMedioPago(totales)),
                 FormatoPdf.monto(totales.netoPercibido()) },
             4, "Concepto", "Importe (" + moneda + ")");
+    }
+
+    private static BigDecimal descuentoMedioPago(
+            InformeAdminTotalesDTO totales) {
+        BigDecimal neto = totales.netoArtistas() != null
+            ? totales.netoArtistas() : BigDecimal.ZERO;
+        BigDecimal liquidado = totales.netoPercibido() != null
+            ? totales.netoPercibido() : BigDecimal.ZERO;
+        return neto.subtract(liquidado);
     }
 
     private void comparacion(

@@ -161,4 +161,13 @@ public interface PagoRepository
     List<Object[]> filasInformeAdminServicios(
         @Param("desde") LocalDateTime desde,
         @Param("hasta") LocalDateTime hasta);
+
+    @Query("""
+        select p.idPago from Pago p
+        where p.estado = :estado
+          and p.idPagoExterno is not null
+          and (p.netoRecibidoMp is null or p.arancelMp is null)
+        order by p.idPago
+        """)
+    List<Long> idsPendientesDeConciliar(@Param("estado") EstadoPago estado);
 }
