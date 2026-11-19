@@ -47,6 +47,8 @@ public class EmailPlantillaService {
     }
 
     public record AlternativaEmail(
+            Long idServicio,
+            Long idSustitucion,
             String nombreServicio,
             String nombreArtista,
             String imagen,
@@ -104,7 +106,7 @@ public class EmailPlantillaService {
         contexto.setVariable("preheader", PREHEADER_CIERRE);
         contexto.setVariable("cierres", vistaCierres(cierres, tokenAcceso));
         contexto.setVariable("alternativas",
-            vistaAlternativas(alternativas, cierres, tokenAcceso));
+            vistaAlternativas(alternativas, tokenAcceso));
         contexto.setVariable("urlExplorar", baseFront() + "/servicios");
         return templateEngine.process(PLANTILLA_CIERRE, contexto);
     }
@@ -156,18 +158,11 @@ public class EmailPlantillaService {
 
     private List<Map<String, Object>> vistaAlternativas(
             List<AlternativaEmail> alternativas,
-            List<CierreEmail> cierres,
             String tokenAcceso) {
         List<Map<String, Object>> vistas = new ArrayList<>();
         if (alternativas == null) {
             return vistas;
         }
-        CierreEmail primero = cierres != null && !cierres.isEmpty()
-            ? cierres.get(0)
-            : null;
-        String url = primero != null
-            ? urlCierre(primero, tokenAcceso)
-            : baseFront() + "/servicios";
         for (AlternativaEmail alternativa : alternativas) {
             Map<String, Object> vista = new LinkedHashMap<>();
             vista.put("imagenUrl", urlImagenSeguro(alternativa.imagen()));
@@ -176,10 +171,28 @@ public class EmailPlantillaService {
             vista.put("nombreArtista", alternativa.nombreArtista());
             vista.put("precio", monto(alternativa.precio()));
             vista.put("moneda", alternativa.moneda());
-            vista.put("url", url);
+            vista.put("url", urlAlternativa(alternativa, tokenAcceso));
             vistas.add(vista);
         }
         return vistas;
+    }
+
+    private String urlAlternativa(
+            AlternativaEmail alternativa, String tokenAcceso) {
+        if (alternativa.idServicio() == null) {
+            return baseFront() + "/servicios" + enlaceAcceso(tokenAcceso);
+        }
+        List<String> parametros = new ArrayList<>();
+        if (tokenAcceso != null && !tokenAcceso.isBlank()) {
+            parametros.add("acceso=" + tokenAcceso);
+        }
+        if (alternativa.idSustitucion() != null) {
+            parametros.add("sustitucion=" + alternativa.idSustitucion());
+        }
+        String query = parametros.isEmpty()
+            ? ""
+            : "?" + String.join("&", parametros);
+        return baseFront() + "/servicios/" + alternativa.idServicio() + query;
     }
 
     private String urlCierre(CierreEmail cierre, String tokenAcceso) {

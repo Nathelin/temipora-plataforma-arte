@@ -228,7 +228,7 @@ public class ReactivacionProcesador {
                     && !servicio.getImagenes().isEmpty()) {
                 imagen = servicio.getImagenes().get(0).getUrl();
             }
-            String url = baseUrl + "/ofertas/" + campana.getToken()
+            String url = baseUrl + "/servicios/" + servicio.getIdServicio()
                 + "?acceso=" + tokenAcceso
                 + "&oferta=" + oferta.getIdOferta();
             ofertas.add(new OfertaEmail(

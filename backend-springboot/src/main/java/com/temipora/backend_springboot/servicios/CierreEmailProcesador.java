@@ -131,7 +131,8 @@ public class CierreEmailProcesador {
                     if (alternativas.size() >= MAX_ALTERNATIVAS) {
                         break;
                     }
-                    alternativas.add(alternativa(opcion));
+                    alternativas.add(
+                        alternativa(opcion, detalle.getIdSustitucion()));
                 }
             }
         }
@@ -201,9 +202,11 @@ public class CierreEmailProcesador {
     }
 
     private EmailPlantillaService.AlternativaEmail alternativa(
-            SustitucionOpcionDTO opcion) {
+            SustitucionOpcionDTO opcion, Long idSustitucion) {
         ServicioDTO servicio = opcion.getServicio();
         return new EmailPlantillaService.AlternativaEmail(
+            servicio != null ? servicio.getIdServicio() : opcion.getIdServicio(),
+            idSustitucion,
             servicio != null ? servicio.getNombre() : "",
             servicio != null ? servicio.getNombreArtista() : "",
             servicio != null ? servicio.getImagenPortada() : null,

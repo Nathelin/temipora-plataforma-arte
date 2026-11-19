@@ -3,6 +3,7 @@ package com.temipora.backend_springboot.servicios;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +28,7 @@ class EmailPlantillaServiceTest {
 
         service = new EmailPlantillaService(engine);
         ReflectionTestUtils.setField(service, "apiUrl", "http://localhost:8080");
+        ReflectionTestUtils.setField(service, "frontUrl", "http://localhost:5173");
     }
 
     @Test
@@ -76,6 +78,32 @@ class EmailPlantillaServiceTest {
         assertThat(html)
             .contains(">I<")
             .doesNotContain("uploads/undefined");
+    }
+
+    @Test
+    void cierre_llevaLasAlternativasAlDetalleDelServicio() {
+        EmailPlantillaService.CierreEmail cierre =
+            new EmailPlantillaService.CierreEmail(
+                "SOLICITUD",
+                5L,
+                null,
+                "Retrato",
+                "artista",
+                null,
+                "El artista rechazó tu solicitud",
+                "Podés buscar otro artista.",
+                LocalDateTime.of(2026, 11, 6, 10, 0));
+        EmailPlantillaService.AlternativaEmail alternativa =
+            new EmailPlantillaService.AlternativaEmail(
+                11L, 99L, "Otro retrato", "otro", null, "120.00", "ARS");
+
+        String html = service.cierre(
+            "Ana", List.of(cierre), List.of(alternativa), "token-cierre");
+
+        assertThat(html)
+            .contains("http://localhost:5173/solicitudes/5/resultado?acceso=token-cierre")
+            .contains("http://localhost:5173/servicios/11?acceso=token-cierre&amp;sustitucion=99")
+            .contains("Ver y solicitar");
     }
 
     @Test

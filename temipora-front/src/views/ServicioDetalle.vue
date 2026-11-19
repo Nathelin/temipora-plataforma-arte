@@ -18,10 +18,12 @@ import {
 import { esImagenVerificada } from '../servicios/imagenes'
 import { buscarAlternativas, datosMotivo } from '../servicios/sustituciones'
 import { useNotificaciones } from '../composables/useNotificaciones'
+import { useAccesoEnlace } from '../composables/useAccesoEnlace'
 
 const route = useRoute()
 const router = useRouter()
 const { exito, error: notificarError } = useNotificaciones()
+const { consumirSiCorresponde } = useAccesoEnlace()
 
 const servicio = ref(null)
 const terminos = ref(null)
@@ -346,10 +348,13 @@ function irASolicitar() {
     return
   }
   const idOferta = servicio.value?.idOferta ?? route.query.oferta
+  const query = {}
+  if (idOferta) query.oferta = idOferta
+  if (route.query.sustitucion) query.sustitucion = route.query.sustitucion
   router.push({
     name: 'solicitud-servicio',
     params: { id: servicio.value.idServicio },
-    query: idOferta ? { oferta: idOferta } : {},
+    query,
   })
 }
 
@@ -369,9 +374,9 @@ function irASolicitarEnEspera() {
   const query = {}
   const idOferta = servicio.value?.idOferta ?? route.query.oferta
   if (idOferta) query.oferta = idOferta
-  if (sustitucion.value?.idSustitucion) {
-    query.sustitucion = sustitucion.value.idSustitucion
-  }
+  const idSustitucion = sustitucion.value?.idSustitucion
+    ?? route.query.sustitucion
+  if (idSustitucion) query.sustitucion = idSustitucion
   router.push({
     name: 'solicitud-servicio',
     params: { id: servicio.value.idServicio },
@@ -615,6 +620,10 @@ function manejarTecla(event) {
 }
 
 onMounted(async () => {
+  const acceso = await consumirSiCorresponde()
+  if (acceso.habiaEnlace) {
+    return
+  }
   await cargar()
   if (servicio.value) {
     void cargarArtista()
