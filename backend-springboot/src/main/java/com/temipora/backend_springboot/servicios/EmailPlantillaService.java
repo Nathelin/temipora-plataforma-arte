@@ -53,7 +53,9 @@ public class EmailPlantillaService {
             String nombreArtista,
             String imagen,
             String precio,
-            String moneda) {
+            String moneda,
+            String motivo,
+            List<String> caracteristicas) {
     }
 
     private final SpringTemplateEngine templateEngine;
@@ -171,6 +173,8 @@ public class EmailPlantillaService {
             vista.put("nombreArtista", alternativa.nombreArtista());
             vista.put("precio", monto(alternativa.precio()));
             vista.put("moneda", alternativa.moneda());
+            vista.put("motivo", alternativa.motivo());
+            vista.put("caracteristicas", alternativa.caracteristicas());
             vista.put("url", urlAlternativa(alternativa, tokenAcceso));
             vistas.add(vista);
         }

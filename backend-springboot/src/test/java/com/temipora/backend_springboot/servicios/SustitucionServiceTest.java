@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +40,7 @@ import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.EstadoServicio;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.EstadoSustitucion;
+import com.temipora.backend_springboot.modelo.Etiqueta;
 import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.ModoRecepcionSolicitud;
 import com.temipora.backend_springboot.modelo.Moneda;
@@ -46,6 +48,7 @@ import com.temipora.backend_springboot.modelo.MotivoSustitucion;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.modelo.ServicioDTO;
+import com.temipora.backend_springboot.modelo.ServicioEtiqueta;
 import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.Sustitucion;
 import com.temipora.backend_springboot.modelo.SustitucionDTO;
@@ -410,6 +413,36 @@ class SustitucionServiceTest {
         assertThat(dto.isPuedeQuedarEnCola()).isTrue();
         assertThat(dto.getServicioOrigen().getIdServicio()).isEqualTo(10L);
         assertThat(dto.getOpciones()).isEmpty();
+    }
+
+    @Test
+    void obtener_priorizaEtiquetasYNoMuestraPrecioMasAlto() {
+        Servicio origen = servicioCompleto(
+            10L, 99L, EstadoServicio.PUBLICADO, ModoRecepcionSolicitud.ABIERTA, 1);
+        origen.setEtiquetas(Set.of(enlaceEtiqueta(6L, "Pastel")));
+
+        Servicio candidato = servicioCompleto(
+            20L, 30L, EstadoServicio.PUBLICADO, ModoRecepcionSolicitud.ABIERTA, 2);
+        candidato.setEtiquetas(Set.of(enlaceEtiqueta(6L, "Pastel")));
+        candidato.setPrecioBase(new BigDecimal("200.00"));
+
+        Sustitucion evento = evento(
+            77L, cliente(), origen, MotivoSustitucion.SIN_CUPOS,
+            EstadoSustitucion.ABIERTA);
+        evento.agregarOpcion(opcion(1L, candidato, 0));
+        when(sustitucionRepository.findById(77L)).thenReturn(Optional.of(evento));
+        when(opcionRepository.findBySustitucionIdSustitucionOrderByOrdenAsc(77L))
+            .thenReturn(List.of(opcion(1L, candidato, 0)));
+        when(servicioService.convertirParaVisor(anyList(), any()))
+            .thenReturn(Map.of(20L, servicioDto(20L), 10L, servicioDto(10L)));
+
+        SustitucionDTO dto = service.obtener(77L, 1L);
+
+        assertThat(dto.getOpciones()).hasSize(1);
+        assertThat(dto.getOpciones().get(0).getMotivo()).isEqualTo("Mismo estilo");
+        assertThat(dto.getOpciones().get(0).getCaracteristicas())
+            .contains("Estilo: Pastel")
+            .noneMatch(caracteristica -> caracteristica.contains("más alto"));
     }
 
     @Test
@@ -839,6 +872,16 @@ class SustitucionServiceTest {
         CrearSustitucionRequest request = new CrearSustitucionRequest();
         request.setIdServicioOrigen(idServicio);
         return request;
+    }
+
+    private ServicioEtiqueta enlaceEtiqueta(Long id, String nombre) {
+        Etiqueta etiqueta = Etiqueta.builder()
+            .idEtiqueta(id)
+            .nombre(nombre)
+            .build();
+        ServicioEtiqueta enlace = new ServicioEtiqueta();
+        enlace.setEtiqueta(etiqueta);
+        return enlace;
     }
 
     private Moneda moneda() {

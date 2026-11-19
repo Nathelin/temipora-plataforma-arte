@@ -702,11 +702,11 @@ public class RecomendacionService {
         if (esFavorito) {
             return "Artista que seguís";
         }
-        if (tipoSim > 0) {
-            return "Mismo tipo de servicio";
-        }
         if (tagSim >= 0.30) {
             return "Mismo estilo";
+        }
+        if (tipoSim > 0) {
+            return "Mismo tipo de servicio";
         }
         if (precioSim >= 0.60) {
             return "Precio similar";

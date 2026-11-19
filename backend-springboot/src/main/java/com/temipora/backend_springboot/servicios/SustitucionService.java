@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Set;
 
 import org.springframework.data.domain.PageRequest;
@@ -717,6 +718,10 @@ public class SustitucionService {
                 .orden(orden++)
                 .score(item.score())
                 .motivo(item.motivo())
+                .caracteristicas(caracteristicas(
+                    sustitucion != null ? sustitucion.getServicioOrigen() : null,
+                    item.servicio(),
+                    dto))
                 .disponible(dto.isDisponibleAhora())
                 .servicio(dto)
                 .build());
@@ -766,13 +771,20 @@ public class SustitucionService {
             if (dto == null) {
                 continue;
             }
+            if (origen != null
+                    && dto.getIdServicio().equals(origen.getIdServicio())) {
+                continue;
+            }
+            List<String> caracteristicas =
+                caracteristicas(origen, opcion.getServicio(), dto);
             resultado.add(SustitucionOpcionDTO.builder()
                 .idServicio(dto.getIdServicio())
                 .orden(opcion.getOrden())
                 .score(opcion.getScore() != null
                     ? opcion.getScore().doubleValue()
                     : 0)
-                .motivo(opcion.getMotivo())
+                .motivo(motivoVisible(opcion.getMotivo(), caracteristicas))
+                .caracteristicas(caracteristicas)
                 .disponible(dto.isDisponibleAhora())
                 .servicio(dto)
                 .build());
@@ -798,6 +810,150 @@ public class SustitucionService {
                 : null)
             .opciones(resultado)
             .build();
+    }
+
+    /**
+     * Devuelve las características que explican por qué una alternativa se
+     * parece al servicio original. Se muestran como distintivos en el mail de
+     * cierre y en la pantalla de sustituciones.
+     */
+    private List<String> caracteristicas(
+            Servicio origen, Servicio candidato, ServicioDTO dto) {
+        if (origen == null || candidato == null || dto == null) {
+            return List.of();
+        }
+        List<String> caracteristicas = new ArrayList<>();
+        List<String> etiquetas = etiquetasEnComun(origen, candidato);
+        for (String etiqueta : etiquetas) {
+            caracteristicas.add("Estilo: " + etiqueta);
+        }
+        if (mismoTipo(origen, candidato)) {
+            String tipo = candidato.getTipoServicio() != null
+                ? candidato.getTipoServicio().getNombre()
+                : null;
+            caracteristicas.add(tipo != null && !tipo.isBlank()
+                ? "Mismo tipo: " + tipo
+                : "Mismo tipo de servicio");
+        }
+        if (mismoMedio(origen, candidato)) {
+            String medio = candidato.getMedio() != null
+                ? candidato.getMedio().getNombre()
+                : null;
+            caracteristicas.add(medio != null && !medio.isBlank()
+                ? "Mismo medio: " + medio
+                : "Mismo medio");
+        }
+        String precio = compararPrecio(origen, candidato);
+        if (precio != null) {
+            caracteristicas.add(precio);
+        }
+        if (dto.getTiempoEntregaDias() != null
+                && dto.getTiempoEntregaDias() > 0) {
+            caracteristicas.add("Entrega en "
+                + dto.getTiempoEntregaDias()
+                + (dto.getTiempoEntregaDias() == 1 ? " día" : " días"));
+        }
+        if (dto.getCantidadResenias() != null && dto.getCantidadResenias() > 0
+                && dto.getCalificacionPromedio() != null
+                && dto.getCalificacionPromedio().doubleValue() >= 4.0) {
+            caracteristicas.add("Buenas reseñas: "
+                + dto.getCalificacionPromedio()
+                    .setScale(1, RoundingMode.HALF_UP)
+                    .toPlainString());
+        }
+        if (dto.isDisponibleAhora()) {
+            caracteristicas.add("Cupos disponibles");
+        }
+        return caracteristicas;
+    }
+
+    /**
+     * El motivo guardado puede ser anterior a la priorización de etiquetas.
+     * Para mostrarlo, lo alineamos con las características que se ven en la
+     * tarjeta.
+     */
+    private String motivoVisible(
+            String motivoGuardado, List<String> caracteristicas) {
+        if (caracteristicas.stream().anyMatch(c -> c.startsWith("Estilo:"))) {
+            return "Mismo estilo";
+        }
+        if (caracteristicas.stream().anyMatch(c -> c.startsWith("Mismo tipo"))) {
+            return "Mismo tipo de servicio";
+        }
+        if (caracteristicas.contains("Precio similar")) {
+            return "Precio similar";
+        }
+        if (caracteristicas.stream().anyMatch(c -> c.startsWith("Precio "))) {
+            return "Precio más bajo";
+        }
+        return motivoGuardado != null && !motivoGuardado.isBlank()
+            ? motivoGuardado
+            : "Tiene cupos disponibles";
+    }
+
+    private boolean mismoTipo(Servicio a, Servicio b) {
+        return a.getTipoServicio() != null && b.getTipoServicio() != null
+            && Objects.equals(a.getTipoServicio().getIdTipoServicio(),
+                b.getTipoServicio().getIdTipoServicio());
+    }
+
+    private boolean mismoMedio(Servicio a, Servicio b) {
+        return a.getMedio() != null && b.getMedio() != null
+            && Objects.equals(a.getMedio().getIdMedio(),
+                b.getMedio().getIdMedio());
+    }
+
+    private List<String> etiquetasEnComun(Servicio origen, Servicio candidato) {
+        Set<Long> ids = new HashSet<>();
+        for (var enlace : origen.getEtiquetas()) {
+            if (enlace != null && enlace.getEtiqueta() != null
+                    && enlace.getEtiqueta().getIdEtiqueta() != null) {
+                ids.add(enlace.getEtiqueta().getIdEtiqueta());
+            }
+        }
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        List<String> nombres = new ArrayList<>();
+        for (var enlace : candidato.getEtiquetas()) {
+            if (enlace == null || enlace.getEtiqueta() == null) {
+                continue;
+            }
+            var etiqueta = enlace.getEtiqueta();
+            if (etiqueta.getIdEtiqueta() != null
+                    && ids.contains(etiqueta.getIdEtiqueta())
+                    && etiqueta.getNombre() != null
+                    && !etiqueta.getNombre().isBlank()) {
+                nombres.add(etiqueta.getNombre());
+            }
+        }
+        nombres.sort(String.CASE_INSENSITIVE_ORDER);
+        return nombres.stream().distinct().limit(3).toList();
+    }
+
+    private String compararPrecio(Servicio origen, Servicio candidato) {
+        BigDecimal base = origen.getPrecioBase();
+        BigDecimal otro = candidato.getPrecioBase();
+        if (base == null || otro == null || base.signum() <= 0) {
+            return null;
+        }
+        if (origen.getMoneda() == null || candidato.getMoneda() == null
+                || !Objects.equals(origen.getMoneda().getIdMoneda(),
+                    candidato.getMoneda().getIdMoneda())) {
+            return null;
+        }
+        // Si la alternativa es más cara que el servicio original no mostramos
+        // el detalle: desalienta la recomendación en lugar de explicarla.
+        if (otro.compareTo(base) > 0) {
+            return null;
+        }
+        BigDecimal diferencia = base.subtract(otro)
+            .multiply(BigDecimal.valueOf(100))
+            .divide(base, 0, RoundingMode.HALF_UP);
+        if (diferencia.compareTo(BigDecimal.valueOf(5)) <= 0) {
+            return "Precio similar";
+        }
+        return "Precio " + diferencia.toPlainString() + "% más bajo";
     }
 
     private boolean puedeQuedarEnCola(MotivoSustitucion motivo) {

@@ -9,6 +9,7 @@ const props = defineProps({
   esFavorito: { type: Boolean, default: false },
   actualizandoFavorito: { type: Boolean, default: false },
   motivo: { type: String, default: '' },
+  caracteristicas: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['alternar-favorito'])
@@ -143,6 +144,16 @@ function textoEntrega(s) {
         <span aria-hidden="true">✦</span>
         {{ motivo }}
       </p>
+
+      <div v-if="caracteristicas.length" class="mb-2 flex flex-wrap gap-1">
+        <span
+          v-for="caracteristica in caracteristicas"
+          :key="caracteristica"
+          class="rounded-full bg-rosa/25 px-2 py-0.5 text-[10px] font-semibold leading-snug text-cafe/75"
+        >
+          {{ caracteristica }}
+        </span>
+      </div>
 
       <h3 class="line-clamp-1 font-display text-base font-bold leading-snug text-granate">
         {{ servicio.nombre }}

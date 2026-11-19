@@ -95,7 +95,9 @@ class EmailPlantillaServiceTest {
                 LocalDateTime.of(2026, 11, 6, 10, 0));
         EmailPlantillaService.AlternativaEmail alternativa =
             new EmailPlantillaService.AlternativaEmail(
-                11L, 99L, "Otro retrato", "otro", null, "120.00", "ARS");
+                11L, 99L, "Otro retrato", "otro", null, "120.00", "ARS",
+                "Mismo estilo",
+                List.of("Mismo tipo: Retrato", "Precio similar"));
 
         String html = service.cierre(
             "Ana", List.of(cierre), List.of(alternativa), "token-cierre");
@@ -103,6 +105,10 @@ class EmailPlantillaServiceTest {
         assertThat(html)
             .contains("http://localhost:5173/solicitudes/5/resultado?acceso=token-cierre")
             .contains("http://localhost:5173/servicios/11?acceso=token-cierre&amp;sustitucion=99")
+            .contains("Por qué te la recomendamos")
+            .contains("Mismo estilo")
+            .contains("Mismo tipo: Retrato")
+            .contains("Precio similar")
             .contains("Ver y solicitar");
     }
 
