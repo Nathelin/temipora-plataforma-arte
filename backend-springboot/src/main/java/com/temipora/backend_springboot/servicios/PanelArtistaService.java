@@ -137,8 +137,9 @@ public class PanelArtistaService {
         BigDecimal delMes = BigDecimal.ZERO;
 
         for (Object[] fila : pagoRepository.netosRealesDeArtista(idArtista)) {
-            BigDecimal neto = decimal(fila[0]);
-            LocalDateTime fecha = fecha(fila[1]);
+            BigDecimal neto = CalculoLiquidacion.netoRecibido(
+                decimal(fila[0]), decimal(fila[1]), decimal(fila[2]));
+            LocalDateTime fecha = fecha(fila[3]);
             total = total.add(neto);
             if (fecha != null && YearMonth.from(fecha).equals(mes)) {
                 delMes = delMes.add(neto);
@@ -147,8 +148,9 @@ public class PanelArtistaService {
 
         for (Object[] fila : compraGrupoRepository
                 .netosRealesDeArtista(idArtista)) {
-            BigDecimal neto = decimal(fila[0]);
-            LocalDateTime fecha = fecha(fila[1]);
+            BigDecimal neto = CalculoLiquidacion.netoRecibido(
+                decimal(fila[0]), decimal(fila[1]), decimal(fila[2]));
+            LocalDateTime fecha = fecha(fila[3]);
             total = total.add(neto);
             if (fecha != null && YearMonth.from(fecha).equals(mes)) {
                 delMes = delMes.add(neto);

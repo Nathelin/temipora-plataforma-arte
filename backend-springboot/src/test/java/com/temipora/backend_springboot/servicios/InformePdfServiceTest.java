@@ -40,7 +40,6 @@ class InformePdfServiceTest {
             .contains("Ventas por ítem")
             .contains("importes en ARS")
             .contains("Neto percibido")
-            .contains("Arancel")
             .contains("Part. del")
             .contains("Ingresó por ventas")
             .contains("Temipora cobró (comisión)")

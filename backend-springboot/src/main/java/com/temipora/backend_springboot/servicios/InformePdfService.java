@@ -114,11 +114,10 @@ public class InformePdfService {
 
         TablaPdf tabla = new TablaPdf(
             new String[] { "Tipo", "Ítem", "Unid.", "Oper.", "Bruto",
-                "Comisión", "Arancel MercadoPago", "Neto percibido",
-                "Part. del neto" },
-            new float[] { 0.95f, 2.2f, 0.7f, 0.7f, 1.2f, 1.2f, 1.25f, 1.2f,
-                0.9f },
-            new boolean[] { false, false, true, true, true, true, true, true,
+                "Comisión", "Neto percibido", "Part. del neto" },
+            new float[] { 0.95f, 2.4f, 0.7f, 0.7f, 1.25f, 1.25f, 1.3f,
+                0.95f },
+            new boolean[] { false, false, true, true, true, true, true,
                 true });
 
         for (InformeItemDTO item : items) {
@@ -129,7 +128,6 @@ public class InformePdfService {
                 String.valueOf(item.operaciones()),
                 FormatoPdf.monto(item.bruto()),
                 FormatoPdf.monto(item.comision()),
-                FormatoPdf.monto(item.arancel()),
                 FormatoPdf.monto(item.netoPercibido()),
                 FormatoPdf.numero(item.participacion()) + "%");
         }

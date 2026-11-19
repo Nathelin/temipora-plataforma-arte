@@ -118,7 +118,8 @@ public interface PagoRepository
      * cobro. Alimenta los totales del panel del artista.
      */
     @Query(value = """
-        SELECT COALESCE(p.neto_recibido_mp, p.monto_neto_cobro),
+        SELECT p.monto_cobro, p.comision_monto_cobro,
+               COALESCE(p.arancel_mp, 0),
                COALESCE(p.fecha_acreditacion, p.fecha_aprobacion,
                     p.fecha_creacion)
         FROM pago p

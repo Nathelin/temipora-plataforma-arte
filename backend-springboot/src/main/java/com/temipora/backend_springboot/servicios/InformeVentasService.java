@@ -328,26 +328,32 @@ public class InformeVentasService {
     }
 
     private static FilaServicio filaServicio(Object[] fila) {
+        BigDecimal bruto = decimal(fila[3]);
+        BigDecimal comision = decimal(fila[4]);
+        BigDecimal arancel = decimal(fila[5]);
         return new FilaServicio(
             fecha(fila[0]),
             numero(fila[1]),
             texto(fila[2]),
-            decimal(fila[3]),
-            decimal(fila[4]),
-            decimal(fila[5]),
-            decimal(fila[6]),
+            bruto,
+            comision,
+            arancel,
+            CalculoLiquidacion.netoRecibido(bruto, comision, arancel),
             entero(fila[7]) == 0,
             numero(fila[8]));
     }
 
     private static FilaGrupo filaGrupo(Object[] fila) {
+        BigDecimal bruto = decimal(fila[2]);
+        BigDecimal comision = decimal(fila[3]);
+        BigDecimal arancel = decimal(fila[4]);
         return new FilaGrupo(
             fecha(fila[0]),
             numero(fila[1]),
-            decimal(fila[2]),
-            decimal(fila[3]),
-            decimal(fila[4]),
-            decimal(fila[5]),
+            bruto,
+            comision,
+            arancel,
+            CalculoLiquidacion.netoRecibido(bruto, comision, arancel),
             entero(fila[6]) == 0,
             entero(fila[7]));
     }

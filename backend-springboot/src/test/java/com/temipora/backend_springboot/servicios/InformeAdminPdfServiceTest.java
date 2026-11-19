@@ -49,7 +49,6 @@ class InformeAdminPdfServiceTest {
             .contains("Ventas por ítem del catálogo")
             .contains("importes en ARS")
             .contains("Total")
-            .contains("Arancel")
             .doesNotContain("Notas")
             .containsPattern("Página\\s+1\\s+de\\s*" + paginas);
 

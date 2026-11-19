@@ -123,16 +123,15 @@ public class InformeAdminPdfService {
 
         TablaPdf tabla = new TablaPdf(
             new String[] { "Tipo", "Oper.", "Unid.", "Volumen", "Comisión",
-                "Neto a artistas", "Arancel MercadoPago" },
-            new float[] { 1.5f, 0.8f, 0.8f, 1.5f, 1.45f, 1.5f, 1.3f },
-            new boolean[] { false, true, true, true, true, true, true });
+                "Neto a artistas" },
+            new float[] { 1.5f, 0.8f, 0.8f, 1.5f, 1.45f, 1.5f },
+            new boolean[] { false, true, true, true, true, true });
 
         long operaciones = 0;
         long unidades = 0;
         BigDecimal volumen = BigDecimal.ZERO;
         BigDecimal comision = BigDecimal.ZERO;
         BigDecimal neto = BigDecimal.ZERO;
-        BigDecimal arancel = BigDecimal.ZERO;
 
         for (InformeAdminTipoDTO tipo : tipos) {
             tabla.fila(tipo(tipo.tipo()),
@@ -140,19 +139,16 @@ public class InformeAdminPdfService {
                 String.valueOf(tipo.unidades()),
                 FormatoPdf.monto(tipo.volumen()),
                 FormatoPdf.monto(tipo.comision()),
-                FormatoPdf.monto(tipo.netoArtistas()),
-                FormatoPdf.monto(tipo.arancel()));
+                FormatoPdf.monto(tipo.netoArtistas()));
             operaciones += tipo.operaciones();
             unidades += tipo.unidades();
             volumen = volumen.add(nulo(tipo.volumen()));
             comision = comision.add(nulo(tipo.comision()));
             neto = neto.add(nulo(tipo.netoArtistas()));
-            arancel = arancel.add(nulo(tipo.arancel()));
         }
         tabla.total("Total", String.valueOf(operaciones),
             String.valueOf(unidades), FormatoPdf.monto(volumen),
-            FormatoPdf.monto(comision), FormatoPdf.monto(neto),
-            FormatoPdf.monto(arancel));
+            FormatoPdf.monto(comision), FormatoPdf.monto(neto));
         documento.tabla(tabla);
     }
 
@@ -170,16 +166,15 @@ public class InformeAdminPdfService {
 
         TablaPdf tabla = new TablaPdf(
             new String[] { "Vendedor / artista", "Oper.", "Unid.", "Volumen",
-                "Comisión", "Neto a artistas", "Arancel MercadoPago" },
-            new float[] { 2.5f, 0.75f, 0.75f, 1.4f, 1.35f, 1.45f, 1.25f },
-            new boolean[] { false, true, true, true, true, true, true });
+                "Comisión", "Neto a artistas" },
+            new float[] { 2.5f, 0.75f, 0.75f, 1.4f, 1.35f, 1.45f },
+            new boolean[] { false, true, true, true, true, true });
 
         long operaciones = 0;
         long unidades = 0;
         BigDecimal volumen = BigDecimal.ZERO;
         BigDecimal comision = BigDecimal.ZERO;
         BigDecimal neto = BigDecimal.ZERO;
-        BigDecimal arancel = BigDecimal.ZERO;
 
         for (InformeAdminVendedorDTO vendedor : vendedores) {
             tabla.fila(FormatoPdf.texto(vendedor.nombre()),
@@ -187,19 +182,16 @@ public class InformeAdminPdfService {
                 String.valueOf(vendedor.unidades()),
                 FormatoPdf.monto(vendedor.volumen()),
                 FormatoPdf.monto(vendedor.comision()),
-                FormatoPdf.monto(vendedor.netoArtistas()),
-                FormatoPdf.monto(vendedor.arancel()));
+                FormatoPdf.monto(vendedor.netoArtistas()));
             operaciones += vendedor.operaciones();
             unidades += vendedor.unidades();
             volumen = volumen.add(nulo(vendedor.volumen()));
             comision = comision.add(nulo(vendedor.comision()));
             neto = neto.add(nulo(vendedor.netoArtistas()));
-            arancel = arancel.add(nulo(vendedor.arancel()));
         }
         tabla.total("Total", String.valueOf(operaciones),
             String.valueOf(unidades), FormatoPdf.monto(volumen),
-            FormatoPdf.monto(comision), FormatoPdf.monto(neto),
-            FormatoPdf.monto(arancel));
+            FormatoPdf.monto(comision), FormatoPdf.monto(neto));
         documento.tabla(tabla);
     }
 
@@ -216,10 +208,9 @@ public class InformeAdminPdfService {
 
         TablaPdf tabla = new TablaPdf(
             new String[] { "Tipo", "Ítem", "Oper.", "Unid.", "Volumen",
-                "Comisión", "Neto a artistas", "Arancel MercadoPago" },
-            new float[] { 0.95f, 2.45f, 0.7f, 0.7f, 1.3f, 1.25f, 1.3f,
-                1.1f },
-            new boolean[] { false, false, true, true, true, true, true, true });
+                "Comisión", "Neto a artistas" },
+            new float[] { 0.95f, 2.45f, 0.7f, 0.7f, 1.3f, 1.25f, 1.3f },
+            new boolean[] { false, false, true, true, true, true, true });
 
         for (InformeAdminItemDTO item : items) {
             tabla.fila(tipo(item.tipo()),
@@ -228,8 +219,7 @@ public class InformeAdminPdfService {
                 String.valueOf(item.unidades()),
                 FormatoPdf.monto(item.volumen()),
                 FormatoPdf.monto(item.comision()),
-                FormatoPdf.monto(item.netoArtistas()),
-                FormatoPdf.monto(item.arancel()));
+                FormatoPdf.monto(item.netoArtistas()));
         }
         documento.tabla(tabla);
     }
