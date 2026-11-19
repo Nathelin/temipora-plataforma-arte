@@ -31,8 +31,8 @@ public class ConstanciaService {
 
         DocumentoPdf documento = DocumentoPdf.vertical(TIPO, referencia, PIE);
         documento.abrir();
-        documento.cabecera(referencia,
-            "Refleja el estado del pedido al momento de generarse.");
+        documento.cabecera("Documento contractual", referencia,
+            "Estado del pedido al momento de generarse · Cifras en " + moneda);
         documento.metadatos(
             "Cliente", "@" + usuario(pedido.getCliente()),
             "Artista", "@" + usuario(pedido.getArtista()),
@@ -46,16 +46,15 @@ public class ConstanciaService {
             "Moneda", moneda,
             "Generado", FormatoPdf.fechaHora(LocalDateTime.now()));
 
-        importes(documento, pedido, moneda);
-        planDePagos(documento, pedido, moneda);
+        importes(documento, pedido);
+        planDePagos(documento, pedido);
         entregas(documento, pedido);
         pagos(documento, pedido);
 
         return documento.cerrar();
     }
 
-    private void importes(
-            DocumentoPdf documento, PedidoDTO pedido, String moneda) {
+    private void importes(DocumentoPdf documento, PedidoDTO pedido) {
         documento.seccion("1", "Importes");
 
         List<String> conceptos = new ArrayList<>();
@@ -104,12 +103,11 @@ public class ConstanciaService {
         documento.resumen(
             conceptos.toArray(String[]::new),
             valores.toArray(String[]::new),
-            destacada, "Concepto", "Importe (" + moneda + ")");
+            destacada);
     }
 
-    private void planDePagos(
-            DocumentoPdf documento, PedidoDTO pedido, String moneda) {
-        documento.seccion("2", "Plan de pagos", "importes en " + moneda);
+    private void planDePagos(DocumentoPdf documento, PedidoDTO pedido) {
+        documento.seccion("2", "Plan de pagos");
 
         List<HitoPedidoDTO> hitos = pedido.getHitos() != null
             ? pedido.getHitos() : List.of();

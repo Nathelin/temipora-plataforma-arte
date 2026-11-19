@@ -27,37 +27,39 @@ public class InformePdfService {
         String artista = "@" + FormatoPdf.texto(nombreArtista);
 
         DocumentoPdf documento = DocumentoPdf.vertical(
-            TIPO, desde + " al " + hasta, PIE);
+            TIPO, desde + " al " + hasta, referencia(informe), PIE);
         documento.abrir();
-        documento.cabecera("Ventas del período",
-            "Actividad de " + artista + " entre el " + desde + " y el "
-                + hasta + " (" + informe.periodo().dias() + " días).");
+        documento.cabecera("Informe del artista", "Ventas del período",
+            desde + " al " + hasta + " · " + informe.periodo().dias()
+                + " días · Cifras en " + moneda);
         documento.metadatos(
             "Emisor", artista,
+            "Filtro", filtro(informe.tipo()),
             "Referencia", referencia(informe),
-            "Período", desde + " al " + hasta,
-            "Generado", FormatoPdf.fechaHora(generado(informe.generadoEn())),
-            "Moneda", moneda,
-            "Filtro", filtro(informe.tipo()));
+            "Generado", FormatoPdf.fechaHora(generado(informe.generadoEn())));
 
-        resumen(documento, informe, moneda);
-        comparacion(documento, informe, moneda);
-        detalle(documento, informe, moneda);
+        resumen(documento, informe);
+        comparacion(documento, informe);
+        detalle(documento, informe);
 
         return documento.cerrar();
     }
 
-    private void resumen(
-            DocumentoPdf documento, InformeVentasDTO informe, String moneda) {
+    private void resumen(DocumentoPdf documento, InformeVentasDTO informe) {
         InformeTotalesDTO totales = informe.totales();
         documento.seccion("1", "Resumen del período");
-        documento.parrafo("Este informe resume tus ventas cobradas en el "
-            + "período y cómo se compone el importe que recibís.");
         documento.indicadores(
-            new String[] { "Operaciones", "Unidades", "Ticket promedio" },
-            new String[] { String.valueOf(totales.operaciones()),
-                String.valueOf(totales.unidades()),
-                FormatoPdf.monto(totales.ticketPromedio()) });
+            new DocumentoPdf.Metrica(String.valueOf(totales.operaciones()),
+                "Operaciones", null, false),
+            new DocumentoPdf.Metrica(String.valueOf(totales.unidades()),
+                "Unidades", null, false),
+            new DocumentoPdf.Metrica(
+                FormatoPdf.monto(totales.ticketPromedio()),
+                "Ticket promedio", null, false),
+            new DocumentoPdf.Metrica(
+                FormatoPdf.monto(totales.netoPercibido()),
+                "Te pagaron", null, true));
+
         BigDecimal bruto = totales.bruto() != null
             ? totales.bruto() : BigDecimal.ZERO;
         BigDecimal comision = totales.comision() != null
@@ -67,43 +69,42 @@ public class InformePdfService {
             ? totales.netoPercibido() : BigDecimal.ZERO;
 
         documento.resumen(
-            new String[] { "Ingresó por ventas",
-                "Temipora cobró (comisión)", "Neto para vos",
-                "MercadoPago descontó", "Se te pagó" },
+            new String[] { "Ingresó por ventas", "Comisión Temipora",
+                "Neto para vos", "Costo de MercadoPago", "Se te pagó" },
             new String[] { FormatoPdf.monto(bruto),
                 FormatoPdf.resta(comision),
                 FormatoPdf.monto(netoArtista),
                 FormatoPdf.resta(netoArtista.subtract(liquidado)),
                 FormatoPdf.monto(liquidado) },
-            4, "Concepto", "Importe (" + moneda + ")");
+            4);
     }
 
     private void comparacion(
-            DocumentoPdf documento, InformeVentasDTO informe, String moneda) {
-        documento.seccion("2", "Comparación con el período anterior");
+            DocumentoPdf documento, InformeVentasDTO informe) {
         var anterior = informe.comparacion();
         if (anterior == null) {
+            documento.seccion("2", "Comparación con el período anterior");
             documento.parrafo(
                 "No hay un período anterior registrado para comparar.");
             return;
         }
-        documento.caption("Período anterior: "
-            + FormatoPdf.fecha(anterior.desde()) + " al "
-            + FormatoPdf.fecha(anterior.hasta()) + ".");
+        documento.seccion("2", "Comparación con el período anterior",
+            FormatoPdf.fecha(anterior.desde()) + " al "
+                + FormatoPdf.fecha(anterior.hasta()));
+
         TablaPdf tabla = new TablaPdf(
-            new String[] { "Concepto", "Período anterior (" + moneda + ")",
-                "Variación" },
-            new float[] { 2.4f, 1.3f, 1.3f },
-            new boolean[] { false, true, true });
+            new String[] { "Concepto", "Anterior", "Actual", "Variación" },
+            new float[] { 2.1f, 1.2f, 1.2f, 1.8f },
+            new boolean[] { false, true, true, true });
         tabla.fila("Neto percibido",
             FormatoPdf.monto(anterior.netoPercibido()),
+            FormatoPdf.monto(informe.totales().netoPercibido()),
             variacion(anterior.variacionNetoPorcentaje()));
         documento.tabla(tabla);
     }
 
-    private void detalle(
-            DocumentoPdf documento, InformeVentasDTO informe, String moneda) {
-        documento.seccion("3", "Ventas por ítem", "importes en " + moneda);
+    private void detalle(DocumentoPdf documento, InformeVentasDTO informe) {
+        documento.seccion("3", "Ventas por ítem");
 
         List<InformeItemDTO> items = informe.items() != null
             ? informe.items() : List.of();
@@ -156,9 +157,9 @@ public class InformePdfService {
 
     private static String variacion(BigDecimal valor) {
         if (valor == null) {
-            return "Sin ventas en el período anterior";
+            return "sin ventas en el período anterior";
         }
         String signo = valor.signum() >= 0 ? "+" : "";
-        return signo + FormatoPdf.numero(valor) + "% vs. período anterior";
+        return signo + FormatoPdf.numero(valor) + "%";
     }
 }

@@ -32,19 +32,19 @@ class InformePdfServiceTest {
             .contains("Temipora")
             .contains("Informe de ventas")
             .contains("Ventas del período")
-            .contains("Referencia")
+            .contains("REFERENCIA")
             .contains("VEN-20261101-20261130")
             .contains("Productos y servicios")
             .contains("Resumen del período")
             .contains("Comparación con el período anterior")
             .contains("Ventas por ítem")
-            .contains("importes en ARS")
+            .contains("Cifras en ARS")
             .contains("Neto percibido")
-            .contains("Part. del")
+            .contains("PART. DEL")
             .contains("Ingresó por ventas")
-            .contains("Temipora cobró (comisión)")
+            .contains("Comisión Temipora")
             .contains("Neto para vos")
-            .contains("MercadoPago descontó")
+            .contains("Costo de MercadoPago")
             .contains("Se te pagó")
             .doesNotContain("Costo de cobro")
             .contains("01/11/2026")
@@ -76,8 +76,8 @@ class InformePdfServiceTest {
 
         assertThat(paginas).isGreaterThanOrEqualTo(2);
         assertThat(textoDePagina(pdf, 2))
-            .contains("Ítem")
-            .contains("Comisión");
+            .contains("ÍTEM")
+            .contains("COMISIÓN");
         assertThat(texto(pdf))
             .containsPattern("Página\\s+1\\s+de\\s*" + paginas);
         assertThat(textoDePagina(pdf, paginas))
@@ -116,7 +116,7 @@ class InformePdfServiceTest {
 
         assertThat(texto(servicio.generar(informe, "artista")))
             .contains("No hay ventas registradas en el período.")
-            .contains("Sin ventas en el período anterior");
+            .contains("sin ventas en el período anterior");
     }
 
     private InformeVentasDTO informeConItems() {

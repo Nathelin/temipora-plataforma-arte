@@ -32,7 +32,7 @@ class ConstanciaServiceTest {
             .contains("Plan de pagos")
             .contains("Entregas")
             .contains("Pagos")
-            .contains("importes en ARS")
+            .contains("Cifras en ARS")
             .contains("Seña")
             .doesNotContain("Notas")
             .containsPattern("Página\\s+1\\s+de\\s*1");

@@ -19,19 +19,23 @@ import com.lowagie.text.pdf.PdfWriter;
  */
 final class EncabezadoPiePdf extends PdfPageEventHelper {
 
-    private static final float SEPARACION = 7f;
+    private static final float SEPARACION = 9f;
     private static final float RESERVA_TOTAL = 16f;
+    private static final float ESPACIO_ETIQUETA = 4f;
 
     private final String tipo;
     private final String referencia;
     private final String pie;
+    private final String detallePie;
     private PdfTemplate totalPaginas;
     private BaseFont fuente;
 
-    EncabezadoPiePdf(String tipo, String referencia, String pie) {
+    EncabezadoPiePdf(
+            String tipo, String referencia, String pie, String detallePie) {
         this.tipo = tipo;
         this.referencia = referencia;
         this.pie = pie;
+        this.detallePie = detallePie;
     }
 
     @Override
@@ -39,7 +43,8 @@ final class EncabezadoPiePdf extends PdfPageEventHelper {
         totalPaginas = writer.getDirectContent().createTemplate(30, 12);
         try {
             fuente = BaseFont.createFont(
-                BaseFont.HELVETICA, BaseFont.WINANSI, BaseFont.NOT_EMBEDDED);
+                BaseFont.HELVETICA_BOLD, BaseFont.WINANSI,
+                BaseFont.NOT_EMBEDDED);
         } catch (DocumentException | java.io.IOException e) {
             throw new IllegalStateException(
                 "No se pudo preparar la numeración del documento.", e);
@@ -52,42 +57,45 @@ final class EncabezadoPiePdf extends PdfPageEventHelper {
         Rectangle pagina = documento.getPageSize();
         float izquierda = documento.leftMargin();
         float derecha = pagina.getWidth() - documento.rightMargin();
-        float arriba = pagina.getHeight() - documento.topMargin() + 22;
-        float abajo = documento.bottomMargin() - 30;
+        float arriba = pagina.getHeight() - documento.topMargin() + 20;
+        float abajo = documento.bottomMargin() - 32;
 
-        lienzo.setColorStroke(EstiloPdf.ROSA);
-        lienzo.setLineWidth(0.8f);
+        lienzo.setColorStroke(EstiloPdf.LINEA);
+        lienzo.setLineWidth(0.6f);
 
         ColumnText.showTextAligned(lienzo, Element.ALIGN_LEFT,
             new Phrase("Temipora", EstiloPdf.MARCA), izquierda, arriba, 0);
         ColumnText.showTextAligned(lienzo, Element.ALIGN_RIGHT,
-            new Phrase(referencia(tipo, referencia), EstiloPdf.CHICO),
+            new Phrase(referencia(tipo, referencia), EstiloPdf.DOCUMENTO),
             derecha, arriba, 0);
 
         lienzo.moveTo(izquierda, arriba - SEPARACION);
         lienzo.lineTo(derecha, arriba - SEPARACION);
         lienzo.stroke();
 
-        lienzo.moveTo(izquierda, abajo + 14);
-        lienzo.lineTo(derecha, abajo + 14);
+        lienzo.moveTo(izquierda, abajo + 24);
+        lienzo.lineTo(derecha, abajo + 24);
         lienzo.stroke();
 
         ColumnText.showTextAligned(lienzo, Element.ALIGN_LEFT,
-            new Phrase(pie, EstiloPdf.CHICO), izquierda, abajo, 0);
+            new Phrase(pie, EstiloPdf.PIE), izquierda, abajo + 12, 0);
+        ColumnText.showTextAligned(lienzo, Element.ALIGN_LEFT,
+            new Phrase(detallePie, EstiloPdf.PIE), izquierda, abajo, 0);
 
-        String etiqueta = "Página " + writer.getPageNumber() + " de ";
+        String etiqueta = "Página " + writer.getPageNumber() + " de";
         float anchoEtiqueta = fuente.getWidthPoint(etiqueta, 7.5f);
         ColumnText.showTextAligned(lienzo, Element.ALIGN_LEFT,
-            new Phrase(etiqueta, EstiloPdf.CHICO),
-            derecha - RESERVA_TOTAL - anchoEtiqueta, abajo, 0);
-        lienzo.addTemplate(totalPaginas, derecha - RESERVA_TOTAL, abajo);
+            new Phrase(etiqueta, EstiloPdf.PIE_DESTACADO),
+            derecha - RESERVA_TOTAL - ESPACIO_ETIQUETA - anchoEtiqueta,
+            abajo + 12, 0);
+        lienzo.addTemplate(totalPaginas, derecha - RESERVA_TOTAL, abajo + 12);
     }
 
     @Override
     public void onCloseDocument(PdfWriter writer, Document documento) {
         totalPaginas.beginText();
         totalPaginas.setFontAndSize(fuente, 7.5f);
-        totalPaginas.setColorFill(EstiloPdf.CAFE);
+        totalPaginas.setColorFill(EstiloPdf.TEXTO);
         totalPaginas.setTextMatrix(0, 0);
         totalPaginas.showText(String.valueOf(writer.getPageNumber() - 1));
         totalPaginas.endText();

@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.servicios;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -29,51 +30,63 @@ public class InformeAdminPdfService {
         String moneda = FormatoPdf.moneda(informe.moneda());
 
         DocumentoPdf documento = DocumentoPdf.vertical(
-            TIPO, desde + " al " + hasta, PIE);
+            TIPO, desde + " al " + hasta, referencia(informe), PIE);
         documento.abrir();
-        documento.cabecera("Resumen de la plataforma",
-            "Ventas y comisiones de Temipora entre el " + desde + " y el "
-                + hasta + " (" + informe.periodo().dias() + " días).");
+        documento.cabecera("Informe de administración",
+            "Ventas y comisiones",
+            desde + " al " + hasta + " · " + informe.periodo().dias()
+                + " días · Cifras en " + moneda);
         documento.metadatos(
             "Alcance", "Toda la plataforma",
+            "Filtro", filtro(informe.tipo()),
             "Referencia", referencia(informe),
-            "Período", desde + " al " + hasta,
-            "Generado", FormatoPdf.fechaHora(generado(informe.generadoEn())),
-            "Moneda", moneda,
-            "Filtro", filtro(informe.tipo()));
+            "Generado", FormatoPdf.fechaHora(generado(informe.generadoEn())));
 
-        resumen(documento, informe, moneda);
-        comparacion(documento, informe, moneda);
-        porTipo(documento, informe, moneda);
-        porVendedor(documento, informe, moneda);
-        porItem(documento, informe, moneda);
+        resumen(documento, informe);
+        comparacion(documento, informe);
+        porTipo(documento, informe);
+        porVendedor(documento, informe);
+        porItem(documento, informe);
 
         return documento.cerrar();
     }
 
-    private void resumen(
-            DocumentoPdf documento, InformeAdminDTO informe, String moneda) {
+    private void resumen(DocumentoPdf documento, InformeAdminDTO informe) {
         InformeAdminTotalesDTO totales = informe.totales();
         documento.seccion("1", "Resumen del período");
-        documento.parrafo("Este informe resume las ventas cobradas en el "
-            + "período y cómo se reparte ese importe entre los artistas y "
-            + "Temipora.");
         documento.indicadores(
-            new String[] { "Operaciones", "Unidades", "Ticket promedio" },
-            new String[] { String.valueOf(totales.operaciones()),
-                String.valueOf(totales.unidades()),
-                FormatoPdf.monto(totales.ticketPromedio()) });
+            new DocumentoPdf.Metrica(String.valueOf(totales.operaciones()),
+                "Operaciones", null, false),
+            new DocumentoPdf.Metrica(String.valueOf(totales.unidades()),
+                "Unidades", null, false),
+            new DocumentoPdf.Metrica(
+                FormatoPdf.monto(totales.ticketPromedio()),
+                "Ticket promedio", null, false),
+            new DocumentoPdf.Metrica(
+                FormatoPdf.monto(totales.comision()),
+                "La plataforma cobró",
+                tasaComision(totales) + " de las ventas", true));
         documento.resumen(
-            new String[] { "Ingresó por ventas",
-                "La plataforma cobró (comisión Temipora)",
-                "Neto para los artistas", "MercadoPago descontó",
-                "Se les pagó a los artistas" },
+            new String[] { "Ingresó por ventas", "Comisión Temipora",
+                "Neto para los artistas", "Costo de MercadoPago",
+                "Pagado a los artistas" },
             new String[] { FormatoPdf.monto(totales.volumen()),
                 FormatoPdf.resta(totales.comision()),
                 FormatoPdf.monto(totales.netoArtistas()),
                 FormatoPdf.resta(descuentoMedioPago(totales)),
                 FormatoPdf.monto(totales.netoPercibido()) },
-            4, "Concepto", "Importe (" + moneda + ")");
+            4);
+    }
+
+    private static String tasaComision(InformeAdminTotalesDTO totales) {
+        BigDecimal volumen = nulo(totales.volumen());
+        if (volumen.signum() == 0) {
+            return FormatoPdf.porcentaje(null);
+        }
+        BigDecimal tasa = nulo(totales.comision())
+            .multiply(BigDecimal.valueOf(100))
+            .divide(volumen, 2, RoundingMode.HALF_UP);
+        return FormatoPdf.porcentaje(tasa);
     }
 
     private static BigDecimal descuentoMedioPago(
@@ -86,34 +99,35 @@ public class InformeAdminPdfService {
     }
 
     private void comparacion(
-            DocumentoPdf documento, InformeAdminDTO informe, String moneda) {
-        documento.seccion("2", "Comparación con el período anterior");
+            DocumentoPdf documento, InformeAdminDTO informe) {
         var anterior = informe.comparacion();
         if (anterior == null) {
+            documento.seccion("2", "Comparación con el período anterior");
             documento.parrafo(
                 "No hay un período anterior registrado para comparar.");
             return;
         }
-        documento.caption("Período anterior: "
-            + FormatoPdf.fecha(anterior.desde()) + " al "
-            + FormatoPdf.fecha(anterior.hasta()) + ".");
+        documento.seccion("2", "Comparación con el período anterior",
+            FormatoPdf.fecha(anterior.desde()) + " al "
+                + FormatoPdf.fecha(anterior.hasta()));
+
         TablaPdf tabla = new TablaPdf(
-            new String[] { "Concepto", "Período anterior (" + moneda + ")",
-                "Variación" },
-            new float[] { 2.4f, 1.3f, 1.3f },
-            new boolean[] { false, true, true });
-        tabla.fila("Volumen procesado", FormatoPdf.monto(anterior.volumen()),
+            new String[] { "Concepto", "Anterior", "Actual", "Variación" },
+            new float[] { 2.1f, 1.2f, 1.2f, 1.8f },
+            new boolean[] { false, true, true, true });
+        tabla.fila("Volumen procesado",
+            FormatoPdf.monto(anterior.volumen()),
+            FormatoPdf.monto(informe.totales().volumen()),
             variacion(anterior.variacionVolumenPorcentaje()));
-        tabla.fila("Ingresos de la plataforma (comisión)",
+        tabla.fila("Ingresos de la plataforma",
             FormatoPdf.monto(anterior.comision()),
+            FormatoPdf.monto(informe.totales().comision()),
             variacion(anterior.variacionComisionPorcentaje()));
         documento.tabla(tabla);
     }
 
-    private void porTipo(
-            DocumentoPdf documento, InformeAdminDTO informe, String moneda) {
-        documento.seccion("3", "Ventas por tipo de ítem",
-            "importes en " + moneda);
+    private void porTipo(DocumentoPdf documento, InformeAdminDTO informe) {
+        documento.seccion("3", "Ventas por tipo de ítem");
         List<InformeAdminTipoDTO> tipos = informe.tipos() != null
             ? informe.tipos() : List.of();
         if (tipos.isEmpty()) {
@@ -152,10 +166,8 @@ public class InformeAdminPdfService {
         documento.tabla(tabla);
     }
 
-    private void porVendedor(
-            DocumentoPdf documento, InformeAdminDTO informe, String moneda) {
-        documento.seccion("4", "Ventas por vendedor y artista",
-            "importes en " + moneda);
+    private void porVendedor(DocumentoPdf documento, InformeAdminDTO informe) {
+        documento.seccion("4", "Ventas por vendedor y artista");
         List<InformeAdminVendedorDTO> vendedores = informe.vendedores() != null
             ? informe.vendedores() : List.of();
         if (vendedores.isEmpty()) {
@@ -195,10 +207,8 @@ public class InformeAdminPdfService {
         documento.tabla(tabla);
     }
 
-    private void porItem(
-            DocumentoPdf documento, InformeAdminDTO informe, String moneda) {
-        documento.seccion("5", "Ventas por ítem del catálogo",
-            "importes en " + moneda);
+    private void porItem(DocumentoPdf documento, InformeAdminDTO informe) {
+        documento.seccion("5", "Ventas por ítem del catálogo");
         List<InformeAdminItemDTO> items = informe.items() != null
             ? informe.items() : List.of();
         if (items.isEmpty()) {
@@ -250,7 +260,7 @@ public class InformeAdminPdfService {
 
     private static String variacion(BigDecimal valor) {
         if (valor == null) {
-            return "Sin ventas en el período anterior";
+            return "sin ventas en el período anterior";
         }
         String signo = valor.signum() >= 0 ? "+" : "";
         return signo + FormatoPdf.numero(valor) + "%";

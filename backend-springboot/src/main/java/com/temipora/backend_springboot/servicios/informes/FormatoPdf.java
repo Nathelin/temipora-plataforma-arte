@@ -58,6 +58,11 @@ public final class FormatoPdf {
             : new DecimalFormat("#,##0.##").format(valor);
     }
 
+    public static String porcentaje(Number valor) {
+        return valor == null ? VACIO
+            : new DecimalFormat("#,##0.##").format(valor) + "%";
+    }
+
     public static String texto(String valor) {
         return valor == null || valor.isBlank() ? VACIO : valor;
     }
