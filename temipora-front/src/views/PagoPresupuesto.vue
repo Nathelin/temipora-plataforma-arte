@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearMonto, formatearPrecio } from '../servicios/moneda'
 import { descripcionHito } from '../servicios/pedidos'
+import RedirigiendoMercadoPago from '../components/RedirigiendoMercadoPago.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +16,7 @@ const solicitud = ref(null)
 const pedido = ref(null)
 const cargando = ref(true)
 const enviando = ref(false)
+const redirigiendoPago = ref(false)
 const confirmando = ref(false)
 const error = ref('')
 const errorAccion = ref('')
@@ -78,6 +80,11 @@ const textoBotonPago = computed(() => {
   if (!pagaAlInicio.value) return 'Aceptar y comenzar el pedido'
   return esPagoUnico.value ? 'Pagar el total' : 'Pagar primera cuota'
 })
+const detalleRedireccion = computed(() => {
+  const hito = primerHito.value
+  if (!hito) return ''
+  return `Estamos preparando el pago de ${hito.nombre} (${formatear(hito.montoMostrado ?? hito.monto)}).`
+})
 
 function formatear(valor, codigo) {
   return formatearPrecio(valor, codigo || moneda.value)
@@ -111,20 +118,30 @@ async function cargar() {
 async function pagar() {
   if (!puedePagar.value || enviando.value) return
   enviando.value = true
+  redirigiendoPago.value = true
   errorAccion.value = ''
+  let redirigiendo = false
   try {
     const res = await api.post(
       `/solicitudes-servicio/${idSolicitud.value}/pagar`,
     )
     pedido.value = res.data
     if (pago.value?.proveedor === 'MERCADOPAGO' && pago.value.instruccion) {
+      redirigiendo = true
       window.location.href = pago.value.instruccion
     }
   } catch (e) {
     errorAccion.value = e.response?.data?.message || 'No se pudo iniciar el pago.'
   } finally {
     enviando.value = false
+    if (!redirigiendo) redirigiendoPago.value = false
   }
+}
+
+function irAPagarMercadoPago() {
+  if (!pago.value?.instruccion) return
+  redirigiendoPago.value = true
+  window.location.href = pago.value.instruccion
 }
 
 async function confirmar() {
@@ -302,14 +319,20 @@ onMounted(cargar)
         >
           {{ confirmando ? 'Confirmando...' : 'Confirmar pago (simulado)' }}
         </button>
-        <a
+        <button
           v-else-if="pago?.proveedor === 'MERCADOPAGO' && pago.instruccion"
-          :href="pago.instruccion"
+          type="button"
           class="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-coral px-6 text-sm font-semibold text-white transition hover:bg-rojizo"
+          @click="irAPagarMercadoPago"
         >
           Ir a pagar con MercadoPago
-        </a>
+        </button>
       </section>
     </template>
+
+    <RedirigiendoMercadoPago
+      :visible="redirigiendoPago"
+      :detalle="detalleRedireccion"
+    />
   </div>
 </template>

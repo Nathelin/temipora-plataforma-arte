@@ -10,6 +10,7 @@ import EntregasHito from '../components/EntregasHito.vue'
 import HiloConversacion from '../components/HiloConversacion.vue'
 import IconoDescarga from '../components/IconoDescarga.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+import RedirigiendoMercadoPago from '../components/RedirigiendoMercadoPago.vue'
 import SubirEntregable from '../components/SubirEntregable.vue'
 import FormularioResenia from '../components/FormularioResenia.vue'
 import TarjetaResenia from '../components/TarjetaResenia.vue'
@@ -46,6 +47,8 @@ const pedido = ref(null)
 const cargando = ref(true)
 const error = ref('')
 const procesando = ref(false)
+const redirigiendoPago = ref(false)
+const hitoPagando = ref(null)
 const avisoPago = ref('')
 const sondeandoPago = ref(false)
 const descargandoConstancia = ref(false)
@@ -188,6 +191,12 @@ function formatearMontoHito(hito) {
     moneda.value,
   )
 }
+
+const detalleRedireccion = computed(() => {
+  const hito = hitoPagando.value
+  if (!hito) return ''
+  return `Estamos preparando el pago de ${hito.nombre} (${formatearMontoHito(hito)}).`
+})
 
 function pagoAprobado(hito) {
   return (hito?.pagos || []).find((pago) => pago.estado === 'APROBADO') || null
@@ -597,6 +606,9 @@ function urlCheckoutMercadoPago(data) {
 async function pagarHito(hito) {
   if (procesando.value) return
   procesando.value = true
+  hitoPagando.value = hito
+  redirigiendoPago.value = true
+  let redirigiendo = false
   try {
     await sincronizarPagoPendiente()
     const actualizado = (pedido.value?.hitos || [])
@@ -611,6 +623,7 @@ async function pagarHito(hito) {
     pedido.value = res.data
     const url = urlCheckoutMercadoPago(res.data)
     if (url) {
+      redirigiendo = true
       window.location.href = url
       return
     }
@@ -624,7 +637,17 @@ async function pagarHito(hito) {
       || 'No se pudo completar la acción.')
   } finally {
     procesando.value = false
+    if (!redirigiendo) {
+      redirigiendoPago.value = false
+      hitoPagando.value = null
+    }
   }
+}
+
+function irAPagarMercadoPago(pago, hito) {
+  hitoPagando.value = hito
+  redirigiendoPago.value = true
+  window.location.href = pago.instruccion
 }
 
 async function refrescarPedido() {
@@ -1606,13 +1629,14 @@ onMounted(async () => {
             >
               Confirmar pago (simulado)
             </button>
-            <a
+            <button
               v-else-if="esCliente && pagoPendiente(hito).proveedor === 'MERCADOPAGO' && pagoPendiente(hito).instruccion"
-              :href="pagoPendiente(hito).instruccion"
+              type="button"
               class="mt-3 inline-flex min-h-9 items-center justify-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+              @click="irAPagarMercadoPago(pagoPendiente(hito), hito)"
             >
               Ir a pagar con MercadoPago
-            </a>
+            </button>
           </div>
 
           <div
@@ -1900,6 +1924,11 @@ onMounted(async () => {
         ?? pedido.precioFinalCliente"
       estimado
       @cerrar="modalCalculoAbierto = false"
+    />
+
+    <RedirigiendoMercadoPago
+      :visible="redirigiendoPago"
+      :detalle="detalleRedireccion"
     />
   </div>
 </template>
