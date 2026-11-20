@@ -244,7 +244,7 @@ onMounted(() => cargar(0))
 
     <div
       v-if="cargando"
-      class="grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3 sm:gap-x-6 sm:gap-y-10 lg:grid-cols-4 xl:grid-cols-6"
+      class="grid min-h-[calc(100vh-4rem)] grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3 sm:gap-x-6 sm:gap-y-10 lg:grid-cols-4 xl:grid-cols-6"
       aria-label="Cargando artistas favoritos"
     >
       <div

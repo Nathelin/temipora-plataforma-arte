@@ -175,7 +175,7 @@ watch(() => props.id, cargar)
       ← Volver
     </button>
 
-    <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando publicación...</p>
+    <CargandoPagina v-if="cargando" tipo="detalle" mensaje="Cargando publicación…" />
     <div
       v-else-if="error"
       class="mx-auto max-w-xl rounded-2xl border border-rosa/60 bg-blanco px-6 py-12 text-center"

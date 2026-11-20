@@ -435,7 +435,7 @@ onMounted(cargar)
   <div class="bg-blanco rounded-3xl shadow-xl shadow-rosa/40 p-6 sm:p-8">
     <h2 class="text-lg text-granate font-bold">Cuenta y seguridad</h2>
 
-    <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
+    <CargandoPagina v-if="cargando" tipo="lista" mensaje="Cargando cuenta…" :tarjetas="5" />
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
 
     <div v-else class="space-y-4">

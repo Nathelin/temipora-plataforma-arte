@@ -126,7 +126,7 @@ onMounted(cargar)
       y el estado de su registro de autenticidad.
     </div>
 
-    <p v-if="cargando" class="py-10 text-center text-cafe/60">Cargando...</p>
+    <CargandoPagina v-if="cargando" tipo="detalle" mensaje="Cargando producto…" />
     <p v-else-if="error" class="py-10 text-center text-rojizo">{{ error }}</p>
 
     <div v-else-if="producto" class="mt-6">

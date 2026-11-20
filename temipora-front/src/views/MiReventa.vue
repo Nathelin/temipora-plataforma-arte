@@ -194,9 +194,7 @@ onMounted(cargar)
       </router-link>
     </div>
 
-    <p v-if="cargando" class="py-12 text-center text-sm text-cafe/60">
-      Cargando tu actividad de reventa...
-    </p>
+    <CargandoPagina v-if="cargando" tipo="lista" mensaje="Cargando tu actividad de reventa…" :tarjetas="5" />
     <p v-else-if="error" role="alert" class="py-12 text-center text-sm text-rojizo">
       {{ error }}
     </p>

@@ -467,7 +467,7 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <div v-if="cargando" class="mt-8 space-y-6" role="status" aria-live="polite">
+    <div v-if="cargando" class="mt-8 min-h-[calc(100vh-4rem)] space-y-6" role="status" aria-live="polite">
       <span class="sr-only">Cargando resumen...</span>
       <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div v-for="n in 4" :key="n" class="h-28 animate-pulse rounded-2xl border border-rosa/40 bg-blanco/70" aria-hidden="true"></div>

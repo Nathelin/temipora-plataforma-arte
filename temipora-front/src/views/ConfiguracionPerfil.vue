@@ -248,6 +248,9 @@ async function guardar() {
       ? String(r.data.idMonedaPreferida)
       : (monedas.value.find((m) => m.codigo === r.data.monedaPreferida)?.idMoneda ?? '')
     localStorage.setItem('urlFotoPerfil', form.value.urlFotoPerfil)
+    if (r.data.monedaPreferida) {
+      localStorage.setItem('monedaPreferida', r.data.monedaPreferida)
+    }
     window.dispatchEvent(new CustomEvent('perfil-foto-actualizada', {
       detail: { url: form.value.urlFotoPerfil },
     }))
@@ -294,7 +297,7 @@ onBeforeUnmount(() => {
   <div class="bg-blanco rounded-3xl shadow-xl shadow-rosa/40 p-6 sm:p-8">
     <h2 class="text-lg text-granate mb-6 font-bold">Mi perfil</h2>
 
-    <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
+    <CargandoPagina v-if="cargando" tipo="lista" mensaje="Cargando perfil…" :tarjetas="5" />
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
 
     <div v-else class="space-y-5">

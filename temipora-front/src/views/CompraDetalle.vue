@@ -379,7 +379,7 @@ onBeforeUnmount(() => {
       ← Volver a mis compras
     </router-link>
 
-    <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando...</p>
+    <CargandoPagina v-if="cargando" tipo="detalle" mensaje="Cargando compra…" />
     <p v-else-if="error" class="mt-8 rounded-xl border border-rojizo/30 bg-rojizo/5 px-4 py-3 text-sm text-rojizo">
       {{ error }}
     </p>

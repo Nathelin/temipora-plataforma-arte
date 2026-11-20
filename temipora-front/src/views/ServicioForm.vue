@@ -829,7 +829,7 @@ onBeforeUnmount(() => {
       <p class="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-cafe/65">{{ subtituloPagina }}</p>
     </div>
 
-    <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
+    <CargandoPagina v-if="cargando" tipo="detalle" mensaje="Cargando servicio…" />
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
 
     <template v-else>

@@ -276,9 +276,12 @@ onMounted(() => {
       </span>
     </div>
 
-    <div v-if="cargando && !hayNotificaciones" class="mt-8 rounded-2xl border border-rosa/50 bg-blanco px-6 py-12 text-center text-sm text-cafe/60">
-      Cargando notificaciones...
-    </div>
+    <CargandoPagina
+      v-if="cargando && !hayNotificaciones"
+      tipo="lista"
+      mensaje="Cargando notificaciones…"
+      :tarjetas="6"
+    />
 
     <div v-else-if="error && !hayNotificaciones" class="mt-8 rounded-2xl border border-rosa/50 bg-blanco px-6 py-12 text-center">
       <p class="text-sm text-cafe/70">{{ error }}</p>

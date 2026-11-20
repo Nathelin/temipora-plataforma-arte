@@ -247,7 +247,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="cargando" class="mt-6 space-y-3" role="status" aria-live="polite">
+    <div v-if="cargando" class="mt-6 min-h-[calc(100vh-4rem)] space-y-3" role="status" aria-live="polite">
       <span class="sr-only">Cargando mensajes...</span>
       <div
         v-for="n in 3"

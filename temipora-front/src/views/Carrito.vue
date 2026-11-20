@@ -223,7 +223,7 @@ onMounted(cargar)
       </div>
     </div>
 
-    <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando...</p>
+    <CargandoPagina v-if="cargando" tipo="lista" mensaje="Cargando carrito…" :tarjetas="4" />
 
     <div
       v-else-if="error && !grupos.length"

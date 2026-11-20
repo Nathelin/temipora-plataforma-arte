@@ -229,7 +229,7 @@ onMounted(async () => {
       {{ mensajeAcceso }}
     </p>
 
-    <div v-if="cargando" class="mt-10 space-y-6">
+    <div v-if="cargando" class="mt-10 min-h-[calc(100vh-4rem)] space-y-6">
       <div class="h-40 animate-pulse rounded-[28px] bg-rosa/25"></div>
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
         <div v-for="marcador in 3" :key="marcador" class="h-80 animate-pulse rounded-[26px] bg-rosa/20"></div>

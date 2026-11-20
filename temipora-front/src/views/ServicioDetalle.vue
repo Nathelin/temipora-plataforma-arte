@@ -640,7 +640,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
 
 <template>
   <div class="mx-auto max-w-screen-2xl px-4 py-8 sm:px-8 sm:py-10">
-    <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando servicio...</p>
+    <CargandoPagina v-if="cargando" tipo="detalle" mensaje="Cargando servicio…" />
     <div
       v-else-if="noDisponible"
       class="mx-auto max-w-xl rounded-2xl border border-rosa/60 bg-blanco px-6 py-12 text-center"

@@ -175,6 +175,7 @@ function cerrarSesion() {
   localStorage.removeItem('nombreUsuario')
   localStorage.removeItem('idUsuario')
   localStorage.removeItem('urlFotoPerfil')
+  localStorage.removeItem('monedaPreferida')
   limpiarNotificaciones()
   detenerPollingNotificaciones()
   limpiarMensajes()

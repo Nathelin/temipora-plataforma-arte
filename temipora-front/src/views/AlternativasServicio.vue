@@ -200,7 +200,7 @@ onMounted(async () => {
       </template>
     </PageHeader>
 
-    <div v-if="cargando" class="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+    <div v-if="cargando" class="mt-10 grid min-h-[calc(100vh-4rem)] grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
       <div v-for="marcador in 6" :key="marcador" class="h-96 animate-pulse rounded-[26px] bg-rosa/25"></div>
     </div>
 

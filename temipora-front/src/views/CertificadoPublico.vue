@@ -161,7 +161,7 @@ watch(() => props.codigo, cargar)
       </button>
     </div>
 
-    <p v-if="cargando" class="py-20 text-center text-cafe/55">Cargando certificado…</p>
+    <CargandoPagina v-if="cargando" tipo="detalle" mensaje="Cargando certificado…" />
     <p v-else-if="error" role="alert" class="py-20 text-center text-rojizo">{{ error }}</p>
 
     <article

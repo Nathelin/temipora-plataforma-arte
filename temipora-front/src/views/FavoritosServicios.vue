@@ -327,7 +327,7 @@ onMounted(() => {
 
     <div
       v-if="cargando"
-      class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
+      class="grid min-h-[calc(100vh-4rem)] grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
       aria-label="Cargando servicios favoritos"
     >
       <div

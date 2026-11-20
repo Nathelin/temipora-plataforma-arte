@@ -831,9 +831,7 @@ onMounted(async () => {
       ← Volver a pedidos
     </button>
 
-    <p v-if="cargando" class="mt-8 py-16 text-center text-sm text-cafe/60">
-      Cargando pedido...
-    </p>
+    <CargandoPagina v-if="cargando" tipo="detalle" mensaje="Cargando pedido…" />
     <p v-else-if="error" class="mt-8 py-16 text-center text-sm text-rojizo">
       {{ error }}
     </p>

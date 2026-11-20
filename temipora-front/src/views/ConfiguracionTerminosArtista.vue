@@ -217,7 +217,7 @@ onBeforeUnmount(() => {
       <p v-if="version" class="text-xs text-cafe/50 mt-1">Versión {{ version }}</p>
     </div>
 
-    <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
+    <CargandoPagina v-if="cargando" tipo="lista" mensaje="Cargando términos…" :tarjetas="4" />
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
 
     <div v-else class="space-y-10">

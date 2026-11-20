@@ -63,7 +63,7 @@ onMounted(cargar)
       </template>
     </PageHeader>
 
-    <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando reventas...</p>
+    <CargandoPagina v-if="cargando" mensaje="Cargando reventas…" />
     <p v-else-if="error" role="alert" class="py-16 text-center text-rojizo">{{ error }}</p>
 
     <template v-else>
