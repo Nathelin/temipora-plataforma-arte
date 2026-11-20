@@ -17,6 +17,7 @@ import TarjetaResenia from '../components/TarjetaResenia.vue'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import { useHiloConversacion } from '../composables/useHiloConversacion'
 import { useSubirImagen } from '../composables/useSubirImagen'
+import { useAccesoEnlace } from '../composables/useAccesoEnlace'
 import { estadoConversacionDe } from '../servicios/mensajes'
 import {
   cargarCriterios,
@@ -41,6 +42,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const { consumirSiCorresponde } = useAccesoEnlace()
 const enPanel = computed(() => route.path.startsWith('/panel'))
 const idPedido = computed(() => Number(route.params.idPedido))
 
@@ -840,6 +842,10 @@ function abrirChat() {
 }
 
 onMounted(async () => {
+  const acceso = await consumirSiCorresponde()
+  if (acceso.habiaEnlace) {
+    return
+  }
   await cargar()
   void procesarRetornoPago()
 })
@@ -1546,6 +1552,21 @@ onMounted(async () => {
               <dt class="text-cafe/50">Aprobación automática</dt>
               <dd class="mt-0.5 text-cafe">{{ formatearFechaHora(hito.fechaLimiteAprobacion) }}</dd>
             </div>
+            <div v-if="hito.fechaLimiteReentrega">
+              <dt class="text-cafe/50">Reentrega antes de</dt>
+              <dd class="mt-0.5 text-cafe">
+                {{ formatearFechaHora(hito.fechaLimiteReentrega) }}
+                <span v-if="hito.reentregaAtrasada" class="ml-1 font-semibold text-rojizo">
+                  Atrasada
+                </span>
+              </dd>
+            </div>
+            <div v-if="hito.revisionesMaximas">
+              <dt class="text-cafe/50">Revisiones</dt>
+              <dd class="mt-0.5 text-cafe">
+                {{ hito.revisiones || 0 }} de {{ hito.revisionesMaximas }}
+              </dd>
+            </div>
           </dl>
 
           <EntregasHito
@@ -1673,12 +1694,19 @@ onMounted(async () => {
               Aprobar entregable
             </button>
             <button
+              v-if="hito.puedeSolicitarRevision"
               type="button"
               class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-5 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10"
               @click="abrirRevision(hito)"
             >
               Solicitar revisión
             </button>
+            <p
+              v-else-if="hito.revisionesMaximas && (hito.revisiones || 0) >= hito.revisionesMaximas"
+              class="self-center text-xs leading-relaxed text-cafe/55"
+            >
+              Ya usaste las {{ hito.revisionesMaximas }} revisiones incluidas en esta etapa.
+            </p>
           </div>
 
           <div

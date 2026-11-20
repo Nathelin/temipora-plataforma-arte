@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.repositorios;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,7 +12,9 @@ import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
+import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.HitoPedido;
+import com.temipora.backend_springboot.modelo.TipoHito;
 
 import jakarta.persistence.LockModeType;
 
@@ -52,4 +55,41 @@ public interface HitoPedidoRepository extends JpaRepository<HitoPedido, Long> {
     List<HitoPedido> findPagadosDeArtista(
         @Param("idArtista") Long idArtista,
         @Param("pagado") EstadoPagoHito pagado);
+
+    @Query("""
+        select h from HitoPedido h
+        join fetch h.pedido p
+        join fetch h.hitoPresupuesto hp
+        join fetch p.cliente
+        join fetch p.artista
+        left join fetch p.servicio
+        where h.estadoPago = :pendiente
+          and hp.tipo = :tipo
+          and p.estado = :estadoPedido
+          and p.fechaCreacion <= :limite
+        """)
+    List<HitoPedido> findSenasPendientes(
+        @Param("pendiente") EstadoPagoHito pendiente,
+        @Param("tipo") TipoHito tipo,
+        @Param("estadoPedido") EstadoPedido estadoPedido,
+        @Param("limite") LocalDateTime limite);
+
+    @Query("""
+        select h from HitoPedido h
+        join fetch h.pedido p
+        join fetch h.hitoPresupuesto hp
+        join fetch p.cliente
+        join fetch p.artista
+        left join fetch p.servicio
+        where h.estadoPago = :pendiente
+          and h.fechaLimitePago between :desde and :hasta
+          and hp.tipo in :tipos
+          and p.estado in :estados
+        """)
+    List<HitoPedido> findPagosPorVencer(
+        @Param("pendiente") EstadoPagoHito pendiente,
+        @Param("tipos") Collection<TipoHito> tipos,
+        @Param("estados") Collection<EstadoPedido> estados,
+        @Param("desde") LocalDateTime desde,
+        @Param("hasta") LocalDateTime hasta);
 }

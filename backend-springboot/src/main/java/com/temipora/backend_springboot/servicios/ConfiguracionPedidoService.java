@@ -19,6 +19,8 @@ public class ConfiguracionPedidoService {
     private static final java.util.List<CampoAuditado> CAMPOS = java.util.List.of(
         CampoAuditado.de("diasAprobacionAutomatica", "Días de aprobación automática"),
         CampoAuditado.de("diasPagoCuota", "Días para pagar una cuota"),
+        CampoAuditado.de("revisionesMaximasPorHito", "Revisiones máximas por hito"),
+        CampoAuditado.de("diasReentrega", "Días para reentregar tras una revisión"),
         CampoAuditado.de("maxHitos", "Máximo de hitos"),
         CampoAuditado.de("porcentajeMaxPrimerHito", "Porcentaje máximo de la primera cuota"),
         CampoAuditado.de("montoMinimoCuota", "Monto mínimo por cuota"));
@@ -42,6 +44,10 @@ public class ConfiguracionPedidoService {
                 config.setDiasAprobacionAutomatica(
                     ConfiguracionPedido.DIAS_APROBACION_POR_DEFECTO);
                 config.setDiasPagoCuota(ConfiguracionPedido.DIAS_PAGO_POR_DEFECTO);
+                config.setRevisionesMaximasPorHito(
+                    ConfiguracionPedido.REVISIONES_MAXIMAS_POR_DEFECTO);
+                config.setDiasReentrega(
+                    ConfiguracionPedido.DIAS_REENTREGA_POR_DEFECTO);
                 config.setMaxHitos(ConfiguracionPedido.MAX_HITOS_POR_DEFECTO);
                 config.setPorcentajeMaxPrimerHito(
                     ConfiguracionPedido.PORCENTAJE_MAX_PRIMER_HITO_POR_DEFECTO);
@@ -65,6 +71,10 @@ public class ConfiguracionPedidoService {
             "La aprobación automática debe estar entre 1 y 60 días.");
         validarRango(request.getDiasPagoCuota(), 1, 14,
             "El plazo de pago debe estar entre 1 y 14 días.");
+        validarRango(request.getRevisionesMaximasPorHito(), 1, 10,
+            "El máximo de revisiones debe estar entre 1 y 10.");
+        validarRango(request.getDiasReentrega(), 1, 60,
+            "El plazo de reentrega debe estar entre 1 y 60 días.");
         validarRango(request.getMaxHitos(), 1, 6,
             "El máximo de hitos debe estar entre 1 y 6.");
 
@@ -88,6 +98,8 @@ public class ConfiguracionPedidoService {
         Snapshot antes = Snapshot.de(config, CAMPOS);
         config.setDiasAprobacionAutomatica(request.getDiasAprobacionAutomatica());
         config.setDiasPagoCuota(request.getDiasPagoCuota());
+        config.setRevisionesMaximasPorHito(request.getRevisionesMaximasPorHito());
+        config.setDiasReentrega(request.getDiasReentrega());
         config.setMaxHitos(request.getMaxHitos());
         config.setPorcentajeMaxPrimerHito(
             porcentajeMaximo.setScale(2, RoundingMode.HALF_UP));

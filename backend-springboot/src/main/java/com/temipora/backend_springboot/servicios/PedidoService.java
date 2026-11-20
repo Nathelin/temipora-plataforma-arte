@@ -91,7 +91,9 @@ public class PedidoService {
         CampoAuditado.de("estadoEntrega", "Estado de la entrega"),
         CampoAuditado.de("fechaPago", "Fecha de pago"),
         CampoAuditado.de("fechaEntrega", "Fecha de entrega"),
-        CampoAuditado.de("fechaAprobacion", "Fecha de aprobación"));
+        CampoAuditado.de("fechaAprobacion", "Fecha de aprobación"),
+        CampoAuditado.de("revisiones", "Revisiones solicitadas"),
+        CampoAuditado.de("fechaLimiteReentrega", "Plazo de reentrega"));
 
     private static final String ENTIDAD_ENTREGA = "Entrega";
     private static final List<CampoAuditado> CAMPOS_ENTREGA = List.of(
@@ -366,6 +368,7 @@ public class PedidoService {
         hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
         hito.setFechaEntrega(ahora);
         hito.setFechaLimiteAprobacion(null);
+        hito.setFechaLimiteReentrega(null);
         if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
             hito.setFechaLimitePago(
                 ahora.plusDays(hitoFlujoService.diasPagoCuota()));
@@ -454,9 +457,20 @@ public class PedidoService {
                 "Solo podés pedir una revisión de un entregable ya subido.");
         }
 
+        int maxRevisiones = hitoFlujoService.revisionesMaximasPorHito();
+        if (hito.getRevisiones() >= maxRevisiones) {
+            throw new ConflictoException(
+                "Ya usaste las " + maxRevisiones
+                    + " revisiones incluidas en esta etapa.");
+        }
+
         Snapshot antesHito = Snapshot.de(hito, CAMPOS_HITO);
+        LocalDateTime ahoraRevision = LocalDateTime.now();
         hito.setEstadoEntrega(EstadoEntregaHito.CON_REVISION);
         hito.setFechaLimiteAprobacion(null);
+        hito.setRevisiones(hito.getRevisiones() + 1);
+        hito.setFechaLimiteReentrega(
+            ahoraRevision.plusDays(hitoFlujoService.diasReentrega()));
         if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
             hito.setFechaLimitePago(null);
         }
@@ -928,6 +942,7 @@ public class PedidoService {
                         entregable,
                         false,
                         false,
+                        0,
                         muestraOrigen,
                         muestraCobro,
                         factorCobro,
@@ -1141,6 +1156,7 @@ public class PedidoService {
             && pedido.getEstado() == EstadoPedido.FINALIZADO
             && pedido.isPublicacionAutorizada();
 
+        int revisionesMaximas = hitoFlujoService.revisionesMaximasPorHito();
         for (HitoPedido hito : pedido.getHitos()) {
             List<Pago> pagos = pagoRepository
                 .findByHitoPedidoIdHitoPedidoOrderByFechaCreacionDesc(
@@ -1149,7 +1165,8 @@ public class PedidoService {
             boolean puedeEntregar = esArtista && puedeEntregar(pedido, hito);
             boolean puedeAprobar = esCliente && puedeAprobar(hito);
             boolean puedeSolicitarRevision = esCliente
-                && hito.getEstadoEntrega() == EstadoEntregaHito.ENTREGADO;
+                && hito.getEstadoEntrega() == EstadoEntregaHito.ENTREGADO
+                && hito.getRevisiones() < revisionesMaximas;
             boolean incluirEntrega = esArtista || esAdmin
                 || hito.getHitoPresupuesto().getTipo() != TipoHito.ENTREGA
                 || hito.getEstadoPago() == EstadoPagoHito.PAGADO;
@@ -1181,6 +1198,7 @@ public class PedidoService {
                 puedeEntregar,
                 puedeAprobar,
                 puedeSolicitarRevision,
+                revisionesMaximas,
                 muestraOrigen,
                 muestraCobro,
                 factorCobro,

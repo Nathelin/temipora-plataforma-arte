@@ -223,6 +223,8 @@ class PedidoServiceTest {
             .thenAnswer(invocacion -> invocacion.getArgument(0));
         lenient().when(solicitudRepository.save(any()))
             .thenAnswer(invocacion -> invocacion.getArgument(0));
+        lenient().when(hitoFlujoService.revisionesMaximasPorHito()).thenReturn(2);
+        lenient().when(hitoFlujoService.diasReentrega()).thenReturn(7);
     }
 
     @Test
@@ -406,8 +408,40 @@ class PedidoServiceTest {
         assertThat(dto).isNotNull();
         assertThat(hito.getEstadoEntrega())
             .isEqualTo(EstadoEntregaHito.CON_REVISION);
+        assertThat(hito.getRevisiones()).isEqualTo(1);
+        assertThat(hito.getFechaLimiteReentrega()).isNotNull();
         verify(entregaService).registrarRevision(
             hito, cliente, "Cambiar la pose");
+    }
+
+    @Test
+    void solicitarRevision_alcanzadoElTope_lanzaConflicto() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PAGADO);
+        hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
+        hito.setRevisiones(2);
+        bloquearPedidoYHito();
+
+        assertThatThrownBy(() -> pedidoService.solicitarRevision(
+            PEDIDO, HITO, CLIENTE, new SolicitudRevisionRequest()))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("revisiones");
+        verify(entregaService, never()).registrarRevision(any(), any(), any());
+    }
+
+    @Test
+    void entregar_limpiaElPlazoDeReentrega() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PAGADO);
+        hito.setEstadoEntrega(EstadoEntregaHito.CON_REVISION);
+        hito.setFechaLimiteReentrega(LocalDateTime.now().plusDays(3));
+        bloquearPedidoYHito();
+
+        pedidoService.entregar(
+            PEDIDO, HITO, ARTISTA,
+            new EntregaHitoMultipartRequest(), List.<MultipartFile>of());
+
+        assertThat(hito.getFechaLimiteReentrega()).isNull();
     }
 
     @Test
@@ -775,6 +809,19 @@ class PedidoServiceTest {
         assertThat(dto.getNoLeidos()).isZero();
         verify(mensajeRepository, never())
             .contarNoLeidosPorConversacion(anyLong(), any(), any());
+    }
+
+    @Test
+    void obtener_marcaLaReentregaAtrasada() {
+        hito.setEstadoEntrega(EstadoEntregaHito.CON_REVISION);
+        hito.setFechaLimiteReentrega(LocalDateTime.now().minusDays(1));
+        when(pedidoRepository.findById(PEDIDO)).thenReturn(Optional.of(pedido));
+        when(conversacionRepository.buscarPorPar(CLIENTE, ARTISTA))
+            .thenReturn(Optional.empty());
+
+        PedidoDTO dto = pedidoService.obtener(PEDIDO, CLIENTE);
+
+        assertThat(dto.getHitos().get(0).isReentregaAtrasada()).isTrue();
     }
 
     @Test

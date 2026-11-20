@@ -11,9 +11,11 @@ import {
 import FilaPedidoActivo from '../components/FilaPedidoActivo.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import { useAccesoEnlace } from '../composables/useAccesoEnlace'
 
 const route = useRoute()
 const router = useRouter()
+const { consumirSiCorresponde } = useAccesoEnlace()
 
 const CONTADORES_VACIOS = {
   todos: 0,
@@ -211,7 +213,11 @@ function cargarMas() {
   cargar(false)
 }
 
-onMounted(() => {
+onMounted(async () => {
+  const acceso = await consumirSiCorresponde()
+  if (acceso.habiaEnlace) {
+    return
+  }
   cargar(true)
   cargarContadores()
   cargarServicios()

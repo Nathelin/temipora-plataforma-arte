@@ -154,6 +154,44 @@ class HitoFlujoServiceTest {
             .isEqualTo(ConfiguracionPedido.DIAS_APROBACION_POR_DEFECTO);
     }
 
+    @Test
+    void revisionesMaximasPorHito_usaElValorConfigurado() {
+        ConfiguracionPedido config = new ConfiguracionPedido();
+        config.setRevisionesMaximasPorHito(4);
+        when(configuracionPedidoService.obtener()).thenReturn(config);
+
+        assertThat(service.revisionesMaximasPorHito()).isEqualTo(4);
+    }
+
+    @Test
+    void revisionesMaximasPorHito_sinValor_usaElDefault() {
+        ConfiguracionPedido config = new ConfiguracionPedido();
+        config.setRevisionesMaximasPorHito(null);
+        when(configuracionPedidoService.obtener()).thenReturn(config);
+
+        assertThat(service.revisionesMaximasPorHito())
+            .isEqualTo(ConfiguracionPedido.REVISIONES_MAXIMAS_POR_DEFECTO);
+    }
+
+    @Test
+    void diasReentrega_usaElValorConfigurado() {
+        ConfiguracionPedido config = new ConfiguracionPedido();
+        config.setDiasReentrega(10);
+        when(configuracionPedidoService.obtener()).thenReturn(config);
+
+        assertThat(service.diasReentrega()).isEqualTo(10);
+    }
+
+    @Test
+    void diasReentrega_sinValor_usaElDefault() {
+        ConfiguracionPedido config = new ConfiguracionPedido();
+        config.setDiasReentrega(null);
+        when(configuracionPedidoService.obtener()).thenReturn(config);
+
+        assertThat(service.diasReentrega())
+            .isEqualTo(ConfiguracionPedido.DIAS_REENTREGA_POR_DEFECTO);
+    }
+
     // ---------------------------------------------------------------
     // helpers
     // ---------------------------------------------------------------

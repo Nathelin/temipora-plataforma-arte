@@ -18,6 +18,8 @@ public class PedidoConfigDTO {
 
     private Integer diasAprobacionAutomatica;
     private Integer diasPagoCuota;
+    private Integer revisionesMaximasPorHito;
+    private Integer diasReentrega;
     private Integer maxHitos;
     private BigDecimal porcentajeMaxPrimerHito;
     private BigDecimal montoMinimoCuota;
@@ -27,6 +29,8 @@ public class PedidoConfigDTO {
         return PedidoConfigDTO.builder()
             .diasAprobacionAutomatica(config.getDiasAprobacionAutomatica())
             .diasPagoCuota(config.getDiasPagoCuota())
+            .revisionesMaximasPorHito(config.getRevisionesMaximasPorHito())
+            .diasReentrega(config.getDiasReentrega())
             .maxHitos(config.getMaxHitos())
             .porcentajeMaxPrimerHito(config.getPorcentajeMaxPrimerHito())
             .montoMinimoCuota(config.getMontoMinimoCuota())
