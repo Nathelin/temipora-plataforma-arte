@@ -1312,6 +1312,24 @@ public class PedidoService {
                 pedido.getAceptacionTerminosPlataforma() != null
                     ? pedido.getAceptacionTerminosPlataforma().getFechaAceptacion()
                     : null)
+            .terminosPlataformaHuella(
+                pedido.getAceptacionTerminosPlataforma() != null
+                    ? HuellaTexto.sha256(
+                        pedido.getAceptacionTerminosPlataforma().getSnapshot())
+                    : null)
+            .terminosArtistaVersion(
+                pedido.getSolicitud().getTerminos() != null
+                    ? pedido.getSolicitud().getTerminosVersion()
+                    : null)
+            .terminosArtistaAceptadosEn(
+                pedido.getSolicitud().getTerminosAceptadosEn())
+            .terminosArtistaDelServicio(
+                pedido.getSolicitud().getTerminos() != null
+                    && pedido.getSolicitud().getTerminos().getServicio()
+                        != null)
+            .terminosArtistaHuella(
+                HuellaTexto.sha256(
+                    pedido.getSolicitud().getTerminosSnapshot()))
             .hitos(hitosDto)
             .dibujos(pedido.getSolicitud().getItems().stream()
                 .map(DibujoResumenDTO::desdeItem)

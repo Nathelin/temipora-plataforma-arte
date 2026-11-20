@@ -89,6 +89,11 @@ public class PedidoDTO {
 
     private Integer terminosPlataformaVersion;
     private LocalDateTime terminosPlataformaAceptadosEn;
+    private String terminosPlataformaHuella;
+    private Integer terminosArtistaVersion;
+    private LocalDateTime terminosArtistaAceptadosEn;
+    private boolean terminosArtistaDelServicio;
+    private String terminosArtistaHuella;
     private List<HitoPedidoDTO> hitos;
     private List<DibujoResumenDTO> dibujos;
     private boolean puedeCancelar;

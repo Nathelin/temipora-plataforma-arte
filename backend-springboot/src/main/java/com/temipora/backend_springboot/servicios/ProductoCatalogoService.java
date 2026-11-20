@@ -453,17 +453,19 @@ public class ProductoCatalogoService {
         dto.setNombreVendedor(publicacion.getVendedor() != null
             ? publicacion.getVendedor().getNombreUsuario() : null);
         CompraItem origen = publicacion.getCompraItemOrigen();
-        String titulo = origen != null && hayTexto(origen.getNombreVariante())
-            ? origen.getNombreVariante()
-            : publicacion.getVariante().getNombre();
-        String tituloOriginal = origen != null
+        String nombreVariante = NombrePiezaVisible.nombreDeVariante(
+            origen != null && hayTexto(origen.getNombreVariante())
+                ? origen.getNombreVariante()
+                : publicacion.getVariante().getNombre());
+        String tituloProducto = origen != null
             && hayTexto(origen.getTituloProducto())
                 ? origen.getTituloProducto()
                 : producto.getTitulo();
+        String titulo = NombrePiezaVisible.deReventa(nombreVariante, tituloProducto);
         if (hayTexto(titulo)) {
             dto.setTitulo(titulo);
         }
-        dto.setTituloOriginal(tituloOriginal);
+        dto.setTituloOriginal(nombreVariante != null ? tituloProducto : null);
         dto.setPrecioDesde(convertir(publicacion.getPrecio(), producto, moneda));
         dto.setMoneda(moneda != null ? moneda.getCodigo()
             : (producto.getMoneda() != null

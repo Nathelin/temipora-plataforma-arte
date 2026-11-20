@@ -3,6 +3,8 @@ package com.temipora.backend_springboot.modelo;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.temipora.backend_springboot.servicios.NombrePiezaVisible;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -46,16 +48,18 @@ public class PublicacionReventaDTO {
         Producto producto = variante != null ? variante.getProducto() : null;
         Usuario artista = producto != null ? producto.getArtista() : null;
         CompraItem origen = publicacion.getCompraItemOrigen();
+        String nombreVariante = NombrePiezaVisible.nombreDeVariante(
+            origen != null ? origen.getNombreVariante()
+                : (variante != null ? variante.getNombre() : null));
+        String tituloProducto = origen != null ? origen.getTituloProducto()
+            : (producto != null ? producto.getTitulo() : null);
         return PublicacionReventaDTO.builder()
             .idPublicacionReventa(publicacion.getIdPublicacionReventa())
             .idVariante(variante != null ? variante.getIdVariante() : null)
-            .nombreVariante(origen != null ? origen.getNombreVariante()
-                : (variante != null ? variante.getNombre() : null))
+            .nombreVariante(nombreVariante)
             .idProducto(producto != null ? producto.getIdProducto() : null)
-            .titulo(origen != null ? origen.getNombreVariante()
-                : (variante != null ? variante.getNombre() : null))
-            .tituloOriginal(origen != null ? origen.getTituloProducto()
-                : (producto != null ? producto.getTitulo() : null))
+            .titulo(nombreVariante != null ? nombreVariante : tituloProducto)
+            .tituloOriginal(nombreVariante != null ? tituloProducto : null)
             .imagenUrl(variante != null ? variante.getImagenUrl() : null)
             .idArtistaOriginal(artista != null ? artista.getIdUsuario() : null)
             .nombreArtistaOriginal(artista != null

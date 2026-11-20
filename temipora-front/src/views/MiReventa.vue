@@ -235,7 +235,7 @@ onMounted(cargar)
               <h4 class="font-display text-base font-bold text-granate">
                 {{ pieza.titulo }}
               </h4>
-              <p class="text-sm text-cafe/60">{{ pieza.nombreVariante }}</p>
+              <p v-if="pieza.nombreVariante" class="text-sm text-cafe/60">{{ pieza.nombreVariante }}</p>
               <p class="mt-1 text-xs text-cafe/50">
                 Tope: {{ formatear(pieza.precioTope, pieza.moneda) }}
                 · Pagaste: {{ formatear(pieza.precioPagado, pieza.moneda) }}
@@ -298,7 +298,10 @@ onMounted(cargar)
                   {{ estadoTexto(publicacion.estado) }}
                 </span>
               </div>
-              <p class="text-sm text-cafe/60">
+              <p
+                v-if="publicacion.tituloOriginal || publicacion.nombreVariante"
+                class="text-sm text-cafe/60"
+              >
                 {{ publicacion.tituloOriginal || publicacion.nombreVariante }}
               </p>
               <p class="mt-1 font-semibold text-coral">
@@ -371,7 +374,10 @@ onMounted(cargar)
                       {{ estadoTexto(publicacion.estado) }}
                     </span>
                   </div>
-                  <p class="text-xs text-cafe/55">
+                  <p
+                    v-if="publicacion.tituloOriginal || publicacion.nombreVariante"
+                    class="text-xs text-cafe/55"
+                  >
                     {{ publicacion.tituloOriginal || publicacion.nombreVariante }}
                   </p>
                 </div>

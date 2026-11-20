@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.temipora.backend_springboot.modelo.EntregaArchivoDTO;
@@ -25,6 +26,15 @@ public class ConstanciaService {
         "Documento contractual del pedido · generado automáticamente por "
             + "Temipora";
 
+    private final String urlFrontend;
+
+    public ConstanciaService(
+            @Value("${app.frontend.url:}") String urlFrontend) {
+        this.urlFrontend = urlFrontend == null
+            ? ""
+            : urlFrontend.replaceAll("/+$", "");
+    }
+
     public byte[] generar(PedidoDTO pedido) {
         String referencia = "Pedido #" + pedido.getIdPedido();
         String moneda = FormatoPdf.moneda(pedido.getMonedaMostrada());
@@ -41,8 +51,6 @@ public class ConstanciaService {
             "Inicio", FormatoPdf.fecha(pedido.getFechaInicio()),
             "Límite de entrega", FormatoPdf.fecha(pedido.getLimiteEntrega()),
             "Finalizado", FormatoPdf.fechaHora(pedido.getFinalizadoEn()),
-            "Términos de la plataforma", "versión "
-                + FormatoPdf.numero(pedido.getTerminosPlataformaVersion()),
             "Moneda", moneda,
             "Generado", FormatoPdf.fechaHora(LocalDateTime.now()));
 
@@ -50,6 +58,7 @@ public class ConstanciaService {
         planDePagos(documento, pedido);
         entregas(documento, pedido);
         pagos(documento, pedido);
+        terminos(documento, pedido);
 
         return documento.cerrar();
     }
@@ -273,6 +282,69 @@ public class ConstanciaService {
             case "CON_REVISION" -> "Con revisión";
             default -> valor;
         };
+    }
+
+    private void terminos(DocumentoPdf documento, PedidoDTO pedido) {
+        documento.seccion("5", "Términos aceptados");
+
+        TablaPdf tabla = new TablaPdf(
+            new String[] { "Documento", "Versión", "Alcance", "Aceptado",
+                "Huella" },
+            new float[] { 1.2f, 0.6f, 1.9f, 1.3f, 1.4f },
+            new boolean[] { false, true, false, false, false });
+
+        tabla.fila(
+            "Plataforma",
+            version(pedido.getTerminosPlataformaVersion()),
+            "Uso de la plataforma",
+            FormatoPdf.fechaHora(pedido.getTerminosPlataformaAceptadosEn()),
+            huellaCorta(pedido.getTerminosPlataformaHuella()));
+
+        boolean hayTerminosDelArtista =
+            pedido.getTerminosArtistaVersion() != null;
+        if (hayTerminosDelArtista) {
+            tabla.fila(
+                "Del artista",
+                version(pedido.getTerminosArtistaVersion()),
+                pedido.isTerminosArtistaDelServicio()
+                    ? "Del servicio «"
+                        + FormatoPdf.texto(pedido.getNombreServicio()) + "»"
+                    : "Generales del artista",
+                FormatoPdf.fechaHora(pedido.getTerminosArtistaAceptadosEn()),
+                huellaCorta(pedido.getTerminosArtistaHuella()));
+        }
+        documento.tabla(tabla);
+
+        documento.parrafoChico(
+            "La huella identifica el texto exacto de los términos aceptados: "
+                + "si se modifican después, la de este pedido no cambia. Los "
+                + "términos del artista se aceptaron al enviar la solicitud.");
+        if (pedido.getTerminosPlataformaHuella() != null) {
+            documento.parrafoChico("Plataforma · huella SHA-256 completa: "
+                + pedido.getTerminosPlataformaHuella());
+        }
+        if (hayTerminosDelArtista && pedido.getTerminosArtistaHuella() != null) {
+            documento.parrafoChico("Artista · huella SHA-256 completa: "
+                + pedido.getTerminosArtistaHuella());
+            if (!urlFrontend.isBlank()) {
+                documento.parrafoChico(
+                    "Verificación pública del texto aceptado: "
+                        + urlFrontend + "/terminos-aceptados/"
+                        + CodigoTerminos.codificar(pedido.getIdSolicitud(),
+                            pedido.getTerminosArtistaHuella()));
+            }
+        }
+    }
+
+    private static String version(Integer valor) {
+        return valor == null ? "—" : "v" + valor;
+    }
+
+    private static String huellaCorta(String huella) {
+        if (huella == null || huella.isBlank()) {
+            return "—";
+        }
+        return huella.length() <= 16 ? huella : huella.substring(0, 16) + "…";
     }
 
     private static String estadoPago(String valor) {

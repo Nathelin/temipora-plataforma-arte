@@ -85,6 +85,7 @@ const Carrito = () => import('../views/Carrito.vue')
 const MisCompras = () => import('../views/MisCompras.vue')
 const CompraDetalle = () => import('../views/CompraDetalle.vue')
 const CertificadoPublico = () => import('../views/CertificadoPublico.vue')
+const TerminosAceptadosPublico = () => import('../views/TerminosAceptadosPublico.vue')
 const ServiciosArchivados = () => import('../views/ServiciosArchivados.vue')
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useConfirmacionSalida } from '../composables/useConfirmacionSalida'
@@ -119,6 +120,10 @@ const routes = [
       { path: 'certificado/:codigo', name: 'certificado-publico', component: CertificadoPublico,
         props: (route) => ({ codigo: String(route.params.codigo) }),
         meta: { title: (route) => `Certificado ${route.params.codigo}` }
+      },
+      { path: 'terminos-aceptados/:codigo', name: 'terminos-aceptados-publico', component: TerminosAceptadosPublico,
+        props: (route) => ({ codigo: String(route.params.codigo) }),
+        meta: { title: 'Términos aceptados' }
       },
       {
         path: 'carrito',

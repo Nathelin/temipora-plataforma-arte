@@ -306,7 +306,7 @@ watch(() => props.id, cargar)
 
         <ResumenPropiedad
           v-if="reventa.ledger?.tieneLedger"
-          :nombre="reventa.ledger.nombre || reventa.nombreVariante"
+          :nombre="reventa.titulo || reventa.ledger.nombre || reventa.nombreVariante"
           :propietario="reventa.nombreVendedor"
           :estado="estadoReventa"
           :eventos="reventa.ledger.eventos"
@@ -421,7 +421,7 @@ watch(() => props.id, cargar)
 
     <HistorialLedgerModal
       :abierto="!!historialAbierto"
-      :titulo="historialAbierto?.nombre || reventa?.nombreVariante || 'Historial de la pieza'"
+      :titulo="reventa?.titulo || historialAbierto?.nombre || 'Historial de la pieza'"
       :eventos="historialAbierto?.eventos || []"
       :integridad="historialAbierto?.integridad"
       :mensaje="historialAbierto?.mensaje"

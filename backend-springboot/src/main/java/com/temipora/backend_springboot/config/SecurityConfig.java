@@ -109,6 +109,7 @@ public class SecurityConfig {
                     "/api/coleccion/**",
                     "/api/resenias/**",
                     "/api/terminos-plataforma",
+                    "/api/terminos-aceptados/**",
                     "/api/comisiones/**",
                     "/api/configuracion-pedido",
                     "/api/ofertas/campana/**",

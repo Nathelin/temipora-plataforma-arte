@@ -17,7 +17,8 @@ import com.temipora.backend_springboot.modelo.UsuarioResumenDTO;
 
 class ConstanciaServiceTest {
 
-    private final ConstanciaService constanciaService = new ConstanciaService();
+    private final ConstanciaService constanciaService =
+        new ConstanciaService("https://temipora.test");
 
     @Test
     void generaUnaConstanciaConEncabezadoSeccionesYNotas() throws Exception {
@@ -137,9 +138,28 @@ class ConstanciaServiceTest {
             .contains("Pendiente de pago");
     }
 
+    @Test
+    void muestraLosTerminosAceptadosConVersionYHuella() throws Exception {
+        String texto = texto(constanciaService.generar(pedidoConHitosYPagos()));
+
+        assertThat(texto)
+            .contains("Términos aceptados")
+            .contains("Plataforma")
+            .contains("v3")
+            .contains("Del artista")
+            .contains("v7")
+            .contains("Generales del artista")
+            .contains("faa13a754b615f98")
+            .contains("b00994ee58432ff1")
+            .contains(
+                "https://temipora.test/terminos-aceptados/"
+                    + "TA-Y-b00994ee58432ff1");
+    }
+
     private PedidoDTO pedidoConHitosYPagos() {
         return PedidoDTO.builder()
             .idPedido(12L)
+            .idSolicitud(34L)
             .cliente(usuario(1L, "cliente"))
             .artista(usuario(2L, "artista"))
             .nombreServicio("Ilustración")
@@ -152,6 +172,18 @@ class ConstanciaServiceTest {
             .comisionMontoMostrado(new BigDecimal("5.00"))
             .montoNetoArtistaMostrado(new BigDecimal("95.00"))
             .terminosPlataformaVersion(3)
+            .terminosPlataformaAceptadosEn(
+                LocalDateTime.of(2026, 11, 19, 23, 35))
+            .terminosPlataformaHuella(
+                "faa13a754b615f989a9e6600f4642592344820379bf3cb8232b40bd3"
+                    + "0d6e08b5")
+            .terminosArtistaVersion(7)
+            .terminosArtistaAceptadosEn(
+                LocalDateTime.of(2026, 11, 12, 10, 2))
+            .terminosArtistaDelServicio(false)
+            .terminosArtistaHuella(
+                "b00994ee58432ff1a76c14fc395e51da35e9a4ebd68e0803e25a8351"
+                    + "b87d4320")
             .hitos(List.of(HitoPedidoDTO.builder()
                 .idHitoPedido(1L)
                 .orden(0)
