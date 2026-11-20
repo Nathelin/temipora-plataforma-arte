@@ -26,6 +26,7 @@ const allowedHosts = [
   '.ngrok-free.dev',
   '.trycloudflare.com',
   '.devtunnels.ms',
+  '.temipora-demo.online',
 ]
 
 // Los archivos de /assets llevan hash en el nombre: su contenido no cambia

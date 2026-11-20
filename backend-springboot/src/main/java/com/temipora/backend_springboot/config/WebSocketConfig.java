@@ -27,7 +27,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 "http://127.0.0.1:8080",
                 "https://*.ngrok-free.dev",
                 "https://*.ngrok-free.app",
-                "https://*.trycloudflare.com");
+                "https://*.trycloudflare.com",
+                "https://*.temipora-demo.online",
+                "https://temipora-demo.online");
     }
 
     @Override
