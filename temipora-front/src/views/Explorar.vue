@@ -258,7 +258,30 @@ watch(serviciosGrilla, async () => {
       </router-link>
     </header>
 
-    <p v-if="cargando" class="py-24 text-center text-cafe/60">Cargando...</p>
+    <!-- El esqueleto ocupa el alto de la pantalla para que el footer no quede
+         visible y salte cuando llegan los datos (CLS). -->
+    <div
+      v-if="cargando"
+      class="min-h-[calc(100vh-4rem)]"
+      role="status"
+      aria-busy="true"
+    >
+      <div class="mt-8 animate-pulse" aria-hidden="true">
+        <div class="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          <div class="min-h-[320px] rounded-3xl bg-superficie-alt sm:min-h-[440px]"></div>
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+            <div class="min-h-[200px] rounded-2xl bg-superficie-alt"></div>
+            <div class="min-h-[200px] rounded-2xl bg-superficie-alt"></div>
+          </div>
+        </div>
+        <div class="mt-8 flex gap-2">
+          <div class="h-10 w-20 rounded-full bg-superficie-alt"></div>
+          <div class="h-10 w-24 rounded-full bg-superficie-alt"></div>
+          <div class="h-10 w-28 rounded-full bg-superficie-alt"></div>
+        </div>
+      </div>
+      <span class="sr-only">Cargando contenido…</span>
+    </div>
     <p v-else-if="error" role="alert" class="py-24 text-center text-rojizo">{{ error }}</p>
 
     <template v-else>

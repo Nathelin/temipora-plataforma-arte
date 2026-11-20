@@ -63,12 +63,66 @@ function cacheInmutableAssets() {
   }
 }
 
+// El HTML se sirve igual para cualquier ruta de la SPA, así que no puede saber
+// qué vista se va a abrir. El chunk de Explorar y las fuentes latinas se
+// precargan desde el <head> para que empiecen a bajar junto con el entry, en
+// vez de esperar a que el router los descubra (un viaje extra al túnel).
+function precargarVistaYFuentes() {
+  return {
+    name: 'temipora-preload-vista-y-fuentes',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, ctx) {
+        const bundle = Object.values(ctx.bundle || {})
+        const etiquetas = []
+
+        const explorar = bundle.find(
+          (item) => item.type === 'chunk' && item.name === 'Explorar',
+        )
+        if (explorar) {
+          etiquetas.push({
+            tag: 'link',
+            attrs: {
+              rel: 'modulepreload',
+              crossorigin: '',
+              href: `/${explorar.fileName}`,
+            },
+            injectTo: 'head',
+          })
+        }
+
+        const fuentes = bundle.filter(
+          (item) => item.type === 'asset'
+            && /(?:^|\/)(bricolage-grotesque-latin|dm-sans-latin)-wght-normal-[^/]*\.woff2$/.test(item.fileName),
+        )
+        for (const fuente of fuentes) {
+          etiquetas.push({
+            tag: 'link',
+            attrs: {
+              rel: 'preload',
+              as: 'font',
+              type: 'font/woff2',
+              crossorigin: '',
+              href: `/${fuente.fileName}`,
+            },
+            injectTo: 'head',
+          })
+        }
+
+        return etiquetas.length ? { html, tags: etiquetas } : html
+      },
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
     tailwindcss(),
     cacheInmutableAssets(),
+    precargarVistaYFuentes(),
   ],
   resolve: {
     alias: {

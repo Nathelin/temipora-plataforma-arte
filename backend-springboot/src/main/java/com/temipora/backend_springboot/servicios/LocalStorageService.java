@@ -44,7 +44,7 @@ public class LocalStorageService implements StorageService {
      * ({@code uploads/320/<uuid>.webp}) para no tocar nunca el archivo
      * original que referencia la base de datos y el ledger.
      */
-    static final int[] ANCHOS_VARIANTE = {320, 640, 960, 1280};
+    static final int[] ANCHOS_VARIANTE = {128, 320, 480, 640, 960, 1280};
 
     private static final String PREFIJO_UPLOADS = "/uploads/";
     private static final Pattern NOMBRE_UUID_WEBP = Pattern.compile(

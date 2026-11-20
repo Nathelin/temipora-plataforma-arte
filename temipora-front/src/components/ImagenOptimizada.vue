@@ -10,7 +10,7 @@ const props = defineProps({
   alto: { type: [Number, String], default: null },
 })
 
-const ANCHOS = [320, 640, 960, 1280]
+const ANCHOS = [128, 320, 480, 640, 960, 1280]
 const PATRON = /^\/uploads\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\.webp$/
 
 // Solo reescribimos las imágenes públicas propias. Cualquier otra URL
