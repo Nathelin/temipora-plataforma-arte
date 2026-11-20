@@ -9,6 +9,7 @@ import TarjetaReseniaPublica from '../components/TarjetaReseniaPublica.vue'
 import ModalResenias from '../components/ModalResenias.vue'
 import VisorImagenes from '../components/VisorImagenes.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+import ImagenOptimizada from '../components/ImagenOptimizada.vue'
 import TarjetaArtistaRecomendado from '../components/TarjetaArtistaRecomendado.vue'
 import {
   cargarReseniasServicio,
@@ -696,10 +697,12 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
               aria-label="Ampliar imagen del servicio"
               @click="abrirVisor()"
             >
-              <img
+              <ImagenOptimizada
                 v-if="imagenActiva"
                 :src="imagenActiva.url"
                 :alt="servicio.nombre"
+                sizes="(min-width: 1024px) 60vw, 100vw"
+                prioridad
                 class="aspect-[3/2] w-full object-cover transition duration-200"
                 :class="mostrarBlur ? 'scale-105 blur-[18px]' : ''"
               />
@@ -794,7 +797,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
               :aria-pressed="indiceImagen === i"
               @click="seleccionarImagen(i)"
             >
-              <img :src="img.url" alt="" class="h-full w-full object-cover" />
+              <ImagenOptimizada :src="img.url" alt="" sizes="80px" class="h-full w-full object-cover" />
               <span
                 v-if="esImagenVerificada(img.url)"
                 class="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-700 text-[10px] font-bold text-white shadow"
@@ -1081,10 +1084,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', manejarTecla))
           <div class="rounded-[24px] border border-rosa/40 bg-superficie p-4">
             <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/60">Artista</p>
             <div class="mt-3 flex items-center gap-3">
-              <img
+              <ImagenOptimizada
                 v-if="fotoArtista"
                 :src="fotoArtista"
                 alt=""
+                sizes="48px"
                 class="h-12 w-12 shrink-0 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-rosa/50"
               />
               <span

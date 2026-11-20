@@ -8,6 +8,7 @@ import { useNotificaciones } from '../composables/useNotificaciones'
 import ResumenPropiedad from '../components/ResumenPropiedad.vue'
 import HistorialLedgerModal from '../components/HistorialLedgerModal.vue'
 import ListaResenias from '../components/ListaResenias.vue'
+import ImagenOptimizada from '../components/ImagenOptimizada.vue'
 import { cargarReseniasProducto } from '../servicios/resenias'
 
 const props = defineProps({
@@ -193,10 +194,12 @@ watch(() => props.id, cargar)
     <div v-else-if="reventa" class="mt-5 grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
       <section class="space-y-4">
         <div class="relative overflow-hidden rounded-[22px] border border-borde/60 bg-rosa/20 shadow-sm">
-          <img
+          <ImagenOptimizada
             v-if="reventa.imagenUrl"
             :src="reventa.imagenUrl"
             :alt="titulo"
+            sizes="(min-width: 1024px) 52vw, 100vw"
+            prioridad
             class="aspect-square w-full object-cover"
             :class="requiereAdvertencia ? 'scale-105 blur-[18px]' : ''"
           />
@@ -321,10 +324,11 @@ watch(() => props.id, cargar)
             :to="`/perfil/${reventa.nombreArtista}`"
             class="mt-3 inline-flex items-center gap-2"
           >
-            <img
+            <ImagenOptimizada
               v-if="reventa.urlFotoArtista"
               :src="reventa.urlFotoArtista"
               alt=""
+              sizes="32px"
               class="h-8 w-8 rounded-full object-cover ring-1 ring-borde/50"
             />
             <span

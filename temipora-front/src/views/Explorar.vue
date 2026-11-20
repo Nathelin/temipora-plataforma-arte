@@ -5,6 +5,7 @@ import api from '../servicios/api'
 import { cargarCatalogoProductos } from '../servicios/productos'
 import { formatearPrecio } from '../servicios/moneda'
 import { formatearPromedio } from '../servicios/resenias'
+import ImagenOptimizada from '../components/ImagenOptimizada.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -268,10 +269,12 @@ watch(serviciosGrilla, async () => {
           class="group relative flex min-h-[320px] cursor-pointer items-end overflow-hidden rounded-3xl border border-borde/60 bg-superficie shadow-sm sm:min-h-[440px]"
           @click="irAServicio(heroServicio.idServicio)"
         >
-          <img
+          <ImagenOptimizada
             v-if="heroServicio.imagenPortada"
             :src="heroServicio.imagenPortada"
             :alt="heroServicio.nombre"
+            sizes="(min-width: 1024px) 66vw, 100vw"
+            prioridad
             class="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
           />
           <div
@@ -291,10 +294,11 @@ watch(serviciosGrilla, async () => {
             </h2>
             <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-inverso-suave">
               <span class="inline-flex items-center gap-2">
-                <img
+                <ImagenOptimizada
                   v-if="heroServicio.urlFotoArtista"
                   :src="heroServicio.urlFotoArtista"
                   alt=""
+                  sizes="40px"
                   class="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-white/40"
                 />
                 <span
@@ -324,10 +328,11 @@ watch(serviciosGrilla, async () => {
             class="group relative flex min-h-[200px] cursor-pointer items-end overflow-hidden rounded-2xl border border-borde/60 bg-superficie shadow-sm"
             @click="irAServicio(mini.idServicio)"
           >
-            <img
+            <ImagenOptimizada
               v-if="mini.imagenPortada"
               :src="mini.imagenPortada"
               :alt="mini.nombre"
+              sizes="(min-width: 1024px) 33vw, 50vw"
               class="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
             />
             <div
@@ -354,10 +359,11 @@ watch(serviciosGrilla, async () => {
             class="group relative flex min-h-[200px] cursor-pointer items-end overflow-hidden rounded-2xl border border-borde/60 bg-superficie shadow-sm"
             @click="irAProducto(heroMiniProducto.idProducto)"
           >
-            <img
+            <ImagenOptimizada
               v-if="heroMiniProducto.imagenPortada"
               :src="heroMiniProducto.imagenPortada"
               :alt="heroMiniProducto.titulo"
+              sizes="(min-width: 1024px) 33vw, 50vw"
               class="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
             />
             <div
@@ -457,10 +463,11 @@ watch(serviciosGrilla, async () => {
               @click="irAServicio(servicio.idServicio)"
             >
               <div class="relative aspect-[4/5] overflow-hidden bg-rosa/20">
-                <img
+                <ImagenOptimizada
                   v-if="servicio.imagenPortada"
                   :src="servicio.imagenPortada"
                   :alt="servicio.nombre"
+                  sizes="(min-width: 640px) 260px, 240px"
                   class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
                   :class="servicio.requiereAdvertencia ? 'scale-105 blur-[18px]' : ''"
                 />
@@ -512,10 +519,11 @@ watch(serviciosGrilla, async () => {
                   class="mt-2 flex w-fit items-center gap-2 text-xs font-medium text-cafe/70 transition hover:text-acento"
                   @click.stop="irAPerfil(servicio.nombreArtista)"
                 >
-                  <img
+                  <ImagenOptimizada
                     v-if="servicio.urlFotoArtista"
                     :src="servicio.urlFotoArtista"
                     alt=""
+                    sizes="40px"
                     class="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-borde/50"
                   />
                   <span
@@ -598,10 +606,11 @@ watch(serviciosGrilla, async () => {
             @click="irAProducto(producto.idProducto)"
           >
             <div class="relative aspect-square overflow-hidden bg-rosa/20">
-              <img
+              <ImagenOptimizada
                 v-if="producto.imagenPortada"
                 :src="producto.imagenPortada"
                 :alt="producto.titulo"
+                sizes="(min-width: 1280px) 25vw, (min-width: 640px) 33vw, 50vw"
                 class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
                 :class="producto.contenidoSensible ? 'scale-105 blur-[18px]' : ''"
               />
@@ -653,10 +662,11 @@ watch(serviciosGrilla, async () => {
                 class="mt-1.5 flex w-fit items-center gap-1.5 text-[11px] text-cafe/65 transition hover:text-acento"
                 @click.stop="irAPerfil(producto.nombreArtista)"
               >
-                <img
+                <ImagenOptimizada
                   v-if="producto.urlFotoArtista"
                   :src="producto.urlFotoArtista"
                   alt=""
+                  sizes="32px"
                   class="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-borde/50"
                 />
                 <span

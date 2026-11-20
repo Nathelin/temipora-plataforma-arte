@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import BrandLogo from '../components/BrandLogo.vue'
+import ImagenOptimizada from '../components/ImagenOptimizada.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import MenuTemaMovil from '../components/MenuTemaMovil.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
@@ -10,6 +11,7 @@ import { useMensajes } from '../composables/useMensajes'
 import { useMensajeriaSocket } from '../composables/useMensajeriaSocket'
 import { useNotificacionesSistema } from '../composables/useNotificacionesSistema'
 import { useCarrito } from '../composables/useCarrito'
+import { cuandoEsteLibre } from '../composables/useTareasDiferidas'
 import { obtenerContacto } from '../servicios/contacto'
 
 const route = useRoute()
@@ -22,8 +24,12 @@ const urlFotoPerfil = ref(localStorage.getItem('urlFotoPerfil') || '')
 
 const contactoEmail = ref('temiporasupport@gmail.com')
 
-onMounted(async () => {
-  contactoEmail.value = await obtenerContacto()
+let cancelarTareasIniciales = null
+
+onMounted(() => {
+  cuandoEsteLibre(async () => {
+    contactoEmail.value = await obtenerContacto()
+  })
 })
 
 const menuAbierto = ref(false)
@@ -128,27 +134,33 @@ onMounted(() => {
   window.addEventListener('perfil-foto-actualizada', actualizarFotoPerfil)
   document.addEventListener('click', manejarClickExterior)
   document.addEventListener('keydown', manejarTecla)
-  if (!esAdmin.value) {
-    iniciarPollingMensajes()
-  }
 
-  if (estaLogueado.value && !esAdmin.value) {
-    cargarCarrito()
-    conectarSocket()
-    quitarSuscripcionSocket = suscribirSocket((evento) => {
-      if (evento?.tipo === 'MENSAJE'
-        && evento.mensaje
-        && !evento.mensaje.esPropio) {
-        cargarContadorMensajes({ silencioso: true })
-      }
-      if (evento?.tipo === 'CONVERSACION') {
-        cargarContadorMensajes({ silencioso: true })
-      }
-    })
-  }
+  // Contadores, carrito y WebSocket no son necesarios para pintar la página:
+  // esperan a que el navegador quede libre para no competir con la vista.
+  cancelarTareasIniciales = cuandoEsteLibre(() => {
+    if (!esAdmin.value) {
+      iniciarPollingMensajes()
+    }
+
+    if (estaLogueado.value && !esAdmin.value) {
+      cargarCarrito()
+      conectarSocket()
+      quitarSuscripcionSocket = suscribirSocket((evento) => {
+        if (evento?.tipo === 'MENSAJE'
+          && evento.mensaje
+          && !evento.mensaje.esPropio) {
+          cargarContadorMensajes({ silencioso: true })
+        }
+        if (evento?.tipo === 'CONVERSACION') {
+          cargarContadorMensajes({ silencioso: true })
+        }
+      })
+    }
+  })
 })
 
 onBeforeUnmount(() => {
+  cancelarTareasIniciales?.()
   window.removeEventListener('perfil-foto-actualizada', actualizarFotoPerfil)
   document.removeEventListener('click', manejarClickExterior)
   document.removeEventListener('keydown', manejarTecla)
@@ -335,10 +347,11 @@ function irAPerfil() {
                 aria-label="Abrir menú de usuario"
                 @click="alternarMenu"
               >
-                <img
+                <ImagenOptimizada
                   v-if="urlFotoPerfil"
                   :src="urlFotoPerfil"
                   alt=""
+                  sizes="40px"
                   class="h-8.5 w-8.5 rounded-full border-2 border-white object-cover shadow-sm ring-1 ring-rosa/70"
                 />
                 <span

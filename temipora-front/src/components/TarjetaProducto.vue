@@ -4,6 +4,7 @@ import { formatearPrecio } from '../servicios/moneda'
 import { etiquetaDisponibilidad } from '../servicios/productos'
 import { formatearPromedio } from '../servicios/resenias'
 import ValoracionEstrellas from './ValoracionEstrellas.vue'
+import ImagenOptimizada from './ImagenOptimizada.vue'
 
 const props = defineProps({
   producto: { type: Object, required: true },
@@ -62,10 +63,11 @@ const destino = computed(() => (
     </router-link>
 
     <div class="relative aspect-[4/3] w-full overflow-hidden bg-rosa/20">
-      <img
+      <ImagenOptimizada
         v-if="producto.imagenPortada"
         :src="producto.imagenPortada"
         :alt="producto.titulo"
+        sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
         class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
         :class="requiereAdvertencia ? 'scale-105 blur-[18px]' : ''"
       />
@@ -149,10 +151,11 @@ const destino = computed(() => (
         class="relative z-20 mt-2 flex w-fit items-center gap-2"
         @click.stop
       >
-        <img
+        <ImagenOptimizada
           v-if="producto.urlFotoArtista"
           :src="producto.urlFotoArtista"
           alt=""
+          sizes="40px"
           class="h-6 w-6 rounded-full object-cover ring-1 ring-borde/50"
         />
         <span

@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { acceptImagenes, validarImagen, procesarImagen, LIMITES_IMAGEN } from '../servicios/archivos'
 import { useAvisoActualizacion } from '../composables/useAvisoActualizacion'
-import fondo from '../assets/fondos/prueba.png'
+import fondo from '../assets/fondos/prueba.webp'
 
 const router = useRouter()
 const {

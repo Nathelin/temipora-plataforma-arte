@@ -13,6 +13,7 @@ import {
 import { formatearFecha } from '../servicios/pedidos'
 import TarjetaServicio from '../components/TarjetaServicio.vue'
 import TarjetaProducto from '../components/TarjetaProducto.vue'
+import ImagenOptimizada from '../components/ImagenOptimizada.vue'
 import { cargarProductosDeArtista } from '../servicios/productos'
 import ImagenGaleria from '../components/ImagenGaleria.vue'
 import ListaResenias from '../components/ListaResenias.vue'
@@ -1120,10 +1121,12 @@ function irASubirImagen(imagen = null) {
     <div class="relative h-44 w-full overflow-hidden bg-linear-to-br from-rosa via-durazno to-mantequilla sm:h-64">
       <div class="absolute -left-10 top-6 h-44 w-44 rounded-full bg-white/20 blur-2xl" aria-hidden="true"></div>
       <div class="absolute right-10 top-8 h-28 w-28 rounded-full bg-coral/20 blur-xl" aria-hidden="true"></div>
-      <img
+      <ImagenOptimizada
         v-if="perfil.urlBanner"
         :src="perfil.urlBanner"
         alt="Banner"
+        sizes="100vw"
+        prioridad
         class="h-full w-full object-cover"
       />
       <div v-if="perfil.urlBanner" class="absolute inset-0 bg-linear-to-t from-granate/35 via-transparent to-transparent" aria-hidden="true"></div>
@@ -1133,10 +1136,11 @@ function irASubirImagen(imagen = null) {
       <div class="flex flex-col gap-4 border-b border-borde/50 pb-8 pt-2 sm:flex-row sm:items-end sm:gap-6 sm:pt-4">
         <div class="relative z-10 h-8 w-36 shrink-0 sm:h-10 sm:w-44">
           <div class="absolute bottom-0 left-0 h-36 w-36 overflow-hidden rounded-full border-4 border-white bg-coral/20 shadow-xl ring-4 ring-rosa/30 sm:h-44 sm:w-44">
-            <img
+            <ImagenOptimizada
               v-if="perfil.urlFotoPerfil"
               :src="perfil.urlFotoPerfil"
               alt="Perfil"
+              sizes="176px"
               class="h-full w-full object-cover"
             />
             <span
@@ -1387,10 +1391,11 @@ function irASubirImagen(imagen = null) {
                   @click="abrirDetalleImagen(obra)"
                 >
                   <div class="relative h-[calc(100%-2.25rem)] min-h-0 overflow-hidden rounded-2xl bg-coral/20">
-                    <img
+                    <ImagenOptimizada
                       v-if="obra.url"
                       :src="obra.url"
                       :alt="obra.titulo"
+                      sizes="(min-width: 1280px) 20vw, (min-width: 768px) 25vw, 50vw"
                       class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
                       :class="obra.requiereAdvertencia ? 'blur-[18px] scale-105' : ''"
                     />
@@ -1736,10 +1741,11 @@ function irASubirImagen(imagen = null) {
                   <p class="mt-0.5 truncate text-sm text-cafe/65">{{ pieza.nombreServicio }}</p>
                   <div class="mt-3 flex items-center gap-2">
                     <span class="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-rosa text-xs font-bold text-granate">
-                      <img
+                      <ImagenOptimizada
                         v-if="pieza.artista?.urlFotoPerfil"
                         :src="pieza.artista.urlFotoPerfil"
                         alt=""
+                        sizes="32px"
                         class="h-full w-full object-cover"
                       />
                       <template v-else>
@@ -1907,10 +1913,11 @@ function irASubirImagen(imagen = null) {
                   class="group block"
                 >
                   <div class="relative aspect-4/3 overflow-hidden bg-rosa/20">
-                    <img
+                    <ImagenOptimizada
                       v-if="producto.imagenUrl"
                       :src="producto.imagenUrl"
                       :alt="tituloProductoColeccion(producto)"
+                      sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
                       class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
                       :class="producto.requiereAdvertencia ? 'blur-[18px] scale-105' : ''"
                     />
@@ -1960,10 +1967,11 @@ function irASubirImagen(imagen = null) {
                   </p>
                   <div class="mt-3 flex items-center gap-2">
                     <span class="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-rosa text-xs font-bold text-granate">
-                      <img
+                      <ImagenOptimizada
                         v-if="producto.artista?.urlFotoPerfil"
                         :src="producto.artista.urlFotoPerfil"
                         alt=""
+                        sizes="32px"
                         class="h-full w-full object-cover"
                       />
                       <template v-else>
@@ -2155,10 +2163,11 @@ function irASubirImagen(imagen = null) {
                 class="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-coral transition hover:text-rojizo"
               >
                 <span class="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-rosa text-xs font-bold text-granate">
-                  <img
+                  <ImagenOptimizada
                     v-if="piezaGaleriaActual.artista?.urlFotoPerfil"
                     :src="piezaGaleriaActual.artista.urlFotoPerfil"
                     alt=""
+                    sizes="32px"
                     class="h-full w-full object-cover"
                   />
                   <template v-else>
