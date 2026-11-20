@@ -93,6 +93,50 @@ class ConstanciaServiceTest {
             .contains("Todavía no hay pagos registrados.");
     }
 
+    @Test
+    void muestraLosEstadosLegiblesSinCortarPalabras() throws Exception {
+        PedidoDTO pedido = PedidoDTO.builder()
+            .idPedido(14L)
+            .cliente(usuario(1L, "cliente"))
+            .artista(usuario(2L, "artista"))
+            .nombreServicio("Retrato")
+            .estado("PENDIENTE_PAGO")
+            .precioFinalMostrado(new BigDecimal("1000.00"))
+            .monedaMostrada("ARS")
+            .hitos(List.of(
+                HitoPedidoDTO.builder()
+                    .idHitoPedido(1L)
+                    .orden(0)
+                    .nombre("Seña")
+                    .tipo("SENA")
+                    .montoMostrado(new BigDecimal("500.00"))
+                    .estadoPago("PENDIENTE")
+                    .estadoEntrega("NO_INICIADO")
+                    .pagos(List.of())
+                    .build(),
+                HitoPedidoDTO.builder()
+                    .idHitoPedido(2L)
+                    .orden(1)
+                    .nombre("Entrega final")
+                    .tipo("CUOTA")
+                    .montoMostrado(new BigDecimal("500.00"))
+                    .estadoPago("REEMBOLSADO")
+                    .estadoEntrega("APROBADO_AUTOMATICAMENTE")
+                    .pagos(List.of())
+                    .build()))
+            .build();
+
+        String texto = texto(constanciaService.generar(pedido));
+
+        assertThat(texto)
+            .contains("No iniciado")
+            .contains("Pendiente")
+            .contains("Reembolsado")
+            .contains("automáticamente")
+            .contains("Cuota")
+            .contains("Pendiente de pago");
+    }
+
     private PedidoDTO pedidoConHitosYPagos() {
         return PedidoDTO.builder()
             .idPedido(12L)

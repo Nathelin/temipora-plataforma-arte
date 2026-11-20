@@ -64,6 +64,8 @@ export const ETIQUETAS_ACCION = {
   SUSTITUCION_CONFIG_ACTUALIZAR: 'Actualizó las sustituciones',
   COTIZACION_ACTUALIZAR: 'Actualizó la cotización',
   COTIZACION_REFRESCAR: 'Actualizó la cotización desde la API',
+  LEDGER_ANCLAR: 'Selló un lote del registro de autenticidad',
+  LEDGER_ANCLAJE_CONFIRMAR: 'Confirmó el sellado de un lote en Bitcoin',
   RESENIA_CREAR: 'Dejó una reseña',
   RESENIA_EDITAR: 'Editó una reseña',
   RESENIA_ELIMINAR: 'Eliminó una reseña',
@@ -161,6 +163,7 @@ export const ETIQUETAS_ENTIDAD = {
   ReporteResenia: 'Reporte de reseña',
   Usuario: 'Usuario',
   SancionCuenta: 'Sanción de cuenta',
+  AnclajeLedger: 'Sellado del registro de autenticidad',
 }
 
 export const ETIQUETAS_CATEGORIA = {

@@ -37,7 +37,7 @@ public class ConstanciaService {
             "Cliente", "@" + usuario(pedido.getCliente()),
             "Artista", "@" + usuario(pedido.getArtista()),
             "Servicio", FormatoPdf.texto(pedido.getNombreServicio()),
-            "Estado", FormatoPdf.texto(pedido.getEstado()),
+            "Estado", estadoPedido(pedido.getEstado()),
             "Inicio", FormatoPdf.fecha(pedido.getFechaInicio()),
             "Límite de entrega", FormatoPdf.fecha(pedido.getLimiteEntrega()),
             "Finalizado", FormatoPdf.fechaHora(pedido.getFinalizadoEn()),
@@ -120,7 +120,7 @@ public class ConstanciaService {
         TablaPdf tabla = new TablaPdf(
             new String[] { "#", "Hito", "Alcance", "Tipo", "Monto", "Pago",
                 "Entrega" },
-            new float[] { 0.35f, 1.6f, 3.1f, 0.9f, 1.2f, 1.05f, 1.15f },
+            new float[] { 0.35f, 1.6f, 2.55f, 0.95f, 1.2f, 1.3f, 1.4f },
             new boolean[] { true, false, false, false, true, false, false });
 
         for (HitoPedidoDTO hito : hitos) {
@@ -129,10 +129,10 @@ public class ConstanciaService {
                     (hito.getOrden() == null ? 0 : hito.getOrden()) + 1),
                 FormatoPdf.texto(hito.getNombre()),
                 FormatoPdf.texto(hito.getDescripcion()),
-                FormatoPdf.texto(hito.getTipo()),
+                tipoHito(hito.getTipo()),
                 FormatoPdf.monto(hito.getMontoMostrado()),
-                FormatoPdf.texto(hito.getEstadoPago()),
-                FormatoPdf.texto(hito.getEstadoEntrega()));
+                estadoPago(hito.getEstadoPago()),
+                estadoEntrega(hito.getEstadoEntrega()));
         }
         documento.tabla(tabla);
     }
@@ -205,7 +205,7 @@ public class ConstanciaService {
                 filas.add(new String[] {
                     FormatoPdf.texto(hito.getNombre()),
                     "#" + pago.getIdPago(),
-                    FormatoPdf.texto(pago.getEstado()),
+                    estadoPago(pago.getEstado()),
                     montoConMoneda(pago.getMonto(), pago.getMoneda()),
                     FormatoPdf.fechaHora(
                         pago.getFechaAcreditacion() != null
@@ -232,6 +232,63 @@ public class ConstanciaService {
     private String usuario(UsuarioResumenDTO usuario) {
         return usuario == null || usuario.getNombreUsuario() == null
             ? "—" : usuario.getNombreUsuario();
+    }
+
+    private static String estadoPedido(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return "—";
+        }
+        return switch (valor) {
+            case "PENDIENTE_PAGO" -> "Pendiente de pago";
+            case "EN_CURSO" -> "En curso";
+            case "FINALIZADO" -> "Finalizado";
+            case "CANCELADO" -> "Cancelado";
+            case "IMPAGO" -> "Impago";
+            default -> valor;
+        };
+    }
+
+    private static String tipoHito(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return "—";
+        }
+        return switch (valor) {
+            case "SENA" -> "Seña";
+            case "CUOTA" -> "Cuota";
+            case "ENTREGA" -> "Entrega";
+            default -> valor;
+        };
+    }
+
+    private static String estadoEntrega(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return "—";
+        }
+        return switch (valor) {
+            case "NO_INICIADO" -> "No iniciado";
+            case "EN_PROCESO" -> "En proceso";
+            case "ENTREGADO" -> "Entregado";
+            case "APROBADO" -> "Aprobado";
+            case "APROBADO_AUTOMATICAMENTE" -> "Aprobado automáticamente";
+            case "CON_REVISION" -> "Con revisión";
+            default -> valor;
+        };
+    }
+
+    private static String estadoPago(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return "—";
+        }
+        return switch (valor) {
+            case "PENDIENTE" -> "Pendiente";
+            case "PAGADO" -> "Pagado";
+            case "APROBADO" -> "Aprobado";
+            case "RECHAZADO" -> "Rechazado";
+            case "REEMBOLSADO" -> "Reembolsado";
+            case "VENCIDO" -> "Vencido";
+            case "CANCELADO" -> "Cancelado";
+            default -> valor;
+        };
     }
 
     private static String montoConMoneda(BigDecimal valor, String moneda) {
