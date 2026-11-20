@@ -1095,9 +1095,12 @@ function irASubirImagen(imagen = null) {
 
 <template>
   <div class="w-full">
-    <div v-if="cargandoPerfil" class="max-w-screen-2xl mx-auto px-4 sm:px-8 py-16 text-center text-cafe/60">
-      Cargando perfil...
-    </div>
+    <CargandoPagina
+      v-if="cargandoPerfil"
+      tipo="perfil"
+      mensaje="Cargando perfil…"
+      class="mx-auto max-w-screen-2xl px-4 py-8 sm:px-8"
+    />
     <div
       v-else-if="perfilNoDisponible"
       class="mx-auto max-w-xl rounded-2xl border border-rosa/60 bg-blanco px-6 py-12 text-center"

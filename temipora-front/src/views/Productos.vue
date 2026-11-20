@@ -274,7 +274,7 @@ onBeforeUnmount(() => {
           </li>
         </ul>
 
-        <p v-if="cargando" class="mt-6 py-16 text-center text-cafe/60">Cargando productos...</p>
+        <CargandoPagina v-if="cargando" class="mt-6" mensaje="Cargando productos…" />
         <p v-else-if="error" role="alert" class="mt-6 py-16 text-center text-rojizo">{{ error }}</p>
 
         <template v-else>

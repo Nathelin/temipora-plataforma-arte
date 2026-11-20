@@ -303,10 +303,7 @@ onBeforeUnmount(() => {
         </p>
 
         <div class="mt-6">
-          <div v-if="cargando" class="flex flex-col items-center justify-center py-20 text-cafe/60">
-            <span class="h-8 w-8 animate-spin rounded-full border-2 border-borde border-t-coral" aria-hidden="true"></span>
-            <p class="mt-4 text-sm">Cargando servicios...</p>
-          </div>
+          <CargandoPagina v-if="cargando" class="mt-2" mensaje="Cargando servicios…" />
           <p
             v-else-if="error"
             class="rounded-3xl border border-rojizo/20 bg-rojizo/5 px-6 py-12 text-center text-rojizo"
