@@ -63,8 +63,8 @@ public class ConfiguracionPedidoService {
         }
         validarRango(request.getDiasAprobacionAutomatica(), 1, 60,
             "La aprobación automática debe estar entre 1 y 60 días.");
-        validarRango(request.getDiasPagoCuota(), 1, 90,
-            "El plazo de pago debe estar entre 1 y 90 días.");
+        validarRango(request.getDiasPagoCuota(), 1, 14,
+            "El plazo de pago debe estar entre 1 y 14 días.");
         validarRango(request.getMaxHitos(), 1, 6,
             "El máximo de hitos debe estar entre 1 y 6.");
 

@@ -31,6 +31,9 @@ public class PedidoDTO {
     private LocalDateTime fechaCreacion;
     private LocalDate fechaInicio;
     private LocalDate limiteEntrega;
+    private LocalDate fechaEntregaPrevista;
+    private int diasDemoraCliente;
+    private boolean entregaAtrasada;
     private LocalDateTime finalizadoEn;
     private BigDecimal precioFinal;
     private BigDecimal precioFinalCobro;

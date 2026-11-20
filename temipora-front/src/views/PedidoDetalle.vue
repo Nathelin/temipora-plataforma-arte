@@ -36,6 +36,7 @@ import {
   hitoPrioritario,
   pagoPendiente,
   resumenPagos,
+  textoAjusteEntrega,
 } from '../servicios/pedidos'
 
 const route = useRoute()
@@ -1021,9 +1022,28 @@ onMounted(async () => {
             </dd>
           </div>
           <div class="rounded-xl bg-rosa/10 px-3 py-2">
-            <dt class="text-xs text-cafe/50">Límite de entrega</dt>
+            <dt class="text-xs text-cafe/50">Entrega prevista</dt>
             <dd class="mt-0.5 font-medium text-cafe">
-              {{ pedido.limiteEntrega ? formatearFecha(pedido.limiteEntrega) : 'A confirmar' }}
+              {{ pedido.fechaEntregaPrevista || pedido.limiteEntrega
+                ? formatearFecha(pedido.fechaEntregaPrevista || pedido.limiteEntrega)
+                : 'A confirmar' }}
+            </dd>
+            <dd
+              v-if="textoAjusteEntrega(pedido)"
+              class="mt-1 text-[11px] leading-relaxed text-cafe/55"
+            >
+              {{ textoAjusteEntrega(pedido) }}
+            </dd>
+            <dd
+              v-else-if="pedido.fechaEntregaPrevista || pedido.limiteEntrega"
+              class="mt-1 text-[11px] leading-relaxed text-cafe/50"
+            >
+              Se corre solo si el cliente paga tarde una cuota; el atraso del artista no la mueve.
+            </dd>
+            <dd v-if="pedido.entregaAtrasada" class="mt-1">
+              <span class="inline-flex rounded-full bg-rojizo/10 px-2 py-0.5 text-[11px] font-semibold text-rojizo">
+                Entrega atrasada
+              </span>
             </dd>
           </div>
           <div v-if="pedido.finalizadoEn" class="rounded-xl bg-rosa/10 px-3 py-2">

@@ -285,6 +285,14 @@ onMounted(cargar)
               </p>
             </li>
           </ol>
+          <p class="mt-4 rounded-xl bg-rosa/10 px-3 py-2 text-xs leading-relaxed text-cafe/60">
+            La entrega se cuenta desde el pago de la seña.
+            <template v-if="pagosRestantes > 0">
+              Si más adelante una cuota se paga tarde, la fecha de entrega se corre
+              esos mismos días.
+            </template>
+            El atraso del artista no la mueve: el pedido queda marcado como atrasado.
+          </p>
         </div>
       </section>
 

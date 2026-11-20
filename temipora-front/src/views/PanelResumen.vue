@@ -238,7 +238,7 @@ const atenciones = computed(() => {
       continue
     }
 
-    const limite = primero.fechaLimitePago || pedido?.limiteEntrega
+    const limite = primero.fechaLimitePago || pedido?.fechaEntregaPrevista || pedido?.limiteEntrega
     items.push({
       clave: `entrega-${grupo.idPedido}`,
       titulo: `Falta subir tu entrega${extra}`,

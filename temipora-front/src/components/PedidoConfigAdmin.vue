@@ -70,7 +70,7 @@ async function guardar() {
   mensaje.value = ''
   const errores = [
     entero(diasAprobacionAutomatica.value, 1, 60, 'La aprobación automática'),
-    entero(diasPagoCuota.value, 1, 90, 'El plazo de pago'),
+    entero(diasPagoCuota.value, 1, 14, 'El plazo de pago'),
     entero(maxHitos.value, 1, 6, 'El máximo de hitos'),
     decimal(porcentajeMaxPrimerHito.value, 1, 100, 'El porcentaje máximo del primer hito'),
     decimal(montoMinimoCuota.value, 0, 10000000, 'El monto mínimo por cuota'),
@@ -194,19 +194,21 @@ onMounted(cargar)
             </div>
             <div>
               <label for="dias-pago" class="mb-2 block text-sm text-cafe">
-                Plazo para pagar una cuota (días) <span class="text-rojizo">*</span>
+                Plazo máximo para pagar (días) <span class="text-rojizo">*</span>
               </label>
               <input
                 id="dias-pago"
                 v-model="diasPagoCuota"
                 type="number"
                 min="1"
-                max="90"
+                max="14"
                 step="1"
-                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset ring-coral"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
               />
               <p class="mt-2 text-xs leading-relaxed text-cafe/50">
-                Si el cliente no paga a tiempo, el pedido se cierra y el artista conserva lo cobrado.
+                Aplica a la seña, a cada cuota y a la entrega final. Al vencer, el pedido
+                se cierra y el artista conserva lo cobrado. La ventana de una cuota nunca
+                supera la entrega prevista del pedido.
               </p>
             </div>
           </div>
@@ -246,7 +248,7 @@ onMounted(cargar)
             <dd class="text-cafe">{{ config.diasAprobacionAutomatica }} días</dd>
           </div>
           <div class="flex justify-between gap-3">
-            <dt class="text-xs text-cafe/50">Plazo de pago</dt>
+            <dt class="text-xs text-cafe/50">Plazo máximo de pago</dt>
             <dd class="text-cafe">{{ config.diasPagoCuota }} días</dd>
           </div>
           <div class="flex justify-between gap-3">

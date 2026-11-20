@@ -1228,6 +1228,10 @@ public class PedidoService {
             .fechaCreacion(pedido.getFechaCreacion())
             .fechaInicio(pedido.getFechaInicio())
             .limiteEntrega(pedido.getLimiteEntrega())
+            .fechaEntregaPrevista(PedidoFechas.entregaPrevista(pedido))
+            .diasDemoraCliente(PedidoFechas.diasDemoraCliente(pedido))
+            .entregaAtrasada(PedidoFechas.entregaAtrasada(
+                pedido, LocalDate.now()))
             .finalizadoEn(pedido.getFinalizadoEn())
             .precioFinal(pedido.getPresupuesto().getPrecioFinal())
             .precioFinalCobro(pedido.getPresupuesto().getPrecioFinalCobro())
@@ -1404,6 +1408,10 @@ public class PedidoService {
                 : null)
             .fechaCreacion(pedido.getFechaCreacion())
             .limiteEntrega(pedido.getLimiteEntrega())
+            .fechaEntregaPrevista(PedidoFechas.entregaPrevista(pedido))
+            .diasDemoraCliente(PedidoFechas.diasDemoraCliente(pedido))
+            .entregaAtrasada(PedidoFechas.entregaAtrasada(
+                pedido, LocalDate.now()))
             .precioFinalCobro(pedido.getPresupuesto().getPrecioFinalCobro())
             .monedaCobro(pedido.getPresupuesto().getMonedaCobro() != null
                 ? pedido.getPresupuesto().getMonedaCobro().getCodigo()

@@ -94,7 +94,7 @@ class ConfiguracionPedidoServiceTest {
         PedidoConfigDTO dto = configuracionPedidoService.actualizar(request);
 
         assertThat(dto.getDiasAprobacionAutomatica()).isEqualTo(5);
-        assertThat(dto.getDiasPagoCuota()).isEqualTo(15);
+        assertThat(dto.getDiasPagoCuota()).isEqualTo(14);
         assertThat(dto.getMaxHitos()).isEqualTo(4);
         assertThat(dto.getPorcentajeMaxPrimerHito())
             .isEqualByComparingTo("55.56");
@@ -119,7 +119,7 @@ class ConfiguracionPedidoServiceTest {
             .hasMessageContaining("aprobación automática");
 
         PedidoConfigRequest sinPago = requestValido();
-        sinPago.setDiasPagoCuota(91);
+        sinPago.setDiasPagoCuota(15);
         assertThatThrownBy(() -> configuracionPedidoService.actualizar(sinPago))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("plazo de pago");
@@ -169,7 +169,7 @@ class ConfiguracionPedidoServiceTest {
     private PedidoConfigRequest requestValido() {
         PedidoConfigRequest request = new PedidoConfigRequest();
         request.setDiasAprobacionAutomatica(5);
-        request.setDiasPagoCuota(15);
+        request.setDiasPagoCuota(14);
         request.setMaxHitos(4);
         request.setPorcentajeMaxPrimerHito(new BigDecimal("50.00"));
         request.setMontoMinimoCuota(new BigDecimal("10.00"));

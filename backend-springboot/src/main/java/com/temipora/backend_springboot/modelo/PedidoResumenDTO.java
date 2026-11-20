@@ -24,6 +24,9 @@ public class PedidoResumenDTO {
     private String estado;
     private LocalDateTime fechaCreacion;
     private LocalDate limiteEntrega;
+    private LocalDate fechaEntregaPrevista;
+    private int diasDemoraCliente;
+    private boolean entregaAtrasada;
     private BigDecimal precioFinalCobro;
     private String monedaCobro;
     private String proximoHitoNombre;

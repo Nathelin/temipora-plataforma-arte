@@ -378,7 +378,14 @@ function formatearRecargo(recargo) {
 
     <dl class="mt-5 grid gap-3 text-sm sm:grid-cols-2">
       <div class="flex items-start justify-between gap-3 rounded-xl bg-rosa/10 px-3 py-2 sm:block">
-        <dt class="text-cafe/55">Entrega máxima</dt>
+        <dt class="flex items-center gap-1.5 text-cafe/55">
+          Plazo de entrega
+          <BurbujaInfo etiqueta="Cómo se calcula la fecha de entrega">
+            El plazo corre desde el pago de la seña. Si una cuota posterior se
+            paga tarde, la entrega se corre esos mismos días. Si el artista se
+            atrasa, la fecha no se mueve: el pedido queda marcado como atrasado.
+          </BurbujaInfo>
+        </dt>
         <dd class="text-right font-semibold text-cafe sm:mt-1 sm:text-left">{{ entrega }}</dd>
       </div>
       <div class="flex items-start justify-between gap-3 rounded-xl bg-rosa/10 px-3 py-2 sm:block">
@@ -414,7 +421,9 @@ function formatearRecargo(recargo) {
         </div>
       </dl>
       <p v-if="vigente" class="mt-3 text-xs leading-relaxed text-cafe/50">
-        La fecha se recalcula al confirmarse el pago.
+        La fecha se recalcula al confirmarse el pago de la seña. Si más adelante
+        una cuota se paga tarde, la entrega se corre esos días; si el artista se
+        atrasa, la fecha no se mueve y el pedido queda marcado como atrasado.
       </p>
     </div>
 

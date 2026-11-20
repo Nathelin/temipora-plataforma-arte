@@ -49,7 +49,8 @@ public class HitoFlujoService {
             return null;
         }
         if (siguiente.getHitoPresupuesto().getTipo() != TipoHito.ENTREGA) {
-            siguiente.setFechaLimitePago(ahora.plusDays(diasPagoCuota()));
+            siguiente.setFechaLimitePago(
+                PedidoFechas.ventanaPago(pedido, ahora, diasPagoCuota()));
             hitoPedidoRepository.save(siguiente);
             notificacionService.crearParaUsuario(
                 pedido.getCliente().getIdUsuario(),

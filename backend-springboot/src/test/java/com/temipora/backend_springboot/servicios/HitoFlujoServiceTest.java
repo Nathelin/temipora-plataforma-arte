@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -17,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
+import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.HitoPresupuesto;
 import com.temipora.backend_springboot.modelo.Pedido;
@@ -68,6 +70,25 @@ class HitoFlujoServiceTest {
             eq(2L), eq("CUOTA_PENDIENTE"), eq("Cuota habilitada"),
             eq("Se habilitó el pago de 'Cuota 2' del pedido de 'Retrato'."),
             eq(10L), eq("PEDIDO"));
+    }
+
+    @Test
+    void habilitarSiguiente_cuota_noSuperaLaEntregaPrevista() {
+        HitoPedido siguiente = hito(2);
+        siguiente.getHitoPresupuesto().setTipo(TipoHito.CUOTA);
+        siguiente.getHitoPresupuesto().setNombre("Cuota 2");
+        when(hitoPedidoRepository
+            .findFirstByPedidoIdPedidoAndOrdenGreaterThanOrderByOrdenAsc(10L, 1))
+            .thenReturn(Optional.of(siguiente));
+        when(configuracionPedidoService.obtener()).thenReturn(configConDiasPago(7));
+        Pedido pedido = pedido();
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        pedido.setLimiteEntrega(LocalDate.of(2026, 3, 3));
+
+        service.habilitarSiguiente(pedido, hito(1), ahora());
+
+        assertThat(siguiente.getFechaLimitePago())
+            .isEqualTo(LocalDateTime.of(2026, 3, 3, 23, 59, 59));
     }
 
     @Test
