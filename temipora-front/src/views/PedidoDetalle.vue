@@ -765,6 +765,17 @@ function cancelar() {
   ))
 }
 
+function cerrarPorIncumplimiento() {
+  pedirConfirmacion({
+    titulo: '¿Cerrar el pedido por incumplimiento?',
+    mensaje: 'Vas a conservar los archivos de las etapas entregadas y el pedido se cierra. Los pagos ya realizados no se devuelven automáticamente.',
+    textoConfirmar: 'Sí, cerrar el pedido',
+  }, () => ejecutar(
+    () => api.post(`/pedidos/${idPedido.value}/cerrar-incumplimiento`),
+    'El pedido se cerró por incumplimiento.',
+  ))
+}
+
 function alEntregar(data) {
   if (data) pedido.value = data
   exito('Entregable subido. El cliente fue notificado.')
@@ -1184,6 +1195,21 @@ onMounted(async () => {
               @click="cancelar"
             >
               Cancelar pedido
+            </button>
+          </div>
+
+          <div v-if="pedido.puedeCerrarPorIncumplimiento" class="rounded-2xl border border-rojizo/25 bg-rojizo/5 p-5 sm:p-6">
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-rojizo">Incumplimiento del artista</p>
+            <p class="mt-1 text-sm leading-relaxed text-cafe/65">
+              El artista no entregó lo pendiente y su cuenta está bloqueada. Podés cerrar el pedido y quedarte con todo lo que ya se entregó.
+            </p>
+            <button
+              type="button"
+              :disabled="procesando"
+              class="mt-3 inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-5 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10 disabled:opacity-50"
+              @click="cerrarPorIncumplimiento"
+            >
+              Cerrar por incumplimiento
             </button>
           </div>
         </section>

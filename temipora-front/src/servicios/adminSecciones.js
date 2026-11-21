@@ -1,5 +1,12 @@
 export const SECCIONES_CON_TABS = [
   {
+    id: 'comunidad',
+    tabs: [
+      { etiqueta: 'Sanciones', to: '/admin/sanciones' },
+      { etiqueta: 'Apelaciones', to: '/admin/apelaciones' },
+    ],
+  },
+  {
     id: 'informes',
     tabs: [
       { etiqueta: 'Ventas', to: '/admin/informes/ventas' },

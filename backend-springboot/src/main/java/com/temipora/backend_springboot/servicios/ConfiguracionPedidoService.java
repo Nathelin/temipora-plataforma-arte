@@ -23,7 +23,11 @@ public class ConfiguracionPedidoService {
         CampoAuditado.de("diasReentrega", "Días para reentregar tras una revisión"),
         CampoAuditado.de("maxHitos", "Máximo de hitos"),
         CampoAuditado.de("porcentajeMaxPrimerHito", "Porcentaje máximo de la primera cuota"),
-        CampoAuditado.de("montoMinimoCuota", "Monto mínimo por cuota"));
+        CampoAuditado.de("montoMinimoCuota", "Monto mínimo por cuota"),
+        CampoAuditado.de("diasGraciaEntrega", "Días de gracia de entrega"),
+        CampoAuditado.de("diasSancionVentas", "Duración de la sanción de ventas"),
+        CampoAuditado.de("diasReapelacion", "Días entre apelaciones"),
+        CampoAuditado.de("diasCierreTrasBloqueo", "Días para cerrar tras el bloqueo"));
 
     private final ConfiguracionPedidoRepository configuracionRepository;
     private final AuditoriaService auditoria;
@@ -37,24 +41,38 @@ public class ConfiguracionPedidoService {
 
     @Transactional
     public ConfiguracionPedido obtener() {
-        return configuracionRepository.findById(ConfiguracionPedido.ID_UNICO)
+        ConfiguracionPedido config = configuracionRepository
+            .findById(ConfiguracionPedido.ID_UNICO)
             .orElseGet(() -> {
-                ConfiguracionPedido config = new ConfiguracionPedido();
-                config.setIdConfiguracion(ConfiguracionPedido.ID_UNICO);
-                config.setDiasAprobacionAutomatica(
+                ConfiguracionPedido nueva = new ConfiguracionPedido();
+                nueva.setIdConfiguracion(ConfiguracionPedido.ID_UNICO);
+                nueva.setDiasAprobacionAutomatica(
                     ConfiguracionPedido.DIAS_APROBACION_POR_DEFECTO);
-                config.setDiasPagoCuota(ConfiguracionPedido.DIAS_PAGO_POR_DEFECTO);
-                config.setRevisionesMaximasPorHito(
+                nueva.setDiasPagoCuota(ConfiguracionPedido.DIAS_PAGO_POR_DEFECTO);
+                nueva.setRevisionesMaximasPorHito(
                     ConfiguracionPedido.REVISIONES_MAXIMAS_POR_DEFECTO);
-                config.setDiasReentrega(
+                nueva.setDiasReentrega(
                     ConfiguracionPedido.DIAS_REENTREGA_POR_DEFECTO);
-                config.setMaxHitos(ConfiguracionPedido.MAX_HITOS_POR_DEFECTO);
-                config.setPorcentajeMaxPrimerHito(
+                nueva.setMaxHitos(ConfiguracionPedido.MAX_HITOS_POR_DEFECTO);
+                nueva.setPorcentajeMaxPrimerHito(
                     ConfiguracionPedido.PORCENTAJE_MAX_PRIMER_HITO_POR_DEFECTO);
-                config.setMontoMinimoCuota(
+                nueva.setMontoMinimoCuota(
                     ConfiguracionPedido.MONTO_MINIMO_CUOTA_POR_DEFECTO);
-                return configuracionRepository.save(config);
+                nueva.setDiasGraciaEntrega(
+                    ConfiguracionPedido.DIAS_GRACIA_ENTREGA_POR_DEFECTO);
+                nueva.setDiasSancionVentas(
+                    ConfiguracionPedido.DIAS_SANCION_VENTAS_POR_DEFECTO);
+                nueva.setDiasReapelacion(
+                    ConfiguracionPedido.DIAS_REAPELACION_POR_DEFECTO);
+                nueva.setDiasCierreTrasBloqueo(
+                    ConfiguracionPedido.DIAS_CIERRE_TRAS_BLOQUEO_POR_DEFECTO);
+                return configuracionRepository.save(nueva);
             });
+        if (config.getSancionesAutomaticasDesde() == null) {
+            config.setSancionesAutomaticasDesde(LocalDateTime.now());
+            config = configuracionRepository.save(config);
+        }
+        return config;
     }
 
     @Transactional
@@ -77,6 +95,14 @@ public class ConfiguracionPedidoService {
             "El plazo de reentrega debe estar entre 1 y 60 días.");
         validarRango(request.getMaxHitos(), 1, 6,
             "El máximo de hitos debe estar entre 1 y 6.");
+        validarRango(request.getDiasGraciaEntrega(), 1, 30,
+            "La gracia de entrega debe estar entre 1 y 30 días.");
+        validarRango(request.getDiasSancionVentas(), 1, 60,
+            "La sanción de ventas debe estar entre 1 y 60 días.");
+        validarRango(request.getDiasReapelacion(), 1, 90,
+            "La espera entre apelaciones debe estar entre 1 y 90 días.");
+        validarRango(request.getDiasCierreTrasBloqueo(), 7, 180,
+            "El cierre tras el bloqueo debe estar entre 7 y 180 días.");
 
         BigDecimal porcentajeMaximo = decimal(
             request.getPorcentajeMaxPrimerHito(),
@@ -104,6 +130,10 @@ public class ConfiguracionPedidoService {
         config.setPorcentajeMaxPrimerHito(
             porcentajeMaximo.setScale(2, RoundingMode.HALF_UP));
         config.setMontoMinimoCuota(montoMinimo.setScale(2, RoundingMode.HALF_UP));
+        config.setDiasGraciaEntrega(request.getDiasGraciaEntrega());
+        config.setDiasSancionVentas(request.getDiasSancionVentas());
+        config.setDiasReapelacion(request.getDiasReapelacion());
+        config.setDiasCierreTrasBloqueo(request.getDiasCierreTrasBloqueo());
         config.setFechaActualizacion(LocalDateTime.now());
         ConfiguracionPedido guardada = configuracionRepository.save(config);
         auditoria.registrar(

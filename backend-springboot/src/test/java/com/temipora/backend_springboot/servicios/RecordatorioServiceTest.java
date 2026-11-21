@@ -54,6 +54,10 @@ class RecordatorioServiceTest {
     @Mock
     private RecordatorioProcesador procesador;
 
+    @org.mockito.Spy
+    private EntregaPendienteService entregaPendienteService =
+        new EntregaPendienteService();
+
     @InjectMocks
     private RecordatorioService service;
 

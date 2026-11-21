@@ -79,6 +79,20 @@ public class Terminos {
     @Column(name = "fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
 
+    /**
+     * El artista declara que acepta la preeminencia de los Términos de la
+     * Plataforma sobre los suyos. Se registra la versión concreta aceptada.
+     */
+    @Column(name = "acepta_preeminencia", nullable = false)
+    private boolean aceptaPreeminencia = false;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_terminos_plataforma_aceptados")
+    private TerminosPlataforma terminosPlataformaAceptados;
+
+    @Column(name = "preeminencia_aceptada_en")
+    private LocalDateTime preeminenciaAceptadaEn;
+
     @OneToMany(mappedBy = "terminos", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TerminoDerecho> terminoDerechos = new ArrayList<>();
 

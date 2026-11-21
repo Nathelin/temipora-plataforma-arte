@@ -16,6 +16,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 import com.temipora.backend_springboot.config.ContactoPlataforma;
 import com.temipora.backend_springboot.config.JwtUtils;
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.modelo.ConfiguracionBajaCuenta;
 import com.temipora.backend_springboot.modelo.LoginRequest;
 import com.temipora.backend_springboot.modelo.SancionCuenta;
@@ -90,9 +91,14 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
 
         // La contraseña ya fue validada: recién ahora es seguro revelar la sanción.
         var sancionVigente = usuarioService.sancionVigente(entidad.getIdUsuario());
+        boolean restringido = false;
         if (sancionVigente.isPresent()) {
-            escribirSancion(response, sancionVigente.get());
-            return;
+            SancionCuenta sancion = sancionVigente.get();
+            if (sancion.getAlcance() == AlcanceSancion.ACCESO) {
+                escribirSancion(response, sancion);
+                return;
+            }
+            restringido = sancion.getAlcance() == AlcanceSancion.ENTREGAS;
         }
 
         // El rol del token es el rol real del usuario, no la primera autoridad
@@ -110,6 +116,10 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         httpResponse.put("Message", "Autenticación realizada correctamente");
         httpResponse.put("NombreUsuario", usuario.getUsername());
         httpResponse.put("rol", rol);
+        httpResponse.put("restringido", restringido);
+        if (restringido) {
+            httpResponse.put("alcance", "ENTREGAS");
+        }
         httpResponse.put("idUsuario", entidad.getIdUsuario());
         httpResponse.put("urlFotoPerfil", entidad.getUrlFotoPerfil());
 

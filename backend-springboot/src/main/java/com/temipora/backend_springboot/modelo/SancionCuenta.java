@@ -46,6 +46,11 @@ public class SancionCuenta {
     @Builder.Default
     private AlcanceSancion alcance = AlcanceSancion.ACCESO;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "origen", nullable = false, length = 20)
+    @Builder.Default
+    private OrigenSancion origen = OrigenSancion.MANUAL;
+
     @Column(name = "motivo", nullable = false, length = 500)
     private String motivo;
 
@@ -61,9 +66,34 @@ public class SancionCuenta {
     @Builder.Default
     private EstadoSancion estado = EstadoSancion.ACTIVA;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "id_admin_aplico", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_admin_aplico")
     private Usuario adminAplico;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_pedido")
+    private Pedido pedido;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_hito_pedido")
+    private HitoPedido hitoPedido;
+
+    @Column(name = "fecha_objetivo")
+    private LocalDateTime fechaObjetivo;
+
+    @Column(name = "fecha_escalada")
+    private LocalDateTime fechaEscalada;
+
+    @Column(name = "clave", length = 160, unique = true)
+    private String clave;
+
+    /**
+     * Ids de servicios, productos y reventas que la sanción pausó, en formato
+     * {@code servicios=1,2;productos=3;reventas=4}. Se restauran solo esos al
+     * revertir.
+     */
+    @Column(name = "alcance_afectado", columnDefinition = "TEXT")
+    private String alcanceAfectado;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_admin_revertio")

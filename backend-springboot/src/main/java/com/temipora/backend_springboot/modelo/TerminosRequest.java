@@ -27,4 +27,10 @@ public class TerminosRequest {
     private String queNoDibuja;
 
     private List<@Valid TerminoDerechoRequest> derechos;
+
+    /**
+     * Aceptación de que los Términos de la Plataforma prevalecen sobre los del
+     * artista en caso de contradicción.
+     */
+    private Boolean aceptaPreeminencia;
 }

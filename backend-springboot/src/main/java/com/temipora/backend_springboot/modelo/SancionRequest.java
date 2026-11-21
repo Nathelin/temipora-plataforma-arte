@@ -20,6 +20,9 @@ public class SancionRequest {
     @NotNull(message = "Debés indicar el tipo de sanción.")
     private TipoSancion tipo;
 
+    /** Si no se indica, se bloquea el acceso completo. */
+    private AlcanceSancion alcance;
+
     @NotBlank(message = "El motivo es obligatorio.")
     @Size(max = 500, message = "El motivo no puede superar los 500 caracteres.")
     private String motivo;

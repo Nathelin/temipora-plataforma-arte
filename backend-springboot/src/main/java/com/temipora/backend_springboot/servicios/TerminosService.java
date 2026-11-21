@@ -18,11 +18,13 @@ import com.temipora.backend_springboot.modelo.TerminoDerecho;
 import com.temipora.backend_springboot.modelo.TerminoDerechoRequest;
 import com.temipora.backend_springboot.modelo.Terminos;
 import com.temipora.backend_springboot.modelo.TerminosDTO;
+import com.temipora.backend_springboot.modelo.TerminosPlataforma;
 import com.temipora.backend_springboot.modelo.TerminosRequest;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
 import com.temipora.backend_springboot.repositorios.TerminosRepository;
+import com.temipora.backend_springboot.repositorios.TerminosPlataformaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 @Service
@@ -35,16 +37,19 @@ public class TerminosService {
     private final DerechoTerminoRepository derechoTerminoRepository;
     private final UsuarioRepository usuarioRepository;
     private final ServicioRepository servicioRepository;
+    private final TerminosPlataformaRepository terminosPlataformaRepository;
 
     public TerminosService(
             TerminosRepository terminosRepository,
             DerechoTerminoRepository derechoTerminoRepository,
             UsuarioRepository usuarioRepository,
-            ServicioRepository servicioRepository) {
+            ServicioRepository servicioRepository,
+            TerminosPlataformaRepository terminosPlataformaRepository) {
         this.terminosRepository = terminosRepository;
         this.derechoTerminoRepository = derechoTerminoRepository;
         this.usuarioRepository = usuarioRepository;
         this.servicioRepository = servicioRepository;
+        this.terminosPlataformaRepository = terminosPlataformaRepository;
     }
 
     @Transactional(readOnly = true)
@@ -125,6 +130,15 @@ public class TerminosService {
      */
     private TerminosDTO guardar(
             Terminos actual, Long idArtista, Long idServicio, TerminosRequest request) {
+        TerminosPlataforma plataforma = terminosPlataformaRepository
+            .findFirstByVigenteTrueOrderByVersionDesc()
+            .orElse(null);
+        if (plataforma != null
+                && !Boolean.TRUE.equals(request.getAceptaPreeminencia())) {
+            throw new IllegalArgumentException(
+                "Tenés que aceptar que los Términos de la Plataforma prevalecen "
+                    + "sobre los tuyos antes de guardar.");
+        }
         Terminos nueva;
         if (actual == null) {
             nueva = nuevoTerminos(idArtista, idServicio);
@@ -140,6 +154,11 @@ public class TerminosService {
             nueva.setVigente(true);
         }
         aplicar(nueva, request);
+        if (plataforma != null) {
+            nueva.setAceptaPreeminencia(true);
+            nueva.setTerminosPlataformaAceptados(plataforma);
+            nueva.setPreeminenciaAceptadaEn(LocalDateTime.now());
+        }
         Terminos guardados = terminosRepository.save(nueva);
         return TerminosDTO.desdeTerminos(guardados, idServicio != null);
     }

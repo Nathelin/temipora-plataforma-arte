@@ -71,6 +71,20 @@ public class Pedido {
     @Column(name = "finalizado_en")
     private LocalDateTime finalizadoEn;
 
+    /**
+     * Instante del plazo de entrega que el artista incumplió. Se guarda una vez
+     * y no se recalcula: {@code entregaPrevista} se corre hacia adelante si el
+     * cliente paga tarde.
+     */
+    @Column(name = "mora_desde")
+    private LocalDateTime moraDesde;
+
+    @Column(name = "incumplimiento_en")
+    private LocalDateTime incumplimientoEn;
+
+    @Column(name = "cierre_por_incumplimiento", nullable = false)
+    private boolean cierrePorIncumplimiento = false;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "id_aceptacion_terminos_plataforma", nullable = false)
     private AceptacionTerminosPlataforma aceptacionTerminosPlataforma;

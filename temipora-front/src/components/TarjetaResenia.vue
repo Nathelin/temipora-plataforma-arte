@@ -57,6 +57,12 @@ function claseOpcion(opcion) {
           >
             Editada
           </span>
+          <span
+            v-if="resenia.pedidoIncumplido"
+            class="rounded-full border border-rojizo/40 bg-rojizo/10 px-2 py-0.5 text-[11px] font-semibold text-rojizo"
+          >
+            Pedido incumplido
+          </span>
         </div>
         <p class="mt-1 text-xs text-cafe/50">
           <span v-if="autor">{{ autor }} · </span>

@@ -89,6 +89,12 @@ public final class AccionesAdmin {
     public static final String TERMINOS_ACEPTAR = "TERMINOS_ACEPTAR";
     public static final String CUENTA_SANCIONAR = "CUENTA_SANCIONAR";
     public static final String CUENTA_REVERTIR_SANCION = "CUENTA_REVERTIR_SANCION";
+    public static final String CUENTA_SANCIONAR_SISTEMA = "CUENTA_SANCIONAR_SISTEMA";
+    public static final String CUENTA_ESCALAR_SANCION = "CUENTA_ESCALAR_SANCION";
+    public static final String APELACION_CREAR = "APELACION_CREAR";
+    public static final String APELACION_RESOLVER = "APELACION_RESOLVER";
+    public static final String PEDIDO_CERRAR_INCUMPLIMIENTO = "PEDIDO_CERRAR_INCUMPLIMIENTO";
+    public static final String PEDIDO_MORA_DETECTAR = "PEDIDO_MORA_DETECTAR";
     public static final String USUARIO_CAMBIAR_CORREO = "USUARIO_CAMBIAR_CORREO";
     public static final String USUARIO_CAMBIAR_CONTRASENIA = "USUARIO_CAMBIAR_CONTRASENIA";
     public static final String USUARIO_CAMBIAR_TELEFONO = "USUARIO_CAMBIAR_TELEFONO";

@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.repositorios;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +43,51 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
         where p.estado = :estado
         """)
     List<Pedido> findConHitosByEstado(@Param("estado") EstadoPedido estado);
+
+    /**
+     * Pedidos en curso que todavía no registraron mora y fueron creados después
+     * del corte de sanciones automáticas.
+     */
+    @Query("""
+        select distinct p from Pedido p
+        left join fetch p.hitos h
+        left join fetch h.hitoPresupuesto
+        join fetch p.artista
+        join fetch p.cliente
+        left join fetch p.servicio
+        where p.estado = :estado
+          and p.moraDesde is null
+          and p.fechaCreacion >= :corte
+        """)
+    List<Pedido> findCandidatosMora(
+        @Param("estado") EstadoPedido estado,
+        @Param("corte") LocalDateTime corte);
+
+    @Query("""
+        select distinct p from Pedido p
+        left join fetch p.hitos h
+        left join fetch h.hitoPresupuesto
+        join fetch p.artista
+        join fetch p.cliente
+        left join fetch p.servicio
+        where p.estado = :estado
+          and p.moraDesde is not null
+        """)
+    List<Pedido> findEnMora(@Param("estado") EstadoPedido estado);
+
+    @Query("""
+        select distinct p from Pedido p
+        left join fetch p.hitos h
+        left join fetch h.hitoPresupuesto
+        join fetch p.cliente
+        left join fetch p.servicio
+        where p.estado = :estado
+          and p.moraDesde is not null
+          and p.artista.idUsuario = :idArtista
+        """)
+    List<Pedido> findEnMoraDeArtista(
+        @Param("idArtista") Long idArtista,
+        @Param("estado") EstadoPedido estado);
 
     boolean existsByArtistaIdUsuarioAndClienteIdUsuario(
         Long idArtista, Long idCliente);

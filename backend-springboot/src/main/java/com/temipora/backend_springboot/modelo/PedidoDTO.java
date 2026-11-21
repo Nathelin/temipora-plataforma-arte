@@ -100,6 +100,7 @@ public class PedidoDTO {
     private List<HitoPedidoDTO> hitos;
     private List<DibujoResumenDTO> dibujos;
     private boolean puedeCancelar;
+    private boolean puedeCerrarPorIncumplimiento;
     private String rolVista;
     private Long idConversacion;
     private String estadoConversacion;

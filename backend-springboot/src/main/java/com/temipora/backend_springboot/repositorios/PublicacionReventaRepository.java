@@ -33,6 +33,9 @@ public interface PublicacionReventaRepository
 
     List<PublicacionReventa> findByVendedorIdUsuarioOrderByFechaPublicacionDesc(Long idUsuario);
 
+    List<PublicacionReventa> findByVendedorIdUsuarioAndEstado(
+            Long idUsuario, EstadoPublicacionReventa estado);
+
     @EntityGraph(attributePaths = {
         "variante",
         "variante.producto",

@@ -49,6 +49,10 @@ const form = ref({
 
 const estadoDerechos = ref({})
 const estadoGuardado = ref(null)
+const aceptaPreeminencia = ref(false)
+const aclaracionCancelaciones = ref(
+  'Esta política rige entre artista y cliente en lo que no contradiga los Términos de la Plataforma, que no procesa reembolsos.',
+)
 
 const modal = ref({ abierto: false, titulo: '', descripcion: '' })
 const confirmandoGuardado = ref(false)
@@ -79,6 +83,10 @@ async function cargar() {
 
 function aplicarTerminos(data) {
   version.value = data.version || 0
+  aceptaPreeminencia.value = !!data.aceptaPreeminencia
+  if (data.aclaracionPoliticaCancelaciones) {
+    aclaracionCancelaciones.value = data.aclaracionPoliticaCancelaciones
+  }
   form.value = {
     informacionGeneral: data.informacionGeneral || '',
     politicaRevisiones: data.politicaRevisiones || '',
@@ -108,6 +116,7 @@ function instantanea() {
   return JSON.stringify({
     ...form.value,
     estadoDerechos: estadoDerechos.value,
+    aceptaPreeminencia: aceptaPreeminencia.value,
   })
 }
 
@@ -144,6 +153,10 @@ function solicitarGuardado() {
     errorGuardado.value = 'Completá al menos una sección de tus términos.'
     return
   }
+  if (!aceptaPreeminencia.value) {
+    errorGuardado.value = 'Aceptá la preeminencia de los Términos de la Plataforma.'
+    return
+  }
   confirmandoGuardado.value = true
 }
 
@@ -162,6 +175,7 @@ async function guardar() {
       pagoExtra: form.value.pagoExtra || null,
       queDibuja: form.value.queDibuja || null,
       queNoDibuja: form.value.queNoDibuja || null,
+      aceptaPreeminencia: aceptaPreeminencia.value,
       derechos: derechosCatalogo.value.map((d) => ({
         idDerechoTermino: d.idDerechoTermino,
         disponible: !!estadoDerechos.value[d.idDerechoTermino]?.disponible,
@@ -230,6 +244,38 @@ onBeforeUnmount(() => {
       <template v-if="modo === 'editar'">
         <AvisoCompletitudTerminos :terminos="{ form }" />
 
+        <div class="rounded-xl border border-rosa/60 bg-rosa/10 p-4">
+          <h3 class="text-sm font-semibold text-granate">
+            Preeminencia de los Términos de la Plataforma
+          </h3>
+          <p class="mt-2 text-sm leading-relaxed text-cafe/75">
+            Podés ofrecer al cliente condiciones más favorables que las de la
+            Plataforma, pero nunca menos. Si tus términos contradicen una cláusula
+            de los Términos de la Plataforma, prevalece la más favorable al cliente.
+            En particular, ante un incumplimiento de entrega, los derechos de
+            explotación incluidos en lo que el cliente pagó se entienden otorgados
+            sobre los entregables producidos.
+          </p>
+          <router-link
+            to="/terminos"
+            class="mt-2 inline-block text-xs font-semibold text-coral hover:underline"
+          >
+            Leer los Términos de la Plataforma
+          </router-link>
+          <label class="mt-3 flex items-start gap-2 text-sm text-cafe">
+            <input
+              v-model="aceptaPreeminencia"
+              type="checkbox"
+              class="mt-0.5 accent-coral"
+            />
+            <span>
+              Entiendo y acepto que, si mis términos contradicen los Términos de la
+              Plataforma, prevalecen los de la Plataforma en lo que sea más
+              favorable al cliente.
+            </span>
+          </label>
+        </div>
+
         <!-- Secciones de texto -->
         <div class="space-y-8">
           <div v-for="s in secciones" :key="s.key">
@@ -240,6 +286,12 @@ onBeforeUnmount(() => {
               :placeholder="PLACEHOLDERS[s.key]"
               class="pl-4 pr-4 py-2.5 block w-full rounded-lg border-0 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none resize-none"
             ></textarea>
+            <p
+              v-if="s.key === 'politicaCancelaciones'"
+              class="mt-1 text-xs text-cafe/50"
+            >
+              {{ aclaracionCancelaciones }}
+            </p>
           </div>
         </div>
 

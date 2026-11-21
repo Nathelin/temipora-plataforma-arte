@@ -69,6 +69,8 @@ const ConfiguracionFormularioPedidos = () => import('../views/ConfiguracionFormu
 const ConfiguracionTerminosArtista = () => import('../views/ConfiguracionTerminosArtista.vue')
 const ConfiguracionCuenta = () => import('../views/ConfiguracionCuenta.vue')
 const ConfiguracionCobros = () => import('../views/ConfiguracionCobros.vue')
+const CuentaRestringida = () => import('../views/CuentaRestringida.vue')
+const ApelacionesAdmin = () => import('../components/ApelacionesAdmin.vue')
 const PortfolioSubir = () => import('../views/PortfolioSubir.vue')
 const MisServicios = () => import('../views/MisServicios.vue')
 const ServicioForm = () => import('../views/ServicioForm.vue')
@@ -360,6 +362,12 @@ const routes = [
     ],
   },
   {
+    path: '/cuenta/restringida',
+    name: 'cuenta-restringida',
+    component: CuentaRestringida,
+    meta: { title: 'Cuenta restringida', requiresAuth: true },
+  },
+  {
     path: '/admin',
     component: AdminLayout,
     meta: { requiresAdmin: true },
@@ -391,6 +399,12 @@ const routes = [
         name: 'admin-sanciones',
         component: SancionesAdmin,
         meta: { title: 'Sanciones de cuentas' },
+      },
+      {
+        path: 'apelaciones',
+        name: 'admin-apelaciones',
+        component: ApelacionesAdmin,
+        meta: { title: 'Apelaciones de sanciones' },
       },
       {
         path: 'anclaje',
@@ -638,6 +652,12 @@ router.beforeEach((to, from, next) => {
 
   if (to.matched.some((r) => r.meta.requiresAuth) && !token) {
     next({ name: 'login', query: { redirect: to.fullPath } })
+    return
+  }
+
+  if (localStorage.getItem('restringido') === '1'
+      && to.name !== 'cuenta-restringida') {
+    next({ name: 'cuenta-restringida' })
     return
   }
 

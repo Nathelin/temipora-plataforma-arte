@@ -30,6 +30,10 @@ async function aceptar() {
       version: estado.value.version,
     })
     visible.value = false
+    // Las pantallas ya montadas hicieron sus pedidos con el bloqueo activo y
+    // quedaron en estado de error. Recargamos para que vuelvan a pedir todo
+    // con la aceptación registrada.
+    window.location.reload()
   } catch (e) {
     error.value = e.response?.data?.message
       || 'No se pudo registrar la aceptación.'

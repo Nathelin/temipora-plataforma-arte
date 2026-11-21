@@ -11,6 +11,8 @@ function limpiarSesion() {
   localStorage.removeItem('idUsuario')
   localStorage.removeItem('urlFotoPerfil')
   localStorage.removeItem('monedaPreferida')
+  localStorage.removeItem('restringido')
+  localStorage.removeItem('alcance')
 }
 
 api.interceptors.request.use((config) => {
@@ -32,6 +34,13 @@ api.interceptors.response.use(
     }
     if (status === 403 && data?.codigo === 'TOS_NO_ACEPTADOS') {
       window.dispatchEvent(new CustomEvent('tos-no-aceptados'))
+    }
+    if (status === 403 && data?.codigo === 'CUENTA_RESTRINGIDA') {
+      localStorage.setItem('restringido', '1')
+      if (data?.alcance) {
+        localStorage.setItem('alcance', data.alcance)
+      }
+      window.dispatchEvent(new CustomEvent('cuenta-restringida'))
     }
     if (status === 403
         && (data?.codigo === 'CUENTA_SANCIONADA'

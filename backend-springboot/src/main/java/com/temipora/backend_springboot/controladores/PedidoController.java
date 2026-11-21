@@ -101,6 +101,13 @@ public class PedidoController {
             .body(pdf);
     }
 
+    @GetMapping("/restringido")
+    @PreAuthorize("hasAnyRole('ARTISTA', 'CLIENTE')")
+    public List<PedidoResumenDTO> restringidos(Authentication authentication) {
+        return pedidoService.pedidosRestringidos(
+            idAutenticado(authentication));
+    }
+
     @GetMapping("/recibidos")
     @PreAuthorize("hasRole('ARTISTA')")
     public PaginaDTO<PedidoResumenDTO> recibidos(
@@ -199,6 +206,15 @@ public class PedidoController {
             @PathVariable Long idPedido,
             Authentication authentication) {
         return pedidoService.cancelar(
+            idPedido, idAutenticado(authentication));
+    }
+
+    @PostMapping("/{idPedido}/cerrar-incumplimiento")
+    @PreAuthorize("hasAnyRole('CLIENTE', 'ARTISTA')")
+    public PedidoDTO cerrarPorIncumplimiento(
+            @PathVariable Long idPedido,
+            Authentication authentication) {
+        return pedidoService.cerrarPorIncumplimiento(
             idPedido, idAutenticado(authentication));
     }
 

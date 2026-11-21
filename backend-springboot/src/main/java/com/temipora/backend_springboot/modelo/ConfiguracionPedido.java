@@ -24,6 +24,10 @@ public class ConfiguracionPedido {
     public static final int REVISIONES_MAXIMAS_POR_DEFECTO = 2;
     public static final int DIAS_REENTREGA_POR_DEFECTO = 7;
     public static final int MAX_HITOS_POR_DEFECTO = 4;
+    public static final int DIAS_GRACIA_ENTREGA_POR_DEFECTO = 3;
+    public static final int DIAS_SANCION_VENTAS_POR_DEFECTO = 14;
+    public static final int DIAS_REAPELACION_POR_DEFECTO = 7;
+    public static final int DIAS_CIERRE_TRAS_BLOQUEO_POR_DEFECTO = 30;
     public static final BigDecimal PORCENTAJE_MAX_PRIMER_HITO_POR_DEFECTO =
         new BigDecimal("50.00");
     public static final BigDecimal MONTO_MINIMO_CUOTA_POR_DEFECTO =
@@ -54,6 +58,26 @@ public class ConfiguracionPedido {
 
     @Column(name = "monto_minimo_cuota", nullable = false, precision = 12, scale = 2)
     private BigDecimal montoMinimoCuota = MONTO_MINIMO_CUOTA_POR_DEFECTO;
+
+    @Column(name = "dias_gracia_entrega", nullable = false)
+    private Integer diasGraciaEntrega = DIAS_GRACIA_ENTREGA_POR_DEFECTO;
+
+    @Column(name = "dias_sancion_ventas", nullable = false)
+    private Integer diasSancionVentas = DIAS_SANCION_VENTAS_POR_DEFECTO;
+
+    @Column(name = "dias_reapelacion", nullable = false)
+    private Integer diasReapelacion = DIAS_REAPELACION_POR_DEFECTO;
+
+    @Column(name = "dias_cierre_tras_bloqueo", nullable = false)
+    private Integer diasCierreTrasBloqueo = DIAS_CIERRE_TRAS_BLOQUEO_POR_DEFECTO;
+
+    /**
+     * Corte de las sanciones automáticas: no se evalúa ningún pedido creado
+     * antes de este instante. Una configuración nueva arranca en el momento de
+     * su creación.
+     */
+    @Column(name = "sanciones_automaticas_desde")
+    private LocalDateTime sancionesAutomaticasDesde = LocalDateTime.now();
 
     @Column(name = "fecha_actualizacion")
     private LocalDateTime fechaActualizacion;

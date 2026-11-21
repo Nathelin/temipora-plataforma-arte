@@ -3,6 +3,7 @@ package com.temipora.backend_springboot.config;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.security.authentication.DisabledException;
@@ -15,6 +16,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.modelo.EstadoSancion;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.SancionCuenta;
@@ -82,13 +84,32 @@ public class DetallesUsuarioService implements UserDetailsService, AccesoUsuario
 
         List<SancionCuenta> sancionesVigentes = sancionCuentaRepository
             .findVigentesByUsuarioId(usuario.getIdUsuario(), EstadoSancion.ACTIVA, LocalDateTime.now());
-        if (!sancionesVigentes.isEmpty()) {
-            SancionCuenta sancion = sancionesVigentes.get(0);
+        SancionCuenta bloqueo = sancionesVigentes.stream()
+            .filter(sancion -> sancion.getAlcance() == AlcanceSancion.ACCESO)
+            .findFirst()
+            .orElse(null);
+        if (bloqueo != null) {
             throw new CuentaSancionadaException(
-                sancion.getMotivo(), contacto.getEmail(), sancion.getFechaFin());
+                bloqueo.getMotivo(), contacto.getEmail(), bloqueo.getFechaFin());
         }
 
         return construirDetalles(usuario);
+    }
+
+    /**
+     * Alcance de la sanción vigente que restringe la sesión sin bloquearla. Hoy
+     * solo ENTREGAS limita el acceso; VENTAS deja operar normalmente.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<AlcanceSancion> restriccionVigente(String nombreUsuario) {
+        return usuarioRepository.findByNombreUsuarioIgnoreCase(nombreUsuario)
+            .flatMap(usuario -> sancionCuentaRepository
+                .findVigentesByUsuarioId(
+                    usuario.getIdUsuario(), EstadoSancion.ACTIVA, LocalDateTime.now())
+                .stream()
+                .findFirst())
+            .map(SancionCuenta::getAlcance);
     }
 
     private UserDetails construirDetalles(Usuario usuario) {

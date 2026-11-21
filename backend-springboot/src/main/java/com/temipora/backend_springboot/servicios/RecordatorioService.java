@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.EmailRecordatorioPendiente;
 import com.temipora.backend_springboot.modelo.EstadoEmailRecordatorio;
-import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.HitoPedido;
@@ -38,18 +37,21 @@ public class RecordatorioService {
     private final EmailRecordatorioPendienteRepository recordatorioRepository;
     private final SancionService sancionService;
     private final RecordatorioProcesador procesador;
+    private final EntregaPendienteService entregaPendienteService;
 
     public RecordatorioService(
             HitoPedidoRepository hitoPedidoRepository,
             PedidoRepository pedidoRepository,
             EmailRecordatorioPendienteRepository recordatorioRepository,
             SancionService sancionService,
-            RecordatorioProcesador procesador) {
+            RecordatorioProcesador procesador,
+            EntregaPendienteService entregaPendienteService) {
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.pedidoRepository = pedidoRepository;
         this.recordatorioRepository = recordatorioRepository;
         this.sancionService = sancionService;
         this.procesador = procesador;
+        this.entregaPendienteService = entregaPendienteService;
     }
 
     @Transactional
@@ -148,7 +150,7 @@ public class RecordatorioService {
             if (dias < 0 || dias > DIAS_AVISO_SEMANAL) {
                 continue;
             }
-            if (!artistaDebeEntregar(pedido)) {
+            if (!entregaPendienteService.artistaDebeEntregar(pedido)) {
                 continue;
             }
             long duracion = pedido.getFechaInicio() != null
@@ -185,26 +187,6 @@ public class RecordatorioService {
             total++;
         }
         return total;
-    }
-
-    private boolean artistaDebeEntregar(Pedido pedido) {
-        for (HitoPedido hito : pedido.getHitos()) {
-            if (hito.getHitoPresupuesto() == null
-                    || !hito.getHitoPresupuesto().isRequiereEntrega()) {
-                continue;
-            }
-            EstadoEntregaHito estado = hito.getEstadoEntrega();
-            if (estado == EstadoEntregaHito.ENTREGADO
-                    || estado == EstadoEntregaHito.APROBADO
-                    || estado == EstadoEntregaHito.APROBADO_AUTOMATICAMENTE) {
-                continue;
-            }
-            if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA
-                    || hito.getEstadoPago() == EstadoPagoHito.PAGADO) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private boolean estaSancionado(Long idUsuario) {

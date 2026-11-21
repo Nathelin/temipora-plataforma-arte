@@ -5,5 +5,6 @@ public enum EstadoPedido {
     EN_CURSO,
     FINALIZADO,
     CANCELADO,
-    IMPAGO
+    IMPAGO,
+    INCUMPLIMIENTO
 }

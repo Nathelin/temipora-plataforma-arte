@@ -110,6 +110,9 @@ class PedidoServiceTest {
     @Mock
     private CierreEmailService cierreEmailService;
 
+    @Mock
+    private SancionService sancionService;
+
     @InjectMocks
     private PedidoService pedidoService;
 
@@ -591,7 +594,8 @@ class PedidoServiceTest {
         assertThat(estados.getValue()).containsExactlyInAnyOrder(
             EstadoPedido.FINALIZADO,
             EstadoPedido.CANCELADO,
-            EstadoPedido.IMPAGO);
+            EstadoPedido.IMPAGO,
+            EstadoPedido.INCUMPLIMIENTO);
     }
 
     @Test
@@ -675,7 +679,8 @@ class PedidoServiceTest {
             eq(ARTISTA), estados.capture(), any(), any(),
             any(Pageable.class));
         assertThat(estados.getValue()).containsExactlyInAnyOrder(
-            EstadoPedido.CANCELADO, EstadoPedido.IMPAGO);
+            EstadoPedido.CANCELADO, EstadoPedido.IMPAGO,
+            EstadoPedido.INCUMPLIMIENTO);
     }
 
     @Test

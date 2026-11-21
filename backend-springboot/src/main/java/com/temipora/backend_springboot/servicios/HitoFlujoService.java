@@ -49,6 +49,11 @@ public class HitoFlujoService {
             return null;
         }
         if (siguiente.getHitoPresupuesto().getTipo() != TipoHito.ENTREGA) {
+            // Un pedido en mora congela su escalera de pagos: el hito siguiente
+            // existe, pero sin plazo de pago no se puede abonar.
+            if (pedido.getMoraDesde() != null) {
+                return siguiente;
+            }
             siguiente.setFechaLimitePago(
                 PedidoFechas.ventanaPago(pedido, ahora, diasPagoCuota()));
             hitoPedidoRepository.save(siguiente);

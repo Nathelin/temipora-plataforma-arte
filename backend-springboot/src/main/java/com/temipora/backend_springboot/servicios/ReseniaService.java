@@ -130,7 +130,8 @@ public class ReseniaService {
             ? miResenia.getFechaCreacion().plusDays(config.getDiasEdicion())
             : null;
 
-        boolean finalizado = pedido.getEstado() == EstadoPedido.FINALIZADO;
+        boolean finalizado = pedido.getEstado() == EstadoPedido.FINALIZADO
+            || pedido.getEstado() == EstadoPedido.INCUMPLIMIENTO;
         boolean puedeCrear = finalizado
             && miResenia == null
             && dentroDeVentana(limiteCreacion);
@@ -715,7 +716,8 @@ public class ReseniaService {
     }
 
     private void validarPedidoFinalizado(Pedido pedido) {
-        if (pedido.getEstado() != EstadoPedido.FINALIZADO) {
+        if (pedido.getEstado() != EstadoPedido.FINALIZADO
+                && pedido.getEstado() != EstadoPedido.INCUMPLIMIENTO) {
             throw new IllegalArgumentException(
                 "Solo podés reseñar un pedido finalizado.");
         }

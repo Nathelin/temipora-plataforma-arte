@@ -50,6 +50,7 @@ import com.temipora.backend_springboot.modelo.PresupuestoDTO;
 import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.SolicitudRevisionRequest;
 import com.temipora.backend_springboot.modelo.AceptacionTerminosPlataforma;
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.modelo.TipoHito;
 import com.temipora.backend_springboot.modelo.UsuarioResumenDTO;
 import com.temipora.backend_springboot.repositorios.ConversacionRepository;
@@ -72,6 +73,7 @@ public class PedidoService {
     private static final String NOTIF_HITO_CON_REVISION = "HITO_CON_REVISION";
     private static final String NOTIF_PEDIDO_CANCELADO = "PEDIDO_CANCELADO";
     private static final String NOTIF_PEDIDO_IMPAGO = "PEDIDO_IMPAGO";
+    private static final String NOTIF_PEDIDO_INCUMPLIDO = "PEDIDO_INCUMPLIDO";
     private static final String NOTIF_PUBLICACION_AUTORIZADA =
         "PEDIDO_PUBLICACION_AUTORIZADA";
     private static final String NOTIF_PUBLICACION_RETIRADA =
@@ -122,9 +124,12 @@ public class PedidoService {
     private static final List<EstadoPedido> ESTADOS_ARCHIVO = List.of(
         EstadoPedido.FINALIZADO,
         EstadoPedido.CANCELADO,
-        EstadoPedido.IMPAGO);
+        EstadoPedido.IMPAGO,
+        EstadoPedido.INCUMPLIMIENTO);
     private static final List<EstadoPedido> ESTADOS_CERRADOS = List.of(
-        EstadoPedido.CANCELADO, EstadoPedido.IMPAGO);
+        EstadoPedido.CANCELADO,
+        EstadoPedido.IMPAGO,
+        EstadoPedido.INCUMPLIMIENTO);
     private static final List<EstadoEntregaHito> ESTADOS_ENTREGA_ABIERTA =
         List.of(
             EstadoEntregaHito.NO_INICIADO,
@@ -148,6 +153,7 @@ public class PedidoService {
     private final ArancelEstimadoService arancelEstimadoService;
     private final CuposEventPublisher cuposEventPublisher;
     private final CierreEmailService cierreEmailService;
+    private final SancionService sancionService;
 
     public PedidoService(
             PedidoRepository pedidoRepository,
@@ -166,7 +172,8 @@ public class PedidoService {
             AuditoriaService auditoria,
             ArancelEstimadoService arancelEstimadoService,
             CuposEventPublisher cuposEventPublisher,
-            CierreEmailService cierreEmailService) {
+            CierreEmailService cierreEmailService,
+            SancionService sancionService) {
         this.pedidoRepository = pedidoRepository;
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.pagoRepository = pagoRepository;
@@ -184,6 +191,7 @@ public class PedidoService {
         this.arancelEstimadoService = arancelEstimadoService;
         this.cuposEventPublisher = cuposEventPublisher;
         this.cierreEmailService = cierreEmailService;
+        this.sancionService = sancionService;
     }
 
     @Transactional
@@ -241,6 +249,13 @@ public class PedidoService {
         if (presupuesto.getHitos() == null || presupuesto.getHitos().isEmpty()) {
             throw new ConflictoException(
                 "El presupuesto no tiene un plan de pagos.");
+        }
+        if (solicitud.getArtista() != null
+                && sancionService.tieneSancionVigente(
+                    solicitud.getArtista().getIdUsuario(),
+                    AlcanceSancion.VENTAS)) {
+            throw new ConflictoException(
+                "El artista no está recibiendo encargos en este momento.");
         }
 
         AceptacionTerminosPlataforma aceptacionTerminos =
@@ -527,6 +542,80 @@ public class PedidoService {
         return construirDTO(pedido, idCliente);
     }
 
+    /**
+     * El cliente cierra el pedido cuando el artista ya está en Nivel 2. Conserva
+     * los archivos de las etapas entregadas; no hay reembolso.
+     */
+    @Transactional
+    public PedidoDTO cerrarPorIncumplimiento(Long idPedido, Long idCliente) {
+        Pedido pedido = pedidoRepository.findByIdPedidoForUpdate(idPedido)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Pedido no encontrado: " + idPedido));
+        if (!pedido.getCliente().getIdUsuario().equals(idCliente)) {
+            throw new AccesoDenegadoException(
+                "No podés cerrar este pedido.");
+        }
+        if (pedido.getEstado() != EstadoPedido.EN_CURSO) {
+            throw new ConflictoException("El pedido no está en curso.");
+        }
+        if (!sancionService.tieneSancionVigente(
+                pedido.getArtista().getIdUsuario(),
+                AlcanceSancion.ENTREGAS)) {
+            throw new ConflictoException(
+                "El artista todavía no está bloqueado por incumplimiento.");
+        }
+        cerrarPorIncumplimiento(pedido);
+        return construirDTO(pedido, idCliente);
+    }
+
+    @Transactional
+    public boolean cerrarPorIncumplimientoSistema(Long idPedido) {
+        Pedido pedido = pedidoRepository.findByIdPedidoForUpdate(idPedido)
+            .orElse(null);
+        if (pedido == null || pedido.getEstado() != EstadoPedido.EN_CURSO) {
+            return false;
+        }
+        cerrarPorIncumplimiento(pedido);
+        return true;
+    }
+
+    private void cerrarPorIncumplimiento(Pedido pedido) {
+        LocalDateTime ahora = LocalDateTime.now();
+        for (HitoPedido hito : pedido.getHitos()) {
+            if (hito.getEstadoPago() == EstadoPagoHito.PENDIENTE) {
+                hito.setEstadoPago(EstadoPagoHito.CANCELADO);
+                pagoService.cancelarPendientes(hito);
+            }
+        }
+        pedido.setEstado(EstadoPedido.INCUMPLIMIENTO);
+        pedido.setIncumplimientoEn(ahora);
+        pedido.setCierrePorIncumplimiento(true);
+        pedido.setFinalizadoEn(ahora);
+        pedidoRepository.save(pedido);
+        notificarIncumplimiento(pedido);
+        if (pedido.getServicio() != null) {
+            cuposEventPublisher.publicar(pedido.getServicio().getIdServicio());
+        }
+        auditoria.registrarSistema(
+            AccionesAdmin.PEDIDO_CERRAR_INCUMPLIMIENTO, ENTIDAD_PEDIDO,
+            pedido.getIdPedido(),
+            "Cerró el pedido por incumplimiento del artista");
+    }
+
+    private void notificarIncumplimiento(Pedido pedido) {
+        String descripcion = "El pedido de '" + nombreServicio(pedido)
+            + "' se cerró por incumplimiento del artista. Conservás los "
+            + "archivos de las etapas entregadas.";
+        notificacionService.crearParaUsuario(
+            pedido.getCliente().getIdUsuario(),
+            NOTIF_PEDIDO_INCUMPLIDO, "Pedido incumplido", descripcion,
+            pedido.getIdPedido(), TIPO_REFERENCIA);
+        notificacionService.crearParaUsuario(
+            pedido.getArtista().getIdUsuario(),
+            NOTIF_PEDIDO_INCUMPLIDO, "Pedido cerrado por incumplimiento",
+            descripcion, pedido.getIdPedido(), TIPO_REFERENCIA);
+    }
+
     @Transactional
     public PedidoDTO autorizarPublicacion(
             Long idPedido, Long idArtista, boolean autoriza) {
@@ -661,6 +750,14 @@ public class PedidoService {
             Long idServicio,
             String busqueda,
             String orden) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<PedidoResumenDTO> pedidosRestringidos(Long idArtista) {
+        return pedidoRepository.findEnMoraDeArtista(
+                idArtista, EstadoPedido.EN_CURSO).stream()
+            .map(pedido -> construirResumen(pedido, idArtista))
+            .toList();
     }
 
     @Transactional(readOnly = true)
@@ -1014,7 +1111,8 @@ public class PedidoService {
             Pedido pedido = pedidoRepository.findByIdPedidoForUpdate(
                     hito.getPedido().getIdPedido())
                 .orElse(null);
-            if (pedido == null || pedido.getEstado() != EstadoPedido.EN_CURSO) {
+            if (pedido == null || pedido.getEstado() != EstadoPedido.EN_CURSO
+                    || pedido.getMoraDesde() != null) {
                 continue;
             }
             hito.setEstadoEntrega(
@@ -1359,6 +1457,11 @@ public class PedidoService {
             .puedeCancelar(esCliente
                 && (pedido.getEstado() == EstadoPedido.PENDIENTE_PAGO
                     || pedido.getEstado() == EstadoPedido.EN_CURSO))
+            .puedeCerrarPorIncumplimiento(esCliente
+                && pedido.getEstado() == EstadoPedido.EN_CURSO
+                && sancionService.tieneSancionVigente(
+                    pedido.getArtista().getIdUsuario(),
+                    AlcanceSancion.ENTREGAS))
             .rolVista(esAdmin
                 ? "ADMIN"
                 : esArtista ? "ARTISTA" : "CLIENTE")
@@ -1550,6 +1653,9 @@ public class PedidoService {
         if (hito.getOrden() == null || hito.getOrden() == 0) {
             return true;
         }
+        if (hito.getFechaLimitePago() == null) {
+            return false;
+        }
         HitoPedido anterior = hitoAnterior(pedido, hito);
         return anterior != null && esAprobado(anterior);
     }
@@ -1565,6 +1671,10 @@ public class PedidoService {
         }
         if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
             return "La entrega final todavía no está disponible para pagar.";
+        }
+        if (hito.getOrden() != null && hito.getOrden() > 0
+                && hito.getFechaLimitePago() == null) {
+            return "La cuota todavía no está habilitada para pagar.";
         }
         if (hito.getOrden() != null && hito.getOrden() > 0) {
             HitoPedido anterior = hitoAnterior(pedido, hito);

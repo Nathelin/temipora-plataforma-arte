@@ -12,6 +12,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.servicios.CuentaSancionadaException;
 
 @Component
@@ -87,8 +88,17 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             userDetails = userDetailsService instanceof AccesoUsuarioService acceso
                 ? acceso.loadUserForSession(nombreUsuario)
                 : userDetailsService.loadUserByUsername(nombreUsuario);
+            if (userDetailsService instanceof AccesoUsuarioService acceso
+                    && acceso.restriccionVigente(nombreUsuario)
+                        .filter(alcance -> alcance == AlcanceSancion.ENTREGAS)
+                        .isPresent()) {
+                throw new MessagingException(
+                    "La cuenta está restringida a entregas.");
+            }
         } catch (CuentaSancionadaException e) {
             throw new MessagingException("La cuenta está inhabilitada.");
+        } catch (MessagingException e) {
+            throw e;
         } catch (RuntimeException e) {
             throw new MessagingException("El usuario ya no existe.");
         }

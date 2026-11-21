@@ -61,6 +61,9 @@ class BajaCuentaServiceTest {
     @Mock
     private ContactoPlataforma contacto;
 
+    @Mock
+    private SancionService sancionService;
+
     @InjectMocks
     private BajaCuentaService bajaCuentaService;
 

@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.config.ContactoPlataforma;
 import com.temipora.backend_springboot.config.JwtUtils;
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.modelo.EstadoSancion;
 import com.temipora.backend_springboot.modelo.PropositoToken;
 import com.temipora.backend_springboot.modelo.SancionCuenta;
@@ -108,15 +109,19 @@ public class AccesoEnlaceService {
             throw new AccesoEnlaceInvalidoException("La cuenta no está activa.");
         }
 
+        boolean restringido = false;
         if (usuario != null) {
             var sancionesVigentes = sancionCuentaRepository.findVigentesByUsuarioId(
                 usuario.getIdUsuario(), EstadoSancion.ACTIVA, ahora);
             if (!sancionesVigentes.isEmpty()) {
                 SancionCuenta sancion = sancionesVigentes.get(0);
-                auditarFallo(nombreUsuario, proposito, "Cuenta inhabilitada");
-                throw new AccesoEnlaceInvalidoException(
-                    "Tu cuenta se encuentra inhabilitada. Motivo: " + sancion.getMotivo()
-                        + ". Contacto: " + contacto.getEmail());
+                if (sancion.getAlcance() == AlcanceSancion.ACCESO) {
+                    auditarFallo(nombreUsuario, proposito, "Cuenta inhabilitada");
+                    throw new AccesoEnlaceInvalidoException(
+                        "Tu cuenta se encuentra inhabilitada. Motivo: " + sancion.getMotivo()
+                            + ". Contacto: " + contacto.getEmail());
+                }
+                restringido = sancion.getAlcance() == AlcanceSancion.ENTREGAS;
             }
         }
 
@@ -140,6 +145,10 @@ public class AccesoEnlaceService {
         respuesta.put("urlFotoPerfil", usuario.getUrlFotoPerfil());
         respuesta.put("proposito", proposito);
         respuesta.put("idReferencia", token.getIdReferencia());
+        respuesta.put("restringido", restringido);
+        if (restringido) {
+            respuesta.put("alcance", "ENTREGAS");
+        }
 
         auditarFallo(nombreUsuario, proposito, null);
         return respuesta;

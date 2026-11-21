@@ -21,9 +21,13 @@ public class SancionCuentaDTO {
     private String correo;
     private TipoSancion tipo;
     private AlcanceSancion alcance;
+    private OrigenSancion origen;
     private String motivo;
     private LocalDateTime fechaInicio;
     private LocalDateTime fechaFin;
+    private Long idPedido;
+    private Long idHitoPedido;
+    private LocalDateTime fechaObjetivo;
     private EstadoSancion estado;
     private String estadoEfectivo;
     private boolean vigente;
@@ -40,9 +44,17 @@ public class SancionCuentaDTO {
             .correo(sancion.getUsuario() != null ? sancion.getUsuario().getCorreo() : null)
             .tipo(sancion.getTipo())
             .alcance(sancion.getAlcance())
+            .origen(sancion.getOrigen())
             .motivo(sancion.getMotivo())
             .fechaInicio(sancion.getFechaInicio())
             .fechaFin(sancion.getFechaFin())
+            .idPedido(sancion.getPedido() != null
+                ? sancion.getPedido().getIdPedido()
+                : null)
+            .idHitoPedido(sancion.getHitoPedido() != null
+                ? sancion.getHitoPedido().getIdHitoPedido()
+                : null)
+            .fechaObjetivo(sancion.getFechaObjetivo())
             .estado(sancion.getEstado())
             .estadoEfectivo(estadoEfectivo(sancion, ahora))
             .vigente(sancion.estaVigente(ahora))
