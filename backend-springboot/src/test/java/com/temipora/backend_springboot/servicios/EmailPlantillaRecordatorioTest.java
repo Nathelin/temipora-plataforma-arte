@@ -18,11 +18,12 @@ class EmailPlantillaRecordatorioTest {
             new EmailPlantillaService.RecordatorioEmail(
                 "PAGO", 10L, "Retrato", null, "artista",
                 "Cuota 2", "18/12/2026",
-                new BigDecimal("1200"), "ARS", true, false);
+                new BigDecimal("1200"), "ARS", true, false, null);
         EmailPlantillaService.RecordatorioEmail entrega =
             new EmailPlantillaService.RecordatorioEmail(
                 "ENTREGA", 11L, "Ilustración", null, "cliente",
-                "Boceto", "20/12/2026", null, "ARS", true, false);
+                "Boceto", "20/12/2026", null, "ARS", true, false,
+                "Vence hoy. Si no entregás, en 3 días se suspenden tus ventas.");
 
         String html = servicio.recordatorio(
             "Ana", List.of(pago), List.of(entrega), "tok");
@@ -35,6 +36,8 @@ class EmailPlantillaRecordatorioTest {
         assertThat(html).contains("/panel/pedidos/11");
         assertThat(html).contains("URGENTE");
         assertThat(html).contains("1.200");
+        assertThat(html).contains(
+            "Vence hoy. Si no entregás, en 3 días se suspenden tus ventas.");
     }
 
     private SpringTemplateEngine engine() {

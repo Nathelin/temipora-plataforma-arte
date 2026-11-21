@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.EmailRecordatorioPendiente;
 import com.temipora.backend_springboot.modelo.EnvioEmail;
 import com.temipora.backend_springboot.modelo.EstadoEmailRecordatorio;
@@ -22,6 +23,7 @@ import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.HitoPedido;
+import com.temipora.backend_springboot.modelo.MotivoRecordatorio;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.PropositoToken;
 import com.temipora.backend_springboot.modelo.TipoHito;
@@ -47,6 +49,7 @@ public class RecordatorioProcesador {
     private final EmailRecordatorioPendienteRepository repository;
     private final UsuarioRepository usuarioRepository;
     private final SancionService sancionService;
+    private final ConfiguracionPedidoService configuracionPedidoService;
     private final EmailPlantillaService emailPlantillaService;
     private final EnvioEmailService envioEmailService;
     private final AccesoEnlaceService accesoEnlaceService;
@@ -55,12 +58,14 @@ public class RecordatorioProcesador {
             EmailRecordatorioPendienteRepository repository,
             UsuarioRepository usuarioRepository,
             SancionService sancionService,
+            ConfiguracionPedidoService configuracionPedidoService,
             EmailPlantillaService emailPlantillaService,
             EnvioEmailService envioEmailService,
             AccesoEnlaceService accesoEnlaceService) {
         this.repository = repository;
         this.usuarioRepository = usuarioRepository;
         this.sancionService = sancionService;
+        this.configuracionPedidoService = configuracionPedidoService;
         this.emailPlantillaService = emailPlantillaService;
         this.envioEmailService = envioEmailService;
         this.accesoEnlaceService = accesoEnlaceService;
@@ -93,9 +98,13 @@ public class RecordatorioProcesador {
             new ArrayList<>();
         List<EmailRecordatorioPendiente> filasPago = new ArrayList<>();
         List<EmailRecordatorioPendiente> filasEntrega = new ArrayList<>();
+        ConfiguracionPedido config = configuracionPedidoService.obtener();
+        int gracia = config.getDiasGraciaEntrega() != null
+            ? config.getDiasGraciaEntrega()
+            : ConfiguracionPedido.DIAS_GRACIA_ENTREGA_POR_DEFECTO;
 
         for (EmailRecordatorioPendiente fila : pendientes) {
-            EmailPlantillaService.RecordatorioEmail item = item(fila);
+            EmailPlantillaService.RecordatorioEmail item = item(fila, gracia);
             if (item == null) {
                 fila.setEstado(EstadoEmailRecordatorio.OMITIDO);
                 continue;
@@ -188,7 +197,7 @@ public class RecordatorioProcesador {
     }
 
     private EmailPlantillaService.RecordatorioEmail item(
-            EmailRecordatorioPendiente fila) {
+            EmailRecordatorioPendiente fila, int gracia) {
         Pedido pedido = fila.getPedido();
         if (pedido == null || fila.getMotivo() == null) {
             return null;
@@ -224,7 +233,8 @@ public class RecordatorioProcesador {
                 hito.getHitoPresupuesto().getMonto(),
                 moneda,
                 fila.getMotivo().esUrgente(),
-                fila.getMotivo().esAlerta());
+                fila.getMotivo().esAlerta(),
+                null);
         }
 
         String cliente = pedido.getCliente() != null
@@ -252,7 +262,26 @@ public class RecordatorioProcesador {
             null,
             moneda,
             fila.getMotivo().esUrgente(),
-            fila.getMotivo().esAlerta());
+            fila.getMotivo().esAlerta(),
+            consecuenciaEntrega(fila.getMotivo(), gracia));
+    }
+
+    private String consecuenciaEntrega(MotivoRecordatorio motivo, int gracia) {
+        if (motivo == MotivoRecordatorio.ENTREGA_1D) {
+            return "Mañana vence el plazo. Si no entregás, en "
+                + dias(gracia) + " se suspenden tus ventas.";
+        }
+        if (motivo == MotivoRecordatorio.ENTREGA_HOY) {
+            return "Vence hoy. Si no entregás, en " + dias(gracia)
+                + " se suspenden tus ventas. Si la demora continúa, tu cuenta "
+                + "queda limitada solo a entregar los pedidos abiertos: no podés "
+                + "usar el resto del sitio hasta que un administrador te reintegre.";
+        }
+        return null;
+    }
+
+    private String dias(int cantidad) {
+        return cantidad == 1 ? "1 día" : cantidad + " días";
     }
 
     private HitoPedido proximoEntregable(Pedido pedido) {

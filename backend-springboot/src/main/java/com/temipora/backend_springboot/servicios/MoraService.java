@@ -69,7 +69,9 @@ public class MoraService {
                     + "' tiene una entrega pendiente desde el "
                     + plazo.toLocalDate() + ". Tenés "
                     + config.getDiasGraciaEntrega()
-                    + " días antes de que se suspendan tus ventas.",
+                    + (config.getDiasGraciaEntrega() == 1 ? " día" : " días")
+                    + " antes de que se suspendan tus ventas. Si sigue la mora,"
+                    + " la cuenta queda limitada solo a entregar.",
                 pedido.getIdPedido(),
                 TIPO_REFERENCIA);
             auditoria.registrarSistema(

@@ -75,8 +75,7 @@ const inferior = computed(() => {
 
 const badges = computed(() => ({
   '/panel/solicitudes': metricas.value.solicitudesPorResponder || 0,
-  '/panel/pedidos':
-    (metricas.value.entregasPendientes || 0) + (metricas.value.pedidosImpagos || 0),
+  '/panel/pedidos': metricas.value.entregasPendientes || 0,
   '/panel/mensajes': (noLeidos.value || 0) + (solicitudesPendientes.value || 0),
 }))
 

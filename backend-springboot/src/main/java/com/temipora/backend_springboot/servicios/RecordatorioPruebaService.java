@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
+import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.EnvioEmail;
 import com.temipora.backend_springboot.modelo.EstadoEnvioEmail;
 import com.temipora.backend_springboot.modelo.PropositoToken;
@@ -27,14 +28,17 @@ public class RecordatorioPruebaService {
     private final EmailPlantillaService emailPlantillaService;
     private final EnvioEmailService envioEmailService;
     private final AccesoEnlaceService accesoEnlaceService;
+    private final ConfiguracionPedidoService configuracionPedidoService;
 
     public RecordatorioPruebaService(
             EmailPlantillaService emailPlantillaService,
             EnvioEmailService envioEmailService,
-            AccesoEnlaceService accesoEnlaceService) {
+            AccesoEnlaceService accesoEnlaceService,
+            ConfiguracionPedidoService configuracionPedidoService) {
         this.emailPlantillaService = emailPlantillaService;
         this.envioEmailService = envioEmailService;
         this.accesoEnlaceService = accesoEnlaceService;
+        this.configuracionPedidoService = configuracionPedidoService;
     }
 
     public int enviar(Usuario usuario) {
@@ -43,10 +47,15 @@ public class RecordatorioPruebaService {
             return 0;
         }
         int enviados = 0;
+        ConfiguracionPedido config = configuracionPedidoService.obtener();
+        int gracia = config.getDiasGraciaEntrega() != null
+            ? config.getDiasGraciaEntrega()
+            : ConfiguracionPedido.DIAS_GRACIA_ENTREGA_POR_DEFECTO;
         if (enviarGrupo(usuario, pagosDeMuestra(), true, false, "pago")) {
             enviados++;
         }
-        if (enviarGrupo(usuario, entregasDeMuestra(), false, true, "entrega")) {
+        if (enviarGrupo(usuario, entregasDeMuestra(gracia), false, true,
+                "entrega")) {
             enviados++;
         }
         return enviados;
@@ -93,10 +102,12 @@ public class RecordatorioPruebaService {
             new BigDecimal("1200"),
             "ARS",
             true,
-            false));
+            false,
+            null));
     }
 
-    private List<EmailPlantillaService.RecordatorioEmail> entregasDeMuestra() {
+    private List<EmailPlantillaService.RecordatorioEmail> entregasDeMuestra(
+            int gracia) {
         return List.of(new EmailPlantillaService.RecordatorioEmail(
             "ENTREGA",
             null,
@@ -108,7 +119,19 @@ public class RecordatorioPruebaService {
             null,
             "ARS",
             true,
-            false));
+            false,
+            consecuenciaEntrega(gracia)));
+    }
+
+    private String consecuenciaEntrega(int gracia) {
+        return "Vence hoy. Si no entregás, en " + dias(gracia)
+            + " se suspenden tus ventas. Si la demora continúa, tu cuenta "
+            + "queda limitada solo a entregar los pedidos abiertos: no podés "
+            + "usar el resto del sitio hasta que un administrador te reintegre.";
+    }
+
+    private String dias(int cantidad) {
+        return cantidad == 1 ? "1 día" : cantidad + " días";
     }
 
     private boolean hayUrgente(

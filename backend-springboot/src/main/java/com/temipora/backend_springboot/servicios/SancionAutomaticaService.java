@@ -68,11 +68,9 @@ public class SancionAutomaticaService {
 
     @Transactional
     public SancionCuenta aplicarNivel1(
-            Pedido pedido, int diasGracia, int diasSancionVentas) {
+            Pedido pedido, int diasSancionVentas) {
         LocalDateTime ahora = LocalDateTime.now();
-        LocalDateTime inicio = pedido.getMoraDesde() != null
-            ? pedido.getMoraDesde()
-            : ahora;
+        LocalDateTime inicio = ahora;
         // Nunca pausar el catálogo si ya hay una sanción activa: el registro de
         // lo pausado quedaría asociado a una sanción ajena.
         var activa = sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
@@ -80,8 +78,7 @@ public class SancionAutomaticaService {
         if (activa.isPresent()) {
             return activa.get();
         }
-        LocalDateTime fin = inicio.plusDays(
-            Math.max(0, diasGracia) + Math.max(1, diasSancionVentas));
+        LocalDateTime fin = inicio.plusDays(Math.max(1, diasSancionVentas));
         String clave = "AUTO:ENTREGA:" + pedido.getIdPedido() + ":NIVEL1";
 
         SancionCuenta sancion = sancionService.aplicarSistema(
@@ -130,7 +127,7 @@ public class SancionAutomaticaService {
             NOTIF_ENTREGAS,
             "Cuenta restringida",
             "Tu cuenta quedó limitada a entregar los pedidos pendientes. "
-                + "Podés apelar desde tu panel.",
+                + "Podés apelar desde la pantalla de cuenta restringida.",
             pedido.getIdPedido(),
             TIPO_REFERENCIA);
         return escalada;

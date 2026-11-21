@@ -17,6 +17,7 @@ import com.temipora.backend_springboot.modelo.DineroPanelDTO;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.MetricasPanelDTO;
 import com.temipora.backend_springboot.modelo.PanelArtistaResumenDTO;
+import com.temipora.backend_springboot.modelo.PedidoResumenDTO;
 import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
 import com.temipora.backend_springboot.repositorios.CompraGrupoRepository;
 import com.temipora.backend_springboot.repositorios.PagoRepository;
@@ -39,6 +40,7 @@ public class PanelArtistaService {
     private final CompraGrupoRepository compraGrupoRepository;
     private final ConversacionService conversacionService;
     private final MercadoPagoOAuthService mercadoPagoOAuthService;
+    private final SaludCuentaService saludCuentaService;
 
     public PanelArtistaService(
             SolicitudServicioService solicitudServicioService,
@@ -46,13 +48,15 @@ public class PanelArtistaService {
             PagoRepository pagoRepository,
             CompraGrupoRepository compraGrupoRepository,
             ConversacionService conversacionService,
-            MercadoPagoOAuthService mercadoPagoOAuthService) {
+            MercadoPagoOAuthService mercadoPagoOAuthService,
+            SaludCuentaService saludCuentaService) {
         this.solicitudServicioService = solicitudServicioService;
         this.pedidoService = pedidoService;
         this.pagoRepository = pagoRepository;
         this.compraGrupoRepository = compraGrupoRepository;
         this.conversacionService = conversacionService;
         this.mercadoPagoOAuthService = mercadoPagoOAuthService;
+        this.saludCuentaService = saludCuentaService;
     }
 
     @Transactional(readOnly = true)
@@ -97,6 +101,11 @@ public class PanelArtistaService {
 
         PedidoService.ActividadArtista actividad =
             pedidoService.actividadArtista(idArtista);
+        SaludCuentaService.Salud salud = saludCuentaService.salud(idArtista);
+        for (PedidoResumenDTO pedido : actividad.pedidosActivos()) {
+            pedido.setDiasGraciaRestantes(
+                salud.diasGraciaPorPedido().get(pedido.getIdPedido()));
+        }
 
         ContadorMensajesDTO contador = conversacionService.contador(idArtista);
 
@@ -118,6 +127,7 @@ public class PanelArtistaService {
                 contador.getSolicitudesPendientes())
             .cuentaCobrosConectada(
                 mercadoPagoOAuthService.estado(idArtista).conectada())
+            .saludCuenta(salud.dto())
             .pedidosActivos(actividad.pedidosActivos())
             .hitosAtencion(actividad.hitosAtencion())
             .solicitudesRecientes(recientes)

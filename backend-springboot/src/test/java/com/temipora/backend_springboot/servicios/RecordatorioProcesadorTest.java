@@ -24,6 +24,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.EmailRecordatorioPendiente;
 import com.temipora.backend_springboot.modelo.EnvioEmail;
 import com.temipora.backend_springboot.modelo.EstadoEmailRecordatorio;
@@ -52,6 +53,8 @@ class RecordatorioProcesadorTest {
     private UsuarioRepository usuarioRepository;
     @Mock
     private SancionService sancionService;
+    @Mock
+    private ConfiguracionPedidoService configuracionPedidoService;
     @Mock
     private EmailPlantillaService emailPlantillaService;
     @Mock
@@ -128,8 +131,15 @@ class RecordatorioProcesadorTest {
         when(usuarioRepository.findByIdUsuario(1L))
             .thenReturn(Optional.of(usuario));
         when(sancionService.obtenerVigente(1L)).thenReturn(Optional.empty());
+        when(configuracionPedidoService.obtener()).thenReturn(configuracion());
         when(accesoEnlaceService.generar(any(), any(), any(), anyInt()))
             .thenReturn("tok");
+    }
+
+    private ConfiguracionPedido configuracion() {
+        ConfiguracionPedido config = new ConfiguracionPedido();
+        config.setDiasGraciaEntrega(3);
+        return config;
     }
 
     private void prepararEnvio(String html) {

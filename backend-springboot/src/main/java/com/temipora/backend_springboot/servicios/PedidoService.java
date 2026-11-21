@@ -106,8 +106,7 @@ public class PedidoService {
 
     private static final List<EstadoPedido> ESTADOS_PANEL_ACTIVOS = List.of(
         EstadoPedido.PENDIENTE_PAGO,
-        EstadoPedido.EN_CURSO,
-        EstadoPedido.IMPAGO);
+        EstadoPedido.EN_CURSO);
     private static final int MAX_HITOS_PANEL = 10;
     private static final int DIAS_HITO_POR_VENCER = 3;
 
@@ -961,7 +960,6 @@ public class PedidoService {
         List<HitoAtencion> atenciones = new ArrayList<>();
         long enCurso = 0;
         long pendientePago = 0;
-        long impagos = 0;
         long entregasPendientes = 0;
         long conRevision = 0;
         long porVencer = 0;
@@ -972,8 +970,6 @@ public class PedidoService {
                 enCurso++;
             } else if (pedido.getEstado() == EstadoPedido.PENDIENTE_PAGO) {
                 pendientePago++;
-            } else if (pedido.getEstado() == EstadoPedido.IMPAGO) {
-                impagos++;
             }
 
             boolean muestraOrigen = PresupuestoDTO.mismaMoneda(
@@ -1070,7 +1066,7 @@ public class PedidoService {
                 .toList(),
             enCurso,
             pendientePago,
-            impagos,
+            0,
             entregasPendientes,
             conRevision,
             porVencer,

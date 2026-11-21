@@ -27,6 +27,7 @@ public class PedidoResumenDTO {
     private LocalDate fechaEntregaPrevista;
     private int diasDemoraCliente;
     private boolean entregaAtrasada;
+    private Integer diasGraciaRestantes;
     private BigDecimal precioFinalCobro;
     private String monedaCobro;
     private String proximoHitoNombre;

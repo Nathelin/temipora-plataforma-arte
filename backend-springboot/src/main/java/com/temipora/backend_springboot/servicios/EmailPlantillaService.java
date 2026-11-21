@@ -72,7 +72,8 @@ public class EmailPlantillaService {
             BigDecimal monto,
             String moneda,
             boolean urgente,
-            boolean alerta) {
+            boolean alerta,
+            String consecuencia) {
 
         public boolean esPago() {
             return "PAGO".equals(contexto);
@@ -208,6 +209,7 @@ public class EmailPlantillaService {
         vista.put("moneda", item.moneda());
         vista.put("urgente", item.urgente());
         vista.put("alerta", item.alerta());
+        vista.put("consecuencia", item.consecuencia());
         vista.put("etiqueta", item.esPago() ? "Pagar" : "Subir entrega");
         vista.put("eyebrow", item.esPago()
             ? "Pago pendiente"

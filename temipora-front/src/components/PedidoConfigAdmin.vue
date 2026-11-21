@@ -13,6 +13,10 @@ const diasAprobacionAutomatica = ref('7')
 const diasPagoCuota = ref('7')
 const revisionesMaximasPorHito = ref('2')
 const diasReentrega = ref('7')
+const diasGraciaEntrega = ref('3')
+const diasSancionVentas = ref('14')
+const diasReapelacion = ref('7')
+const diasCierreTrasBloqueo = ref('30')
 const procesandoMails = ref(false)
 const enviandoPrueba = ref(false)
 const mensajeMails = ref('')
@@ -31,6 +35,10 @@ async function cargar() {
     diasPagoCuota.value = res.data?.diasPagoCuota ?? 7
     revisionesMaximasPorHito.value = res.data?.revisionesMaximasPorHito ?? 2
     diasReentrega.value = res.data?.diasReentrega ?? 7
+    diasGraciaEntrega.value = res.data?.diasGraciaEntrega ?? 3
+    diasSancionVentas.value = res.data?.diasSancionVentas ?? 14
+    diasReapelacion.value = res.data?.diasReapelacion ?? 7
+    diasCierreTrasBloqueo.value = res.data?.diasCierreTrasBloqueo ?? 30
     maxHitos.value = res.data?.maxHitos ?? 4
     porcentajeMaxPrimerHito.value = res.data?.porcentajeMaxPrimerHito ?? 50
     montoMinimoCuota.value = res.data?.montoMinimoCuota ?? 1
@@ -81,6 +89,10 @@ async function guardar() {
     entero(diasPagoCuota.value, 1, 14, 'El plazo de pago'),
     entero(revisionesMaximasPorHito.value, 1, 10, 'El máximo de revisiones'),
     entero(diasReentrega.value, 1, 60, 'El plazo de reentrega'),
+    entero(diasGraciaEntrega.value, 1, 30, 'La gracia de entrega'),
+    entero(diasSancionVentas.value, 1, 60, 'La sanción de ventas'),
+    entero(diasReapelacion.value, 1, 90, 'La espera entre apelaciones'),
+    entero(diasCierreTrasBloqueo.value, 7, 180, 'El cierre tras el bloqueo'),
     entero(maxHitos.value, 1, 6, 'El máximo de hitos'),
     decimal(porcentajeMaxPrimerHito.value, 1, 100, 'El porcentaje máximo del primer hito'),
     decimal(montoMinimoCuota.value, 0, 10000000, 'El monto mínimo por cuota'),
@@ -98,6 +110,10 @@ async function guardar() {
       diasPagoCuota: Number(diasPagoCuota.value),
       revisionesMaximasPorHito: Number(revisionesMaximasPorHito.value),
       diasReentrega: Number(diasReentrega.value),
+      diasGraciaEntrega: Number(diasGraciaEntrega.value),
+      diasSancionVentas: Number(diasSancionVentas.value),
+      diasReapelacion: Number(diasReapelacion.value),
+      diasCierreTrasBloqueo: Number(diasCierreTrasBloqueo.value),
       maxHitos: Number(maxHitos.value),
       porcentajeMaxPrimerHito: Number(String(porcentajeMaxPrimerHito.value).replace(',', '.')),
       montoMinimoCuota: Number(String(montoMinimoCuota.value).replace(',', '.')),
@@ -303,6 +319,83 @@ async function enviarRecordatoriosDePrueba() {
           </div>
         </div>
 
+        <div class="border-t border-rosa/40 pt-6">
+          <h2 class="mb-4 text-base text-granate">Sanciones por incumplimiento</h2>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label for="dias-gracia-entrega" class="mb-2 block text-sm text-cafe">
+                Gracia antes de pausar ventas (días) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="dias-gracia-entrega"
+                v-model="diasGraciaEntrega"
+                type="number"
+                min="1"
+                max="30"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Días extra después del plazo de entrega antes de suspender las ventas.
+              </p>
+            </div>
+            <div>
+              <label for="dias-sancion-ventas" class="mb-2 block text-sm text-cafe">
+                Duración de la suspensión de ventas (días) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="dias-sancion-ventas"
+                v-model="diasSancionVentas"
+                type="number"
+                min="1"
+                max="60"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Tiempo que el catálogo queda pausado. Al terminar, si sigue la mora,
+                la cuenta pasa a “solo entregas”.
+              </p>
+            </div>
+            <div>
+              <label for="dias-reapelacion" class="mb-2 block text-sm text-cafe">
+                Espera entre apelaciones (días) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="dias-reapelacion"
+                v-model="diasReapelacion"
+                type="number"
+                min="1"
+                max="90"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Días que debe esperar el artista para volver a apelar.
+              </p>
+            </div>
+            <div>
+              <label for="dias-cierre-tras-bloqueo" class="mb-2 block text-sm text-cafe">
+                Cierre tras el bloqueo (días) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="dias-cierre-tras-bloqueo"
+                v-model="diasCierreTrasBloqueo"
+                type="number"
+                min="7"
+                max="180"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Días desde el Nivel 2 antes de cerrar los pedidos pendientes por
+                incumplimiento.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <p v-if="errorAccion" class="text-sm text-rojizo">{{ errorAccion }}</p>
         <p v-else-if="mensaje" class="text-sm text-green-700">{{ mensaje }}</p>
 
@@ -377,6 +470,28 @@ async function enviarRecordatoriosDePrueba() {
           <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Plazo de reentrega</dt>
             <dd class="text-cafe">{{ config.diasReentrega }} días</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Gracia de entrega</dt>
+            <dd class="text-cafe">{{ config.diasGraciaEntrega }} días</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Suspensión de ventas</dt>
+            <dd class="text-cafe">{{ config.diasSancionVentas }} días</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Espera entre apelaciones</dt>
+            <dd class="text-cafe">{{ config.diasReapelacion }} días</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Cierre tras el bloqueo</dt>
+            <dd class="text-cafe">{{ config.diasCierreTrasBloqueo }} días</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Sanciones automáticas desde</dt>
+            <dd class="text-right text-cafe">
+              {{ formatearFecha(config.sancionesAutomaticasDesde) }}
+            </dd>
           </div>
           <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Última modificación</dt>

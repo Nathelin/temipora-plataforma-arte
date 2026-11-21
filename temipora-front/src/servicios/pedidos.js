@@ -19,6 +19,10 @@ export const ESTADOS_PEDIDO = {
     etiqueta: 'Sin pago',
     clase: 'border-rojizo/30 bg-rojizo/10 text-rojizo',
   },
+  INCUMPLIMIENTO: {
+    etiqueta: 'Cerrado por incumplimiento',
+    clase: 'border-rojizo/30 bg-rojizo/10 text-rojizo',
+  },
 }
 
 export const ESTADOS_PAGO_HITO = {

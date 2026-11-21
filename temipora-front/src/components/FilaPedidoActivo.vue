@@ -41,7 +41,6 @@ const monto = computed(() => {
   )
 })
 const accion = computed(() => {
-  if (props.pedido.estado === 'IMPAGO') return 'Pedido sin pago'
   if (props.pedido.puedeEntregar) return 'Subir entrega'
   if (props.pedido.puedePagar) return 'Pagar cuota'
   if (props.pedido.puedeAprobar) return 'Aprobar entrega'
@@ -51,8 +50,7 @@ const accion = computed(() => {
 const accionDestacada = computed(() => Boolean(
   props.pedido.puedeEntregar
   || props.pedido.puedePagar
-  || props.pedido.puedeAprobar
-  || props.pedido.estado === 'IMPAGO',
+  || props.pedido.puedeAprobar,
 ))
 const noLeidos = computed(() => Number(props.pedido.noLeidos || 0))
 </script>
@@ -107,6 +105,15 @@ const noLeidos = computed(() => Number(props.pedido.noLeidos || 0))
             </span>
             <span v-if="pedido.entregaAtrasada" class="text-[11px] font-semibold text-rojizo">
               Atrasada
+            </span>
+            <span
+              v-if="pedido.diasGraciaRestantes != null"
+              class="text-[11px] font-semibold text-coral"
+              :title="`Si no entregás, en ${pedido.diasGraciaRestantes} días se suspenden tus ventas`"
+            >
+              {{ pedido.diasGraciaRestantes > 0
+                ? `Te ${pedido.diasGraciaRestantes === 1 ? 'queda' : 'quedan'} ${pedido.diasGraciaRestantes} ${pedido.diasGraciaRestantes === 1 ? 'día' : 'días'}`
+                : 'La gracia vence hoy' }}
             </span>
           </div>
         </div>

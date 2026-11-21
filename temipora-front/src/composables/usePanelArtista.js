@@ -41,6 +41,7 @@ const solicitudesMensajePendientes = computed(
   () => Number(resumen.value?.solicitudesMensajePendientes || 0),
 )
 const cuentaCobrosConectada = computed(() => resumen.value?.cuentaCobrosConectada !== false)
+const saludCuenta = computed(() => resumen.value?.saludCuenta || null)
 
 function haySesionArtista() {
   return Boolean(localStorage.getItem('token'))
@@ -116,6 +117,7 @@ export function usePanelArtista() {
     mensajesNoLeidos,
     solicitudesMensajePendientes,
     cuentaCobrosConectada,
+    saludCuenta,
     cargando,
     error,
     cargar,
