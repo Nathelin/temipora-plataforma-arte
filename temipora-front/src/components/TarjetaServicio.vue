@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { formatearPrecio } from '../servicios/moneda'
 import { formatearPromedio } from '../servicios/resenias'
+import ImagenOptimizada from './ImagenOptimizada.vue'
 
 const props = defineProps({
   servicio: { type: Object, required: true },
@@ -9,6 +10,7 @@ const props = defineProps({
   esFavorito: { type: Boolean, default: false },
   actualizandoFavorito: { type: Boolean, default: false },
   motivo: { type: String, default: '' },
+  caracteristicas: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['alternar-favorito'])
@@ -70,10 +72,11 @@ function textoEntrega(s) {
     </router-link>
 
     <div class="relative aspect-[4/3] w-full overflow-hidden bg-rosa/20">
-      <img
+      <ImagenOptimizada
         v-if="servicio.imagenPortada"
         :src="servicio.imagenPortada"
         :alt="servicio.nombre"
+        sizes="(min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
         class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
         :class="requiereAdvertencia && !revelado ? 'scale-105 blur-[18px]' : ''"
       />
@@ -144,15 +147,26 @@ function textoEntrega(s) {
         {{ motivo }}
       </p>
 
+      <div v-if="caracteristicas.length" class="mb-2 flex flex-wrap gap-1">
+        <span
+          v-for="caracteristica in caracteristicas"
+          :key="caracteristica"
+          class="rounded-full bg-rosa/25 px-2 py-0.5 text-[10px] font-semibold leading-snug text-cafe/75"
+        >
+          {{ caracteristica }}
+        </span>
+      </div>
+
       <h3 class="line-clamp-1 font-display text-base font-bold leading-snug text-granate">
         {{ servicio.nombre }}
       </h3>
 
       <div class="mt-2 flex items-center gap-2">
-        <img
+        <ImagenOptimizada
           v-if="servicio.urlFotoArtista"
           :src="servicio.urlFotoArtista"
           alt=""
+          sizes="40px"
           class="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-borde/50"
         />
         <span

@@ -32,6 +32,17 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
     List<Pedido> findByArtistaIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
         Long idArtista, Collection<EstadoPedido> estados, Pageable pageable);
 
+    @Query("""
+        select distinct p from Pedido p
+        left join fetch p.hitos h
+        left join fetch h.hitoPresupuesto
+        join fetch p.artista
+        join fetch p.cliente
+        left join fetch p.servicio
+        where p.estado = :estado
+        """)
+    List<Pedido> findConHitosByEstado(@Param("estado") EstadoPedido estado);
+
     boolean existsByArtistaIdUsuarioAndClienteIdUsuario(
         Long idArtista, Long idCliente);
 

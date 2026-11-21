@@ -153,10 +153,9 @@ class ReventaIntegracionTest {
 
         var detallePublico = reventaService.detallePublico(
             publicacion.getIdPublicacionReventa(), null);
-        assertThat(detallePublico.getTitulo())
-            .isEqualTo(producto.getVariantes().get(0).getNombre());
-        assertThat(detallePublico.getTituloOriginal())
-            .isEqualTo(producto.getTitulo());
+        assertThat(detallePublico.getTitulo()).isEqualTo(producto.getTitulo());
+        assertThat(detallePublico.getTituloOriginal()).isNull();
+        assertThat(detallePublico.getNombreVariante()).isNull();
         assertThat(detallePublico.getNombreVendedor())
             .isEqualTo(vendedor.getNombreUsuario());
         assertThat(detallePublico.getNombreArtista())
@@ -173,9 +172,8 @@ class ReventaIntegracionTest {
             .findFirst()
             .orElseThrow();
         assertThat(publica.isEsReventa()).isTrue();
-        assertThat(publica.getTitulo())
-            .isEqualTo(producto.getVariantes().get(0).getNombre());
-        assertThat(publica.getTituloOriginal()).isEqualTo(producto.getTitulo());
+        assertThat(publica.getTitulo()).isEqualTo(producto.getTitulo());
+        assertThat(publica.getTituloOriginal()).isNull();
         assertThat(publica.getPrecioDesde()).isEqualByComparingTo("150.00");
 
         var catalogoMixto = productoCatalogoService.listar(

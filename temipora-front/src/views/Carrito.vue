@@ -5,6 +5,7 @@ import { useCarrito } from '../composables/useCarrito'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import { formatearPrecio } from '../servicios/moneda'
 import { pagarGrupo } from '../servicios/compras'
+import RedirigiendoMercadoPago from '../components/RedirigiendoMercadoPago.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -78,6 +79,12 @@ const avisosVisibles = computed(() => {
 function totalGrupo(grupo) {
   return formatearPrecio(grupo.total ?? grupo.subtotal, grupo.moneda || 'ARS')
 }
+
+const detalleRedireccion = computed(() => {
+  const grupo = grupoPagando.value
+  if (!grupo) return ''
+  return `Estamos preparando el pago de @${grupo.nombreArtista} (${totalGrupo(grupo)}).`
+})
 
 function imagenesGrupo(grupo) {
   return (grupo.items || [])
@@ -223,7 +230,7 @@ onMounted(cargar)
       </div>
     </div>
 
-    <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando...</p>
+    <CargandoPagina v-if="cargando" tipo="lista" mensaje="Cargando carrito…" :tarjetas="4" />
 
     <div
       v-else-if="error && !grupos.length"
@@ -528,28 +535,9 @@ onMounted(cargar)
         </section>
       </aside>
     </div>
-    <div
-      v-if="procesandoPago"
-      class="fixed inset-0 z-[100] flex items-center justify-center bg-granate/40 p-4 backdrop-blur-sm"
-      role="status"
-      aria-live="polite"
-    >
-      <div class="w-full max-w-sm rounded-2xl border border-rosa bg-blanco p-6 text-center shadow-2xl">
-        <div
-          class="mx-auto h-9 w-9 animate-spin rounded-full border-[3px] border-rosa border-t-coral"
-          aria-hidden="true"
-        ></div>
-        <p class="mt-4 font-display text-base font-bold text-granate">
-          Te estamos redirigiendo a MercadoPago...
-        </p>
-        <p class="mt-1 text-sm leading-relaxed text-cafe/65">
-          No cierres esta ventana.
-          <template v-if="grupoPagando">
-            Estamos preparando el pago de @{{ grupoPagando.nombreArtista }}
-            ({{ totalGrupo(grupoPagando) }}).
-          </template>
-        </p>
-      </div>
-    </div>
+    <RedirigiendoMercadoPago
+      :visible="procesandoPago"
+      :detalle="detalleRedireccion"
+    />
   </div>
 </template>

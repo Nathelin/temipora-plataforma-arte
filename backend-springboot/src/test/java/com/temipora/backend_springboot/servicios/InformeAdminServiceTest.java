@@ -55,7 +55,7 @@ class InformeAdminServiceTest {
         assertThat(totales.comision()).isEqualByComparingTo("35.00");
         assertThat(totales.netoArtistas()).isEqualByComparingTo("315.00");
         assertThat(totales.arancel()).isEqualByComparingTo("15.75");
-        assertThat(totales.netoPercibido()).isEqualByComparingTo("299.25");
+        assertThat(totales.netoPercibido()).isEqualByComparingTo("315.00");
         assertThat(totales.operaciones()).isEqualTo(2);
         assertThat(totales.unidades()).isEqualTo(4);
         assertThat(totales.ticketPromedio()).isEqualByComparingTo("175.00");

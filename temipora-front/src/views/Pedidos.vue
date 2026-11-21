@@ -11,9 +11,11 @@ import {
 import FilaPedidoActivo from '../components/FilaPedidoActivo.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import { useAccesoEnlace } from '../composables/useAccesoEnlace'
 
 const route = useRoute()
 const router = useRouter()
+const { consumirSiCorresponde } = useAccesoEnlace()
 
 const CONTADORES_VACIOS = {
   todos: 0,
@@ -211,7 +213,11 @@ function cargarMas() {
   cargar(false)
 }
 
-onMounted(() => {
+onMounted(async () => {
+  const acceso = await consumirSiCorresponde()
+  if (acceso.habiaEnlace) {
+    return
+  }
   cargar(true)
   cargarContadores()
   cargarServicios()
@@ -324,7 +330,7 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <div v-if="cargando" class="mt-6 space-y-3" role="status" aria-live="polite">
+    <div v-if="cargando" class="mt-6 min-h-[calc(100vh-4rem)] space-y-3" role="status" aria-live="polite">
       <span class="sr-only">Cargando pedidos...</span>
       <div
         v-for="n in 3"

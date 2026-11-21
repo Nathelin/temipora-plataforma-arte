@@ -269,7 +269,7 @@ onMounted(cargar)
 
 <template>
   <div class="mx-auto w-full max-w-screen-2xl px-4 py-8 sm:px-8">
-    <p v-if="cargando" class="py-16 text-center text-cafe/60">Cargando...</p>
+    <CargandoPagina v-if="cargando" tipo="detalle" mensaje="Cargando producto…" />
 
     <div v-else-if="error" class="mx-auto max-w-xl rounded-2xl border border-rosa/60 bg-blanco px-6 py-12 text-center">
       <p class="font-display text-lg font-bold text-granate">{{ error }}</p>

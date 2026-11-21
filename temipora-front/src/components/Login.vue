@@ -5,7 +5,7 @@ import api from '../servicios/api'
 import { useSesion } from '../composables/useSesion'
 import { obtenerContacto } from '../servicios/contacto'
 import { formatearFecha, formatearFechaHora } from '../servicios/fechas'
-import fondo from '../assets/fondos/prueba.png'
+import fondo from '../assets/fondos/prueba.webp'
 import welcomeLogo from '../assets/welcome logo.png'
 
 const router = useRouter()

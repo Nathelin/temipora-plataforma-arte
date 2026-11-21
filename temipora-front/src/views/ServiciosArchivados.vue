@@ -54,7 +54,7 @@ onMounted(cargar)
       descripcion="Los servicios que los artistas dieron de baja definitiva. No son visibles para el artista ni para los clientes, pero se conservan por auditoría. Al restaurarlos vuelven como pausados."
     />
 
-    <div v-if="cargando" class="mt-8 space-y-3" role="status" aria-live="polite">
+    <div v-if="cargando" class="mt-8 min-h-[calc(100vh-4rem)] space-y-3" role="status" aria-live="polite">
       <span class="sr-only">Cargando servicios archivados...</span>
       <div
         v-for="n in 3"

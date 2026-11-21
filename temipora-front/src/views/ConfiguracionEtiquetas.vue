@@ -88,9 +88,7 @@ onMounted(() => {
         {{ errorAccion }}
       </p>
 
-      <p v-if="cargando" class="text-sm text-cafe/60 py-6 text-center">
-        Cargando tus etiquetas...
-      </p>
+      <CargandoPagina v-if="cargando" tipo="lista" mensaje="Cargando tus etiquetas…" :tarjetas="4" />
       <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
       <template v-else>
         <p v-if="!misEtiquetas.length" class="text-sm text-cafe/60 py-6">

@@ -10,12 +10,14 @@ import EntregasHito from '../components/EntregasHito.vue'
 import HiloConversacion from '../components/HiloConversacion.vue'
 import IconoDescarga from '../components/IconoDescarga.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
+import RedirigiendoMercadoPago from '../components/RedirigiendoMercadoPago.vue'
 import SubirEntregable from '../components/SubirEntregable.vue'
 import FormularioResenia from '../components/FormularioResenia.vue'
 import TarjetaResenia from '../components/TarjetaResenia.vue'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import { useHiloConversacion } from '../composables/useHiloConversacion'
 import { useSubirImagen } from '../composables/useSubirImagen'
+import { useAccesoEnlace } from '../composables/useAccesoEnlace'
 import { estadoConversacionDe } from '../servicios/mensajes'
 import {
   cargarCriterios,
@@ -35,10 +37,12 @@ import {
   hitoPrioritario,
   pagoPendiente,
   resumenPagos,
+  textoAjusteEntrega,
 } from '../servicios/pedidos'
 
 const route = useRoute()
 const router = useRouter()
+const { consumirSiCorresponde } = useAccesoEnlace()
 const enPanel = computed(() => route.path.startsWith('/panel'))
 const idPedido = computed(() => Number(route.params.idPedido))
 
@@ -46,6 +50,8 @@ const pedido = ref(null)
 const cargando = ref(true)
 const error = ref('')
 const procesando = ref(false)
+const redirigiendoPago = ref(false)
+const hitoPagando = ref(null)
 const avisoPago = ref('')
 const sondeandoPago = ref(false)
 const descargandoConstancia = ref(false)
@@ -188,6 +194,12 @@ function formatearMontoHito(hito) {
     moneda.value,
   )
 }
+
+const detalleRedireccion = computed(() => {
+  const hito = hitoPagando.value
+  if (!hito) return ''
+  return `Estamos preparando el pago de ${hito.nombre} (${formatearMontoHito(hito)}).`
+})
 
 function pagoAprobado(hito) {
   return (hito?.pagos || []).find((pago) => pago.estado === 'APROBADO') || null
@@ -597,6 +609,9 @@ function urlCheckoutMercadoPago(data) {
 async function pagarHito(hito) {
   if (procesando.value) return
   procesando.value = true
+  hitoPagando.value = hito
+  redirigiendoPago.value = true
+  let redirigiendo = false
   try {
     await sincronizarPagoPendiente()
     const actualizado = (pedido.value?.hitos || [])
@@ -611,6 +626,7 @@ async function pagarHito(hito) {
     pedido.value = res.data
     const url = urlCheckoutMercadoPago(res.data)
     if (url) {
+      redirigiendo = true
       window.location.href = url
       return
     }
@@ -624,7 +640,17 @@ async function pagarHito(hito) {
       || 'No se pudo completar la acción.')
   } finally {
     procesando.value = false
+    if (!redirigiendo) {
+      redirigiendoPago.value = false
+      hitoPagando.value = null
+    }
   }
+}
+
+function irAPagarMercadoPago(pago, hito) {
+  hitoPagando.value = hito
+  redirigiendoPago.value = true
+  window.location.href = pago.instruccion
 }
 
 async function refrescarPedido() {
@@ -816,6 +842,10 @@ function abrirChat() {
 }
 
 onMounted(async () => {
+  const acceso = await consumirSiCorresponde()
+  if (acceso.habiaEnlace) {
+    return
+  }
   await cargar()
   void procesarRetornoPago()
 })
@@ -831,9 +861,7 @@ onMounted(async () => {
       ← Volver a pedidos
     </button>
 
-    <p v-if="cargando" class="mt-8 py-16 text-center text-sm text-cafe/60">
-      Cargando pedido...
-    </p>
+    <CargandoPagina v-if="cargando" tipo="detalle" mensaje="Cargando pedido…" />
     <p v-else-if="error" class="mt-8 py-16 text-center text-sm text-rojizo">
       {{ error }}
     </p>
@@ -1000,9 +1028,28 @@ onMounted(async () => {
             </dd>
           </div>
           <div class="rounded-xl bg-rosa/10 px-3 py-2">
-            <dt class="text-xs text-cafe/50">Límite de entrega</dt>
+            <dt class="text-xs text-cafe/50">Entrega prevista</dt>
             <dd class="mt-0.5 font-medium text-cafe">
-              {{ pedido.limiteEntrega ? formatearFecha(pedido.limiteEntrega) : 'A confirmar' }}
+              {{ pedido.fechaEntregaPrevista || pedido.limiteEntrega
+                ? formatearFecha(pedido.fechaEntregaPrevista || pedido.limiteEntrega)
+                : 'A confirmar' }}
+            </dd>
+            <dd
+              v-if="textoAjusteEntrega(pedido)"
+              class="mt-1 text-[11px] leading-relaxed text-cafe/55"
+            >
+              {{ textoAjusteEntrega(pedido) }}
+            </dd>
+            <dd
+              v-else-if="pedido.fechaEntregaPrevista || pedido.limiteEntrega"
+              class="mt-1 text-[11px] leading-relaxed text-cafe/50"
+            >
+              Se corre solo si el cliente paga tarde una cuota; el atraso del artista no la mueve.
+            </dd>
+            <dd v-if="pedido.entregaAtrasada" class="mt-1">
+              <span class="inline-flex rounded-full bg-rojizo/10 px-2 py-0.5 text-[11px] font-semibold text-rojizo">
+                Entrega atrasada
+              </span>
             </dd>
           </div>
           <div v-if="pedido.finalizadoEn" class="rounded-xl bg-rosa/10 px-3 py-2">
@@ -1505,6 +1552,21 @@ onMounted(async () => {
               <dt class="text-cafe/50">Aprobación automática</dt>
               <dd class="mt-0.5 text-cafe">{{ formatearFechaHora(hito.fechaLimiteAprobacion) }}</dd>
             </div>
+            <div v-if="hito.fechaLimiteReentrega">
+              <dt class="text-cafe/50">Reentrega antes de</dt>
+              <dd class="mt-0.5 text-cafe">
+                {{ formatearFechaHora(hito.fechaLimiteReentrega) }}
+                <span v-if="hito.reentregaAtrasada" class="ml-1 font-semibold text-rojizo">
+                  Atrasada
+                </span>
+              </dd>
+            </div>
+            <div v-if="hito.revisionesMaximas">
+              <dt class="text-cafe/50">Revisiones</dt>
+              <dd class="mt-0.5 text-cafe">
+                {{ hito.revisiones || 0 }} de {{ hito.revisionesMaximas }}
+              </dd>
+            </div>
           </dl>
 
           <EntregasHito
@@ -1608,13 +1670,14 @@ onMounted(async () => {
             >
               Confirmar pago (simulado)
             </button>
-            <a
+            <button
               v-else-if="esCliente && pagoPendiente(hito).proveedor === 'MERCADOPAGO' && pagoPendiente(hito).instruccion"
-              :href="pagoPendiente(hito).instruccion"
+              type="button"
               class="mt-3 inline-flex min-h-9 items-center justify-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+              @click="irAPagarMercadoPago(pagoPendiente(hito), hito)"
             >
               Ir a pagar con MercadoPago
-            </a>
+            </button>
           </div>
 
           <div
@@ -1631,12 +1694,19 @@ onMounted(async () => {
               Aprobar entregable
             </button>
             <button
+              v-if="hito.puedeSolicitarRevision"
               type="button"
               class="inline-flex min-h-10 items-center justify-center rounded-full border border-rojizo/40 px-5 text-sm font-semibold text-rojizo transition hover:bg-rojizo/10"
               @click="abrirRevision(hito)"
             >
               Solicitar revisión
             </button>
+            <p
+              v-else-if="hito.revisionesMaximas && (hito.revisiones || 0) >= hito.revisionesMaximas"
+              class="self-center text-xs leading-relaxed text-cafe/55"
+            >
+              Ya usaste las {{ hito.revisionesMaximas }} revisiones incluidas en esta etapa.
+            </p>
           </div>
 
           <div
@@ -1902,6 +1972,11 @@ onMounted(async () => {
         ?? pedido.precioFinalCliente"
       estimado
       @cerrar="modalCalculoAbierto = false"
+    />
+
+    <RedirigiendoMercadoPago
+      :visible="redirigiendoPago"
+      :detalle="detalleRedireccion"
     />
   </div>
 </template>

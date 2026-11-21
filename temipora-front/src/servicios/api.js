@@ -10,6 +10,7 @@ function limpiarSesion() {
   localStorage.removeItem('rol')
   localStorage.removeItem('idUsuario')
   localStorage.removeItem('urlFotoPerfil')
+  localStorage.removeItem('monedaPreferida')
 }
 
 api.interceptors.request.use((config) => {

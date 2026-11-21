@@ -59,13 +59,13 @@ class InformeVentasServiceTest {
 
         InformeTotalesDTO totales = informe.totales();
         assertThat(totales.bruto()).isEqualByComparingTo("350.00");
-        assertThat(totales.netoPercibido()).isEqualByComparingTo("299.25");
-        assertThat(totales.costoCobro()).isEqualByComparingTo("50.75");
+        assertThat(totales.netoPercibido()).isEqualByComparingTo("315.00");
+        assertThat(totales.costoCobro()).isEqualByComparingTo("35.00");
         assertThat(totales.comision()).isEqualByComparingTo("35.00");
         assertThat(totales.arancel()).isEqualByComparingTo("15.75");
         assertThat(totales.operaciones()).isEqualTo(2);
         assertThat(totales.unidades()).isEqualTo(4);
-        assertThat(totales.ticketPromedio()).isEqualByComparingTo("149.63");
+        assertThat(totales.ticketPromedio()).isEqualByComparingTo("157.50");
         assertThat(informe.operacionesSinNetoReal()).isZero();
     }
 
@@ -80,21 +80,21 @@ class InformeVentasServiceTest {
         assertThat(items).hasSize(3);
         assertThat(items.get(0).tipo()).isEqualTo("SERVICIO");
         assertThat(items.get(0).nombre()).isEqualTo("Ilustración");
-        assertThat(items.get(0).netoPercibido()).isEqualByComparingTo("128.25");
+        assertThat(items.get(0).netoPercibido()).isEqualByComparingTo("135.00");
         assertThat(items.get(0).unidades()).isEqualTo(2);
         assertThat(items.get(0).operaciones()).isEqualTo(1);
         assertThat(items.get(0).participacion()).isEqualByComparingTo("42.86");
 
         InformeItemDTO obraA = items.get(1);
         assertThat(obraA.id()).isEqualTo(30L);
-        assertThat(obraA.netoPercibido()).isEqualByComparingTo("102.60");
+        assertThat(obraA.netoPercibido()).isEqualByComparingTo("108.00");
         assertThat(obraA.arancel()).isEqualByComparingTo("5.40");
         assertThat(obraA.participacion()).isEqualByComparingTo("34.29");
 
         InformeItemDTO obraB = items.get(2);
         assertThat(obraB.id()).isEqualTo(31L);
         // El último ítem absorbe el residuo del prorrateo.
-        assertThat(obraB.netoPercibido()).isEqualByComparingTo("68.40");
+        assertThat(obraB.netoPercibido()).isEqualByComparingTo("72.00");
         assertThat(obraB.arancel()).isEqualByComparingTo("3.60");
     }
 
@@ -111,9 +111,9 @@ class InformeVentasServiceTest {
         assertThat(serie.get(0).netoPercibido()).isEqualByComparingTo("0.00");
         assertThat(serie.get(0).cobros()).isZero();
         assertThat(serie.get(1).periodo()).isEqualTo("2026-11-02");
-        assertThat(serie.get(1).netoPercibido()).isEqualByComparingTo("128.25");
+        assertThat(serie.get(1).netoPercibido()).isEqualByComparingTo("135.00");
         assertThat(serie.get(1).cobros()).isEqualTo(2);
-        assertThat(serie.get(2).netoPercibido()).isEqualByComparingTo("171.00");
+        assertThat(serie.get(2).netoPercibido()).isEqualByComparingTo("180.00");
         assertThat(serie.get(2).cobros()).isEqualTo(1);
     }
 
@@ -127,7 +127,7 @@ class InformeVentasServiceTest {
 
         assertThat(serie).extracting(InformeSerieDTO::periodo)
             .containsExactly("2026-10", "2026-11", "2026-12");
-        assertThat(serie.get(1).netoPercibido()).isEqualByComparingTo("299.25");
+        assertThat(serie.get(1).netoPercibido()).isEqualByComparingTo("315.00");
     }
 
     @Test

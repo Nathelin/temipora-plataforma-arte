@@ -319,7 +319,7 @@ onMounted(aplicarQueryInicial)
     </p>
   </form>
 
-  <div v-if="cargando" class="mt-6 space-y-3" role="status" aria-live="polite">
+  <div v-if="cargando" class="mt-6 min-h-[calc(100vh-4rem)] space-y-3" role="status" aria-live="polite">
     <span class="sr-only">Generando el informe...</span>
     <div class="grid gap-3 sm:grid-cols-3">
       <div

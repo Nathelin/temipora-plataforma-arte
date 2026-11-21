@@ -119,7 +119,7 @@ onMounted(cargarFavoritos)
       <FavoritosNav />
     </div>
 
-    <div v-if="cargando" class="space-y-10" aria-label="Cargando favoritos">
+    <div v-if="cargando" class="min-h-[calc(100vh-4rem)] space-y-10" aria-label="Cargando favoritos">
       <div v-for="bloque in 2" :key="bloque" class="animate-pulse">
         <div class="h-5 w-32 rounded-full bg-rosa/40"></div>
         <div class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">

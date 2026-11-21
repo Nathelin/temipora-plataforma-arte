@@ -21,6 +21,8 @@ public class ConfiguracionPedido {
     public static final Long ID_UNICO = 1L;
     public static final int DIAS_APROBACION_POR_DEFECTO = 7;
     public static final int DIAS_PAGO_POR_DEFECTO = 7;
+    public static final int REVISIONES_MAXIMAS_POR_DEFECTO = 2;
+    public static final int DIAS_REENTREGA_POR_DEFECTO = 7;
     public static final int MAX_HITOS_POR_DEFECTO = 4;
     public static final BigDecimal PORCENTAJE_MAX_PRIMER_HITO_POR_DEFECTO =
         new BigDecimal("50.00");
@@ -36,6 +38,12 @@ public class ConfiguracionPedido {
 
     @Column(name = "dias_pago_cuota", nullable = false)
     private Integer diasPagoCuota = DIAS_PAGO_POR_DEFECTO;
+
+    @Column(name = "revisiones_maximas_por_hito", nullable = false)
+    private Integer revisionesMaximasPorHito = REVISIONES_MAXIMAS_POR_DEFECTO;
+
+    @Column(name = "dias_reentrega", nullable = false)
+    private Integer diasReentrega = DIAS_REENTREGA_POR_DEFECTO;
 
     @Column(name = "max_hitos", nullable = false)
     private Integer maxHitos = MAX_HITOS_POR_DEFECTO;

@@ -47,6 +47,10 @@ class ConfiguracionPedidoServiceTest {
             .isEqualTo(ConfiguracionPedido.DIAS_APROBACION_POR_DEFECTO);
         assertThat(config.getDiasPagoCuota())
             .isEqualTo(ConfiguracionPedido.DIAS_PAGO_POR_DEFECTO);
+        assertThat(config.getRevisionesMaximasPorHito())
+            .isEqualTo(ConfiguracionPedido.REVISIONES_MAXIMAS_POR_DEFECTO);
+        assertThat(config.getDiasReentrega())
+            .isEqualTo(ConfiguracionPedido.DIAS_REENTREGA_POR_DEFECTO);
         assertThat(config.getMaxHitos())
             .isEqualTo(ConfiguracionPedido.MAX_HITOS_POR_DEFECTO);
         assertThat(config.getPorcentajeMaxPrimerHito())
@@ -74,6 +78,8 @@ class ConfiguracionPedidoServiceTest {
 
         assertThat(dto.getDiasAprobacionAutomatica()).isEqualTo(3);
         assertThat(dto.getDiasPagoCuota()).isEqualTo(10);
+        assertThat(dto.getRevisionesMaximasPorHito()).isEqualTo(2);
+        assertThat(dto.getDiasReentrega()).isEqualTo(7);
         assertThat(dto.getMaxHitos()).isEqualTo(3);
         assertThat(dto.getPorcentajeMaxPrimerHito())
             .isEqualByComparingTo("40.00");
@@ -94,7 +100,9 @@ class ConfiguracionPedidoServiceTest {
         PedidoConfigDTO dto = configuracionPedidoService.actualizar(request);
 
         assertThat(dto.getDiasAprobacionAutomatica()).isEqualTo(5);
-        assertThat(dto.getDiasPagoCuota()).isEqualTo(15);
+        assertThat(dto.getDiasPagoCuota()).isEqualTo(14);
+        assertThat(dto.getRevisionesMaximasPorHito()).isEqualTo(3);
+        assertThat(dto.getDiasReentrega()).isEqualTo(5);
         assertThat(dto.getMaxHitos()).isEqualTo(4);
         assertThat(dto.getPorcentajeMaxPrimerHito())
             .isEqualByComparingTo("55.56");
@@ -119,10 +127,22 @@ class ConfiguracionPedidoServiceTest {
             .hasMessageContaining("aprobación automática");
 
         PedidoConfigRequest sinPago = requestValido();
-        sinPago.setDiasPagoCuota(91);
+        sinPago.setDiasPagoCuota(15);
         assertThatThrownBy(() -> configuracionPedidoService.actualizar(sinPago))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("plazo de pago");
+
+        PedidoConfigRequest sinRevisiones = requestValido();
+        sinRevisiones.setRevisionesMaximasPorHito(11);
+        assertThatThrownBy(() -> configuracionPedidoService.actualizar(sinRevisiones))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("máximo de revisiones");
+
+        PedidoConfigRequest sinReentrega = requestValido();
+        sinReentrega.setDiasReentrega(0);
+        assertThatThrownBy(() -> configuracionPedidoService.actualizar(sinReentrega))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("plazo de reentrega");
 
         PedidoConfigRequest sinHitos = requestValido();
         sinHitos.setMaxHitos(7);
@@ -160,6 +180,8 @@ class ConfiguracionPedidoServiceTest {
         config.setIdConfiguracion(ConfiguracionPedido.ID_UNICO);
         config.setDiasAprobacionAutomatica(3);
         config.setDiasPagoCuota(10);
+        config.setRevisionesMaximasPorHito(2);
+        config.setDiasReentrega(7);
         config.setMaxHitos(maxHitos);
         config.setPorcentajeMaxPrimerHito(new BigDecimal("40.00"));
         config.setMontoMinimoCuota(new BigDecimal("2.00"));
@@ -169,7 +191,9 @@ class ConfiguracionPedidoServiceTest {
     private PedidoConfigRequest requestValido() {
         PedidoConfigRequest request = new PedidoConfigRequest();
         request.setDiasAprobacionAutomatica(5);
-        request.setDiasPagoCuota(15);
+        request.setDiasPagoCuota(14);
+        request.setRevisionesMaximasPorHito(3);
+        request.setDiasReentrega(5);
         request.setMaxHitos(4);
         request.setPorcentajeMaxPrimerHito(new BigDecimal("50.00"));
         request.setMontoMinimoCuota(new BigDecimal("10.00"));

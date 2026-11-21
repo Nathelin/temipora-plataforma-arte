@@ -142,6 +142,12 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<!-- Evita -XX:TieredStopAtLevel=1: esa compilación C1
+					     provocaba un EXCEPTION_ACCESS_VIOLATION en jvm.dll
+					     durante el arranque de Spring (Microsoft JDK 21.0.9). -->
+					<optimizedLaunch>false</optimizedLaunch>
+				</configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

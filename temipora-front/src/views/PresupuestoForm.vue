@@ -16,6 +16,7 @@ import {
 } from '../servicios/solicitudes'
 import { useNotificaciones } from '../composables/useNotificaciones'
 import ModalComoSeCalcula from '../components/ModalComoSeCalcula.vue'
+import BurbujaInfo from '../components/BurbujaInfo.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -892,8 +893,10 @@ onMounted(cargar)
               </div>
             </dl>
             <p class="mt-3 text-xs leading-relaxed text-cafe/50">
-              La fecha se recalcula al confirmarse el pago. Si el pago llega después del
-              inicio estimado, el plazo se cuenta desde el pago.
+              La fecha se recalcula al confirmarse el pago de la seña. Si el pago llega
+              después del inicio estimado, el plazo se cuenta desde el pago. Si más
+              adelante una cuota se paga tarde, la entrega se corre esos días; el atraso
+              del artista no mueve la fecha.
             </p>
           </div>
         </section>
@@ -1234,7 +1237,14 @@ onMounted(cargar)
 
             <dl class="mt-4 space-y-3 text-sm">
               <div class="flex items-start justify-between gap-4">
-                <dt class="text-cafe/55">Entrega máxima</dt>
+                <dt class="flex items-center gap-1.5 text-cafe/55">
+                  Plazo de entrega
+                  <BurbujaInfo etiqueta="Cómo se calcula la fecha de entrega">
+                    Es una duración, no una fecha fija. Se cuenta desde el pago
+                    de la seña y se corre los días en que el cliente pague tarde
+                    una cuota. El atraso del artista no la mueve.
+                  </BurbujaInfo>
+                </dt>
                 <dd class="text-right font-medium text-cafe">{{ entregaTexto }}</dd>
               </div>
               <div class="flex items-start justify-between gap-4">

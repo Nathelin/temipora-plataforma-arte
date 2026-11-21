@@ -145,11 +145,26 @@ export function hitoPrioritario(hitos = []) {
 
 export function formatearFecha(valor) {
   if (!valor) return '—'
+  const texto = String(valor)
+  const soloFecha = /^(\d{4})-(\d{2})-(\d{2})$/.exec(texto)
+  if (soloFecha) {
+    const [, anio, mes, dia] = soloFecha
+    return `${dia}/${mes}/${anio}`
+  }
   try {
     return new Date(valor).toLocaleDateString('es-AR')
   } catch {
     return valor
   }
+}
+
+export function textoAjusteEntrega(pedido) {
+  const dias = Number(pedido?.diasDemoraCliente || 0)
+  if (!pedido?.fechaEntregaPrevista || !pedido?.limiteEntrega || dias <= 0) {
+    return ''
+  }
+  const etiqueta = dias === 1 ? 'día' : 'días'
+  return `Prometida ${formatearFecha(pedido.limiteEntrega)} · +${dias} ${etiqueta} por demora en el pago del cliente`
 }
 
 export function formatearFechaHora(valor) {

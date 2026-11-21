@@ -99,6 +99,7 @@ public class InformeAdminService {
         return new InformeAdminDTO(
             new InformePeriodoDTO(desde, hasta, dias, agrupacion.name()),
             MONEDA_COBRO,
+            tipo.name(),
             LocalDateTime.now(),
             actual.totales.dto(),
             new InformeAdminComparacionDTO(
@@ -399,31 +400,37 @@ public class InformeAdminService {
     }
 
     private static FilaServicio filaServicio(Object[] fila) {
+        BigDecimal volumen = decimal(fila[5]);
+        BigDecimal comision = decimal(fila[6]);
+        BigDecimal arancel = decimal(fila[8]);
         return new FilaServicio(
             fecha(fila[0]),
             numero(fila[1]),
             texto(fila[2]),
             numero(fila[3]),
             texto(fila[4]),
-            decimal(fila[5]),
-            decimal(fila[6]),
+            volumen,
+            comision,
             decimal(fila[7]),
-            decimal(fila[8]),
-            decimal(fila[9]),
+            arancel,
+            CalculoLiquidacion.netoRecibido(volumen, comision, arancel),
             entero(fila[10]) == 0,
             numero(fila[11]));
     }
 
     private static FilaGrupo filaGrupo(Object[] fila) {
+        BigDecimal volumen = decimal(fila[3]);
+        BigDecimal comision = decimal(fila[4]);
+        BigDecimal arancel = decimal(fila[6]);
         return new FilaGrupo(
             fecha(fila[0]),
             numero(fila[1]),
             texto(fila[2]),
-            decimal(fila[3]),
-            decimal(fila[4]),
+            volumen,
+            comision,
             decimal(fila[5]),
-            decimal(fila[6]),
-            decimal(fila[7]),
+            arancel,
+            CalculoLiquidacion.netoRecibido(volumen, comision, arancel),
             entero(fila[8]) == 0,
             entero(fila[9]),
             numero(fila[10]));

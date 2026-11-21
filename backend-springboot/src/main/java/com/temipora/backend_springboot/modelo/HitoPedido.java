@@ -62,6 +62,12 @@ public class HitoPedido {
     @Column(name = "fecha_aprobacion")
     private LocalDateTime fechaAprobacion;
 
+    @Column(nullable = false)
+    private int revisiones = 0;
+
+    @Column(name = "fecha_limite_reentrega")
+    private LocalDateTime fechaLimiteReentrega;
+
     @Column(name = "entrega_descripcion", length = 500)
     private String entregaDescripcion;
 

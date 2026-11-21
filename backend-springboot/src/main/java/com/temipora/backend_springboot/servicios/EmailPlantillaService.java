@@ -24,12 +24,15 @@ public class EmailPlantillaService {
 
     private static final String PLANTILLA_REACTIVACION = "emails/reactivacion";
     private static final String PLANTILLA_CIERRE = "emails/cierre";
+    private static final String PLANTILLA_RECORDATORIO = "emails/recordatorio";
     private static final String PLANTILLA_BAJA_CONFIRMADA = "emails/baja-confirmada";
     private static final String PLANTILLA_BAJA_INVALIDA = "emails/baja-invalida";
     private static final String PREHEADER_REACTIVACION =
         "Tenés ofertas con descuento esperándote en Temipora.";
     private static final String PREHEADER_CIERRE =
         "Novedades sobre tus solicitudes y pedidos en Temipora.";
+    private static final String PREHEADER_RECORDATORIO =
+        "Tenés pagos o entregas pendientes en Temipora.";
 
     private static final DateTimeFormatter FECHA_CIERRE =
         DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -47,11 +50,33 @@ public class EmailPlantillaService {
     }
 
     public record AlternativaEmail(
+            Long idServicio,
+            Long idSustitucion,
             String nombreServicio,
             String nombreArtista,
             String imagen,
             String precio,
-            String moneda) {
+            String moneda,
+            String motivo,
+            List<String> caracteristicas) {
+    }
+
+    public record RecordatorioEmail(
+            String contexto,
+            Long idPedido,
+            String nombreServicio,
+            String imagen,
+            String contraparte,
+            String detalle,
+            String vence,
+            BigDecimal monto,
+            String moneda,
+            boolean urgente,
+            boolean alerta) {
+
+        public boolean esPago() {
+            return "PAGO".equals(contexto);
+        }
     }
 
     private final SpringTemplateEngine templateEngine;
@@ -104,9 +129,42 @@ public class EmailPlantillaService {
         contexto.setVariable("preheader", PREHEADER_CIERRE);
         contexto.setVariable("cierres", vistaCierres(cierres, tokenAcceso));
         contexto.setVariable("alternativas",
-            vistaAlternativas(alternativas, cierres, tokenAcceso));
+            vistaAlternativas(alternativas, tokenAcceso));
         contexto.setVariable("urlExplorar", baseFront() + "/servicios");
         return templateEngine.process(PLANTILLA_CIERRE, contexto);
+    }
+
+    public String asuntoRecordatorio(
+            boolean hayPagos, boolean hayEntregas, boolean urgente) {
+        if (hayPagos && hayEntregas) {
+            return "Tenés pagos y entregas pendientes en Temipora";
+        }
+        if (hayPagos) {
+            return "Tenés pagos pendientes en Temipora";
+        }
+        if (hayEntregas && urgente) {
+            return "URGENTE: tenés una entrega por vencer en Temipora";
+        }
+        if (hayEntregas) {
+            return "Tenés entregas por vencer en Temipora";
+        }
+        return "Tenés pendientes en Temipora";
+    }
+
+    public String recordatorio(
+            String nombre,
+            List<RecordatorioEmail> pagos,
+            List<RecordatorioEmail> entregas,
+            String tokenAcceso) {
+        Context contexto = contexto();
+        contexto.setVariable("nombre", nombre);
+        contexto.setVariable("preheader", PREHEADER_RECORDATORIO);
+        contexto.setVariable("pagos", vistaRecordatorios(pagos, tokenAcceso));
+        contexto.setVariable("entregas", vistaRecordatorios(entregas, tokenAcceso));
+        contexto.setVariable("urgente", hayUrgente(pagos, entregas));
+        contexto.setVariable("urlPanel",
+            baseFront() + "/panel/pedidos" + enlaceAcceso(tokenAcceso));
+        return templateEngine.process(PLANTILLA_RECORDATORIO, contexto);
     }
 
     public String bajaConfirmada(String nombre) {
@@ -121,6 +179,74 @@ public class EmailPlantillaService {
 
     private Context contexto() {
         return new Context(Locale.forLanguageTag("es-AR"));
+    }
+
+    private List<Map<String, Object>> vistaRecordatorios(
+            List<RecordatorioEmail> items, String tokenAcceso) {
+        List<Map<String, Object>> vistas = new ArrayList<>();
+        if (items == null) {
+            return vistas;
+        }
+        for (RecordatorioEmail item : items) {
+            vistas.add(vistaRecordatorio(item, tokenAcceso));
+        }
+        return vistas;
+    }
+
+    private Map<String, Object> vistaRecordatorio(
+            RecordatorioEmail item, String tokenAcceso) {
+        Map<String, Object> vista = new LinkedHashMap<>();
+        vista.put("imagenUrl", urlImagenSeguro(item.imagen()));
+        vista.put("inicial", inicial(item.nombreServicio()));
+        vista.put("nombreServicio", item.nombreServicio());
+        vista.put("contraparte", item.contraparte());
+        vista.put("detalle", item.detalle());
+        vista.put("vence", item.vence());
+        vista.put("monto", item.monto() != null
+            ? formatearMonto(item.monto())
+            : null);
+        vista.put("moneda", item.moneda());
+        vista.put("urgente", item.urgente());
+        vista.put("alerta", item.alerta());
+        vista.put("etiqueta", item.esPago() ? "Pagar" : "Subir entrega");
+        vista.put("eyebrow", item.esPago()
+            ? "Pago pendiente"
+            : "Entrega pendiente");
+        vista.put("url", urlRecordatorio(item, tokenAcceso));
+        return vista;
+    }
+
+    private String urlRecordatorio(
+            RecordatorioEmail item, String tokenAcceso) {
+        String path;
+        if (item.idPedido() == null) {
+            path = "/servicios";
+        } else if (item.esPago()) {
+            path = "/pedidos/" + item.idPedido();
+        } else {
+            path = "/panel/pedidos/" + item.idPedido();
+        }
+        return baseFront() + path + enlaceAcceso(tokenAcceso);
+    }
+
+    private boolean hayUrgente(
+            List<RecordatorioEmail> pagos,
+            List<RecordatorioEmail> entregas) {
+        if (pagos != null) {
+            for (RecordatorioEmail pago : pagos) {
+                if (pago.urgente()) {
+                    return true;
+                }
+            }
+        }
+        if (entregas != null) {
+            for (RecordatorioEmail entrega : entregas) {
+                if (entrega.urgente()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private List<Map<String, Object>> vistaCierres(
@@ -156,18 +282,11 @@ public class EmailPlantillaService {
 
     private List<Map<String, Object>> vistaAlternativas(
             List<AlternativaEmail> alternativas,
-            List<CierreEmail> cierres,
             String tokenAcceso) {
         List<Map<String, Object>> vistas = new ArrayList<>();
         if (alternativas == null) {
             return vistas;
         }
-        CierreEmail primero = cierres != null && !cierres.isEmpty()
-            ? cierres.get(0)
-            : null;
-        String url = primero != null
-            ? urlCierre(primero, tokenAcceso)
-            : baseFront() + "/servicios";
         for (AlternativaEmail alternativa : alternativas) {
             Map<String, Object> vista = new LinkedHashMap<>();
             vista.put("imagenUrl", urlImagenSeguro(alternativa.imagen()));
@@ -176,10 +295,30 @@ public class EmailPlantillaService {
             vista.put("nombreArtista", alternativa.nombreArtista());
             vista.put("precio", monto(alternativa.precio()));
             vista.put("moneda", alternativa.moneda());
-            vista.put("url", url);
+            vista.put("motivo", alternativa.motivo());
+            vista.put("caracteristicas", alternativa.caracteristicas());
+            vista.put("url", urlAlternativa(alternativa, tokenAcceso));
             vistas.add(vista);
         }
         return vistas;
+    }
+
+    private String urlAlternativa(
+            AlternativaEmail alternativa, String tokenAcceso) {
+        if (alternativa.idServicio() == null) {
+            return baseFront() + "/servicios" + enlaceAcceso(tokenAcceso);
+        }
+        List<String> parametros = new ArrayList<>();
+        if (tokenAcceso != null && !tokenAcceso.isBlank()) {
+            parametros.add("acceso=" + tokenAcceso);
+        }
+        if (alternativa.idSustitucion() != null) {
+            parametros.add("sustitucion=" + alternativa.idSustitucion());
+        }
+        String query = parametros.isEmpty()
+            ? ""
+            : "?" + String.join("&", parametros);
+        return baseFront() + "/servicios/" + alternativa.idServicio() + query;
     }
 
     private String urlCierre(CierreEmail cierre, String tokenAcceso) {

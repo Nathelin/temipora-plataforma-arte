@@ -148,11 +148,12 @@ class PanelArtistaServiceTest {
         when(pagoRepository.netosRealesDeArtista(ARTISTA))
             .thenReturn(List.<Object[]>of(
                 new Object[] {
-                    new BigDecimal("300.00"), LocalDateTime.now(),
+                    new BigDecimal("300.00"), BigDecimal.ZERO,
+                    BigDecimal.ZERO, LocalDateTime.now(),
                 },
                 new Object[] {
-                    new BigDecimal("100.00"),
-                    LocalDateTime.now().minusMonths(2),
+                    new BigDecimal("100.00"), BigDecimal.ZERO,
+                    BigDecimal.ZERO, LocalDateTime.now().minusMonths(2),
                 }));
         when(compraGrupoRepository.netosRealesDeArtista(ARTISTA))
             .thenReturn(List.of());

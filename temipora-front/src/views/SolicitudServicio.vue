@@ -434,7 +434,7 @@ onBeforeUnmount(() => {
       ← Volver al servicio
     </button>
 
-    <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando solicitud...</p>
+    <CargandoPagina v-if="cargando" tipo="detalle" mensaje="Cargando solicitud…" />
     <p v-else-if="errorCarga" class="text-rojizo text-center py-10">{{ errorCarga }}</p>
 
     <template v-else-if="solicitudPublica">

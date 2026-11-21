@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearMonto, formatearPrecio } from '../servicios/moneda'
 import { descripcionHito } from '../servicios/pedidos'
+import RedirigiendoMercadoPago from '../components/RedirigiendoMercadoPago.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +16,7 @@ const solicitud = ref(null)
 const pedido = ref(null)
 const cargando = ref(true)
 const enviando = ref(false)
+const redirigiendoPago = ref(false)
 const confirmando = ref(false)
 const error = ref('')
 const errorAccion = ref('')
@@ -68,15 +70,34 @@ const pago = computed(() => {
 })
 const primerHito = computed(() => hitos.value[0] || null)
 const pagaAlInicio = computed(
-  () => primerHito.value?.tipo !== 'ENTREGA',
+  () => primerHito.value?.tipo === 'SENA',
 )
 const esPagoUnico = computed(() => hitos.value.length === 1)
 const enCursoSinPago = computed(
   () => pedido.value?.estado === 'EN_CURSO' && !pago.value,
 )
+function montoDeHito(hito) {
+  return Number(hito?.montoMostrado ?? hito?.monto ?? 0)
+}
+const montoAhora = computed(
+  () => (pagaAlInicio.value ? montoDeHito(primerHito.value) : 0),
+)
+const saldoRestante = computed(() => hitos.value
+  .slice(1)
+  .reduce((acumulado, hito) => acumulado + montoDeHito(hito), 0))
+const pagosRestantes = computed(() => Math.max(hitos.value.length - 1, 0))
+const montoEntregaFinal = computed(
+  () => montoDeHito(hitos.value[hitos.value.length - 1]),
+)
 const textoBotonPago = computed(() => {
   if (!pagaAlInicio.value) return 'Aceptar y comenzar el pedido'
-  return esPagoUnico.value ? 'Pagar el total' : 'Pagar primera cuota'
+  if (esPagoUnico.value) return `Pagar el total de ${formatear(montoAhora.value)}`
+  return `Pagar seña de ${formatear(montoAhora.value)}`
+})
+const detalleRedireccion = computed(() => {
+  const hito = primerHito.value
+  if (!hito) return ''
+  return `Estamos preparando el pago de ${hito.nombre} (${formatear(hito.montoMostrado ?? hito.monto)}).`
 })
 
 function formatear(valor, codigo) {
@@ -111,20 +132,30 @@ async function cargar() {
 async function pagar() {
   if (!puedePagar.value || enviando.value) return
   enviando.value = true
+  redirigiendoPago.value = true
   errorAccion.value = ''
+  let redirigiendo = false
   try {
     const res = await api.post(
       `/solicitudes-servicio/${idSolicitud.value}/pagar`,
     )
     pedido.value = res.data
     if (pago.value?.proveedor === 'MERCADOPAGO' && pago.value.instruccion) {
+      redirigiendo = true
       window.location.href = pago.value.instruccion
     }
   } catch (e) {
     errorAccion.value = e.response?.data?.message || 'No se pudo iniciar el pago.'
   } finally {
     enviando.value = false
+    if (!redirigiendo) redirigiendoPago.value = false
   }
+}
+
+function irAPagarMercadoPago() {
+  if (!pago.value?.instruccion) return
+  redirigiendoPago.value = true
+  window.location.href = pago.value.instruccion
 }
 
 async function confirmar() {
@@ -164,9 +195,7 @@ onMounted(cargar)
       ← Volver a la solicitud
     </button>
 
-    <p v-if="cargando" class="mt-8 py-16 text-center text-sm text-cafe/60">
-      Cargando presupuesto...
-    </p>
+    <CargandoPagina v-if="cargando" tipo="detalle" mensaje="Cargando presupuesto…" />
     <p v-else-if="error" class="mt-8 py-16 text-center text-sm text-rojizo">
       {{ error }}
     </p>
@@ -188,18 +217,36 @@ onMounted(cargar)
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p class="text-xs font-semibold uppercase tracking-[0.14em] text-cafe/45">
-              Total a pagar
+              {{ pagaAlInicio ? 'Pagás ahora' : 'Hoy no pagás' }}
             </p>
-            <div class="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <p class="text-3xl font-bold text-granate">{{ total }}</p>
-              <p
+            <p class="mt-1 text-3xl font-bold text-granate">
+              {{ pagaAlInicio ? formatear(montoAhora) : '—' }}
+            </p>
+            <p v-if="pagaAlInicio" class="mt-1 text-sm text-cafe/60">
+              <template v-if="esPagoUnico">Pago único: cubre el total del pedido.</template>
+              <template v-else-if="primerHito.porcentaje != null">
+                Seña del {{ formatearMonto(primerHito.porcentaje) }}% del total.
+              </template>
+              <template v-else>Seña del pedido.</template>
+            </p>
+            <p v-else class="mt-1 text-sm text-cafe/60">
+              El pago se realiza al recibir la entrega final
+              ({{ formatear(montoEntregaFinal) }}).
+            </p>
+            <p v-if="!esPagoUnico" class="mt-2 text-sm text-cafe/65">
+              Total del pedido:
+              <span class="font-semibold text-granate">{{ total }}</span>
+              <span
                 v-if="muestraPrecioOriginal"
-                class="text-lg font-semibold text-cafe/45 line-through decoration-cafe/50"
+                class="ml-1 text-cafe/45 line-through decoration-cafe/50"
               >
-                <span class="sr-only">Precio sin descuento: </span>
                 {{ formatear(precioOriginal) }}
-              </p>
-            </div>
+              </span>
+              <span v-if="pagaAlInicio">
+                · te queda {{ formatear(saldoRestante) }} en
+                {{ pagosRestantes }} {{ pagosRestantes === 1 ? 'pago' : 'pagos' }}
+              </span>
+            </p>
             <p
               v-if="Number(descuentoMostrado) > 0"
               class="mt-2 inline-flex items-center gap-2 rounded-full bg-mantequilla px-3 py-1 text-xs font-bold text-tinta"
@@ -214,13 +261,19 @@ onMounted(cargar)
           <h2 class="text-sm font-semibold text-granate">Plan de pagos</h2>
           <ol class="mt-3 space-y-2">
             <li
-              v-for="hito in hitos"
+              v-for="(hito, indice) in hitos"
               :key="hito.idHitoPresupuesto || hito.orden"
               class="flex items-start justify-between gap-3 rounded-xl bg-rosa/10 px-3 py-2"
             >
               <div class="min-w-0">
                 <p class="text-sm font-medium text-cafe">
                   {{ hito.nombre }}
+                  <span
+                    v-if="pagaAlInicio && indice === 0"
+                    class="ml-1 align-middle rounded-full bg-coral/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-coral"
+                  >
+                    Ahora
+                  </span>
                   <span class="text-xs text-cafe/45">
                     ({{ formatearMonto(hito.porcentaje) }}%)
                   </span>
@@ -232,6 +285,14 @@ onMounted(cargar)
               </p>
             </li>
           </ol>
+          <p class="mt-4 rounded-xl bg-rosa/10 px-3 py-2 text-xs leading-relaxed text-cafe/60">
+            La entrega se cuenta desde el pago de la seña.
+            <template v-if="pagosRestantes > 0">
+              Si más adelante una cuota se paga tarde, la fecha de entrega se corre
+              esos mismos días.
+            </template>
+            El atraso del artista no la mueve: el pedido queda marcado como atrasado.
+          </p>
         </div>
       </section>
 
@@ -304,14 +365,20 @@ onMounted(cargar)
         >
           {{ confirmando ? 'Confirmando...' : 'Confirmar pago (simulado)' }}
         </button>
-        <a
+        <button
           v-else-if="pago?.proveedor === 'MERCADOPAGO' && pago.instruccion"
-          :href="pago.instruccion"
+          type="button"
           class="mt-4 inline-flex min-h-11 items-center justify-center rounded-full bg-coral px-6 text-sm font-semibold text-white transition hover:bg-rojizo"
+          @click="irAPagarMercadoPago"
         >
           Ir a pagar con MercadoPago
-        </a>
+        </button>
       </section>
     </template>
+
+    <RedirigiendoMercadoPago
+      :visible="redirigiendoPago"
+      :detalle="detalleRedireccion"
+    />
   </div>
 </template>

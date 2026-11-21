@@ -103,7 +103,7 @@ onMounted(cargar)
       </template>
     </PageHeader>
 
-    <div v-if="cargando" class="mt-8 space-y-3" role="status" aria-live="polite">
+    <div v-if="cargando" class="mt-8 min-h-[calc(100vh-4rem)] space-y-3" role="status" aria-live="polite">
       <span class="sr-only">Cargando solicitudes...</span>
       <div
         v-for="n in 3"

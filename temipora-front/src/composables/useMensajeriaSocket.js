@@ -1,20 +1,51 @@
 import { ref } from 'vue'
-import { Client } from '@stomp/stompjs'
 
 const conectado = ref(false)
 const handlers = new Set()
 
 let cliente = null
 let intentosReconexion = 0
+let cargandoCliente = null
+let conectando = false
+let deseado = false
+
+// El cliente STOMP se descarga recién cuando hay una sesión que lo usa, así no
+// pesa en el arranque de Explorar ni en las pantallas públicas.
+function cargarCliente() {
+  if (!cargandoCliente) {
+    cargandoCliente = import('@stomp/stompjs')
+      .then((modulo) => modulo.Client)
+      .catch((error) => {
+        cargandoCliente = null
+        throw error
+      })
+  }
+  return cargandoCliente
+}
 
 function urlSocket() {
   const protocolo = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocolo}//${window.location.host}/ws`
 }
 
-function conectar() {
-  if (cliente?.active) return
+async function conectar() {
+  if (cliente?.active || conectando) return
   if (!localStorage.getItem('token')) return
+
+  deseado = true
+  conectando = true
+  let Client
+  try {
+    Client = await cargarCliente()
+  } catch {
+    conectando = false
+    return
+  }
+  conectando = false
+
+  if (!deseado || !localStorage.getItem('token') || cliente?.active) {
+    return
+  }
 
   const nuevo = new Client({
     brokerURL: urlSocket(),
@@ -71,6 +102,7 @@ function conectar() {
 }
 
 async function desconectar() {
+  deseado = false
   conectado.value = false
   const activo = cliente
   cliente = null
@@ -115,7 +147,7 @@ async function reconectarAhora() {
       // La conexión ya estaba cerrada.
     }
   }
-  conectar()
+  await conectar()
 }
 
 if (typeof window !== 'undefined') {

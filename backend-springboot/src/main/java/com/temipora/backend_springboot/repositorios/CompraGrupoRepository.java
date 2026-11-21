@@ -98,7 +98,8 @@ public interface CompraGrupoRepository extends JpaRepository<CompraGrupo, Long>,
      * artista. Alimenta los totales del panel.
      */
     @Query(value = """
-        SELECT COALESCE(ic.neto_recibido_mp, g.neto_artista), g.fecha_pago
+        SELECT g.subtotal, g.comision, COALESCE(ic.arancel_mp, 0),
+               g.fecha_pago
         FROM compra_grupo g
         LEFT JOIN (
             SELECT icg.id_compra_grupo AS id_grupo,

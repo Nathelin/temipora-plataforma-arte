@@ -31,6 +31,9 @@ public class PedidoDTO {
     private LocalDateTime fechaCreacion;
     private LocalDate fechaInicio;
     private LocalDate limiteEntrega;
+    private LocalDate fechaEntregaPrevista;
+    private int diasDemoraCliente;
+    private boolean entregaAtrasada;
     private LocalDateTime finalizadoEn;
     private BigDecimal precioFinal;
     private BigDecimal precioFinalCobro;
@@ -89,6 +92,11 @@ public class PedidoDTO {
 
     private Integer terminosPlataformaVersion;
     private LocalDateTime terminosPlataformaAceptadosEn;
+    private String terminosPlataformaHuella;
+    private Integer terminosArtistaVersion;
+    private LocalDateTime terminosArtistaAceptadosEn;
+    private boolean terminosArtistaDelServicio;
+    private String terminosArtistaHuella;
     private List<HitoPedidoDTO> hitos;
     private List<DibujoResumenDTO> dibujos;
     private boolean puedeCancelar;

@@ -1,197 +1,153 @@
 package com.temipora.backend_springboot.servicios;
 
-import java.awt.Color;
-import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.lowagie.text.Document;
-import com.lowagie.text.DocumentException;
-import com.lowagie.text.Font;
-import com.lowagie.text.PageSize;
-import com.lowagie.text.Paragraph;
-import com.lowagie.text.Phrase;
-import com.lowagie.text.pdf.PdfPCell;
-import com.lowagie.text.pdf.PdfPTable;
-import com.lowagie.text.pdf.PdfWriter;
 import com.temipora.backend_springboot.modelo.EntregaArchivoDTO;
 import com.temipora.backend_springboot.modelo.EntregaHitoDTO;
 import com.temipora.backend_springboot.modelo.HitoPedidoDTO;
 import com.temipora.backend_springboot.modelo.PagoDTO;
 import com.temipora.backend_springboot.modelo.PedidoDTO;
 import com.temipora.backend_springboot.modelo.UsuarioResumenDTO;
+import com.temipora.backend_springboot.servicios.informes.DocumentoPdf;
+import com.temipora.backend_springboot.servicios.informes.FormatoPdf;
+import com.temipora.backend_springboot.servicios.informes.TablaPdf;
 
 @Service
 public class ConstanciaService {
 
-    private static final Font TITULO = new Font(
-        Font.HELVETICA, 16, Font.BOLD);
-    private static final Font SUBTITULO = new Font(
-        Font.HELVETICA, 11, Font.BOLD);
-    private static final Font TEXTO = new Font(
-        Font.HELVETICA, 9, Font.NORMAL);
-    private static final Font TEXTO_BOLD = new Font(
-        Font.HELVETICA, 9, Font.BOLD);
-    private static final Font CHICO = new Font(
-        Font.HELVETICA, 8, Font.NORMAL);
-    private static final DateTimeFormatter FECHA =
-        DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private static final DateTimeFormatter FECHA_HORA =
-        DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final String TIPO = "Constancia del pedido";
+    private static final String PIE =
+        "Documento contractual del pedido · generado automáticamente por "
+            + "Temipora";
+
+    private final String urlFrontend;
+
+    public ConstanciaService(
+            @Value("${app.frontend.url:}") String urlFrontend) {
+        this.urlFrontend = urlFrontend == null
+            ? ""
+            : urlFrontend.replaceAll("/+$", "");
+    }
 
     public byte[] generar(PedidoDTO pedido) {
-        Document documento = new Document(
-            PageSize.A4, 36, 36, 36, 36);
-        ByteArrayOutputStream salida = new ByteArrayOutputStream();
+        String referencia = "Pedido #" + pedido.getIdPedido();
+        String moneda = FormatoPdf.moneda(pedido.getMonedaMostrada());
 
-        try {
-            PdfWriter.getInstance(documento, salida);
-            documento.open();
+        DocumentoPdf documento = DocumentoPdf.vertical(TIPO, referencia, PIE);
+        documento.abrir();
+        documento.cabecera("Documento contractual", referencia,
+            "Estado del pedido al momento de generarse · Cifras en " + moneda);
+        documento.metadatos(
+            "Cliente", "@" + usuario(pedido.getCliente()),
+            "Artista", "@" + usuario(pedido.getArtista()),
+            "Servicio", FormatoPdf.texto(pedido.getNombreServicio()),
+            "Estado", estadoPedido(pedido.getEstado()),
+            "Inicio", FormatoPdf.fecha(pedido.getFechaInicio()),
+            "Límite de entrega", FormatoPdf.fecha(pedido.getLimiteEntrega()),
+            "Finalizado", FormatoPdf.fechaHora(pedido.getFinalizadoEn()),
+            "Moneda", moneda,
+            "Generado", FormatoPdf.fechaHora(LocalDateTime.now()));
 
-            documento.add(new Paragraph(
-                "Constancia del pedido #" + pedido.getIdPedido(), TITULO));
-            documento.add(new Paragraph(
-                "Generada el " + LocalDateTime.now().format(FECHA_HORA)
-                    + ". Refleja el estado del pedido al momento de generarse.",
-                CHICO));
-            documento.add(new Paragraph(" "));
+        importes(documento, pedido);
+        planDePagos(documento, pedido);
+        entregas(documento, pedido);
+        pagos(documento, pedido);
+        terminos(documento, pedido);
 
-            datosGenerales(documento, pedido);
-            planDePagos(documento, pedido);
-            entregas(documento, pedido);
-            pagos(documento, pedido);
-
-            documento.add(new Paragraph(" "));
-            documento.add(new Paragraph(
-                "Los hashes SHA-256 permiten verificar la integridad de los "
-                    + "archivos entregados. La comisión, el arancel y tu neto "
-                    + "solo se incluyen en la copia del artista y del admin.",
-                CHICO));
-
-            documento.close();
-        } catch (DocumentException e) {
-            throw new IllegalStateException(
-                "No se pudo generar la constancia.", e);
-        }
-
-        return salida.toByteArray();
+        return documento.cerrar();
     }
 
-    private void datosGenerales(Document documento, PedidoDTO pedido)
-            throws DocumentException {
-        documento.add(new Paragraph("Datos generales", SUBTITULO));
-        documento.add(new Paragraph(
-            "Cliente: @" + usuario(pedido.getCliente())
-                + "   Artista: @" + usuario(pedido.getArtista()), TEXTO));
-        documento.add(new Paragraph(
-            "Servicio: " + texto(pedido.getNombreServicio())
-                + "   Estado: " + texto(pedido.getEstado()), TEXTO));
-        documento.add(new Paragraph(
-            "Inicio: " + fecha(pedido.getFechaInicio())
-                + "   Límite de entrega: " + fecha(pedido.getLimiteEntrega())
-                + "   Finalizado: " + fechaHora(pedido.getFinalizadoEn()),
-            TEXTO));
-        boolean incluyeComision = pedido.getComisionMonto() != null;
-        if (!incluyeComision) {
-            documento.add(new Paragraph(
-                "Total a pagar: " + monto(
-                    pedido.getPrecioFinalClienteMostrado(),
-                    pedido.getMonedaMostrada()), TEXTO_BOLD));
+    private void importes(DocumentoPdf documento, PedidoDTO pedido) {
+        documento.seccion("1", "Importes");
+
+        List<String> conceptos = new ArrayList<>();
+        List<String> valores = new ArrayList<>();
+        int destacada;
+
+        if (pedido.getComisionMonto() == null) {
+            conceptos.add("Total a pagar");
+            valores.add(FormatoPdf.monto(
+                pedido.getPrecioFinalClienteMostrado()));
+            destacada = 0;
             if (pedido.getDescuentoMostrado() != null
                     && pedido.getDescuentoMostrado().signum() > 0) {
-                documento.add(new Paragraph(
-                    "Precio original: " + monto(
-                        pedido.getPrecioFinalMostrado(),
-                        pedido.getMonedaMostrada())
-                        + "   Descuento de reactivación: "
-                        + monto(pedido.getDescuentoMostrado(),
-                            pedido.getMonedaMostrada()),
-                    TEXTO));
+                conceptos.add("Precio original");
+                valores.add(FormatoPdf.monto(
+                    pedido.getPrecioFinalMostrado()));
+                conceptos.add("Descuento de reactivación");
+                valores.add(FormatoPdf.monto(pedido.getDescuentoMostrado()));
             }
         } else {
-            documento.add(new Paragraph(
-                "Precio del pedido: " + monto(
-                    pedido.getPrecioFinalMostrado(),
-                    pedido.getMonedaMostrada()), TEXTO_BOLD));
-            documento.add(new Paragraph(
-                "Comisión Temipora ("
-                    + numero(pedido.getComisionPorcentaje()) + "%): "
-                    + monto(pedido.getComisionMontoMostrado(),
-                        pedido.getMonedaMostrada())
-                    + "   Tu neto: "
-                    + monto(pedido.getMontoNetoArtistaMostrado(),
-                        pedido.getMonedaMostrada()),
-                TEXTO));
+            conceptos.add("Precio del pedido");
+            valores.add(FormatoPdf.monto(pedido.getPrecioFinalMostrado()));
+            conceptos.add("Comisión Temipora ("
+                + FormatoPdf.numero(pedido.getComisionPorcentaje()) + "%)");
+            valores.add(FormatoPdf.monto(pedido.getComisionMontoMostrado()));
+            conceptos.add("Tu neto");
+            valores.add(FormatoPdf.monto(
+                pedido.getMontoNetoArtistaMostrado()));
+            destacada = 2;
             if (pedido.getArancelMpEstimadoMostrado() != null) {
-                documento.add(new Paragraph(
-                    "Arancel MercadoPago (estimado): " + monto(
-                        pedido.getArancelMpEstimadoMostrado(),
-                        pedido.getMonedaMostrada())
-                        + "   Recibís (estimado): " + monto(
-                            pedido.getMontoNetoArtistaConArancelMostrado(),
-                            pedido.getMonedaMostrada()),
-                    TEXTO));
+                conceptos.add("Arancel MercadoPago (estimado)");
+                valores.add(FormatoPdf.monto(
+                    pedido.getArancelMpEstimadoMostrado()));
+                conceptos.add("Recibís (estimado)");
+                valores.add(FormatoPdf.monto(
+                    pedido.getMontoNetoArtistaConArancelMostrado()));
             }
             if (pedido.getDescuentoMostrado() != null
                     && pedido.getDescuentoMostrado().signum() > 0) {
-                documento.add(new Paragraph(
-                    "Descuento del cliente: " + monto(
-                        pedido.getDescuentoMostrado(),
-                        pedido.getMonedaMostrada())
-                        + " (lo financia Temipora; no reduce tu neto).",
-                    CHICO));
+                conceptos.add(
+                    "Descuento del cliente (lo financia Temipora)");
+                valores.add(FormatoPdf.monto(pedido.getDescuentoMostrado()));
             }
         }
 
-        documento.add(new Paragraph(
-            "Términos de la plataforma: versión "
-                + numero(pedido.getTerminosPlataformaVersion()),
-            CHICO));
-        documento.add(new Paragraph(" "));
+        documento.resumen(
+            conceptos.toArray(String[]::new),
+            valores.toArray(String[]::new),
+            destacada);
     }
 
-    private void planDePagos(Document documento, PedidoDTO pedido)
-            throws DocumentException {
-        documento.add(new Paragraph("Plan de pagos", SUBTITULO));
-
-        PdfPTable tabla = new PdfPTable(
-            new float[] { 0.5f, 1.6f, 3.0f, 1.0f, 1.4f, 1.2f, 1.4f });
-        tabla.setWidthPercentage(100);
-        encabezado(tabla, "#");
-        encabezado(tabla, "Hito");
-        encabezado(tabla, "Alcance");
-        encabezado(tabla, "Tipo");
-        encabezado(tabla, "Monto");
-        encabezado(tabla, "Pago");
-        encabezado(tabla, "Entrega");
+    private void planDePagos(DocumentoPdf documento, PedidoDTO pedido) {
+        documento.seccion("2", "Plan de pagos");
 
         List<HitoPedidoDTO> hitos = pedido.getHitos() != null
             ? pedido.getHitos() : List.of();
-        for (HitoPedidoDTO hito : hitos) {
-            celda(tabla, String.valueOf(
-                (hito.getOrden() == null ? 0 : hito.getOrden()) + 1));
-            celda(tabla, texto(hito.getNombre()));
-            celda(tabla, texto(hito.getDescripcion()));
-            celda(tabla, texto(hito.getTipo()));
-            celda(tabla, monto(
-                hito.getMontoMostrado(), pedido.getMonedaMostrada()));
-            celda(tabla, texto(hito.getEstadoPago()));
-            celda(tabla, texto(hito.getEstadoEntrega()));
+        if (hitos.isEmpty()) {
+            documento.parrafo(
+                "El pedido no tiene hitos de pago registrados.");
+            return;
         }
 
-        documento.add(tabla);
-        documento.add(new Paragraph(" "));
+        TablaPdf tabla = new TablaPdf(
+            new String[] { "#", "Hito", "Alcance", "Tipo", "Monto", "Pago",
+                "Entrega" },
+            new float[] { 0.35f, 1.6f, 2.55f, 0.95f, 1.2f, 1.3f, 1.4f },
+            new boolean[] { true, false, false, false, true, false, false });
+
+        for (HitoPedidoDTO hito : hitos) {
+            tabla.fila(
+                String.valueOf(
+                    (hito.getOrden() == null ? 0 : hito.getOrden()) + 1),
+                FormatoPdf.texto(hito.getNombre()),
+                FormatoPdf.texto(hito.getDescripcion()),
+                tipoHito(hito.getTipo()),
+                FormatoPdf.monto(hito.getMontoMostrado()),
+                estadoPago(hito.getEstadoPago()),
+                estadoEntrega(hito.getEstadoEntrega()));
+        }
+        documento.tabla(tabla);
     }
 
-    private void entregas(Document documento, PedidoDTO pedido)
-            throws DocumentException {
-        documento.add(new Paragraph("Entregas", SUBTITULO));
+    private void entregas(DocumentoPdf documento, PedidoDTO pedido) {
+        documento.seccion("3", "Entregas");
 
         List<HitoPedidoDTO> hitos = pedido.getHitos() != null
             ? pedido.getHitos() : List.of();
@@ -202,8 +158,8 @@ public class ConstanciaService {
                 continue;
             }
             hayEntregas = true;
-            documento.add(new Paragraph(
-                "Hito: " + texto(hito.getNombre()), TEXTO_BOLD));
+            documento.subtitulo(
+                "Hito: " + FormatoPdf.texto(hito.getNombre()));
 
             for (EntregaHitoDTO entrega : hito.getEntregas()) {
                 String estado = entrega.isVigente()
@@ -211,91 +167,75 @@ public class ConstanciaService {
                 if (entrega.isAprobada()) {
                     estado += " · Aprobada";
                 }
-                documento.add(new Paragraph(
-                    "Entrega v" + entrega.getNumero()
-                        + " — " + fechaHora(entrega.getFechaEntrega())
-                        + " — @" + usuario(entrega.getAutor())
-                        + " — " + estado,
-                    TEXTO));
+                documento.parrafoChico("Entrega v" + entrega.getNumero()
+                    + " — " + FormatoPdf.fechaHora(entrega.getFechaEntrega())
+                    + " — @" + usuario(entrega.getAutor())
+                    + " — " + estado);
 
                 if (entrega.getDescripcion() != null) {
-                    documento.add(new Paragraph(
-                        "  " + entrega.getDescripcion(), TEXTO));
+                    documento.parrafoChico("   " + entrega.getDescripcion());
                 }
                 if (entrega.getRevisionMotivo() != null) {
-                    documento.add(new Paragraph(
-                        "  Revisión solicitada: "
-                            + entrega.getRevisionMotivo()
-                            + " (" + fechaHora(entrega.getRevisionFecha())
-                            + ")", TEXTO));
+                    documento.parrafoChico("   Revisión solicitada: "
+                        + entrega.getRevisionMotivo() + " ("
+                        + FormatoPdf.fechaHora(entrega.getRevisionFecha())
+                        + ")");
                 }
-
                 for (EntregaArchivoDTO archivo : entrega.getArchivos()) {
                     String dibujo = archivo.getDibujo() != null
-                        ? "Dibujo "
-                            + ((archivo.getDibujo().getOrden() == null
-                                ? 0 : archivo.getDibujo().getOrden()) + 1)
-                            + " — "
+                        ? "Dibujo " + ((archivo.getDibujo().getOrden() == null
+                            ? 0 : archivo.getDibujo().getOrden()) + 1) + " — "
                         : "";
-                    documento.add(new Paragraph(
-                        "  · " + dibujo + texto(archivo.getNombre())
-                            + " | sha256=" + texto(archivo.getSha256()),
-                        CHICO));
+                    documento.parrafoChico("   · " + dibujo
+                        + FormatoPdf.texto(archivo.getNombre())
+                        + " · huella SHA-256: " + FormatoPdf.texto(
+                            archivo.getSha256()));
                 }
             }
         }
 
         if (!hayEntregas) {
-            documento.add(new Paragraph(
-                "Todavía no hay entregas registradas.", TEXTO));
+            documento.parrafo("Todavía no hay entregas registradas.");
         }
-        documento.add(new Paragraph(" "));
     }
 
-    private void pagos(Document documento, PedidoDTO pedido)
-            throws DocumentException {
-        documento.add(new Paragraph("Pagos", SUBTITULO));
+    private void pagos(DocumentoPdf documento, PedidoDTO pedido) {
+        documento.seccion("4", "Pagos");
 
         List<HitoPedidoDTO> hitos = pedido.getHitos() != null
             ? pedido.getHitos() : List.of();
-        boolean hayPagos = false;
+        List<String[]> filas = new ArrayList<>();
 
         for (HitoPedidoDTO hito : hitos) {
             if (hito.getPagos() == null) {
                 continue;
             }
             for (PagoDTO pago : hito.getPagos()) {
-                hayPagos = true;
-                documento.add(new Paragraph(
-                    "Hito " + texto(hito.getNombre())
-                        + " — Pago #" + pago.getIdPago()
-                        + " — " + texto(pago.getEstado())
-                        + " — " + monto(pago.getMonto(), pago.getMoneda())
-                        + " — " + fechaHora(
-                            pago.getFechaAcreditacion() != null
-                                ? pago.getFechaAcreditacion()
-                                : pago.getFechaCreacion()),
-                    TEXTO));
+                filas.add(new String[] {
+                    FormatoPdf.texto(hito.getNombre()),
+                    "#" + pago.getIdPago(),
+                    estadoPago(pago.getEstado()),
+                    montoConMoneda(pago.getMonto(), pago.getMoneda()),
+                    FormatoPdf.fechaHora(
+                        pago.getFechaAcreditacion() != null
+                            ? pago.getFechaAcreditacion()
+                            : pago.getFechaCreacion()) });
             }
         }
 
-        if (!hayPagos) {
-            documento.add(new Paragraph(
-                "Todavía no hay pagos registrados.", TEXTO));
+        if (filas.isEmpty()) {
+            documento.parrafo("Todavía no hay pagos registrados.");
+            return;
         }
-    }
 
-    private void encabezado(PdfPTable tabla, String valor) {
-        PdfPCell celda = new PdfPCell(new Phrase(valor, TEXTO_BOLD));
-        celda.setBackgroundColor(new Color(238, 238, 238));
-        celda.setPadding(4);
-        tabla.addCell(celda);
-    }
-
-    private void celda(PdfPTable tabla, String valor) {
-        PdfPCell celda = new PdfPCell(new Phrase(valor, CHICO));
-        celda.setPadding(3);
-        tabla.addCell(celda);
+        TablaPdf tabla = new TablaPdf(
+            new String[] { "Hito", "Pago", "Estado", "Monto", "Fecha" },
+            new float[] { 1.7f, 0.7f, 1.1f, 1.4f, 1.5f },
+            new boolean[] { false, true, false, true, true });
+        for (String[] fila : filas) {
+            tabla.fila(fila);
+        }
+        documento.tabla(tabla);
     }
 
     private String usuario(UsuarioResumenDTO usuario) {
@@ -303,32 +243,133 @@ public class ConstanciaService {
             ? "—" : usuario.getNombreUsuario();
     }
 
-    private String texto(String valor) {
-        return valor == null || valor.isBlank() ? "—" : valor;
+    private static String estadoPedido(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return "—";
+        }
+        return switch (valor) {
+            case "PENDIENTE_PAGO" -> "Pendiente de pago";
+            case "EN_CURSO" -> "En curso";
+            case "FINALIZADO" -> "Finalizado";
+            case "CANCELADO" -> "Cancelado";
+            case "IMPAGO" -> "Impago";
+            default -> valor;
+        };
     }
 
-    private String numero(Number valor) {
+    private static String tipoHito(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return "—";
+        }
+        return switch (valor) {
+            case "SENA" -> "Seña";
+            case "CUOTA" -> "Cuota";
+            case "ENTREGA" -> "Entrega";
+            default -> valor;
+        };
+    }
+
+    private static String estadoEntrega(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return "—";
+        }
+        return switch (valor) {
+            case "NO_INICIADO" -> "No iniciado";
+            case "EN_PROCESO" -> "En proceso";
+            case "ENTREGADO" -> "Entregado";
+            case "APROBADO" -> "Aprobado";
+            case "APROBADO_AUTOMATICAMENTE" -> "Aprobado automáticamente";
+            case "CON_REVISION" -> "Con revisión";
+            default -> valor;
+        };
+    }
+
+    private void terminos(DocumentoPdf documento, PedidoDTO pedido) {
+        documento.seccion("5", "Términos aceptados");
+
+        TablaPdf tabla = new TablaPdf(
+            new String[] { "Documento", "Versión", "Alcance", "Aceptado",
+                "Huella" },
+            new float[] { 1.2f, 0.6f, 1.9f, 1.3f, 1.4f },
+            new boolean[] { false, true, false, false, false });
+
+        tabla.fila(
+            "Plataforma",
+            version(pedido.getTerminosPlataformaVersion()),
+            "Uso de la plataforma",
+            FormatoPdf.fechaHora(pedido.getTerminosPlataformaAceptadosEn()),
+            huellaCorta(pedido.getTerminosPlataformaHuella()));
+
+        boolean hayTerminosDelArtista =
+            pedido.getTerminosArtistaVersion() != null;
+        if (hayTerminosDelArtista) {
+            tabla.fila(
+                "Del artista",
+                version(pedido.getTerminosArtistaVersion()),
+                pedido.isTerminosArtistaDelServicio()
+                    ? "Del servicio «"
+                        + FormatoPdf.texto(pedido.getNombreServicio()) + "»"
+                    : "Generales del artista",
+                FormatoPdf.fechaHora(pedido.getTerminosArtistaAceptadosEn()),
+                huellaCorta(pedido.getTerminosArtistaHuella()));
+        }
+        documento.tabla(tabla);
+
+        documento.parrafoChico(
+            "La huella identifica el texto exacto de los términos aceptados: "
+                + "si se modifican después, la de este pedido no cambia. Los "
+                + "términos del artista se aceptaron al enviar la solicitud.");
+        if (pedido.getTerminosPlataformaHuella() != null) {
+            documento.parrafoChico("Plataforma · huella SHA-256 completa: "
+                + pedido.getTerminosPlataformaHuella());
+        }
+        if (hayTerminosDelArtista && pedido.getTerminosArtistaHuella() != null) {
+            documento.parrafoChico("Artista · huella SHA-256 completa: "
+                + pedido.getTerminosArtistaHuella());
+            if (!urlFrontend.isBlank()) {
+                documento.parrafoChico(
+                    "Verificación pública del texto aceptado: "
+                        + urlFrontend + "/terminos-aceptados/"
+                        + CodigoTerminos.codificar(pedido.getIdSolicitud(),
+                            pedido.getTerminosArtistaHuella()));
+            }
+        }
+    }
+
+    private static String version(Integer valor) {
+        return valor == null ? "—" : "v" + valor;
+    }
+
+    private static String huellaCorta(String huella) {
+        if (huella == null || huella.isBlank()) {
+            return "—";
+        }
+        return huella.length() <= 16 ? huella : huella.substring(0, 16) + "…";
+    }
+
+    private static String estadoPago(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return "—";
+        }
+        return switch (valor) {
+            case "PENDIENTE" -> "Pendiente";
+            case "PAGADO" -> "Pagado";
+            case "APROBADO" -> "Aprobado";
+            case "RECHAZADO" -> "Rechazado";
+            case "REEMBOLSADO" -> "Reembolsado";
+            case "VENCIDO" -> "Vencido";
+            case "CANCELADO" -> "Cancelado";
+            default -> valor;
+        };
+    }
+
+    private static String montoConMoneda(BigDecimal valor, String moneda) {
         if (valor == null) {
             return "—";
         }
-        return new DecimalFormat("#,##0.##").format(valor);
-    }
-
-    private String monto(BigDecimal valor, String moneda) {
-        if (valor == null) {
-            return "—";
-        }
-        String formateado = new DecimalFormat("#,##0.00").format(valor);
-        return moneda == null || moneda.isBlank()
-            ? formateado
-            : formateado + " " + moneda;
-    }
-
-    private String fecha(LocalDate valor) {
-        return valor == null ? "—" : valor.format(FECHA);
-    }
-
-    private String fechaHora(LocalDateTime valor) {
-        return valor == null ? "—" : valor.format(FECHA_HORA);
+        String codigo = FormatoPdf.moneda(moneda);
+        return "—".equals(codigo)
+            ? FormatoPdf.monto(valor)
+            : FormatoPdf.monto(valor) + " " + codigo;
     }
 }

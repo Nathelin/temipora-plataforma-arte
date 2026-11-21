@@ -244,7 +244,7 @@ onMounted(cargar)
       </template>
     </AdminPageHeader>
 
-    <div v-if="cargando" class="mt-8 space-y-4" role="status" aria-live="polite">
+    <div v-if="cargando" class="mt-8 min-h-[calc(100vh-4rem)] space-y-4" role="status" aria-live="polite">
       <span class="sr-only">Cargando resumen...</span>
       <div class="h-44 animate-pulse rounded-3xl border border-rosa/40 bg-blanco/70 motion-reduce:animate-none" aria-hidden="true"></div>
       <div class="grid gap-4 sm:grid-cols-3">

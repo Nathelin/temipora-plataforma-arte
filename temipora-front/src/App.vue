@@ -5,9 +5,12 @@ import AvisoActualizacion from './components/AvisoActualizacion.vue'
 import ConfirmacionSalida from './components/ConfirmacionSalida.vue'
 import NotificacionToast from './components/NotificacionToast.vue'
 import { useNotificacionesSistema } from './composables/useNotificacionesSistema'
+import { usePrecargaRutas } from './composables/usePrecargaRutas'
 
 const router = useRouter()
 const { detenerPolling, limpiar } = useNotificacionesSistema()
+
+usePrecargaRutas()
 
 function alInhabilitar() {
   detenerPolling()

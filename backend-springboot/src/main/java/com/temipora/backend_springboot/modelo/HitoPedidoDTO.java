@@ -61,6 +61,10 @@ public class HitoPedidoDTO {
     private LocalDateTime fechaEntrega;
     private LocalDateTime fechaLimiteAprobacion;
     private LocalDateTime fechaAprobacion;
+    private int revisiones;
+    private int revisionesMaximas;
+    private LocalDateTime fechaLimiteReentrega;
+    private boolean reentregaAtrasada;
     private String entregaDescripcion;
     private String entregaImagen;
     private List<EntregaHitoDTO> entregas;
@@ -80,6 +84,7 @@ public class HitoPedidoDTO {
             boolean puedeEntregar,
             boolean puedeAprobar,
             boolean puedeSolicitarRevision,
+            int revisionesMaximas,
             boolean muestraOrigen,
             boolean muestraCobro,
             BigDecimal factorCobroDestino,
@@ -143,6 +148,13 @@ public class HitoPedidoDTO {
             .fechaEntrega(hito.getFechaEntrega())
             .fechaLimiteAprobacion(hito.getFechaLimiteAprobacion())
             .fechaAprobacion(hito.getFechaAprobacion())
+            .revisiones(hito.getRevisiones())
+            .revisionesMaximas(revisionesMaximas)
+            .fechaLimiteReentrega(hito.getFechaLimiteReentrega())
+            .reentregaAtrasada(hito.getFechaLimiteReentrega() != null
+                && hito.getEstadoEntrega() == EstadoEntregaHito.CON_REVISION
+                && hito.getFechaLimiteReentrega()
+                    .isBefore(LocalDateTime.now()))
             .entregaDescripcion(hito.getEntregaDescripcion())
             .entregaImagen(incluirEntrega ? hito.getEntregaImagen() : null)
             .entregas(entregas)

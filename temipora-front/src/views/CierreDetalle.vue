@@ -229,7 +229,7 @@ onMounted(async () => {
       {{ mensajeAcceso }}
     </p>
 
-    <div v-if="cargando" class="mt-10 space-y-6">
+    <div v-if="cargando" class="mt-10 min-h-[calc(100vh-4rem)] space-y-6">
       <div class="h-40 animate-pulse rounded-[28px] bg-rosa/25"></div>
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
         <div v-for="marcador in 3" :key="marcador" class="h-80 animate-pulse rounded-[26px] bg-rosa/20"></div>
@@ -315,10 +315,22 @@ onMounted(async () => {
             <h2 class="mt-2 font-display text-3xl font-extrabold text-granate sm:text-4xl">
               Otros artistas con cupo
             </h2>
-            <p class="mt-1 text-sm text-cafe/60">
-              Parecidos a lo que buscabas, con lugar para empezar ahora.
+            <p class="mt-1 text-sm leading-relaxed text-cafe/60 lg:whitespace-nowrap">
+              Los ordenamos por afinidad con el servicio original. Cada tarjeta indica qué la hace parecida a lo que buscabas.
             </p>
           </div>
+        </div>
+
+        <div class="mt-4 rounded-[24px] border border-rosa/40 bg-durazno/30 px-5 py-4">
+          <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/60">
+            Cómo elegimos estas propuestas
+          </p>
+          <ul class="mt-2 grid gap-x-6 gap-y-1 text-sm text-cafe/80 sm:grid-cols-2">
+            <li>• Estilos y etiquetas en común.</li>
+            <li>• Mismo tipo de servicio y medio.</li>
+            <li>• Precio dentro del rango del servicio original.</li>
+            <li>• Tiempo de entrega y reputación del artista.</li>
+          </ul>
         </div>
 
         <div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">

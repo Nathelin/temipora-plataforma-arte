@@ -6,6 +6,7 @@ import {
   textoDestino as textoCompartido,
 } from '../servicios/notificaciones'
 import { useNotificacionesSistema } from '../composables/useNotificacionesSistema'
+import { cuandoEsteLibre } from '../composables/useTareasDiferidas'
 
 const router = useRouter()
 const rutaNotificaciones = localStorage.getItem('rol') === 'ADMIN'
@@ -106,15 +107,20 @@ function formatearFecha(valor) {
   }).format(fecha)
 }
 
+let cancelarCargaInicial = null
+
 onMounted(() => {
   sincronizarSesion()
-  void refrescarContador()
-  iniciarPolling()
+  cancelarCargaInicial = cuandoEsteLibre(() => {
+    void refrescarContador()
+    iniciarPolling()
+  })
   document.addEventListener('click', manejarClickExterior)
   document.addEventListener('keydown', manejarTecla)
 })
 
 onBeforeUnmount(() => {
+  cancelarCargaInicial?.()
   detenerPolling()
   document.removeEventListener('click', manejarClickExterior)
   document.removeEventListener('keydown', manejarTecla)

@@ -109,6 +109,7 @@ public class SecurityConfig {
                     "/api/coleccion/**",
                     "/api/resenias/**",
                     "/api/terminos-plataforma",
+                    "/api/terminos-aceptados/**",
                     "/api/comisiones/**",
                     "/api/configuracion-pedido",
                     "/api/ofertas/campana/**",
@@ -150,7 +151,9 @@ public class SecurityConfig {
             "https://*.ngrok-free.dev",
             "https://*.ngrok-free.app",
             "https://*.trycloudflare.com",
-            "https://*.devtunnels.ms"
+            "https://*.devtunnels.ms",
+            "https://*.temipora-demo.online",
+            "https://temipora-demo.online"
         ));
         config.setAllowedMethods(List.of(
             "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

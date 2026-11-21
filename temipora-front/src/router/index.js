@@ -1,88 +1,92 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Login from '../components/Login.vue'
-import Usuarios from '../components/Usuarios.vue'
-import SancionesAdmin from '../components/SancionesAdmin.vue'
-import AnclajeAdmin from '../components/AnclajeAdmin.vue'
-import TiposAdmin from '../components/TiposAdmin.vue'
-import EtiquetasAdmin from '../components/EtiquetasAdmin.vue'
-import CategoriasEtiquetaAdmin from '../components/CategoriasEtiquetaAdmin.vue'
-import MediosAdmin from '../components/MediosAdmin.vue'
-import TiposArteAdmin from '../components/TiposArteAdmin.vue'
-import MaterialesAdmin from '../components/MaterialesAdmin.vue'
-import PaisesAdmin from '../components/PaisesAdmin.vue'
-import CotizacionAdmin from '../components/CotizacionAdmin.vue'
-import MonedasAdmin from '../components/MonedasAdmin.vue'
-import PresupuestoAdmin from '../components/PresupuestoAdmin.vue'
-import ComisionAdmin from '../components/ComisionAdmin.vue'
-import PromocionesAdmin from '../components/PromocionesAdmin.vue'
-import SustitucionesAdmin from '../components/SustitucionesAdmin.vue'
-import PedidoConfigAdmin from '../components/PedidoConfigAdmin.vue'
-import ConfiguracionBajaCuentaAdmin from '../components/ConfiguracionBajaCuentaAdmin.vue'
-import ConfiguracionMensajeriaAdmin from '../components/ConfiguracionMensajeriaAdmin.vue'
-import TerminosPlataformaAdmin from '../components/TerminosPlataformaAdmin.vue'
-import CriteriosReseniaAdmin from '../components/CriteriosReseniaAdmin.vue'
-import ConfiguracionReseniaAdmin from '../components/ConfiguracionReseniaAdmin.vue'
-import AuditoriaAdmin from '../components/AuditoriaAdmin.vue'
-import ReseniasReportadasAdmin from '../components/ReseniasReportadasAdmin.vue'
-import HistorialReportesAdmin from '../components/HistorialReportesAdmin.vue'
-import Registro from '../components/Registro.vue'
-import TOS from '../components/TOS.vue'
 import MainLayout from '../layouts/MainLayout.vue'
-import AdminLayout from '../layouts/AdminLayout.vue'
-import ConfiguracionLayout from '../layouts/ConfiguracionLayout.vue'
-import ArtistLayout from '../layouts/ArtistLayout.vue'
-import ClientLayout from '../layouts/ClientLayout.vue'
-import Inicio from '../views/Inicio.vue'
-import Explorar from '../views/Explorar.vue'
-import AdminResumen from '../views/AdminResumen.vue'
-import AdminInformeVentas from '../views/AdminInformeVentas.vue'
-import PanelResumen from '../views/PanelResumen.vue'
-import Ventas from '../views/Ventas.vue'
-import InformeVentas from '../views/InformeVentas.vue'
-import Perfil from '../views/Perfil.vue'
-import Favoritos from '../views/Favoritos.vue'
-import FavoritosArtistas from '../views/FavoritosArtistas.vue'
-import FavoritosServicios from '../views/FavoritosServicios.vue'
-import Servicios from '../views/Servicios.vue'
-import ServicioDetalle from '../views/ServicioDetalle.vue'
-import AlternativasServicio from '../views/AlternativasServicio.vue'
-import SolicitudServicio from '../views/SolicitudServicio.vue'
-import SolicitudDetalle from '../views/SolicitudDetalle.vue'
-import CierreDetalle from '../views/CierreDetalle.vue'
-import Solicitudes from '../views/Solicitudes.vue'
-import PresupuestoForm from '../views/PresupuestoForm.vue'
-import PagoPresupuesto from '../views/PagoPresupuesto.vue'
-import Pedidos from '../views/Pedidos.vue'
-import PedidoDetalle from '../views/PedidoDetalle.vue'
-import Notificaciones from '../views/Notificaciones.vue'
-import Ofertas from '../views/Ofertas.vue'
-import Mensajes from '../views/Mensajes.vue'
-import Conversacion from '../views/Conversacion.vue'
-import ConfiguracionPerfil from '../views/ConfiguracionPerfil.vue'
-import ConfiguracionApariencia from '../views/ConfiguracionApariencia.vue'
-import ConfiguracionPrivacidad from '../views/ConfiguracionPrivacidad.vue'
-import ConfiguracionEtiquetas from '../views/ConfiguracionEtiquetas.vue'
-import ConfiguracionFormularioPedidos from '../views/ConfiguracionFormularioPedidos.vue'
-import ConfiguracionTerminosArtista from '../views/ConfiguracionTerminosArtista.vue'
-import ConfiguracionCuenta from '../views/ConfiguracionCuenta.vue'
-import ConfiguracionCobros from '../views/ConfiguracionCobros.vue'
-import PortfolioSubir from '../views/PortfolioSubir.vue'
-import MisServicios from '../views/MisServicios.vue'
-import ServicioForm from '../views/ServicioForm.vue'
-import ServicioSolicitudes from '../views/ServicioSolicitudes.vue'
-import MisProductos from '../views/MisProductos.vue'
-import ProductoForm from '../views/ProductoForm.vue'
-import ProductoDetalle from '../views/ProductoDetalle.vue'
-import ProductoPublico from '../views/ProductoPublico.vue'
-import Productos from '../views/Productos.vue'
-import Reventas from '../views/Reventas.vue'
-import ReventaPublica from '../views/ReventaPublica.vue'
-import MiReventa from '../views/MiReventa.vue'
-import Carrito from '../views/Carrito.vue'
-import MisCompras from '../views/MisCompras.vue'
-import CompraDetalle from '../views/CompraDetalle.vue'
-import CertificadoPublico from '../views/CertificadoPublico.vue'
-import ServiciosArchivados from '../views/ServiciosArchivados.vue'
+
+// Cada pantalla se carga solo cuando se visita. El primer bundle queda con el
+// shell (layout + router) y la vista inicial; el resto viaja por su cuenta.
+const Login = () => import('../components/Login.vue')
+const Usuarios = () => import('../components/Usuarios.vue')
+const SancionesAdmin = () => import('../components/SancionesAdmin.vue')
+const AnclajeAdmin = () => import('../components/AnclajeAdmin.vue')
+const TiposAdmin = () => import('../components/TiposAdmin.vue')
+const EtiquetasAdmin = () => import('../components/EtiquetasAdmin.vue')
+const CategoriasEtiquetaAdmin = () => import('../components/CategoriasEtiquetaAdmin.vue')
+const MediosAdmin = () => import('../components/MediosAdmin.vue')
+const TiposArteAdmin = () => import('../components/TiposArteAdmin.vue')
+const MaterialesAdmin = () => import('../components/MaterialesAdmin.vue')
+const PaisesAdmin = () => import('../components/PaisesAdmin.vue')
+const CotizacionAdmin = () => import('../components/CotizacionAdmin.vue')
+const MonedasAdmin = () => import('../components/MonedasAdmin.vue')
+const PresupuestoAdmin = () => import('../components/PresupuestoAdmin.vue')
+const ComisionAdmin = () => import('../components/ComisionAdmin.vue')
+const PromocionesAdmin = () => import('../components/PromocionesAdmin.vue')
+const SustitucionesAdmin = () => import('../components/SustitucionesAdmin.vue')
+const PedidoConfigAdmin = () => import('../components/PedidoConfigAdmin.vue')
+const ConfiguracionBajaCuentaAdmin = () => import('../components/ConfiguracionBajaCuentaAdmin.vue')
+const ConfiguracionMensajeriaAdmin = () => import('../components/ConfiguracionMensajeriaAdmin.vue')
+const TerminosPlataformaAdmin = () => import('../components/TerminosPlataformaAdmin.vue')
+const CriteriosReseniaAdmin = () => import('../components/CriteriosReseniaAdmin.vue')
+const ConfiguracionReseniaAdmin = () => import('../components/ConfiguracionReseniaAdmin.vue')
+const AuditoriaAdmin = () => import('../components/AuditoriaAdmin.vue')
+const ReseniasReportadasAdmin = () => import('../components/ReseniasReportadasAdmin.vue')
+const HistorialReportesAdmin = () => import('../components/HistorialReportesAdmin.vue')
+const Registro = () => import('../components/Registro.vue')
+const TOS = () => import('../components/TOS.vue')
+const AdminLayout = () => import('../layouts/AdminLayout.vue')
+const ConfiguracionLayout = () => import('../layouts/ConfiguracionLayout.vue')
+const ArtistLayout = () => import('../layouts/ArtistLayout.vue')
+const ClientLayout = () => import('../layouts/ClientLayout.vue')
+const Inicio = () => import('../views/Inicio.vue')
+const Explorar = () => import('../views/Explorar.vue')
+const AdminResumen = () => import('../views/AdminResumen.vue')
+const AdminInformeVentas = () => import('../views/AdminInformeVentas.vue')
+const PanelResumen = () => import('../views/PanelResumen.vue')
+const Ventas = () => import('../views/Ventas.vue')
+const InformeVentas = () => import('../views/InformeVentas.vue')
+const Perfil = () => import('../views/Perfil.vue')
+const Favoritos = () => import('../views/Favoritos.vue')
+const FavoritosArtistas = () => import('../views/FavoritosArtistas.vue')
+const FavoritosServicios = () => import('../views/FavoritosServicios.vue')
+const Servicios = () => import('../views/Servicios.vue')
+const ServicioDetalle = () => import('../views/ServicioDetalle.vue')
+const AlternativasServicio = () => import('../views/AlternativasServicio.vue')
+const SolicitudServicio = () => import('../views/SolicitudServicio.vue')
+const SolicitudDetalle = () => import('../views/SolicitudDetalle.vue')
+const CierreDetalle = () => import('../views/CierreDetalle.vue')
+const Solicitudes = () => import('../views/Solicitudes.vue')
+const PresupuestoForm = () => import('../views/PresupuestoForm.vue')
+const PagoPresupuesto = () => import('../views/PagoPresupuesto.vue')
+const Pedidos = () => import('../views/Pedidos.vue')
+const PedidoDetalle = () => import('../views/PedidoDetalle.vue')
+const Notificaciones = () => import('../views/Notificaciones.vue')
+const Ofertas = () => import('../views/Ofertas.vue')
+const Mensajes = () => import('../views/Mensajes.vue')
+const Conversacion = () => import('../views/Conversacion.vue')
+const ConfiguracionPerfil = () => import('../views/ConfiguracionPerfil.vue')
+const ConfiguracionApariencia = () => import('../views/ConfiguracionApariencia.vue')
+const ConfiguracionPrivacidad = () => import('../views/ConfiguracionPrivacidad.vue')
+const ConfiguracionEtiquetas = () => import('../views/ConfiguracionEtiquetas.vue')
+const ConfiguracionFormularioPedidos = () => import('../views/ConfiguracionFormularioPedidos.vue')
+const ConfiguracionTerminosArtista = () => import('../views/ConfiguracionTerminosArtista.vue')
+const ConfiguracionCuenta = () => import('../views/ConfiguracionCuenta.vue')
+const ConfiguracionCobros = () => import('../views/ConfiguracionCobros.vue')
+const PortfolioSubir = () => import('../views/PortfolioSubir.vue')
+const MisServicios = () => import('../views/MisServicios.vue')
+const ServicioForm = () => import('../views/ServicioForm.vue')
+const ServicioSolicitudes = () => import('../views/ServicioSolicitudes.vue')
+const MisProductos = () => import('../views/MisProductos.vue')
+const ProductoForm = () => import('../views/ProductoForm.vue')
+const ProductoDetalle = () => import('../views/ProductoDetalle.vue')
+const ProductoPublico = () => import('../views/ProductoPublico.vue')
+const Productos = () => import('../views/Productos.vue')
+const Reventas = () => import('../views/Reventas.vue')
+const ReventaPublica = () => import('../views/ReventaPublica.vue')
+const MiReventa = () => import('../views/MiReventa.vue')
+const Carrito = () => import('../views/Carrito.vue')
+const MisCompras = () => import('../views/MisCompras.vue')
+const CompraDetalle = () => import('../views/CompraDetalle.vue')
+const CertificadoPublico = () => import('../views/CertificadoPublico.vue')
+const TerminosAceptadosPublico = () => import('../views/TerminosAceptadosPublico.vue')
+const ServiciosArchivados = () => import('../views/ServiciosArchivados.vue')
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useConfirmacionSalida } from '../composables/useConfirmacionSalida'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
@@ -116,6 +120,10 @@ const routes = [
       { path: 'certificado/:codigo', name: 'certificado-publico', component: CertificadoPublico,
         props: (route) => ({ codigo: String(route.params.codigo) }),
         meta: { title: (route) => `Certificado ${route.params.codigo}` }
+      },
+      { path: 'terminos-aceptados/:codigo', name: 'terminos-aceptados-publico', component: TerminosAceptadosPublico,
+        props: (route) => ({ codigo: String(route.params.codigo) }),
+        meta: { title: 'Términos aceptados' }
       },
       {
         path: 'carrito',
@@ -661,5 +669,31 @@ router.beforeEach((to, from, next) => {
 
   next()
 })
+
+const rutasPrecargadas = new Set()
+
+/**
+ * Descarga por adelantado el chunk de una ruta. Se usa al pasar el mouse o el
+ * foco por un enlace para que el clic no espere la descarga por el túnel.
+ */
+export function precargarRuta(destino) {
+  let resuelta
+  try {
+    resuelta = router.resolve(destino)
+  } catch {
+    return
+  }
+  for (const registro of resuelta.matched) {
+    for (const componente of Object.values(registro.components || {})) {
+      if (typeof componente !== 'function' || rutasPrecargadas.has(componente)) {
+        continue
+      }
+      rutasPrecargadas.add(componente)
+      componente().catch(() => {
+        rutasPrecargadas.delete(componente)
+      })
+    }
+  }
+}
 
 export default router

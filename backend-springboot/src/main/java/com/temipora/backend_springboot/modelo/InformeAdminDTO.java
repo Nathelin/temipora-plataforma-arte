@@ -6,6 +6,7 @@ import java.util.List;
 public record InformeAdminDTO(
         InformePeriodoDTO periodo,
         String moneda,
+        String tipo,
         LocalDateTime generadoEn,
         InformeAdminTotalesDTO totales,
         InformeAdminComparacionDTO comparacion,

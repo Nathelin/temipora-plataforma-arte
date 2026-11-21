@@ -22,8 +22,18 @@ public class PedidoConfigRequest {
 
     @NotNull(message = "Los días para pagar una cuota son obligatorios.")
     @Min(value = 1, message = "El plazo de pago debe ser al menos 1 día.")
-    @Max(value = 90, message = "El plazo de pago no puede superar los 90 días.")
+    @Max(value = 14, message = "El plazo de pago no puede superar los 14 días.")
     private Integer diasPagoCuota;
+
+    @NotNull(message = "El máximo de revisiones por hito es obligatorio.")
+    @Min(value = 1, message = "Tiene que haber al menos 1 revisión por hito.")
+    @Max(value = 10, message = "El máximo de revisiones no puede superar 10.")
+    private Integer revisionesMaximasPorHito;
+
+    @NotNull(message = "Los días para reentregar son obligatorios.")
+    @Min(value = 1, message = "El plazo de reentrega debe ser al menos 1 día.")
+    @Max(value = 60, message = "El plazo de reentrega no puede superar los 60 días.")
+    private Integer diasReentrega;
 
     @NotNull(message = "El máximo de hitos es obligatorio.")
     @Min(value = 1, message = "Tiene que haber al menos 1 hito.")

@@ -49,7 +49,8 @@ public class HitoFlujoService {
             return null;
         }
         if (siguiente.getHitoPresupuesto().getTipo() != TipoHito.ENTREGA) {
-            siguiente.setFechaLimitePago(ahora.plusDays(diasPagoCuota()));
+            siguiente.setFechaLimitePago(
+                PedidoFechas.ventanaPago(pedido, ahora, diasPagoCuota()));
             hitoPedidoRepository.save(siguiente);
             notificacionService.crearParaUsuario(
                 pedido.getCliente().getIdUsuario(),
@@ -76,6 +77,20 @@ public class HitoFlujoService {
         return config.getDiasAprobacionAutomatica() != null
             ? config.getDiasAprobacionAutomatica()
             : ConfiguracionPedido.DIAS_APROBACION_POR_DEFECTO;
+    }
+
+    public int revisionesMaximasPorHito() {
+        ConfiguracionPedido config = configuracionPedidoService.obtener();
+        return config.getRevisionesMaximasPorHito() != null
+            ? config.getRevisionesMaximasPorHito()
+            : ConfiguracionPedido.REVISIONES_MAXIMAS_POR_DEFECTO;
+    }
+
+    public int diasReentrega() {
+        ConfiguracionPedido config = configuracionPedidoService.obtener();
+        return config.getDiasReentrega() != null
+            ? config.getDiasReentrega()
+            : ConfiguracionPedido.DIAS_REENTREGA_POR_DEFECTO;
     }
 
     private String nombreServicio(Pedido pedido) {

@@ -9,6 +9,7 @@ import {
 import ResumenPropiedad from './ResumenPropiedad.vue'
 import HistorialLedgerModal from './HistorialLedgerModal.vue'
 import VisorImagenes from './VisorImagenes.vue'
+import ImagenOptimizada from './ImagenOptimizada.vue'
 
 const props = defineProps({
   producto: { type: Object, required: true },
@@ -228,9 +229,11 @@ watch(
             aria-label="Ampliar imagen del producto"
             @click="abrirVisor()"
           >
-            <img
+            <ImagenOptimizada
               :src="imagenActiva"
               :alt="producto.titulo"
+              sizes="(min-width: 1024px) 60vw, 100vw"
+              prioridad
               class="h-full w-full object-cover transition duration-500"
               :class="requiereAdvertencia ? 'scale-105 blur-[18px]' : ''"
             />
@@ -305,7 +308,7 @@ watch(
             :aria-label="`Ver imagen ${indice + 1}`"
             @click="seleccionarImagen(indice)"
           >
-            <img :src="url" alt="" class="h-full w-full object-cover" />
+            <ImagenOptimizada :src="url" alt="" sizes="64px" class="h-full w-full object-cover" />
           </button>
         </div>
       </section>
@@ -357,10 +360,11 @@ watch(
             @keydown.space.prevent="seleccionarVariante(variante)"
           >
             <div class="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-rosa/50 bg-rosa/10">
-              <img
+              <ImagenOptimizada
                 v-if="variante.imagenUrl"
                 :src="variante.imagenUrl"
                 :alt="variante.nombre"
+                sizes="80px"
                 class="h-full w-full object-cover transition duration-300 group-hover:scale-105"
               />
             </div>
@@ -609,10 +613,11 @@ watch(
             :to="`/perfil/${producto.nombreArtista}`"
             class="mt-3 flex w-fit items-center gap-2"
           >
-            <img
+            <ImagenOptimizada
               v-if="producto.urlFotoArtista"
               :src="producto.urlFotoArtista"
               alt=""
+              sizes="28px"
               class="h-7 w-7 rounded-full object-cover ring-1 ring-borde/50"
             />
             <span

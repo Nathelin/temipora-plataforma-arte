@@ -2,8 +2,10 @@ package com.temipora.backend_springboot.servicios;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -98,6 +100,7 @@ public class CierreEmailProcesador {
         List<EmailPlantillaService.AlternativaEmail> alternativas =
             new ArrayList<>();
         List<EmailCierrePendiente> incluidos = new ArrayList<>();
+        List<CierreSustitucionDTO> detalles = new ArrayList<>();
 
         for (EmailCierrePendiente fila : pendientes) {
             CierreSustitucionDTO detalle;
@@ -110,6 +113,7 @@ public class CierreEmailProcesador {
                 continue;
             }
             incluidos.add(fila);
+            detalles.add(detalle);
             cierres.add(new EmailPlantillaService.CierreEmail(
                 detalle.getContexto(),
                 detalle.getIdSolicitud(),
@@ -126,18 +130,43 @@ public class CierreEmailProcesador {
                 detalle.getTitulo(),
                 detalle.getDetalle(),
                 detalle.getFecha()));
-            if (alternativas.isEmpty() && detalle.getOpciones() != null) {
-                for (SustitucionOpcionDTO opcion : detalle.getOpciones()) {
-                    if (alternativas.size() >= MAX_ALTERNATIVAS) {
-                        break;
-                    }
-                    alternativas.add(alternativa(opcion));
-                }
-            }
         }
 
         if (incluidos.isEmpty()) {
             return false;
+        }
+
+        // Nunca ofrecemos como alternativa un servicio que este mismo correo
+        // informa como cerrado o rechazado.
+        Set<Long> serviciosCerrados = new HashSet<>();
+        for (CierreSustitucionDTO detalle : detalles) {
+            if (detalle.getServicio() != null
+                    && detalle.getServicio().getIdServicio() != null) {
+                serviciosCerrados.add(detalle.getServicio().getIdServicio());
+            }
+        }
+        for (CierreSustitucionDTO detalle : detalles) {
+            if (detalle.getOpciones() == null || detalle.getOpciones().isEmpty()) {
+                continue;
+            }
+            List<EmailPlantillaService.AlternativaEmail> candidatas =
+                new ArrayList<>();
+            for (SustitucionOpcionDTO opcion : detalle.getOpciones()) {
+                if (candidatas.size() >= MAX_ALTERNATIVAS) {
+                    break;
+                }
+                Long idServicio = idServicioDe(opcion);
+                if (idServicio == null
+                        || serviciosCerrados.contains(idServicio)) {
+                    continue;
+                }
+                candidatas.add(
+                    alternativa(opcion, detalle.getIdSustitucion()));
+            }
+            if (!candidatas.isEmpty()) {
+                alternativas.addAll(candidatas);
+                break;
+            }
         }
 
         String lote = incluidos.stream()
@@ -200,17 +229,30 @@ public class CierreEmailProcesador {
             fila.getSolicitud().getIdSolicitud(), idUsuario);
     }
 
+    private Long idServicioDe(SustitucionOpcionDTO opcion) {
+        if (opcion.getIdServicio() != null) {
+            return opcion.getIdServicio();
+        }
+        return opcion.getServicio() != null
+            ? opcion.getServicio().getIdServicio()
+            : null;
+    }
+
     private EmailPlantillaService.AlternativaEmail alternativa(
-            SustitucionOpcionDTO opcion) {
+            SustitucionOpcionDTO opcion, Long idSustitucion) {
         ServicioDTO servicio = opcion.getServicio();
         return new EmailPlantillaService.AlternativaEmail(
+            servicio != null ? servicio.getIdServicio() : opcion.getIdServicio(),
+            idSustitucion,
             servicio != null ? servicio.getNombre() : "",
             servicio != null ? servicio.getNombreArtista() : "",
             servicio != null ? servicio.getImagenPortada() : null,
             servicio != null && servicio.getPrecioBaseMostrado() != null
                 ? servicio.getPrecioBaseMostrado().toPlainString()
                 : "",
-            servicio != null ? servicio.getMonedaMostrada() : "");
+            servicio != null ? servicio.getMonedaMostrada() : "",
+            opcion.getMotivo(),
+            opcion.getCaracteristicas());
     }
 
     private void incrementarIntentos(List<EmailCierrePendiente> filas) {

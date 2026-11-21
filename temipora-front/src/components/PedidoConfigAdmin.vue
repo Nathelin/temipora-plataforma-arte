@@ -11,6 +11,12 @@ const mensaje = ref('')
 const config = ref(null)
 const diasAprobacionAutomatica = ref('7')
 const diasPagoCuota = ref('7')
+const revisionesMaximasPorHito = ref('2')
+const diasReentrega = ref('7')
+const procesandoMails = ref(false)
+const enviandoPrueba = ref(false)
+const mensajeMails = ref('')
+const errorMails = ref('')
 const maxHitos = ref('4')
 const porcentajeMaxPrimerHito = ref('50')
 const montoMinimoCuota = ref('1')
@@ -23,6 +29,8 @@ async function cargar() {
     config.value = res.data
     diasAprobacionAutomatica.value = res.data?.diasAprobacionAutomatica ?? 7
     diasPagoCuota.value = res.data?.diasPagoCuota ?? 7
+    revisionesMaximasPorHito.value = res.data?.revisionesMaximasPorHito ?? 2
+    diasReentrega.value = res.data?.diasReentrega ?? 7
     maxHitos.value = res.data?.maxHitos ?? 4
     porcentajeMaxPrimerHito.value = res.data?.porcentajeMaxPrimerHito ?? 50
     montoMinimoCuota.value = res.data?.montoMinimoCuota ?? 1
@@ -70,7 +78,9 @@ async function guardar() {
   mensaje.value = ''
   const errores = [
     entero(diasAprobacionAutomatica.value, 1, 60, 'La aprobación automática'),
-    entero(diasPagoCuota.value, 1, 90, 'El plazo de pago'),
+    entero(diasPagoCuota.value, 1, 14, 'El plazo de pago'),
+    entero(revisionesMaximasPorHito.value, 1, 10, 'El máximo de revisiones'),
+    entero(diasReentrega.value, 1, 60, 'El plazo de reentrega'),
     entero(maxHitos.value, 1, 6, 'El máximo de hitos'),
     decimal(porcentajeMaxPrimerHito.value, 1, 100, 'El porcentaje máximo del primer hito'),
     decimal(montoMinimoCuota.value, 0, 10000000, 'El monto mínimo por cuota'),
@@ -86,6 +96,8 @@ async function guardar() {
     const res = await api.put('/admin/configuracion-pedido', {
       diasAprobacionAutomatica: Number(diasAprobacionAutomatica.value),
       diasPagoCuota: Number(diasPagoCuota.value),
+      revisionesMaximasPorHito: Number(revisionesMaximasPorHito.value),
+      diasReentrega: Number(diasReentrega.value),
       maxHitos: Number(maxHitos.value),
       porcentajeMaxPrimerHito: Number(String(porcentajeMaxPrimerHito.value).replace(',', '.')),
       montoMinimoCuota: Number(String(montoMinimoCuota.value).replace(',', '.')),
@@ -101,6 +113,47 @@ async function guardar() {
 }
 
 onMounted(cargar)
+
+async function procesarMails() {
+  if (procesandoMails.value) return
+  procesandoMails.value = true
+  mensajeMails.value = ''
+  errorMails.value = ''
+  try {
+    const res = await api.post('/admin/recordatorios/procesar')
+    const encolados = Number(res.data?.encolados || 0)
+    const enviados = Number(res.data?.enviados || 0)
+    mensajeMails.value = `${encolados} recordatorio(s) encolado(s) y `
+      + `${enviados} mail(s) enviado(s).`
+  } catch (e) {
+    errorMails.value = e.response?.data?.message
+      || 'No se pudieron procesar los mails pendientes.'
+  } finally {
+    procesandoMails.value = false
+  }
+}
+
+async function enviarRecordatoriosDePrueba() {
+  if (enviandoPrueba.value) return
+  enviandoPrueba.value = true
+  mensajeMails.value = ''
+  errorMails.value = ''
+  try {
+    const res = await api.post('/admin/recordatorios/prueba')
+    const enviados = Number(res.data?.enviados || 0)
+    const destino = res.data?.correo || 'tu correo'
+    mensajeMails.value = enviados === 2
+      ? `Se enviaron los dos mails de prueba a ${destino}: uno de pagos y otro de entregas.`
+      : enviados === 1
+        ? `Se envió 1 de los 2 mails de prueba a ${destino}. Revisá Mailpit y la configuración.`
+        : 'No se pudo enviar: revisá Mailpit y que el envío de mails esté habilitado.'
+  } catch (e) {
+    errorMails.value = e.response?.data?.message
+      || 'No se pudieron enviar los recordatorios de prueba.'
+  } finally {
+    enviandoPrueba.value = false
+  }
+}
 </script>
 
 <template>
@@ -194,19 +247,57 @@ onMounted(cargar)
             </div>
             <div>
               <label for="dias-pago" class="mb-2 block text-sm text-cafe">
-                Plazo para pagar una cuota (días) <span class="text-rojizo">*</span>
+                Plazo máximo para pagar (días) <span class="text-rojizo">*</span>
               </label>
               <input
                 id="dias-pago"
                 v-model="diasPagoCuota"
                 type="number"
                 min="1"
-                max="90"
+                max="14"
                 step="1"
-                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset ring-coral"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
               />
               <p class="mt-2 text-xs leading-relaxed text-cafe/50">
-                Si el cliente no paga a tiempo, el pedido se cierra y el artista conserva lo cobrado.
+                Aplica a la seña, a cada cuota y a la entrega final. Al vencer, el pedido
+                se cierra y el artista conserva lo cobrado. La ventana de una cuota nunca
+                supera la entrega prevista del pedido.
+              </p>
+            </div>
+            <div>
+              <label for="max-revisiones" class="mb-2 block text-sm text-cafe">
+                Revisiones por hito <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="max-revisiones"
+                v-model="revisionesMaximasPorHito"
+                type="number"
+                min="1"
+                max="10"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Rondas de cambios incluidas en cada etapa. Después del tope, el cliente
+                solo puede aprobar o cancelar.
+              </p>
+            </div>
+            <div>
+              <label for="dias-reentrega" class="mb-2 block text-sm text-cafe">
+                Plazo para reentregar (días) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="dias-reentrega"
+                v-model="diasReentrega"
+                type="number"
+                min="1"
+                max="60"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Tiempo del artista para subir la nueva versión después de una revisión.
+                Si no reentrega, el pedido queda marcado como atrasado.
               </p>
             </div>
           </div>
@@ -223,6 +314,36 @@ onMounted(cargar)
           >
             {{ guardando ? 'Guardando...' : 'Guardar cambios' }}
           </button>
+        </div>
+
+        <div class="border-t border-rosa/40 pt-6">
+          <h2 class="mb-2 text-base text-granate">Recordatorios por mail</h2>
+          <p class="text-xs leading-relaxed text-cafe/50">
+            Encola y envía ahora los avisos de pagos y entregas pendientes, sin
+            esperar al programador.
+          </p>
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              :disabled="procesandoMails"
+              class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-coral px-5 text-sm font-semibold text-coral transition hover:bg-coral/10 disabled:opacity-50"
+              @click="procesarMails"
+            >
+              {{ procesandoMails ? 'Procesando...' : 'Procesar mails pendientes' }}
+            </button>
+            <button
+              :disabled="enviandoPrueba"
+              class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition hover:bg-rosa/20 disabled:opacity-50"
+              @click="enviarRecordatoriosDePrueba"
+            >
+              {{ enviandoPrueba ? 'Enviando...' : 'Enviar recordatorios de prueba' }}
+            </button>
+          </div>
+          <p class="mt-3 text-xs leading-relaxed text-cafe/50">
+            La prueba envía dos mails separados a tu correo: uno de pagos y otro
+            de entregas. No encola ni modifica pedidos.
+          </p>
+          <p v-if="mensajeMails" class="mt-3 text-sm text-green-700">{{ mensajeMails }}</p>
+          <p v-if="errorMails" class="mt-3 text-sm text-rojizo">{{ errorMails }}</p>
         </div>
       </div>
 
@@ -246,8 +367,16 @@ onMounted(cargar)
             <dd class="text-cafe">{{ config.diasAprobacionAutomatica }} días</dd>
           </div>
           <div class="flex justify-between gap-3">
-            <dt class="text-xs text-cafe/50">Plazo de pago</dt>
+            <dt class="text-xs text-cafe/50">Plazo máximo de pago</dt>
             <dd class="text-cafe">{{ config.diasPagoCuota }} días</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Revisiones por hito</dt>
+            <dd class="text-cafe">{{ config.revisionesMaximasPorHito }}</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Plazo de reentrega</dt>
+            <dd class="text-cafe">{{ config.diasReentrega }} días</dd>
           </div>
           <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Última modificación</dt>

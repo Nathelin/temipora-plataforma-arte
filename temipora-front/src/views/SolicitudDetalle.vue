@@ -400,9 +400,7 @@ onMounted(cargar)
       ← Volver a solicitudes
     </button>
 
-    <div v-if="cargando" class="mt-8 rounded-2xl border border-rosa/50 bg-blanco px-6 py-16 text-center text-sm text-cafe/60">
-      Cargando solicitud...
-    </div>
+    <CargandoPagina v-if="cargando" tipo="detalle" mensaje="Cargando solicitud…" />
 
     <div v-else-if="errorCarga" class="mt-8 rounded-2xl border border-rosa/50 bg-blanco px-6 py-16 text-center">
       <p class="text-sm text-cafe/70">{{ errorCarga }}</p>

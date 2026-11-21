@@ -200,7 +200,7 @@ onMounted(async () => {
       </template>
     </PageHeader>
 
-    <div v-if="cargando" class="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+    <div v-if="cargando" class="mt-10 grid min-h-[calc(100vh-4rem)] grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
       <div v-for="marcador in 6" :key="marcador" class="h-96 animate-pulse rounded-[26px] bg-rosa/25"></div>
     </div>
 
@@ -284,10 +284,31 @@ onMounted(async () => {
               {{ opciones.length }}
               {{ opciones.length === 1 ? 'artista disponible' : 'artistas disponibles' }}
             </h2>
-            <p class="mt-1 text-sm text-cafe/60">
-              Ordenados por parecido con lo que buscabas.
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-cafe/60">
+              Los ordenamos de mayor a menor afinidad con «{{ nombreOrigen }}».
+              Cada tarjeta indica qué la acerca a lo que buscabas.
             </p>
           </div>
+        </div>
+
+        <div
+          v-if="opciones.length"
+          class="mt-5 rounded-[24px] border border-rosa/40 bg-durazno/30 px-5 py-4"
+        >
+          <p class="text-[11px] font-bold uppercase tracking-wide text-cafe/60">
+            Cómo elegimos estas propuestas
+          </p>
+          <ul class="mt-2 grid gap-x-6 gap-y-1 text-sm text-cafe/80 sm:grid-cols-2">
+            <li>• Estilos y etiquetas en común.</li>
+            <li>• Mismo tipo de servicio y medio.</li>
+            <li>• Precio dentro del rango del servicio original.</li>
+            <li>• Tiempo de entrega y reputación del artista.</li>
+          </ul>
+          <p class="mt-2 text-xs leading-relaxed text-cafe/55">
+            Solo mostramos artistas con cupo disponible ahora. El orden no es una
+            valoración del artista, sino qué tan parecida es la propuesta a la que
+            querías.
+          </p>
         </div>
 
         <div v-if="opciones.length" class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">

@@ -259,7 +259,8 @@ public class ReventaService {
                 .idProducto(producto.getIdProducto())
                 .idVariante(variante.getIdVariante())
                 .titulo(item.getTituloProducto())
-                .nombreVariante(item.getNombreVariante())
+                .nombreVariante(NombrePiezaVisible.nombreDeVariante(
+                    item.getNombreVariante()))
                 .imagenUrl(imagen(variante, producto))
                 .moneda(item.getMonedaOriginal() != null
                     ? item.getMonedaOriginal().getCodigo()
@@ -307,16 +308,18 @@ public class ReventaService {
         }
         boolean puedeComprar = publicacion.getEstado()
             == EstadoPublicacionReventa.PUBLICADA && !propia;
+        String nombreVariante = NombrePiezaVisible.nombreDeVariante(
+            origen != null ? origen.getNombreVariante()
+                : (variante != null ? variante.getNombre() : null));
+        String tituloProducto = origen != null ? origen.getTituloProducto()
+            : (producto != null ? producto.getTitulo() : null);
         return ReventaDetalleDTO.builder()
             .idPublicacionReventa(publicacion.getIdPublicacionReventa())
             .idProducto(producto != null ? producto.getIdProducto() : null)
             .idVariante(variante != null ? variante.getIdVariante() : null)
-            .titulo(origen != null ? origen.getNombreVariante()
-                : (variante != null ? variante.getNombre() : null))
-            .tituloOriginal(origen != null ? origen.getTituloProducto()
-                : (producto != null ? producto.getTitulo() : null))
-            .nombreVariante(origen != null ? origen.getNombreVariante()
-                : (variante != null ? variante.getNombre() : null))
+            .titulo(nombreVariante != null ? nombreVariante : tituloProducto)
+            .tituloOriginal(nombreVariante != null ? tituloProducto : null)
+            .nombreVariante(nombreVariante)
             .descripcion(producto != null ? producto.getDescripcion() : null)
             .imagenUrl(imagen(variante, producto))
             .moneda(publicacion.getMoneda() != null

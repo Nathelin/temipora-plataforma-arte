@@ -15,6 +15,7 @@ const emit = defineEmits(['solicitar', 'alternar-favorito'])
   <TarjetaServicio
     :servicio="opcion.servicio"
     :motivo="opcion.motivo"
+    :caracteristicas="opcion.caracteristicas"
     mostrar-favorito
     :es-favorito="esFavorito"
     :actualizando-favorito="actualizandoFavorito"

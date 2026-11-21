@@ -9,6 +9,9 @@ export function useSesion() {
     )
     localStorage.setItem('idUsuario', datos.idUsuario ?? '')
     localStorage.setItem('urlFotoPerfil', datos.urlFotoPerfil ?? '')
+    if (datos.monedaPreferida) {
+      localStorage.setItem('monedaPreferida', datos.monedaPreferida)
+    }
   }
 
   function usuarioActual() {
@@ -25,6 +28,7 @@ export function useSesion() {
     localStorage.removeItem('nombreUsuario')
     localStorage.removeItem('idUsuario')
     localStorage.removeItem('urlFotoPerfil')
+    localStorage.removeItem('monedaPreferida')
   }
 
   return { guardarSesion, usuarioActual, estaAutenticado, limpiarSesionLocal }

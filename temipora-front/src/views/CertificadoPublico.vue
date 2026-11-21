@@ -161,7 +161,7 @@ watch(() => props.codigo, cargar)
       </button>
     </div>
 
-    <p v-if="cargando" class="py-20 text-center text-cafe/55">Cargando certificado…</p>
+    <CargandoPagina v-if="cargando" tipo="detalle" mensaje="Cargando certificado…" />
     <p v-else-if="error" role="alert" class="py-20 text-center text-rojizo">{{ error }}</p>
 
     <article
@@ -472,8 +472,7 @@ watch(() => props.codigo, cargar)
         <p class="min-w-0 flex-1 text-xs leading-relaxed text-cafe/55">
           <b class="font-semibold text-cafe">Escaneá para ver este certificado en línea.</b>
           Si cambia el propietario, el certificado se actualiza y el historial
-          anterior queda registrado. No reemplaza los derechos de autor ni
-          constituye asesoramiento legal.
+          anterior queda registrado. No reemplaza los derechos de autor.
         </p>
       </footer>
     </article>

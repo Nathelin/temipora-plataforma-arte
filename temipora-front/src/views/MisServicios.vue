@@ -365,7 +365,7 @@ onBeforeUnmount(() => clearTimeout(temporizadorAviso))
       </template>
     </PageHeader>
 
-    <p v-if="cargando" class="mt-6 text-cafe/60 text-center py-10">Cargando...</p>
+    <CargandoPagina v-if="cargando" class="mt-6" mensaje="Cargando servicios…" />
     <p v-else-if="error" class="mt-6 text-rojizo text-center py-10">{{ error }}</p>
 
     <template v-else>

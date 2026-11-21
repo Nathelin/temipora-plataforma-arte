@@ -29,7 +29,7 @@ const tipos = ref([])
 const medios = ref([])
 const etiquetas = ref([])
 const categorias = ref([])
-const monedaUsuario = ref('ARS')
+const monedaUsuario = ref(localStorage.getItem('monedaPreferida') || 'ARS')
 const cargando = ref(true)
 const cargandoMas = ref(false)
 const error = ref('')
@@ -181,7 +181,10 @@ onMounted(async () => {
   etiquetas.value = etiquetasRes?.data || []
   categorias.value = categoriasRes?.data || []
   const codigo = perfilRes?.data?.monedaPreferida
-  if (codigo) monedaUsuario.value = codigo
+  if (codigo) {
+    monedaUsuario.value = codigo
+    localStorage.setItem('monedaPreferida', codigo)
+  }
   cargar()
 })
 
@@ -274,7 +277,7 @@ onBeforeUnmount(() => {
           </li>
         </ul>
 
-        <p v-if="cargando" class="mt-6 py-16 text-center text-cafe/60">Cargando productos...</p>
+        <CargandoPagina v-if="cargando" class="mt-6" mensaje="Cargando productos…" />
         <p v-else-if="error" role="alert" class="mt-6 py-16 text-center text-rojizo">{{ error }}</p>
 
         <template v-else>

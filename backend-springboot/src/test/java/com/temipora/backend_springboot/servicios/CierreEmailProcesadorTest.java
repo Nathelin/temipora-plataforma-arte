@@ -17,6 +17,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -103,6 +104,46 @@ class CierreEmailProcesadorTest {
         assertThat(fila.getEstado()).isEqualTo(EstadoEmailCierre.OMITIDO);
         verify(envioEmailService, never()).enviar(
             any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void procesar_noOfreceServiciosQueElMailInformaComoCerrados() {
+        Usuario usuario = usuario("a@mail.com");
+        EmailCierrePendiente fila5 = fila(usuario, 5L);
+        EmailCierrePendiente fila6 = fila(usuario, 6L);
+        when(usuarioRepository.findByIdUsuario(1L))
+            .thenReturn(Optional.of(usuario));
+        when(configuracionService.obtener()).thenReturn(config());
+        when(repository.findByUsuarioIdUsuarioAndEstadoOrderByCreadoEnAsc(
+            eq(1L), eq(EstadoEmailCierre.PENDIENTE), any(Pageable.class)))
+            .thenReturn(List.of(fila5, fila6));
+        when(sustitucionService.detalleCierrePorSolicitud(5L, 1L))
+            .thenReturn(detalleConOpciones(
+                5L, 10L, "Retrato",
+                opcion(11L, "Otro retrato"),
+                opcion(20L, "Servicio que se informa cerrado")));
+        when(sustitucionService.detalleCierrePorSolicitud(6L, 1L))
+            .thenReturn(detalleConOpciones(
+                6L, 20L, "Servicio que se informa cerrado"));
+        when(accesoEnlaceService.generar(any(), any(), any(), anyInt()))
+            .thenReturn("token");
+        when(emailPlantillaService.asuntoCierre(anyList())).thenReturn("asunto");
+        ArgumentCaptor<List<EmailPlantillaService.AlternativaEmail>> captor =
+            ArgumentCaptor.forClass(List.class);
+        when(emailPlantillaService.cierre(
+            anyString(), anyList(), captor.capture(), anyString()))
+            .thenReturn("<html>");
+        when(repository.saveAll(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(envioEmailService.enviar(
+            any(), anyString(), any(), any(), anyString(), anyString(), anyString()))
+            .thenReturn(envioEnviado());
+
+        procesador.procesar(1L);
+
+        assertThat(captor.getValue())
+            .extracting(EmailPlantillaService.AlternativaEmail::idServicio)
+            .containsExactly(11L);
     }
 
     @Test
@@ -205,6 +246,45 @@ class CierreEmailProcesadorTest {
             .servicio(servicio)
             .procesoHabilitado(true)
             .opciones(List.of(opcion))
+            .build();
+    }
+
+    private CierreSustitucionDTO detalleConOpciones(
+            Long idSolicitud,
+            Long idServicio,
+            String nombre,
+            SustitucionOpcionDTO... opciones) {
+        ServicioDTO servicio = ServicioDTO.builder()
+            .idServicio(idServicio)
+            .nombre(nombre)
+            .nombreArtista("artista")
+            .precioBaseMostrado(new BigDecimal("100.00"))
+            .monedaMostrada("ARS")
+            .build();
+        return CierreSustitucionDTO.builder()
+            .contexto("SOLICITUD")
+            .idSolicitud(idSolicitud)
+            .idSustitucion(99L)
+            .motivo("SOLICITUD_RECHAZADA")
+            .titulo("El artista rechazó tu solicitud")
+            .detalle("Podés buscar otro artista.")
+            .fecha(LocalDateTime.now())
+            .servicio(servicio)
+            .procesoHabilitado(true)
+            .opciones(List.of(opciones))
+            .build();
+    }
+
+    private SustitucionOpcionDTO opcion(Long idServicio, String nombre) {
+        return SustitucionOpcionDTO.builder()
+            .idServicio(idServicio)
+            .servicio(ServicioDTO.builder()
+                .idServicio(idServicio)
+                .nombre(nombre)
+                .nombreArtista("otro")
+                .precioBaseMostrado(new BigDecimal("120.00"))
+                .monedaMostrada("ARS")
+                .build())
             .build();
     }
 

@@ -1,247 +1,165 @@
 package com.temipora.backend_springboot.servicios;
 
-import java.awt.Color;
-import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
-import java.text.DecimalFormat;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import com.lowagie.text.Document;
-import com.lowagie.text.DocumentException;
-import com.lowagie.text.Font;
-import com.lowagie.text.PageSize;
-import com.lowagie.text.Paragraph;
-import com.lowagie.text.Phrase;
-import com.lowagie.text.pdf.PdfPCell;
-import com.lowagie.text.pdf.PdfPTable;
-import com.lowagie.text.pdf.PdfWriter;
 import com.temipora.backend_springboot.modelo.InformeItemDTO;
-import com.temipora.backend_springboot.modelo.InformeSerieDTO;
 import com.temipora.backend_springboot.modelo.InformeTotalesDTO;
 import com.temipora.backend_springboot.modelo.InformeVentasDTO;
+import com.temipora.backend_springboot.servicios.informes.DocumentoPdf;
+import com.temipora.backend_springboot.servicios.informes.FormatoPdf;
+import com.temipora.backend_springboot.servicios.informes.TablaPdf;
 
 @Service
 public class InformePdfService {
 
-    private static final Font TITULO = new Font(
-        Font.HELVETICA, 16, Font.BOLD);
-    private static final Font SUBTITULO = new Font(
-        Font.HELVETICA, 11, Font.BOLD);
-    private static final Font TEXTO = new Font(
-        Font.HELVETICA, 9, Font.NORMAL);
-    private static final Font TEXTO_BOLD = new Font(
-        Font.HELVETICA, 9, Font.BOLD);
-    private static final Font CHICO = new Font(
-        Font.HELVETICA, 8, Font.NORMAL);
-    private static final DateTimeFormatter FECHA =
-        DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private static final DateTimeFormatter FECHA_HORA =
-        DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final String TIPO = "Informe de ventas";
+    private static final String PIE =
+        "Documento interno del artista · generado automáticamente por Temipora";
 
     public byte[] generar(InformeVentasDTO informe, String nombreArtista) {
-        Document documento = new Document(
-            PageSize.A4, 36, 36, 36, 36);
-        ByteArrayOutputStream salida = new ByteArrayOutputStream();
+        String desde = FormatoPdf.fecha(informe.periodo().desde());
+        String hasta = FormatoPdf.fecha(informe.periodo().hasta());
+        String moneda = FormatoPdf.moneda(informe.moneda());
+        String artista = "@" + FormatoPdf.texto(nombreArtista);
 
-        try {
-            PdfWriter.getInstance(documento, salida);
-            documento.open();
+        DocumentoPdf documento = DocumentoPdf.vertical(
+            TIPO, desde + " al " + hasta, referencia(informe), PIE);
+        documento.abrir();
+        documento.cabecera("Informe del artista", "Ventas del período",
+            desde + " al " + hasta + " · " + informe.periodo().dias()
+                + " días · Cifras en " + moneda);
+        documento.metadatos(
+            "Emisor", artista,
+            "Filtro", filtro(informe.tipo()),
+            "Referencia", referencia(informe),
+            "Generado", FormatoPdf.fechaHora(generado(informe.generadoEn())));
 
-            documento.add(new Paragraph("Informe de ventas", TITULO));
-            documento.add(new Paragraph(
-                "Artista: @" + texto(nombreArtista), TEXTO));
-            documento.add(new Paragraph(
-                "Período: " + fecha(informe.periodo().desde())
-                    + " al " + fecha(informe.periodo().hasta())
-                    + " (" + informe.periodo().dias() + " días)",
-                TEXTO));
-            documento.add(new Paragraph(
-                "Generado el " + LocalDateTime.now().format(FECHA_HORA)
-                    + ". Importes en " + informe.moneda() + ".",
-                CHICO));
-            documento.add(new Paragraph(" "));
+        resumen(documento, informe);
+        comparacion(documento, informe);
+        detalle(documento, informe);
 
-            resumen(documento, informe);
-            comparacion(documento, informe);
-            detalle(documento, informe);
-
-            documento.add(new Paragraph(" "));
-            documento.add(new Paragraph(
-                "El neto percibido es el importe que el medio de pago liquidó "
-                    + "realmente. Cuando una operación no tiene ese dato, se "
-                    + "muestra el neto del artista como estimación.",
-                CHICO));
-
-            documento.close();
-        } catch (DocumentException e) {
-            throw new IllegalStateException(
-                "No se pudo generar el informe de ventas.", e);
-        }
-
-        return salida.toByteArray();
+        return documento.cerrar();
     }
 
-    private void resumen(Document documento, InformeVentasDTO informe)
-            throws DocumentException {
+    private void resumen(DocumentoPdf documento, InformeVentasDTO informe) {
         InformeTotalesDTO totales = informe.totales();
-        documento.add(new Paragraph("Resumen del período", SUBTITULO));
+        documento.seccion("1", "Resumen del período");
+        documento.indicadores(
+            new DocumentoPdf.Metrica(String.valueOf(totales.operaciones()),
+                "Operaciones", null, false),
+            new DocumentoPdf.Metrica(String.valueOf(totales.unidades()),
+                "Unidades", null, false),
+            new DocumentoPdf.Metrica(
+                FormatoPdf.monto(totales.ticketPromedio()),
+                "Ticket promedio", null, false),
+            new DocumentoPdf.Metrica(
+                FormatoPdf.monto(totales.netoPercibido()),
+                "Te pagaron", null, true));
 
-        PdfPTable tabla = new PdfPTable(new float[] { 2.4f, 1.6f });
-        tabla.setWidthPercentage(70);
-        tabla.setHorizontalAlignment(PdfPTable.ALIGN_LEFT);
-        filaResumen(tabla, "Ventas brutas", monto(totales.bruto(),
-            informe.moneda()));
-        filaResumen(tabla, "Neto percibido", monto(
-            totales.netoPercibido(), informe.moneda()));
-        filaResumen(tabla, "Costo de cobro", monto(
-            totales.costoCobro(), informe.moneda()));
-        filaResumen(tabla, "Comisión Temipora", monto(
-            totales.comision(), informe.moneda()));
-        filaResumen(tabla, "Arancel MercadoPago", monto(
-            totales.arancel(), informe.moneda()));
-        filaResumen(tabla, "Operaciones", String.valueOf(
-            totales.operaciones()));
-        filaResumen(tabla, "Unidades", String.valueOf(totales.unidades()));
-        filaResumen(tabla, "Ticket promedio", monto(
-            totales.ticketPromedio(), informe.moneda()));
-        documento.add(tabla);
-        documento.add(new Paragraph(" "));
+        BigDecimal bruto = totales.bruto() != null
+            ? totales.bruto() : BigDecimal.ZERO;
+        BigDecimal comision = totales.comision() != null
+            ? totales.comision() : BigDecimal.ZERO;
+        BigDecimal netoArtista = bruto.subtract(comision);
+        BigDecimal liquidado = totales.netoPercibido() != null
+            ? totales.netoPercibido() : BigDecimal.ZERO;
 
-        /*if (informe.operacionesSinNetoReal() > 0) {
-            documento.add(new Paragraph(
-                informe.operacionesSinNetoReal() + " de "
-                    + totales.operaciones()
-                    + " operaciones no tienen importe liquidado por el medio "
-                    + "de pago; en esos casos el neto es estimado.",
-                CHICO));
-            documento.add(new Paragraph(" "));
-        }*/
+        documento.resumen(
+            new String[] { "Ingresó por ventas", "Comisión Temipora",
+                "Neto para vos", "Costo de MercadoPago", "Se te pagó" },
+            new String[] { FormatoPdf.monto(bruto),
+                FormatoPdf.resta(comision),
+                FormatoPdf.monto(netoArtista),
+                FormatoPdf.resta(netoArtista.subtract(liquidado)),
+                FormatoPdf.monto(liquidado) },
+            4);
     }
 
-    private void comparacion(Document documento, InformeVentasDTO informe)
-            throws DocumentException {
+    private void comparacion(
+            DocumentoPdf documento, InformeVentasDTO informe) {
         var anterior = informe.comparacion();
         if (anterior == null) {
+            documento.seccion("2", "Comparación con el período anterior");
+            documento.parrafo(
+                "No hay un período anterior registrado para comparar.");
             return;
         }
-        documento.add(new Paragraph("Comparación", SUBTITULO));
-        documento.add(new Paragraph(
-            "Período anterior (" + fecha(anterior.desde())
-                + " al " + fecha(anterior.hasta()) + "): neto "
-                + monto(anterior.netoPercibido(), informe.moneda())
-                + variacion(anterior.variacionNetoPorcentaje()),
-            TEXTO));
-        documento.add(new Paragraph(" "));
+        documento.seccion("2", "Comparación con el período anterior",
+            FormatoPdf.fecha(anterior.desde()) + " al "
+                + FormatoPdf.fecha(anterior.hasta()));
+
+        TablaPdf tabla = new TablaPdf(
+            new String[] { "Concepto", "Anterior", "Actual", "Variación" },
+            new float[] { 2.1f, 1.2f, 1.2f, 1.8f },
+            new boolean[] { false, true, true, true });
+        tabla.fila("Neto percibido",
+            FormatoPdf.monto(anterior.netoPercibido()),
+            FormatoPdf.monto(informe.totales().netoPercibido()),
+            variacion(anterior.variacionNetoPorcentaje()));
+        documento.tabla(tabla);
     }
 
-    private void detalle(Document documento, InformeVentasDTO informe)
-            throws DocumentException {
-        documento.add(new Paragraph("Detalle por producto y servicio", SUBTITULO));
+    private void detalle(DocumentoPdf documento, InformeVentasDTO informe) {
+        documento.seccion("3", "Ventas por ítem");
 
         List<InformeItemDTO> items = informe.items() != null
             ? informe.items() : List.of();
         if (items.isEmpty()) {
-            documento.add(new Paragraph(
-                "No hay ventas registradas en el período.", TEXTO));
+            documento.parrafo("No hay ventas registradas en el período.");
             return;
         }
 
-        PdfPTable tabla = new PdfPTable(
-            new float[] { 0.9f, 2.6f, 0.8f, 0.9f, 1.2f, 1.2f, 1.2f, 1.3f, 0.9f });
-        tabla.setWidthPercentage(100);
-        encabezado(tabla, "Tipo");
-        encabezado(tabla, "Ítem");
-        encabezado(tabla, "Unid.");
-        encabezado(tabla, "Oper.");
-        encabezado(tabla, "Bruto");
-        encabezado(tabla, "Comisión");
-        encabezado(tabla, "Arancel");
-        encabezado(tabla, "Neto");
-        encabezado(tabla, "Part.");
+        TablaPdf tabla = new TablaPdf(
+            new String[] { "Tipo", "Ítem", "Unid.", "Oper.", "Bruto",
+                "Comisión", "Neto percibido", "Part. del neto" },
+            new float[] { 0.95f, 2.4f, 0.7f, 0.7f, 1.25f, 1.25f, 1.3f,
+                0.95f },
+            new boolean[] { false, false, true, true, true, true, true,
+                true });
 
         for (InformeItemDTO item : items) {
-            celda(tabla, "PRODUCTO".equals(item.tipo())
-                ? "Producto" : "Servicio");
-            celda(tabla, texto(item.nombre()));
-            celda(tabla, String.valueOf(item.unidades()));
-            celda(tabla, String.valueOf(item.operaciones()));
-            celda(tabla, monto(item.bruto(), informe.moneda()));
-            celda(tabla, monto(item.comision(), informe.moneda()));
-            celda(tabla, monto(item.arancel(), informe.moneda()));
-            celda(tabla, monto(item.netoPercibido(), informe.moneda()));
-            celda(tabla, numero(item.participacion()) + "%");
+            tabla.fila(
+                "PRODUCTO".equals(item.tipo()) ? "Producto" : "Servicio",
+                FormatoPdf.texto(item.nombre()),
+                String.valueOf(item.unidades()),
+                String.valueOf(item.operaciones()),
+                FormatoPdf.monto(item.bruto()),
+                FormatoPdf.monto(item.comision()),
+                FormatoPdf.monto(item.netoPercibido()),
+                FormatoPdf.numero(item.participacion()) + "%");
         }
-        documento.add(tabla);
-
-        List<InformeSerieDTO> serie = informe.serie() != null
-            ? informe.serie() : List.of();
-        long cobros = serie.stream().mapToLong(InformeSerieDTO::cobros).sum();
-        documento.add(new Paragraph(" "));
-        documento.add(new Paragraph(
-            "Cobros registrados en la serie: " + cobros + ".", CHICO));
+        documento.tabla(tabla);
     }
 
-    private void filaResumen(PdfPTable tabla, String etiqueta, String valor) {
-        PdfPCell celdaEtiqueta = new PdfPCell(new Phrase(etiqueta, TEXTO));
-        celdaEtiqueta.setBorderColor(new Color(214, 214, 214));
-        celdaEtiqueta.setPadding(4);
-        tabla.addCell(celdaEtiqueta);
-
-        PdfPCell celdaValor = new PdfPCell(new Phrase(valor, TEXTO_BOLD));
-        celdaValor.setBorderColor(new Color(214, 214, 214));
-        celdaValor.setPadding(4);
-        celdaValor.setHorizontalAlignment(PdfPCell.ALIGN_RIGHT);
-        tabla.addCell(celdaValor);
+    private String referencia(InformeVentasDTO informe) {
+        return "VEN-" + FormatoPdf.fechaCompacta(informe.periodo().desde())
+            + "-" + FormatoPdf.fechaCompacta(informe.periodo().hasta());
     }
 
-    private void encabezado(PdfPTable tabla, String valor) {
-        PdfPCell celda = new PdfPCell(new Phrase(valor, TEXTO_BOLD));
-        celda.setBackgroundColor(new Color(238, 238, 238));
-        celda.setPadding(4);
-        tabla.addCell(celda);
+    private LocalDateTime generado(LocalDateTime valor) {
+        return valor != null ? valor : LocalDateTime.now();
     }
 
-    private void celda(PdfPTable tabla, String valor) {
-        PdfPCell celda = new PdfPCell(new Phrase(valor, CHICO));
-        celda.setPadding(3);
-        tabla.addCell(celda);
+    private static String filtro(String tipo) {
+        if (tipo == null) {
+            return "Productos y servicios";
+        }
+        return switch (tipo) {
+            case "PRODUCTOS" -> "Solo productos";
+            case "SERVICIOS" -> "Solo servicios";
+            default -> "Productos y servicios";
+        };
     }
 
-    private String variacion(BigDecimal valor) {
+    private static String variacion(BigDecimal valor) {
         if (valor == null) {
-            return " (sin ventas en el período anterior)";
+            return "sin ventas en el período anterior";
         }
         String signo = valor.signum() >= 0 ? "+" : "";
-        return " (" + signo + numero(valor) + "% respecto del anterior)";
-    }
-
-    private String texto(String valor) {
-        return valor == null || valor.isBlank() ? "—" : valor;
-    }
-
-    private String numero(Number valor) {
-        if (valor == null) {
-            return "—";
-        }
-        return new DecimalFormat("#,##0.##").format(valor);
-    }
-
-    private String monto(BigDecimal valor, String moneda) {
-        if (valor == null) {
-            return "—";
-        }
-        String formateado = new DecimalFormat("#,##0.00").format(valor);
-        return moneda == null || moneda.isBlank()
-            ? formateado
-            : formateado + " " + moneda;
-    }
-
-    private String fecha(LocalDate valor) {
-        return valor == null ? "—" : valor.format(FECHA);
+        return signo + FormatoPdf.numero(valor) + "%";
     }
 }

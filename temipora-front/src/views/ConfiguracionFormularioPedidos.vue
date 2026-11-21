@@ -281,7 +281,7 @@ onBeforeUnmount(() => {
       Este es el formulario por defecto que usarán tus clientes para solicitar tus servicios.
     </p>
 
-    <p v-if="cargando" class="text-cafe/60 text-center py-10">Cargando...</p>
+    <CargandoPagina v-if="cargando" tipo="lista" mensaje="Cargando formulario…" :tarjetas="5" />
     <p v-else-if="error" class="text-rojizo text-center py-10">{{ error }}</p>
 
     <div v-else class="space-y-6">

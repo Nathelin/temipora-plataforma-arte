@@ -102,8 +102,11 @@ const noLeidos = computed(() => Number(props.pedido.noLeidos || 0))
               <span v-if="monto" class="font-semibold text-granate"> · {{ monto }}</span>
             </span>
             <span v-else class="text-[11px] text-cafe/50">Sin hitos pendientes</span>
-            <span v-if="pedido.limiteEntrega" class="text-[11px] text-cafe/45">
-              Entrega: {{ formatearFecha(pedido.limiteEntrega) }}
+            <span v-if="pedido.fechaEntregaPrevista || pedido.limiteEntrega" class="text-[11px] text-cafe/45">
+              Entrega: {{ formatearFecha(pedido.fechaEntregaPrevista || pedido.limiteEntrega) }}
+            </span>
+            <span v-if="pedido.entregaAtrasada" class="text-[11px] font-semibold text-rojizo">
+              Atrasada
             </span>
           </div>
         </div>
