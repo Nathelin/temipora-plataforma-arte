@@ -485,6 +485,32 @@ const configuracion = computed(() => {
 
 const pedidosVisibles = computed(() => pedidosActivos.value.slice(0, 4))
 
+const DIAS_AVISO_ENTREGA = 7
+
+function diasHastaEntrega(fecha) {
+  if (!fecha) return null
+  const [anio, mes, dia] = String(fecha).split('-').map(Number)
+  if (!anio || !mes || !dia) return null
+  const objetivo = new Date(anio, mes - 1, dia)
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  return Math.round((objetivo - hoy) / 86400000)
+}
+
+const entregasEnRiesgo = computed(() => pedidosActivos.value
+  .filter((pedido) => pedido.puedeEntregar)
+  .map((pedido) => ({
+    ...pedido,
+    dias: diasHastaEntrega(pedido.fechaEntregaPrevista),
+  }))
+  .filter((pedido) => pedido.dias != null
+    && pedido.dias <= DIAS_AVISO_ENTREGA)
+  .sort((a, b) => a.dias - b.dias))
+
+const entregasAtrasadas = computed(
+  () => entregasEnRiesgo.value.filter((pedido) => pedido.dias < 0).length,
+)
+
 const serviciosDestacados = computed(() =>
   [...servicios.value]
     .sort((a, b) => {
@@ -613,6 +639,69 @@ onMounted(() => {
           <p class="mt-1 text-xs text-cafe/55">{{ tarjeta.detalle }}</p>
         </router-link>
       </div>
+
+      <section
+        v-if="saludCuenta?.estado === 'AL_DIA' && entregasEnRiesgo.length"
+        class="mt-6 rounded-2xl border-2 p-5 sm:p-6"
+        :class="entregasAtrasadas > 0
+          ? 'border-rojizo/60 bg-rojizo/10'
+          : 'border-coral/60 bg-coral/10'"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-rojizo">
+              Riesgo de sanción
+            </p>
+            <h2 class="mt-1 font-display text-xl font-bold text-granate">
+              {{ entregasAtrasadas > 0
+                ? 'Tenés entregas atrasadas: tu cuenta puede suspenderse'
+                : 'Tenés entregas por vencer: evitá que se suspendan tus ventas' }}
+            </h2>
+          </div>
+          <router-link
+            :to="{ name: 'panel-pedidos' }"
+            class="inline-flex min-h-9 items-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+          >
+            Ver pedidos →
+          </router-link>
+        </div>
+        <p class="mt-2 text-sm leading-relaxed text-cafe/80">
+          Si no subís estos entregables, se suspenden tus ventas y la cuenta
+          queda limitada a entregar los pedidos abiertos: no podés vender,
+          comprar ni usar el resto del sitio hasta que un administrador te
+          reintegre.
+        </p>
+        <ul class="mt-3 space-y-2">
+          <li
+            v-for="pedido in entregasEnRiesgo.slice(0, 3)"
+            :key="pedido.idPedido"
+            class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-blanco/80 px-3 py-2"
+          >
+            <span class="text-sm text-cafe">
+              #{{ pedido.idPedido }} · {{ pedido.nombreServicio }}
+            </span>
+            <span
+              class="text-xs font-semibold"
+              :class="pedido.dias < 0 ? 'text-rojizo' : 'text-coral'"
+            >
+              {{ pedido.dias < 0
+                ? `Atrasada hace ${-pedido.dias} día(s)`
+                : pedido.dias === 0
+                  ? 'Vence hoy'
+                  : `Vence en ${pedido.dias} día(s)` }}
+            </span>
+            <router-link
+              :to="{ name: 'panel-pedido-detalle', params: { idPedido: pedido.idPedido } }"
+              class="text-xs font-semibold text-coral underline decoration-coral/40 underline-offset-2 hover:text-rojizo"
+            >
+              Entregar →
+            </router-link>
+          </li>
+        </ul>
+        <p v-if="entregasEnRiesgo.length > 3" class="mt-2 text-xs text-cafe/60">
+          y {{ entregasEnRiesgo.length - 3 }} entrega(s) más.
+        </p>
+      </section>
 
       <section
         v-if="saludCuenta && saludCuenta.estado !== 'AL_DIA' && saludEstado"

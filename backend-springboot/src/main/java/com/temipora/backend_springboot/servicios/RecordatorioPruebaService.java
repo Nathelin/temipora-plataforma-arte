@@ -75,7 +75,7 @@ public class RecordatorioPruebaService {
             usuario, PropositoToken.RECORDATORIO, null,
             VIGENCIA_ENLACE_HORAS);
         String asunto = "[Prueba] " + emailPlantillaService.asuntoRecordatorio(
-            hayPagos, hayEntregas, hayUrgente(items));
+            hayPagos, hayEntregas, false, hayAlerta(items), hayUrgente(items));
         String html = hayPagos
             ? emailPlantillaService.recordatorio(
                 nombre(usuario), items, List.of(), token)
@@ -144,6 +144,16 @@ public class RecordatorioPruebaService {
 
     private String dias(int cantidad) {
         return cantidad == 1 ? "1 día" : cantidad + " días";
+    }
+
+    private boolean hayAlerta(
+            List<EmailPlantillaService.RecordatorioEmail> items) {
+        for (EmailPlantillaService.RecordatorioEmail item : items) {
+            if (item.alerta()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean hayUrgente(

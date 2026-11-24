@@ -107,14 +107,14 @@ public class MoraClienteService {
             notificacionService.crearParaUsuario(
                 pedido.getCliente().getIdUsuario(),
                 NOTIF_PAGO_ATRASADO,
-                "Pago atrasado",
+                "Pago atrasado: tu cuenta en riesgo",
                 "El pago de la entrega final de '" + nombreServicio(pedido)
                     + "' venció el " + plazo.format(FECHA) + ". Tenés "
                     + config.getDiasGraciaPago()
                     + (config.getDiasGraciaPago() == 1 ? " día" : " días")
                     + " antes de que se suspendan tus compras y solo puedas"
                     + " mensajear al artista. Si sigue impago, la cuenta queda"
-                    + " limitada a pagos.",
+                    + " limitada a pagos: no podés comprar ni contratar.",
                 pedido.getIdPedido(),
                 TIPO_REFERENCIA);
             auditoria.registrarSistema(

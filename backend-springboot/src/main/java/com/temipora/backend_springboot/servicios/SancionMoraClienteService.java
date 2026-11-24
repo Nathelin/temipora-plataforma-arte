@@ -170,7 +170,7 @@ public class SancionMoraClienteService {
         notificacionService.crearParaUsuario(
             pedido.getCliente().getIdUsuario(),
             NOTIF_COMPRAS,
-            "Compras suspendidas",
+            "Compras suspendidas: tu cuenta está limitada",
             "No pagaste la entrega final del pedido #" + pedido.getIdPedido()
                 + ". Tus compras quedan suspendidas hasta el " + fin.format(FECHA)
                 + " y solo podés mensajear al artista al que le debés. Podés"

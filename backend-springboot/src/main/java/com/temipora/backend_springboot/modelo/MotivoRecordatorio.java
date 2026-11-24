@@ -22,6 +22,7 @@ public enum MotivoRecordatorio {
     }
 
     public boolean esAlerta() {
-        return this == ENTREGA_1D || this == PAGO_7D || this == PAGO_72H;
+        return this == ENTREGA_1D || this == ENTREGA_7D
+            || this == PAGO_7D || this == PAGO_72H;
     }
 }

@@ -71,11 +71,13 @@ public class MoraService {
             notificacionService.crearParaUsuario(
                 pedido.getArtista().getIdUsuario(),
                 NOTIF_MORA,
-                "Entrega atrasada",
+                "Entrega atrasada: tu cuenta en riesgo",
                 "El pedido de '" + nombreServicio(pedido)
                     + "' tiene una entrega pendiente desde el "
-                    + plazo.toLocalDate() + ". Si no la subís, tus ventas"
-                    + " quedan suspendidas.",
+                    + plazo.toLocalDate() + ". Si no la subís, se suspenden tus"
+                    + " ventas y la cuenta queda limitada a entregar los pedidos"
+                    + " abiertos: no podés vender, comprar ni usar el resto del"
+                    + " sitio.",
                 pedido.getIdPedido(),
                 TIPO_REFERENCIA);
             auditoria.registrarSistema(

@@ -158,8 +158,11 @@ public class RecordatorioProcesador {
         }
         repository.saveAll(filas);
 
+        boolean pagoCuentaEnRiesgo = hayPagos
+            && filas.stream().anyMatch(this::esEntregaFinal);
         String asunto = emailPlantillaService.asuntoRecordatorio(
-            hayPagos, hayEntregas, hayUrgente(items));
+            hayPagos, hayEntregas, pagoCuentaEnRiesgo,
+            hayAlerta(items), hayUrgente(items));
         try {
             String token = accesoEnlaceService.generar(
                 usuario, PropositoToken.RECORDATORIO, null,
@@ -213,13 +216,18 @@ public class RecordatorioProcesador {
             return;
         }
         boolean pago = item.esPago();
-        String nombre = pago ? "Pago por vencer" : "Entrega por vencer";
+        String nombre = pago
+            ? "Pago pendiente: tu cuenta en riesgo"
+            : "Entrega pendiente: tu cuenta en riesgo";
         String descripcion = pago
             ? "El pago de '" + item.detalle() + "' del pedido #"
                 + item.idPedido() + " vence el " + item.vence()
-                + ". Regularizalo para que el pedido siga avanzando."
+                + ". Si no lo regularizás, se suspenden tus compras y solo"
+                + " podés mensajear al artista al que le debés."
             : "Tenés que entregar '" + item.detalle() + "' del pedido #"
-                + item.idPedido() + " antes del " + item.vence() + ".";
+                + item.idPedido() + " antes del " + item.vence()
+                + ". Si no lo hacés, se suspenden tus ventas y la cuenta queda"
+                + " limitada a entregar los pedidos abiertos.";
         notificacionService.crearOActualizarParaUsuario(
             fila.getUsuario().getIdUsuario(),
             pago ? NOTIF_PAGO : NOTIF_ENTREGA,
@@ -227,6 +235,16 @@ public class RecordatorioProcesador {
             descripcion,
             item.idPedido(),
             TIPO_REFERENCIA);
+    }
+
+    private boolean hayAlerta(
+            List<EmailPlantillaService.RecordatorioEmail> items) {
+        for (EmailPlantillaService.RecordatorioEmail item : items) {
+            if (item.alerta()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean hayUrgente(
@@ -285,7 +303,8 @@ public class RecordatorioProcesador {
                 moneda,
                 fila.getMotivo().esUrgente(),
                 fila.getMotivo().esAlerta(),
-                consecuenciaPago(fila.getMotivo(), graciaPago, diasCompras));
+                consecuenciaPago(fila.getMotivo(), graciaPago, diasCompras,
+                    esEntregaFinal(fila)));
         }
 
         String cliente = pedido.getCliente() != null
@@ -318,11 +337,16 @@ public class RecordatorioProcesador {
     }
 
     private String consecuenciaPago(
-            MotivoRecordatorio motivo, int graciaPago, int diasCompras) {
+            MotivoRecordatorio motivo, int graciaPago, int diasCompras,
+            boolean entregaFinal) {
         if (motivo != MotivoRecordatorio.PAGO_7D
                 && motivo != MotivoRecordatorio.PAGO_72H
                 && motivo != MotivoRecordatorio.PAGO_24H) {
             return null;
+        }
+        if (!entregaFinal) {
+            return "Si no pagás antes de la fecha, el pedido se cierra y el"
+                + " artista conserva lo cobrado.";
         }
         int total = graciaPago + diasCompras;
         return "Si no pagás, en " + dias(graciaPago)
@@ -331,10 +355,24 @@ public class RecordatorioProcesador {
             + " del vencimiento la cuenta queda limitada a pagos.";
     }
 
+    private boolean esEntregaFinal(EmailRecordatorioPendiente fila) {
+        return fila.getHitoPedido() != null
+            && fila.getHitoPedido().getHitoPresupuesto() != null
+            && fila.getHitoPedido().getHitoPresupuesto().getTipo()
+                == TipoHito.ENTREGA;
+    }
+
     private String consecuenciaEntrega(MotivoRecordatorio motivo) {
+        if (motivo == MotivoRecordatorio.ENTREGA_7D) {
+            return "Si no entregás, se suspenden tus ventas y la cuenta queda"
+                + " limitada a entregar los pedidos abiertos: no podés vender,"
+                + " comprar ni usar el resto del sitio hasta que un administrador"
+                + " te reintegre.";
+        }
         if (motivo == MotivoRecordatorio.ENTREGA_1D) {
             return "Mañana vence el plazo. Si no entregás, se suspenden tus"
-                + " ventas.";
+                + " ventas y la cuenta queda limitada a entregar los pedidos"
+                + " abiertos: no podés vender, comprar ni usar el resto del sitio.";
         }
         if (motivo == MotivoRecordatorio.ENTREGA_HOY) {
             return "Vence hoy. Si no entregás, se suspenden tus ventas. Si la"

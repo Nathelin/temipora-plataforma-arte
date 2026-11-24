@@ -624,10 +624,12 @@ function irAPerfil() {
           <template v-if="cuentaSuspendida">
             Tenés un pago pendiente de una entrega final. Tus compras están
             suspendidas y solo podés mensajear al artista al que le debés.
+            Regularizá el pago para recuperar el resto de la plataforma.
           </template>
           <template v-else>
-            Tenés un pago vencido de una entrega final. Regularizalo para evitar
-            que se suspendan tus compras.
+            Tenés un pago vencido de una entrega final. Regularizalo para no
+            perder la posibilidad de comprar, contratar y mensajear con otros
+            usuarios.
           </template>
         </p>
         <router-link

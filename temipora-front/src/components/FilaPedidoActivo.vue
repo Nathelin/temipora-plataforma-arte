@@ -103,8 +103,12 @@ const noLeidos = computed(() => Number(props.pedido.noLeidos || 0))
             <span v-if="pedido.fechaEntregaPrevista || pedido.limiteEntrega" class="text-[11px] text-cafe/45">
               Entrega: {{ formatearFecha(pedido.fechaEntregaPrevista || pedido.limiteEntrega) }}
             </span>
-            <span v-if="pedido.entregaAtrasada" class="text-[11px] font-semibold text-rojizo">
-              Atrasada
+            <span
+              v-if="pedido.entregaAtrasada"
+              class="rounded-full bg-rojizo/10 px-2 py-0.5 text-[11px] font-semibold text-rojizo"
+              title="Si no entregás, se suspenden tus ventas y la cuenta queda limitada a entregar."
+            >
+              Entrega atrasada
             </span>
           </div>
         </div>

@@ -103,7 +103,7 @@ public class SancionAutomaticaService {
         notificacionService.crearParaUsuario(
             pedido.getArtista().getIdUsuario(),
             NOTIF_VENTAS,
-            "Ventas suspendidas",
+            "Ventas suspendidas: tu cuenta está limitada",
             "No entregaste a tiempo un encargo. Tus ventas quedan suspendidas "
                 + "hasta el " + fin.format(FECHA)
                 + ". Podés terminar los pedidos que tenés abiertos.",
@@ -126,7 +126,7 @@ public class SancionAutomaticaService {
         notificacionService.crearParaUsuario(
             escalada.getUsuario().getIdUsuario(),
             NOTIF_ENTREGAS,
-            "Cuenta restringida",
+            "Cuenta limitada a entregas",
             "Tu cuenta quedó limitada a entregar los pedidos pendientes. "
                 + "Podés apelar desde la pantalla de cuenta restringida.",
             pedido.getIdPedido(),

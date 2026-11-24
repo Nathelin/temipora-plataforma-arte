@@ -136,18 +136,35 @@ public class EmailPlantillaService {
     }
 
     public String asuntoRecordatorio(
-            boolean hayPagos, boolean hayEntregas, boolean urgente) {
+            boolean hayPagos, boolean hayEntregas, boolean pagoCuentaEnRiesgo,
+            boolean alerta, boolean urgente) {
+        boolean riesgo = alerta || urgente;
         if (hayPagos && hayEntregas) {
-            return "Tenés pagos y entregas pendientes en Temipora";
+            if (urgente) {
+                return "URGENTE: pagos y entregas pendientes — tu cuenta en riesgo";
+            }
+            return riesgo
+                ? "Tu cuenta en riesgo: pagos y entregas pendientes en Temipora"
+                : "Tenés pagos y entregas pendientes en Temipora";
         }
         if (hayPagos) {
-            return "Tenés pagos pendientes en Temipora";
-        }
-        if (hayEntregas && urgente) {
-            return "URGENTE: tenés una entrega por vencer en Temipora";
+            if (pagoCuentaEnRiesgo && riesgo) {
+                return urgente
+                    ? "URGENTE: pagá hoy o tu cuenta queda limitada"
+                    : "Tu cuenta puede limitarse: pago de entrega final pendiente";
+            }
+            if (urgente) {
+                return "URGENTE: pagá hoy o se cierra tu pedido";
+            }
+            return "Pago pendiente: evitá que se cierre tu pedido";
         }
         if (hayEntregas) {
-            return "Tenés entregas por vencer en Temipora";
+            if (urgente) {
+                return "URGENTE: entregá hoy o se suspenden tus ventas";
+            }
+            return riesgo
+                ? "Tu cuenta puede suspenderse: entrega pendiente en Temipora"
+                : "Entrega pendiente: evitá que se suspendan tus ventas";
         }
         return "Tenés pendientes en Temipora";
     }
@@ -163,6 +180,7 @@ public class EmailPlantillaService {
         contexto.setVariable("pagos", vistaRecordatorios(pagos, tokenAcceso));
         contexto.setVariable("entregas", vistaRecordatorios(entregas, tokenAcceso));
         contexto.setVariable("urgente", hayUrgente(pagos, entregas));
+        contexto.setVariable("alerta", hayAlerta(pagos, entregas));
         contexto.setVariable("urlPanel",
             baseFront() + "/panel/pedidos" + enlaceAcceso(tokenAcceso));
         return templateEngine.process(PLANTILLA_RECORDATORIO, contexto);
@@ -229,6 +247,21 @@ public class EmailPlantillaService {
             path = "/panel/pedidos/" + item.idPedido();
         }
         return baseFront() + path + enlaceAcceso(tokenAcceso);
+    }
+
+    private boolean hayAlerta(
+            List<RecordatorioEmail> pagos,
+            List<RecordatorioEmail> entregas) {
+        for (List<RecordatorioEmail> lista : List.of(
+                pagos != null ? pagos : List.<RecordatorioEmail>of(),
+                entregas != null ? entregas : List.<RecordatorioEmail>of())) {
+            for (RecordatorioEmail item : lista) {
+                if (item.alerta()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private boolean hayUrgente(
