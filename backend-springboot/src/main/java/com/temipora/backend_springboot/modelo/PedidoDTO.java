@@ -33,7 +33,13 @@ public class PedidoDTO {
     private LocalDate limiteEntrega;
     private LocalDate fechaEntregaPrevista;
     private int diasDemoraCliente;
+    private int diasProrroga;
     private boolean entregaAtrasada;
+    private List<ProrrogaDTO> prorrogas;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private ProrrogaDTO prorrogaPendiente;
+    private boolean puedeSolicitarProrroga;
+    private boolean puedeResponderProrroga;
     private LocalDateTime finalizadoEn;
     private LocalDateTime impagoDesde;
     private boolean pagoVencido;

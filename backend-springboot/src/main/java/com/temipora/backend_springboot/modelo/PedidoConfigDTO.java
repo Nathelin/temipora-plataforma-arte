@@ -29,6 +29,7 @@ public class PedidoConfigDTO {
     private Integer diasCierreTrasBloqueo;
     private Integer diasGraciaPago;
     private Integer diasSancionCompras;
+    private Integer horasRespuestaProrroga;
     private LocalDateTime sancionesAutomaticasDesde;
     private LocalDateTime fechaActualizacion;
 
@@ -47,6 +48,7 @@ public class PedidoConfigDTO {
             .diasCierreTrasBloqueo(config.getDiasCierreTrasBloqueo())
             .diasGraciaPago(config.getDiasGraciaPago())
             .diasSancionCompras(config.getDiasSancionCompras())
+            .horasRespuestaProrroga(config.getHorasRespuestaProrroga())
             .sancionesAutomaticasDesde(config.getSancionesAutomaticasDesde())
             .fechaActualizacion(config.getFechaActualizacion())
             .build();

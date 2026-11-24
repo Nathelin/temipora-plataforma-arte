@@ -163,12 +163,79 @@ export function formatearFecha(valor) {
 }
 
 export function textoAjusteEntrega(pedido) {
-  const dias = Number(pedido?.diasDemoraCliente || 0)
-  if (!pedido?.fechaEntregaPrevista || !pedido?.limiteEntrega || dias <= 0) {
+  if (!pedido?.fechaEntregaPrevista || !pedido?.limiteEntrega) {
     return ''
   }
-  const etiqueta = dias === 1 ? 'día' : 'días'
-  return `Prometida ${formatearFecha(pedido.limiteEntrega)} · +${dias} ${etiqueta} por demora en el pago del cliente`
+  const partes = []
+  const prorroga = Number(pedido?.diasProrroga || 0)
+  const demora = Number(pedido?.diasDemoraCliente || 0)
+  if (prorroga > 0) {
+    partes.push(`+${prorroga} ${prorroga === 1 ? 'día' : 'días'} por prórroga aceptada`)
+  }
+  if (demora > 0) {
+    partes.push(`+${demora} ${demora === 1 ? 'día' : 'días'} por demora en el pago del cliente`)
+  }
+  if (!partes.length) {
+    return ''
+  }
+  return `Prometida ${formatearFecha(pedido.limiteEntrega)} · ${partes.join(' · ')}`
+}
+
+export const ESTADOS_PRORROGA = {
+  PENDIENTE: {
+    etiqueta: 'Esperando respuesta',
+    clase: 'border-durazno bg-durazno/30 text-cafe',
+  },
+  ACEPTADA: {
+    etiqueta: 'Aceptada',
+    clase: 'border-green-700/30 bg-green-700/10 text-green-700',
+  },
+  RECHAZADA: {
+    etiqueta: 'Rechazada',
+    clase: 'border-rojizo/30 bg-rojizo/10 text-rojizo',
+  },
+  VENCIDA: {
+    etiqueta: 'Vencida sin respuesta',
+    clase: 'border-cafe/25 bg-cafe/5 text-cafe/60',
+  },
+}
+
+export function estadoProrrogaDe(prorroga) {
+  const vencida = prorroga?.estado === 'PENDIENTE'
+    && prorroga?.fechaLimiteRespuesta
+    && new Date(prorroga.fechaLimiteRespuesta).getTime() <= Date.now()
+  if (vencida) {
+    return ESTADOS_PRORROGA.VENCIDA
+  }
+  return ESTADOS_PRORROGA[prorroga?.estado] || {
+    etiqueta: prorroga?.estado || 'Sin estado',
+    clase: 'border-rosa bg-blanco text-cafe/60',
+  }
+}
+
+export function sumarDiasFecha(valor, dias) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(valor || ''))
+  if (!match) return null
+  const fecha = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+  )
+  fecha.setDate(fecha.getDate() + Number(dias || 0))
+  return fecha
+}
+
+export function textoRestante(fechaLimite, ahora = Date.now()) {
+  if (!fechaLimite) return ''
+  const restante = new Date(fechaLimite).getTime() - ahora
+  if (restante <= 0) return 'vencida'
+  const totalMinutos = Math.floor(restante / 60000)
+  const horas = Math.floor(totalMinutos / 60)
+  const minutos = totalMinutos % 60
+  if (horas >= 1) {
+    return minutos > 0 ? `${horas} h ${minutos} min` : `${horas} h`
+  }
+  return `${Math.max(1, minutos)} min`
 }
 
 export function formatearFechaHora(valor) {

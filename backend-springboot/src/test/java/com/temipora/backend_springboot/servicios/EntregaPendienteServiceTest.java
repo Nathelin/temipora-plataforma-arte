@@ -10,9 +10,11 @@ import org.junit.jupiter.api.Test;
 import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
+import com.temipora.backend_springboot.modelo.EstadoProrroga;
 import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.HitoPresupuesto;
 import com.temipora.backend_springboot.modelo.Pedido;
+import com.temipora.backend_springboot.modelo.ProrrogaPedido;
 import com.temipora.backend_springboot.modelo.TipoHito;
 
 class EntregaPendienteServiceTest {
@@ -112,6 +114,61 @@ class EntregaPendienteServiceTest {
 
         assertThat(service.plazoVigente(pedido))
             .isEqualTo(LIMITE.minusDays(3).atTime(9, 0));
+    }
+
+    @Test
+    void prorrogaPendiente_pausaLaMoraHastaLaRespuesta() {
+        Pedido pedido = pedido();
+        pedido.agregarHito(hito(1L, 1, TipoHito.CUOTA,
+            EstadoPagoHito.PAGADO, EstadoEntregaHito.NO_INICIADO));
+        LocalDateTime limiteRespuesta = LocalDateTime.now().plusHours(12);
+        prorroga(pedido, EstadoProrroga.PENDIENTE, 5, limiteRespuesta);
+
+        assertThat(service.plazoVigente(pedido)).isEqualTo(limiteRespuesta);
+        assertThat(service.estaEnMora(pedido, despuesDelLimite())).isFalse();
+        assertThat(service.plazoVigente(pedido, pedido.getHitos().get(0)))
+            .isEqualTo(limiteRespuesta);
+    }
+
+    @Test
+    void prorrogaVencida_noPausaLaMora() {
+        Pedido pedido = pedido();
+        pedido.agregarHito(hito(1L, 1, TipoHito.CUOTA,
+            EstadoPagoHito.PAGADO, EstadoEntregaHito.NO_INICIADO));
+        prorroga(pedido, EstadoProrroga.VENCIDA, 5,
+            LocalDateTime.now().plusHours(12));
+
+        assertThat(service.plazoVigente(pedido))
+            .isEqualTo(LIMITE.atTime(23, 59, 59));
+        assertThat(service.estaEnMora(pedido, despuesDelLimite())).isTrue();
+    }
+
+    @Test
+    void prorrogaAceptada_correElPlazoVigente() {
+        Pedido pedido = pedido();
+        pedido.agregarHito(hito(1L, 1, TipoHito.CUOTA,
+            EstadoPagoHito.PAGADO, EstadoEntregaHito.NO_INICIADO));
+        prorroga(pedido, EstadoProrroga.ACEPTADA, 5,
+            LocalDateTime.now().plusHours(12));
+
+        assertThat(service.plazoVigente(pedido))
+            .isEqualTo(LIMITE.plusDays(5).atTime(23, 59, 59));
+        assertThat(service.estaEnMora(
+            pedido, LIMITE.plusDays(4).atTime(12, 0))).isFalse();
+    }
+
+    private ProrrogaPedido prorroga(
+            Pedido pedido,
+            EstadoProrroga estado,
+            int dias,
+            LocalDateTime limiteRespuesta) {
+        ProrrogaPedido prorroga = new ProrrogaPedido();
+        prorroga.setEstado(estado);
+        prorroga.setDiasSolicitados(dias);
+        prorroga.setMotivo("Motivo de prueba");
+        prorroga.setFechaLimiteRespuesta(limiteRespuesta);
+        pedido.agregarProrroga(prorroga);
+        return prorroga;
     }
 
     private Pedido pedido() {

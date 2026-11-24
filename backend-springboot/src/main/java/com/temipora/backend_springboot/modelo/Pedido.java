@@ -23,6 +23,7 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 
 @Entity
 @Table(name = "pedido")
@@ -113,8 +114,22 @@ public class Pedido {
     @OrderBy("orden ASC")
     private List<HitoPedido> hitos = new ArrayList<>();
 
+    /**
+     * Propuestas de prórroga del plazo. Se cargan en lote para que proyectar
+     * las fechas de una lista de pedidos no dispare una consulta por fila.
+     */
+    @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("fechaSolicitud DESC")
+    @BatchSize(size = 50)
+    private List<ProrrogaPedido> prorrogas = new ArrayList<>();
+
     public void agregarHito(HitoPedido hito) {
         hito.setPedido(this);
         this.hitos.add(hito);
+    }
+
+    public void agregarProrroga(ProrrogaPedido prorroga) {
+        prorroga.setPedido(this);
+        this.prorrogas.add(prorroga);
     }
 }

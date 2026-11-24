@@ -7,8 +7,10 @@ import org.springframework.stereotype.Service;
 
 import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
+import com.temipora.backend_springboot.modelo.EstadoProrroga;
 import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.Pedido;
+import com.temipora.backend_springboot.modelo.ProrrogaPedido;
 import com.temipora.backend_springboot.modelo.TipoHito;
 
 /**
@@ -95,12 +97,13 @@ public class EntregaPendienteService {
         }
         if (hito.getEstadoEntrega() == EstadoEntregaHito.CON_REVISION
                 && hito.getFechaLimiteReentrega() != null) {
-            return hito.getFechaLimiteReentrega();
+            return pausarPorProrroga(
+                pedido, hito.getFechaLimiteReentrega());
         }
         if (!esExigibleAlArtista(pedido, hito)) {
             return null;
         }
-        return plazoPrevisto(pedido);
+        return pausarPorProrroga(pedido, plazoPrevisto(pedido));
     }
 
     /**
@@ -120,7 +123,33 @@ public class EntregaPendienteService {
                 masAntiguo = plazo;
             }
         }
-        return masAntiguo;
+        return pausarPorProrroga(pedido, masAntiguo);
+    }
+
+    /**
+     * Mientras el cliente tiene una propuesta de prórroga sin responder, el
+     * reloj de la mora queda pausado hasta el vencimiento de la propuesta. La
+     * prórroga aceptada sí corre la fecha; la rechazada o vencida no.
+     */
+    private LocalDateTime pausarPorProrroga(
+            Pedido pedido, LocalDateTime plazo) {
+        if (plazo == null || pedido == null
+                || pedido.getProrrogas() == null) {
+            return plazo;
+        }
+        LocalDateTime ahora = LocalDateTime.now();
+        for (ProrrogaPedido prorroga : pedido.getProrrogas()) {
+            if (prorroga == null
+                    || prorroga.getEstado() != EstadoProrroga.PENDIENTE
+                    || prorroga.getFechaLimiteRespuesta() == null
+                    || !prorroga.getFechaLimiteRespuesta().isAfter(ahora)) {
+                continue;
+            }
+            return prorroga.getFechaLimiteRespuesta().isAfter(plazo)
+                ? prorroga.getFechaLimiteRespuesta()
+                : plazo;
+        }
+        return plazo;
     }
 
     public boolean estaEnMora(Pedido pedido, LocalDateTime ahora) {

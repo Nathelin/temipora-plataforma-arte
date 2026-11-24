@@ -7,8 +7,10 @@ import java.util.Objects;
 
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
+import com.temipora.backend_springboot.modelo.EstadoProrroga;
 import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.Pedido;
+import com.temipora.backend_springboot.modelo.ProrrogaPedido;
 import com.temipora.backend_springboot.modelo.TipoHito;
 
 /**
@@ -17,7 +19,8 @@ import com.temipora.backend_springboot.modelo.TipoHito;
  * <p>El artista promete una duración; la plataforma proyecta una fecha. La
  * entrega prometida ({@code pedido.limiteEntrega}) se congela al confirmar y la
  * entrega prevista cuenta además los días en que el cliente demoró el pago de
- * una cuota que bloqueaba al artista.</p>
+ * una cuota que bloqueaba al artista y los días de prórrogas que el cliente
+ * aceptó.</p>
  */
 public final class PedidoFechas {
 
@@ -60,6 +63,26 @@ public final class PedidoFechas {
     }
 
     /**
+     * Días que el cliente aceptó correr el plazo. Solo cuentan las prórrogas
+     * aceptadas: una propuesta pendiente, rechazada o vencida no mueve la fecha.
+     */
+    public static int diasProrroga(Pedido pedido) {
+        if (pedido == null || pedido.getProrrogas() == null) {
+            return 0;
+        }
+        int total = 0;
+        for (ProrrogaPedido prorroga : pedido.getProrrogas()) {
+            if (prorroga == null
+                    || prorroga.getEstado() != EstadoProrroga.ACEPTADA
+                    || prorroga.getDiasSolicitados() == null) {
+                continue;
+            }
+            total += prorroga.getDiasSolicitados();
+        }
+        return total;
+    }
+
+    /**
      * Fecha de entrega vigente. Devuelve {@code null} si el pedido todavía no
      * arrancó (no tiene entrega prometida).
      */
@@ -67,7 +90,9 @@ public final class PedidoFechas {
         if (pedido == null || pedido.getLimiteEntrega() == null) {
             return null;
         }
-        return pedido.getLimiteEntrega().plusDays(diasDemoraCliente(pedido));
+        return pedido.getLimiteEntrega()
+            .plusDays(diasDemoraCliente(pedido))
+            .plusDays(diasProrroga(pedido));
     }
 
     public static boolean entregaAtrasada(Pedido pedido, LocalDate hoy) {

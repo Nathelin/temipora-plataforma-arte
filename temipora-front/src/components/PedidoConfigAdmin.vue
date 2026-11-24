@@ -20,6 +20,7 @@ const diasReapelacion = ref('7')
 const diasCierreTrasBloqueo = ref('30')
 const diasGraciaPago = ref('3')
 const diasSancionCompras = ref('27')
+const horasRespuestaProrroga = ref('24')
 const procesandoMails = ref(false)
 const enviandoPrueba = ref(false)
 const mensajeMails = ref('')
@@ -48,6 +49,7 @@ async function cargar() {
     diasCierreTrasBloqueo.value = res.data?.diasCierreTrasBloqueo ?? 30
     diasGraciaPago.value = res.data?.diasGraciaPago ?? 3
     diasSancionCompras.value = res.data?.diasSancionCompras ?? 27
+    horasRespuestaProrroga.value = res.data?.horasRespuestaProrroga ?? 24
     maxHitos.value = res.data?.maxHitos ?? 4
     porcentajeMaxPrimerHito.value = res.data?.porcentajeMaxPrimerHito ?? 50
     montoMinimoCuota.value = res.data?.montoMinimoCuota ?? 1
@@ -105,6 +107,12 @@ async function guardar() {
     entero(diasGraciaPago.value, 1, 30, 'La gracia de pago'),
     entero(diasSancionCompras.value, 1, 90, 'La sanción de compras'),
     entero(maxHitos.value, 1, 6, 'El máximo de hitos'),
+    entero(
+      horasRespuestaProrroga.value,
+      1,
+      168,
+      'La respuesta a una prórroga',
+    ),
     decimal(porcentajeMaxPrimerHito.value, 1, 100, 'El porcentaje máximo del primer hito'),
     decimal(montoMinimoCuota.value, 0, 10000000, 'El monto mínimo por cuota'),
   ].filter(Boolean)
@@ -128,6 +136,7 @@ async function guardar() {
       diasGraciaPago: Number(diasGraciaPago.value),
       diasSancionCompras: Number(diasSancionCompras.value),
       maxHitos: Number(maxHitos.value),
+      horasRespuestaProrroga: Number(horasRespuestaProrroga.value),
       porcentajeMaxPrimerHito: Number(String(porcentajeMaxPrimerHito.value).replace(',', '.')),
       montoMinimoCuota: Number(String(montoMinimoCuota.value).replace(',', '.')),
     })
@@ -346,6 +355,24 @@ async function reenviarRecordatorios() {
               <p class="mt-2 text-xs leading-relaxed text-cafe/50">
                 Tiempo del artista para subir la nueva versión después de una revisión.
                 Si no reentrega, el pedido queda marcado como atrasado.
+              </p>
+            </div>
+            <div>
+              <label for="horas-prorroga" class="mb-2 block text-sm text-cafe">
+                Respuesta a una prórroga (horas) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="horas-prorroga"
+                v-model="horasRespuestaProrroga"
+                type="number"
+                min="1"
+                max="168"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Tiempo del cliente para aceptar una prórroga del plazo. Si no responde,
+                se mantienen los plazos originales.
               </p>
             </div>
           </div>

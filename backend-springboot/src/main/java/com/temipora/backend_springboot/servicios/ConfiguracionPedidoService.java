@@ -29,7 +29,8 @@ public class ConfiguracionPedidoService {
         CampoAuditado.de("diasReapelacion", "Días entre apelaciones"),
         CampoAuditado.de("diasCierreTrasBloqueo", "Días para cerrar tras el bloqueo"),
         CampoAuditado.de("diasGraciaPago", "Días de gracia de pago del cliente"),
-        CampoAuditado.de("diasSancionCompras", "Duración de la sanción de compras"));
+        CampoAuditado.de("diasSancionCompras", "Duración de la sanción de compras"),
+        CampoAuditado.de("horasRespuestaProrroga", "Horas para responder una prórroga"));
 
     private final ConfiguracionPedidoRepository configuracionRepository;
     private final AuditoriaService auditoria;
@@ -72,6 +73,8 @@ public class ConfiguracionPedidoService {
                     ConfiguracionPedido.DIAS_GRACIA_PAGO_POR_DEFECTO);
                 nueva.setDiasSancionCompras(
                     ConfiguracionPedido.DIAS_SANCION_COMPRAS_POR_DEFECTO);
+                nueva.setHorasRespuestaProrroga(
+                    ConfiguracionPedido.HORAS_RESPUESTA_PRORROGA_POR_DEFECTO);
                 return configuracionRepository.save(nueva);
             });
         if (config.getSancionesAutomaticasDesde() == null) {
@@ -119,6 +122,10 @@ public class ConfiguracionPedidoService {
             validarRango(request.getDiasSancionCompras(), 1, 90,
                 "La sanción de compras debe estar entre 1 y 90 días.");
         }
+        if (request.getHorasRespuestaProrroga() != null) {
+            validarRango(request.getHorasRespuestaProrroga(), 1, 168,
+                "La respuesta a una prórroga debe estar entre 1 y 168 horas.");
+        }
 
         BigDecimal porcentajeMaximo = decimal(
             request.getPorcentajeMaxPrimerHito(),
@@ -158,6 +165,10 @@ public class ConfiguracionPedidoService {
         config.setDiasSancionCompras(request.getDiasSancionCompras() != null
             ? request.getDiasSancionCompras()
             : config.getDiasSancionCompras());
+        config.setHorasRespuestaProrroga(
+            request.getHorasRespuestaProrroga() != null
+                ? request.getHorasRespuestaProrroga()
+                : config.getHorasRespuestaProrroga());
         config.setFechaActualizacion(LocalDateTime.now());
         ConfiguracionPedido guardada = configuracionRepository.save(config);
         auditoria.registrar(

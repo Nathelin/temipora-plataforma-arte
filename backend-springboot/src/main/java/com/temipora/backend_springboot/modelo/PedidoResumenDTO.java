@@ -26,7 +26,10 @@ public class PedidoResumenDTO {
     private LocalDate limiteEntrega;
     private LocalDate fechaEntregaPrevista;
     private int diasDemoraCliente;
+    private int diasProrroga;
     private boolean entregaAtrasada;
+    private boolean prorrogaPendiente;
+    private boolean puedeResponderProrroga;
     private Integer diasGraciaRestantes;
     private LocalDateTime impagoDesde;
     private boolean pagoVencido;

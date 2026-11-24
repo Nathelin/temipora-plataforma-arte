@@ -125,6 +125,10 @@ public final class AccionesAdmin {
     public static final String PEDIDO_GALERIA_OCULTAR = "PEDIDO_GALERIA_OCULTAR";
     public static final String PEDIDO_GALERIA_MOSTRAR = "PEDIDO_GALERIA_MOSTRAR";
     public static final String PEDIDO_PROCESAR = "PEDIDO_PROCESAR";
+    public static final String PRORROGA_SOLICITAR = "PRORROGA_SOLICITAR";
+    public static final String PRORROGA_ACEPTAR = "PRORROGA_ACEPTAR";
+    public static final String PRORROGA_RECHAZAR = "PRORROGA_RECHAZAR";
+    public static final String PRORROGA_VENCER = "PRORROGA_VENCER";
     public static final String HITO_APROBAR = "HITO_APROBAR";
     public static final String HITO_REVISION = "HITO_REVISION";
     public static final String HITO_APROBAR_AUTOMATICO = "HITO_APROBAR_AUTOMATICO";

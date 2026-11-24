@@ -11,6 +11,8 @@ import HiloConversacion from '../components/HiloConversacion.vue'
 import IconoDescarga from '../components/IconoDescarga.vue'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import RedirigiendoMercadoPago from '../components/RedirigiendoMercadoPago.vue'
+import ResponderProrrogaModal from '../components/ResponderProrrogaModal.vue'
+import SolicitarProrrogaModal from '../components/SolicitarProrrogaModal.vue'
 import SubirEntregable from '../components/SubirEntregable.vue'
 import FormularioResenia from '../components/FormularioResenia.vue'
 import TarjetaResenia from '../components/TarjetaResenia.vue'
@@ -32,6 +34,7 @@ import {
   estadoEntregaDe,
   estadoPagoDe,
   estadoPedidoDe,
+  estadoProrrogaDe,
   etiquetaTipoHito,
   formatearFecha,
   formatearFechaHora,
@@ -145,6 +148,23 @@ const puedeVerResenias = computed(() => (
 ))
 const estadoInfo = computed(() => estadoPedidoDe(pedido.value?.estado))
 const hitos = computed(() => pedido.value?.hitos || [])
+const prorrogas = computed(() => pedido.value?.prorrogas || [])
+const prorrogaPendiente = computed(() => pedido.value?.prorrogaPendiente || null)
+const puedeSolicitarProrroga = computed(
+  () => Boolean(pedido.value?.puedeSolicitarProrroga),
+)
+const prorrogaBloqueante = computed(() => Boolean(
+  pedido.value?.puedeResponderProrroga && prorrogaPendiente.value,
+))
+const prorrogaUsada = computed(() => prorrogas.value.length > 0)
+const motivoProrrogaAceptada = computed(
+  () => prorrogas.value.find(
+    (prorroga) => prorroga.estado === 'ACEPTADA',
+  )?.motivo || '',
+)
+const solicitarProrrogaAbierto = ref(false)
+const procesandoProrroga = ref(false)
+const errorProrroga = ref('')
 const modalCalculoAbierto = ref(false)
 const moneda = computed(
   () => pedido.value?.monedaMostrada || pedido.value?.moneda || 'ARS',
@@ -732,6 +752,78 @@ function cerrarPorIncumplimiento() {
   ))
 }
 
+async function ejecutarProrroga(accion, mensaje) {
+  if (procesandoProrroga.value) return false
+  procesandoProrroga.value = true
+  errorProrroga.value = ''
+  try {
+    const res = await accion()
+    if (res?.data) await actualizarPedido(res.data)
+    exito(mensaje)
+    return true
+  } catch (e) {
+    if (e.response?.status === 401) {
+      router.push({ name: 'login' })
+      return false
+    }
+    errorProrroga.value = e.response?.data?.message
+      || 'No se pudo completar la acción.'
+    return false
+  } finally {
+    procesandoProrroga.value = false
+  }
+}
+
+function abrirSolicitudProrroga() {
+  errorProrroga.value = ''
+  solicitarProrrogaAbierto.value = true
+}
+
+function cerrarSolicitudProrroga() {
+  if (procesandoProrroga.value) return
+  solicitarProrrogaAbierto.value = false
+  errorProrroga.value = ''
+}
+
+async function enviarProrroga(payload) {
+  const ok = await ejecutarProrroga(
+    () => api.post(`/pedidos/${idPedido.value}/prorrogas`, payload),
+    'Le enviaste la propuesta de prórroga al cliente.',
+  )
+  if (ok) solicitarProrrogaAbierto.value = false
+}
+
+function aceptarProrroga() {
+  const prorroga = prorrogaPendiente.value
+  if (!prorroga) return
+  return ejecutarProrroga(
+    () => api.post(
+      `/pedidos/${idPedido.value}/prorrogas/${prorroga.idProrroga}/aceptar`,
+    ),
+    'Aceptaste la nueva fecha de entrega.',
+  )
+}
+
+function rechazarProrroga(motivo) {
+  const prorroga = prorrogaPendiente.value
+  if (!prorroga) return
+  return ejecutarProrroga(
+    () => api.post(
+      `/pedidos/${idPedido.value}/prorrogas/${prorroga.idProrroga}/rechazar`,
+      { motivo: motivo || null },
+    ),
+    'Mantuviste la fecha de entrega original.',
+  )
+}
+
+async function alVencerProrroga() {
+  try {
+    await refrescarPedido()
+  } catch {
+    // El job del backend termina de cerrar la propuesta.
+  }
+}
+
 function alEntregar(data) {
   if (data) pedido.value = data
   exito('Entregable subido. El cliente fue notificado.')
@@ -1011,12 +1103,34 @@ onMounted(async () => {
               v-else-if="pedido.fechaEntregaPrevista || pedido.limiteEntrega"
               class="mt-1 text-[11px] leading-relaxed text-cafe/50"
             >
-              Se corre solo si el cliente paga tarde una cuota; el atraso del artista no la mueve.
+              Se corre si el cliente paga tarde una cuota o acepta una prórroga; el
+              atraso del artista no la mueve.
+            </dd>
+            <dd
+              v-if="motivoProrrogaAceptada"
+              class="mt-1 text-[11px] leading-relaxed text-cafe/55"
+            >
+              Motivo de la prórroga: {{ motivoProrrogaAceptada }}
             </dd>
             <dd v-if="pedido.entregaAtrasada" class="mt-1">
               <span class="inline-flex rounded-full bg-rojizo/10 px-2 py-0.5 text-[11px] font-semibold text-rojizo">
                 Entrega atrasada
               </span>
+            </dd>
+            <dd v-if="esArtista && puedeSolicitarProrroga" class="mt-2">
+              <button
+                type="button"
+                class="inline-flex min-h-9 items-center justify-center rounded-full border border-coral/40 bg-blanco px-4 text-xs font-semibold text-coral transition hover:bg-coral/10"
+                @click="abrirSolicitudProrroga"
+              >
+                Solicitar más plazo
+              </button>
+            </dd>
+            <dd
+              v-else-if="esArtista && prorrogaUsada"
+              class="mt-1 text-[11px] leading-relaxed text-cafe/50"
+            >
+              Ya usaste la prórroga de este pedido.
             </dd>
           </div>
           <div v-if="pedido.finalizadoEn" class="rounded-xl bg-rosa/10 px-3 py-2">
@@ -1119,6 +1233,55 @@ onMounted(async () => {
             y las cuotas.
           </p>
         </div>
+          </section>
+
+          <section v-if="prorrogas.length" class="rounded-2xl border border-rosa/50 bg-blanco p-5 sm:p-6">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 class="text-lg font-semibold text-granate">Prórrogas del plazo</h2>
+              <p class="text-xs text-cafe/50">Una sola prórroga por pedido</p>
+            </div>
+            <ul class="mt-3 space-y-3">
+              <li
+                v-for="prorroga in prorrogas"
+                :key="prorroga.idProrroga"
+                class="rounded-xl border border-rosa/40 bg-rosa/5 p-4"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <p class="text-sm font-semibold text-granate">
+                    +{{ prorroga.diasSolicitados }}
+                    {{ prorroga.diasSolicitados === 1 ? 'día' : 'días' }}
+                  </p>
+                  <span
+                    class="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
+                    :class="estadoProrrogaDe(prorroga).clase"
+                  >
+                    {{ estadoProrrogaDe(prorroga).etiqueta }}
+                  </span>
+                </div>
+                <p class="mt-1 text-xs text-cafe/55">
+                  Solicitada el {{ formatearFechaHora(prorroga.fechaSolicitud) }}
+                  <span v-if="prorroga.fechaLimiteRespuesta">
+                    · Responder antes de
+                    {{ formatearFechaHora(prorroga.fechaLimiteRespuesta) }}
+                  </span>
+                </p>
+                <p class="mt-2 text-sm leading-relaxed text-cafe/75">
+                  <span class="font-semibold text-cafe/60">Motivo:</span>
+                  {{ prorroga.motivo }}
+                </p>
+                <p
+                  v-if="prorroga.estado === 'ACEPTADA'"
+                  class="mt-1 text-sm text-green-700"
+                >
+                  Entrega: {{ formatearFecha(prorroga.entregaPrevistaAntes) }}
+                  → {{ formatearFecha(prorroga.entregaPrevistaDespues) }}
+                </p>
+                <p v-if="prorroga.motivoRespuesta" class="mt-1 text-sm text-cafe/75">
+                  <span class="font-semibold text-cafe/60">Respuesta del cliente:</span>
+                  {{ prorroga.motivoRespuesta }}
+                </p>
+              </li>
+            </ul>
           </section>
 
           <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-coral/25 bg-coral/5 p-4">
@@ -1924,6 +2087,26 @@ onMounted(async () => {
         <img :src="visor.imagen" alt="Entregable ampliado" class="max-h-[80vh] w-auto" />
       </div>
     </div>
+
+    <SolicitarProrrogaModal
+      :abierto="solicitarProrrogaAbierto"
+      :pedido="pedido"
+      :procesando="procesandoProrroga"
+      :error="errorProrroga"
+      @cerrar="cerrarSolicitudProrroga"
+      @solicitar="enviarProrroga"
+    />
+
+    <ResponderProrrogaModal
+      :abierto="prorrogaBloqueante"
+      :pedido="pedido"
+      :prorroga="prorrogaPendiente"
+      :procesando="procesandoProrroga"
+      :error="errorProrroga"
+      @aceptar="aceptarProrroga"
+      @rechazar="rechazarProrroga"
+      @expirada="alVencerProrroga"
+    />
 
     <ModalConfirmacion
       :abierto="confirmacion.abierto"

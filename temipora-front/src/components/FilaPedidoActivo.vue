@@ -41,6 +41,7 @@ const monto = computed(() => {
   )
 })
 const accion = computed(() => {
+  if (props.pedido.puedeResponderProrroga) return 'Responder prórroga'
   if (props.pedido.puedeEntregar) return 'Subir entrega'
   if (props.pedido.puedePagar) return 'Pagar cuota'
   if (props.pedido.puedeAprobar) return 'Aprobar entrega'
@@ -48,7 +49,8 @@ const accion = computed(() => {
   return 'Ver pedido'
 })
 const accionDestacada = computed(() => Boolean(
-  props.pedido.puedeEntregar
+  props.pedido.puedeResponderProrroga
+  || props.pedido.puedeEntregar
   || props.pedido.puedePagar
   || props.pedido.puedeAprobar,
 ))
@@ -102,6 +104,17 @@ const noLeidos = computed(() => Number(props.pedido.noLeidos || 0))
             <span v-else class="text-[11px] text-cafe/50">Sin hitos pendientes</span>
             <span v-if="pedido.fechaEntregaPrevista || pedido.limiteEntrega" class="text-[11px] text-cafe/45">
               Entrega: {{ formatearFecha(pedido.fechaEntregaPrevista || pedido.limiteEntrega) }}
+              <template v-if="Number(pedido.diasProrroga || 0) > 0">
+                (+{{ pedido.diasProrroga }} por prórroga)
+              </template>
+            </span>
+            <span
+              v-if="pedido.prorrogaPendiente"
+              class="rounded-full bg-coral/10 px-2 py-0.5 text-[11px] font-semibold text-coral"
+            >
+              {{ pedido.puedeResponderProrroga
+                ? 'Prórroga para responder'
+                : 'Prórroga pendiente' }}
             </span>
             <span
               v-if="pedido.entregaAtrasada"

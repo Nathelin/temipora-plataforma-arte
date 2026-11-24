@@ -81,4 +81,8 @@ public class PedidoConfigRequest {
     @Min(value = 1, message = "La sanción de compras debe durar al menos 1 día.")
     @Max(value = 90, message = "La sanción de compras no puede superar los 90 días.")
     private Integer diasSancionCompras;
+
+    @Min(value = 1, message = "La respuesta a una prórroga debe tener al menos 1 hora.")
+    @Max(value = 168, message = "La respuesta a una prórroga no puede superar las 168 horas.")
+    private Integer horasRespuestaProrroga;
 }

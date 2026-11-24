@@ -30,6 +30,7 @@ public class ConfiguracionPedido {
     public static final int DIAS_CIERRE_TRAS_BLOQUEO_POR_DEFECTO = 30;
     public static final int DIAS_GRACIA_PAGO_POR_DEFECTO = 3;
     public static final int DIAS_SANCION_COMPRAS_POR_DEFECTO = 27;
+    public static final int HORAS_RESPUESTA_PRORROGA_POR_DEFECTO = 24;
     public static final BigDecimal PORCENTAJE_MAX_PRIMER_HITO_POR_DEFECTO =
         new BigDecimal("50.00");
     public static final BigDecimal MONTO_MINIMO_CUOTA_POR_DEFECTO =
@@ -78,6 +79,14 @@ public class ConfiguracionPedido {
 
     @Column(name = "dias_sancion_compras", nullable = false)
     private Integer diasSancionCompras = DIAS_SANCION_COMPRAS_POR_DEFECTO;
+
+    /**
+     * Ventana que tiene el cliente para aceptar una propuesta de prórroga del
+     * plazo. Al cumplirse sin respuesta, la propuesta vence y se mantienen los
+     * plazos originales.
+     */
+    @Column(name = "horas_respuesta_prorroga", nullable = false)
+    private Integer horasRespuestaProrroga = HORAS_RESPUESTA_PRORROGA_POR_DEFECTO;
 
     /**
      * Corte de las sanciones automáticas: no se evalúa ningún pedido creado

@@ -34,6 +34,7 @@ import com.temipora.backend_springboot.modelo.EstadoMensaje;
 import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
+import com.temipora.backend_springboot.modelo.EstadoProrroga;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.HitoPedidoDTO;
@@ -48,6 +49,8 @@ import com.temipora.backend_springboot.modelo.PedidoDTO;
 import com.temipora.backend_springboot.modelo.PedidoResumenDTO;
 import com.temipora.backend_springboot.modelo.Presupuesto;
 import com.temipora.backend_springboot.modelo.PresupuestoDTO;
+import com.temipora.backend_springboot.modelo.ProrrogaDTO;
+import com.temipora.backend_springboot.modelo.ProrrogaPedido;
 import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.SolicitudRevisionRequest;
 import com.temipora.backend_springboot.modelo.AceptacionTerminosPlataforma;
@@ -1462,6 +1465,19 @@ public class PedidoService {
         boolean puedeOcultarPublicacion = esCliente
             && pedido.getEstado() == EstadoPedido.FINALIZADO
             && pedido.isPublicacionAutorizada();
+        List<ProrrogaPedido> prorrogas = pedido.getProrrogas() != null
+            ? pedido.getProrrogas()
+            : List.of();
+        ProrrogaPedido pendiente = prorrogaPendiente(prorrogas);
+        boolean prorrogaVigente = pendiente != null
+            && pendiente.getFechaLimiteRespuesta() != null
+            && pendiente.getFechaLimiteRespuesta().isAfter(ahora);
+        boolean puedeSolicitarProrroga = esArtista
+            && pedido.getEstado() == EstadoPedido.EN_CURSO
+            && pedido.getLimiteEntrega() != null
+            && pedido.getMoraDesde() == null
+            && prorrogas.isEmpty();
+        boolean puedeResponderProrroga = esCliente && prorrogaVigente;
 
         int revisionesMaximas = hitoFlujoService.revisionesMaximasPorHito();
         for (HitoPedido hito : pedido.getHitos()) {
@@ -1555,6 +1571,7 @@ public class PedidoService {
             .limiteEntrega(pedido.getLimiteEntrega())
             .fechaEntregaPrevista(PedidoFechas.entregaPrevista(pedido))
             .diasDemoraCliente(PedidoFechas.diasDemoraCliente(pedido))
+            .diasProrroga(PedidoFechas.diasProrroga(pedido))
             .entregaAtrasada(PedidoFechas.entregaAtrasada(
                 pedido, LocalDate.now()))
             .finalizadoEn(pedido.getFinalizadoEn())
@@ -1693,6 +1710,14 @@ public class PedidoService {
             .publicacionVisible(publicacionVisible)
             .puedeAutorizarPublicacion(puedeAutorizarPublicacion)
             .puedeOcultarPublicacion(puedeOcultarPublicacion)
+            .prorrogas(prorrogas.stream()
+                .map(ProrrogaDTO::desde)
+                .toList())
+            .prorrogaPendiente(pendiente != null
+                ? ProrrogaDTO.desde(pendiente)
+                : null)
+            .puedeSolicitarProrroga(puedeSolicitarProrroga)
+            .puedeResponderProrroga(puedeResponderProrroga)
             .build();
 
         if (incluirComision) {
@@ -1719,6 +1744,13 @@ public class PedidoService {
         BigDecimal factorCobro = mostrada != null
             ? monedaVistaService.factorCobroAMostrada(mostrada, ahora)
             : null;
+        List<ProrrogaPedido> prorrogas = pedido.getProrrogas() != null
+            ? pedido.getProrrogas()
+            : List.of();
+        ProrrogaPedido pendiente = prorrogaPendiente(prorrogas);
+        boolean prorrogaVigente = pendiente != null
+            && pendiente.getFechaLimiteRespuesta() != null
+            && pendiente.getFechaLimiteRespuesta().isAfter(ahora);
         HitoPedido proximo = proximoHito(pedido);
         BigDecimal montoMostrado = proximo != null
             ? PresupuestoDTO.totalMostrado(
@@ -1743,8 +1775,11 @@ public class PedidoService {
             .limiteEntrega(pedido.getLimiteEntrega())
             .fechaEntregaPrevista(PedidoFechas.entregaPrevista(pedido))
             .diasDemoraCliente(PedidoFechas.diasDemoraCliente(pedido))
+            .diasProrroga(PedidoFechas.diasProrroga(pedido))
             .entregaAtrasada(PedidoFechas.entregaAtrasada(
                 pedido, LocalDate.now()))
+            .prorrogaPendiente(pendiente != null)
+            .puedeResponderProrroga(esCliente && prorrogaVigente)
             .impagoDesde(pedido.getImpagoDesde())
             .pagoVencido(pedido.getImpagoDesde() != null)
             .diasGraciaPagoRestantes(diasGraciaPagoRestantes(pedido))
@@ -1788,6 +1823,17 @@ public class PedidoService {
             .puedeAprobar(esCliente && pedido.getHitos().stream()
                 .anyMatch(this::puedeAprobar))
             .build();
+    }
+
+    private ProrrogaPedido prorrogaPendiente(
+            List<ProrrogaPedido> prorrogas) {
+        for (ProrrogaPedido prorroga : prorrogas) {
+            if (prorroga != null
+                    && prorroga.getEstado() == EstadoProrroga.PENDIENTE) {
+                return prorroga;
+            }
+        }
+        return null;
     }
 
     private int hitosPagadosDe(Pedido pedido) {
