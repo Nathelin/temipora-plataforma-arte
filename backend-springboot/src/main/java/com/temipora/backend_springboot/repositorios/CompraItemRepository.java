@@ -79,6 +79,27 @@ public interface CompraItemRepository extends JpaRepository<CompraItem, Long> {
             @Param("idUsuario") Long idUsuario,
             @Param("estado") EstadoEntregaItem estado);
 
+    @Query("""
+        SELECT i FROM CompraItem i
+        JOIN FETCH i.grupo g
+        JOIN FETCH g.compra c
+        JOIN FETCH i.producto p
+        JOIN FETCH p.artista a
+        WHERE c.cliente.idUsuario = :idCliente
+          AND g.estado = :estadoPagado
+          AND g.fechaPago IS NOT NULL
+          AND g.fechaPago >= :desde
+          AND NOT EXISTS (
+              SELECT r FROM Resenia r
+              WHERE r.producto = p
+                AND r.autor.idUsuario = :idCliente)
+        ORDER BY g.fechaPago DESC
+        """)
+    List<CompraItem> findPagadosSinReseniaProducto(
+        @Param("idCliente") Long idCliente,
+        @Param("estadoPagado") EstadoCompraGrupo estadoPagado,
+        @Param("desde") LocalDateTime desde);
+
     /**
      * Colección pública de productos comprados. Solo incluye compras pagadas.
      * Para piezas únicas se descartan las compras anteriores a la más reciente

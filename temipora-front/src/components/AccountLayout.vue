@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 
 const props = defineProps({
   titulo: { type: String, required: true },
+  principal: { type: Object, default: null },
   secciones: { type: Array, required: true },
   inferior: { type: Array, default: () => [] },
   badges: { type: Object, default: () => ({}) },
@@ -12,7 +13,10 @@ const props = defineProps({
 const route = useRoute()
 const menuAbierto = ref(false)
 
-const todos = computed(() => props.secciones.flatMap((seccion) => seccion.items))
+const todos = computed(() => [
+  ...(props.principal ? [props.principal] : []),
+  ...props.secciones.flatMap((seccion) => seccion.items),
+])
 const esActiva = (item) => (item.base
   ? route.path.startsWith(item.base)
   : route.path === item.to)
@@ -59,6 +63,30 @@ function badgeDe(item) {
             :class="menuAbierto ? 'block' : 'hidden'"
             :aria-label="titulo"
           >
+            <router-link
+              v-if="principal"
+              :to="principal.to"
+              class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition"
+              :class="esActiva(principal)
+                ? 'bg-rosa/40 font-medium text-granate'
+                : 'text-cafe hover:bg-rosa/20'"
+              :aria-current="esActiva(principal) ? 'page' : undefined"
+              @click="menuAbierto = false"
+            >
+              <svg
+                class="h-5 w-5 shrink-0"
+                :class="esActiva(principal) ? 'text-coral' : 'text-cafe/50'"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" :d="principal.icono" />
+              </svg>
+              <span>{{ principal.nombre }}</span>
+            </router-link>
+
             <div v-for="seccion in secciones" :key="seccion.titulo">
               <p class="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-cafe/40">
                 {{ seccion.titulo }}

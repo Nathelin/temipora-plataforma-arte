@@ -34,6 +34,28 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
     List<Pedido> findByArtistaIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
         Long idArtista, Collection<EstadoPedido> estados, Pageable pageable);
 
+    List<Pedido> findByClienteIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
+        Long idCliente, Collection<EstadoPedido> estados, Pageable pageable);
+
+    @Query("""
+        select p from Pedido p
+        join fetch p.artista
+        join fetch p.servicio
+        where p.cliente.idUsuario = :idCliente
+          and p.estado in :estados
+          and p.finalizadoEn is not null
+          and p.finalizadoEn >= :desde
+          and not exists (
+              select r from Resenia r
+              where r.pedido = p
+                and r.autor.idUsuario = :idCliente)
+        order by p.finalizadoEn desc
+        """)
+    List<Pedido> findFinalizadosSinReseniaCliente(
+        @Param("idCliente") Long idCliente,
+        @Param("estados") Collection<EstadoPedido> estados,
+        @Param("desde") LocalDateTime desde);
+
     @Query("""
         select distinct p from Pedido p
         left join fetch p.hitos h

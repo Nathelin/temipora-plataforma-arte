@@ -68,7 +68,9 @@ const estaLogueado = computed(() => !!token.value)
 const esAdmin = computed(() => rol.value === 'ADMIN')
 const esArtista = computed(() => rol.value === 'ARTISTA')
 const puedeVerActividad = computed(() => estaLogueado.value && !esAdmin.value)
-const enActividad = computed(() => route.path.startsWith('/compras')
+const enActividad = computed(() => route.path.startsWith('/mi-actividad')
+  || route.path.startsWith('/compras')
+  || route.path.startsWith('/reventa')
   || route.path.startsWith('/pedidos')
   || route.path.startsWith('/solicitudes'))
 const enCarrito = computed(() => route.path.startsWith('/carrito'))
@@ -258,7 +260,7 @@ function irAPerfil() {
             </router-link>
             <router-link
               v-if="puedeVerActividad"
-              to="/compras"
+              to="/mi-actividad"
               class="relative inline-flex items-center gap-2 rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-sm font-semibold text-coral transition hover:bg-coral/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
               :class="enActividad ? 'ring-2 ring-coral/40' : ''"
               :aria-current="enActividad ? 'page' : undefined"
@@ -520,7 +522,7 @@ function irAPerfil() {
 
               <div v-if="puedeVerActividad" class="mt-1 border-t border-rosa/40 pt-2">
                 <router-link
-                  to="/compras"
+                  to="/mi-actividad"
                   class="flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/25 bg-coral/10 px-4 py-3 text-sm font-semibold text-coral transition hover:bg-coral/15"
                   :class="enActividad ? 'ring-2 ring-coral/40' : ''"
                   :aria-current="enActividad ? 'page' : undefined"

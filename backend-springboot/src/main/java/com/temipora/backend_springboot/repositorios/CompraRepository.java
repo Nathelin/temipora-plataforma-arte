@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.repositorios;
 
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -13,6 +14,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.Compra;
 import com.temipora.backend_springboot.modelo.EstadoCompra;
+import com.temipora.backend_springboot.modelo.EstadoCompraGrupo;
 
 import jakarta.persistence.LockModeType;
 
@@ -40,4 +42,14 @@ public interface CompraRepository extends JpaRepository<Compra, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM Compra c WHERE c.idCompra = :idCompra")
     Optional<Compra> findByIdCompraForUpdate(@Param("idCompra") Long idCompra);
+
+    @Query("""
+        SELECT COALESCE(SUM(g.subtotal), 0)
+        FROM CompraGrupo g
+        WHERE g.compra.cliente.idUsuario = :idUsuario
+          AND g.estado = :estado
+        """)
+    BigDecimal sumarPendienteGrupos(
+            @Param("idUsuario") Long idUsuario,
+            @Param("estado") EstadoCompraGrupo estado);
 }

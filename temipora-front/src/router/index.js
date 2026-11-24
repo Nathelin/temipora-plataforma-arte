@@ -85,6 +85,7 @@ const ReventaPublica = () => import('../views/ReventaPublica.vue')
 const MiReventa = () => import('../views/MiReventa.vue')
 const Carrito = () => import('../views/Carrito.vue')
 const MisCompras = () => import('../views/MisCompras.vue')
+const MiActividad = () => import('../views/MiActividad.vue')
 const CompraDetalle = () => import('../views/CompraDetalle.vue')
 const CertificadoPublico = () => import('../views/CertificadoPublico.vue')
 const TerminosAceptadosPublico = () => import('../views/TerminosAceptadosPublico.vue')
@@ -213,7 +214,12 @@ const routes = [
         component: ClientLayout,
         meta: { requiresAuth: true },
         children: [
-          { path: '', redirect: { name: 'compras' } },
+          {
+            path: '',
+            name: 'mi-actividad',
+            component: MiActividad,
+            meta: { title: 'Mi actividad', requiresComprador: true },
+          },
           {
             path: '/compras',
             name: 'compras',
