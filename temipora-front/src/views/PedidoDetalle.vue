@@ -15,6 +15,7 @@ import SubirEntregable from '../components/SubirEntregable.vue'
 import FormularioResenia from '../components/FormularioResenia.vue'
 import TarjetaResenia from '../components/TarjetaResenia.vue'
 import { useNotificaciones } from '../composables/useNotificaciones'
+import { usePagoHito } from '../composables/usePagoHito'
 import { useHiloConversacion } from '../composables/useHiloConversacion'
 import { useSubirImagen } from '../composables/useSubirImagen'
 import { useAccesoEnlace } from '../composables/useAccesoEnlace'
@@ -50,8 +51,6 @@ const pedido = ref(null)
 const cargando = ref(true)
 const error = ref('')
 const procesando = ref(false)
-const redirigiendoPago = ref(false)
-const hitoPagando = ref(null)
 const avisoPago = ref('')
 const sondeandoPago = ref(false)
 const descargandoConstancia = ref(false)
@@ -60,6 +59,20 @@ const motivoRevision = ref('')
 const visor = reactive({ abierto: false, imagen: '' })
 const { abrirVerificada } = useSubirImagen()
 const { exito, error: errorToast } = useNotificaciones()
+const {
+  hitoPagando,
+  redirigiendoPago,
+  pagarHito,
+  irAPagarMercadoPago,
+  sincronizarPagoPendiente,
+} = usePagoHito({
+  procesando,
+  getPedido: () => pedido.value,
+  onActualizado: (data) => actualizarPedido(data),
+  onExito: exito,
+  onError: errorToast,
+  onNoAutorizado: () => router.push({ name: 'login' }),
+})
 const idsEnPortfolio = ref([])
 const pestanaActiva = ref('resumen')
 const tabsRef = ref(null)
@@ -273,6 +286,19 @@ const proximoPaso = computed(() => {
     }
 
     const hitoPagar = hitos.value.find((hito) => hito.puedePagar)
+    if (hitoPagar && pedido.value.pagoVencido) {
+      return {
+        titulo: 'El pago de la entrega final está vencido',
+        detalle: pedido.value.diasGraciaPagoRestantes > 0
+          ? `Te quedan ${pedido.value.diasGraciaPagoRestantes} día(s) antes de que se suspendan tus compras y solo puedas mensajear al artista.`
+          : 'Tu cuenta quedó limitada a pagos hasta que regularices la deuda.',
+        accion: 'Pagar ahora',
+        destino: 'plan-pagos',
+        ancla: 'hito',
+        idHitoPedido: hitoPagar.idHitoPedido,
+      }
+    }
+
     if (hitoPagar) {
       return {
         titulo: `Tenés que pagar «${hitoPagar.nombre}»`,
@@ -581,76 +607,6 @@ async function ejecutar(accion, mensaje) {
   } finally {
     procesando.value = false
   }
-}
-
-async function sincronizarPagoPendiente() {
-  const pendiente = (pedido.value?.hitos || [])
-    .flatMap((hito) => hito.pagos || [])
-    .find((pago) => pago.estado === 'PENDIENTE'
-      && pago.proveedor === 'MERCADOPAGO')
-  if (!pendiente) return
-  try {
-    const res = await api.post(`/pagos/${pendiente.idPago}/sincronizar`)
-    if (res.data) await actualizarPedido(res.data)
-  } catch {
-    // Si el proveedor no responde, seguimos con el polling normal.
-  }
-}
-
-function urlCheckoutMercadoPago(data) {
-  const pendiente = (data?.hitos || [])
-    .flatMap((hito) => hito.pagos || [])
-    .find((pago) => pago.estado === 'PENDIENTE')
-  return pendiente?.proveedor === 'MERCADOPAGO'
-    ? pendiente.instruccion
-    : null
-}
-
-async function pagarHito(hito) {
-  if (procesando.value) return
-  procesando.value = true
-  hitoPagando.value = hito
-  redirigiendoPago.value = true
-  let redirigiendo = false
-  try {
-    await sincronizarPagoPendiente()
-    const actualizado = (pedido.value?.hitos || [])
-      .find((item) => item.idHitoPedido === hito.idHitoPedido)
-    if (actualizado && actualizado.estadoPago !== 'PENDIENTE') {
-      exito('El pago ya fue acreditado.')
-      return
-    }
-    const res = await api.post(
-      `/pedidos/${idPedido.value}/hitos/${hito.idHitoPedido}/pagar`,
-    )
-    pedido.value = res.data
-    const url = urlCheckoutMercadoPago(res.data)
-    if (url) {
-      redirigiendo = true
-      window.location.href = url
-      return
-    }
-    exito('Pago iniciado. Confirmalo para activar el hito.')
-  } catch (e) {
-    if (e.response?.status === 401) {
-      router.push({ name: 'login' })
-      return
-    }
-    errorToast(e.response?.data?.message
-      || 'No se pudo completar la acción.')
-  } finally {
-    procesando.value = false
-    if (!redirigiendo) {
-      redirigiendoPago.value = false
-      hitoPagando.value = null
-    }
-  }
-}
-
-function irAPagarMercadoPago(pago, hito) {
-  hitoPagando.value = hito
-  redirigiendoPago.value = true
-  window.location.href = pago.instruccion
 }
 
 async function refrescarPedido() {

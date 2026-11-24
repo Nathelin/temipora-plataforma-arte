@@ -2,6 +2,7 @@ package com.temipora.backend_springboot.modelo;
 
 public enum MotivoRecordatorio {
     PAGO_SENA,
+    PAGO_7D,
     PAGO_72H,
     PAGO_24H,
     ENTREGA_7D,
@@ -21,6 +22,6 @@ public enum MotivoRecordatorio {
     }
 
     public boolean esAlerta() {
-        return this == ENTREGA_1D;
+        return this == ENTREGA_1D || this == PAGO_7D || this == PAGO_72H;
     }
 }

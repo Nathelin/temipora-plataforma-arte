@@ -133,7 +133,7 @@ class SancionAutomaticaServiceTest {
         SancionCuenta escalada = sancionAutomatica();
 
         when(sancionService.escalarSistema(
-                eq(99L), anyString(), anyString(), any(), any(), any()))
+                eq(99L), any(), anyString(), anyString(), any(), any(), any()))
             .thenReturn(escalada);
 
         SancionCuenta resultado = service.escalarNivel2(sancionAutomatica(), pedido);
@@ -141,6 +141,7 @@ class SancionAutomaticaServiceTest {
         assertThat(resultado).isSameAs(escalada);
         verify(sancionService).escalarSistema(
             eq(99L),
+            eq(AlcanceSancion.ENTREGAS),
             anyString(),
             eq("AUTO:ENTREGA:10:NIVEL2"),
             eq(pedido),

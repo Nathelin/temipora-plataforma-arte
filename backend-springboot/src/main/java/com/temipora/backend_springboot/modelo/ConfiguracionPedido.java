@@ -28,6 +28,8 @@ public class ConfiguracionPedido {
     public static final int DIAS_SANCION_VENTAS_POR_DEFECTO = 14;
     public static final int DIAS_REAPELACION_POR_DEFECTO = 7;
     public static final int DIAS_CIERRE_TRAS_BLOQUEO_POR_DEFECTO = 30;
+    public static final int DIAS_GRACIA_PAGO_POR_DEFECTO = 3;
+    public static final int DIAS_SANCION_COMPRAS_POR_DEFECTO = 27;
     public static final BigDecimal PORCENTAJE_MAX_PRIMER_HITO_POR_DEFECTO =
         new BigDecimal("50.00");
     public static final BigDecimal MONTO_MINIMO_CUOTA_POR_DEFECTO =
@@ -70,6 +72,12 @@ public class ConfiguracionPedido {
 
     @Column(name = "dias_cierre_tras_bloqueo", nullable = false)
     private Integer diasCierreTrasBloqueo = DIAS_CIERRE_TRAS_BLOQUEO_POR_DEFECTO;
+
+    @Column(name = "dias_gracia_pago", nullable = false)
+    private Integer diasGraciaPago = DIAS_GRACIA_PAGO_POR_DEFECTO;
+
+    @Column(name = "dias_sancion_compras", nullable = false)
+    private Integer diasSancionCompras = DIAS_SANCION_COMPRAS_POR_DEFECTO;
 
     /**
      * Corte de las sanciones automáticas: no se evalúa ningún pedido creado

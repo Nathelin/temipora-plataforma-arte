@@ -13,6 +13,7 @@ import { useNotificacionesSistema } from '../composables/useNotificacionesSistem
 import { useCarrito } from '../composables/useCarrito'
 import { cuandoEsteLibre } from '../composables/useTareasDiferidas'
 import { obtenerContacto } from '../servicios/contacto'
+import { obtenerMiEstadoCuenta } from '../servicios/miEstadoCuenta'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,12 +24,37 @@ const nombreUsuario = ref(localStorage.getItem('nombreUsuario') || '')
 const urlFotoPerfil = ref(localStorage.getItem('urlFotoPerfil') || '')
 
 const contactoEmail = ref('temiporasupport@gmail.com')
+const estadoCuenta = ref(null)
 
 let cancelarTareasIniciales = null
+
+async function cargarEstadoCuenta() {
+  if (!token.value || rol.value === 'ADMIN') {
+    estadoCuenta.value = null
+    return
+  }
+  try {
+    const res = await obtenerMiEstadoCuenta()
+    estadoCuenta.value = res.data
+  } catch {
+    estadoCuenta.value = null
+  }
+}
+
+const avisoPagoPendiente = computed(() => Boolean(
+  (estadoCuenta.value?.deudas?.length || 0) > 0
+  && estadoCuenta.value?.alcance !== 'PAGOS',
+))
+const cuentaSuspendida = computed(() => Boolean(
+  estadoCuenta.value?.sancionado
+  && estadoCuenta.value?.alcance === 'COMPRAS',
+))
+const primeraDeuda = computed(() => estadoCuenta.value?.deudas?.[0] || null)
 
 onMounted(() => {
   cuandoEsteLibre(async () => {
     contactoEmail.value = await obtenerContacto()
+    await cargarEstadoCuenta()
   })
 })
 
@@ -586,6 +612,31 @@ function irAPerfil() {
         </div>
       </div>
     </header>
+
+    <div
+      v-if="avisoPagoPendiente"
+      class="border-b border-durazno/60 bg-durazno/30"
+    >
+      <div class="mx-auto flex max-w-screen-2xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-8">
+        <p class="text-sm leading-relaxed text-cafe">
+          <template v-if="cuentaSuspendida">
+            Tenés un pago pendiente de una entrega final. Tus compras están
+            suspendidas y solo podés mensajear al artista al que le debés.
+          </template>
+          <template v-else>
+            Tenés un pago vencido de una entrega final. Regularizalo para evitar
+            que se suspendan tus compras.
+          </template>
+        </p>
+        <router-link
+          v-if="primeraDeuda"
+          :to="{ name: 'pedido-detalle', params: { idPedido: primeraDeuda.idPedido } }"
+          class="inline-flex min-h-9 items-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+        >
+          Regularizar pago
+        </router-link>
+      </div>
+    </div>
 
     <main class="flex-1 w-full">
       <!-- La key cubre cualquier parámetro (servicio, perfil, pedido, token):

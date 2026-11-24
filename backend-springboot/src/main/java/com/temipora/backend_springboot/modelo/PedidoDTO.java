@@ -35,6 +35,9 @@ public class PedidoDTO {
     private int diasDemoraCliente;
     private boolean entregaAtrasada;
     private LocalDateTime finalizadoEn;
+    private LocalDateTime impagoDesde;
+    private boolean pagoVencido;
+    private Integer diasGraciaPagoRestantes;
     private BigDecimal precioFinal;
     private BigDecimal precioFinalCobro;
     private BigDecimal precioFinalMostrado;

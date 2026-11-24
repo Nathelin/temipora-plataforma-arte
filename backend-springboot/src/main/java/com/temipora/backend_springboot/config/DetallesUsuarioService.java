@@ -97,8 +97,8 @@ public class DetallesUsuarioService implements UserDetailsService, AccesoUsuario
     }
 
     /**
-     * Alcance de la sanción vigente que restringe la sesión sin bloquearla. Hoy
-     * solo ENTREGAS limita el acceso; VENTAS deja operar normalmente.
+     * Alcance de la sanción vigente que restringe la sesión sin bloquearla.
+     * ENTREGAS y PAGOS limitan el acceso; VENTAS deja operar normalmente.
      */
     @Override
     @Transactional(readOnly = true)

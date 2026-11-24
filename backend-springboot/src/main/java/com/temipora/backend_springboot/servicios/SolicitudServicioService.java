@@ -285,6 +285,10 @@ public class SolicitudServicioService {
 
         Usuario cliente = usuarioRepository.findByIdUsuario(idCliente)
             .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idCliente));
+        if (sancionService.tieneSancionDeCompra(idCliente)) {
+            throw new ConflictoException(
+                MoraClienteService.MENSAJE_COMPRA_BLOQUEADA);
+        }
         Servicio servicio = servicioRepository.findByIdServicioForUpdate(request.getIdServicio())
             .orElseThrow(() -> new NoSuchElementException(
                 "Servicio no encontrado: " + request.getIdServicio()));

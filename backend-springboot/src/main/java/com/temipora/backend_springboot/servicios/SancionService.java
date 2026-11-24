@@ -167,6 +167,7 @@ public class SancionService {
     @Transactional
     public SancionCuenta escalarSistema(
             Long idSancion,
+            AlcanceSancion alcance,
             String motivo,
             String clave,
             Pedido pedido,
@@ -179,7 +180,7 @@ public class SancionService {
             return sancion;
         }
         sancion.setTipo(TipoSancion.INHABILITACION);
-        sancion.setAlcance(AlcanceSancion.ENTREGAS);
+        sancion.setAlcance(alcance);
         sancion.setFechaFin(null);
         sancion.setClave(clave);
         sancion.setPedido(pedido);
@@ -200,6 +201,16 @@ public class SancionService {
                 idUsuario, EstadoSancion.ACTIVA, LocalDateTime.now())
             .stream()
             .anyMatch(sancion -> sancion.getAlcance() == alcance);
+    }
+
+    /**
+     * Sanción vigente de compras o solo-pagos: el cliente no puede contratar,
+     * comprar productos ni mensajear fuera del artista deudor.
+     */
+    @Transactional(readOnly = true)
+    public boolean tieneSancionDeCompra(Long idUsuario) {
+        return tieneSancionVigente(idUsuario, AlcanceSancion.COMPRAS)
+            || tieneSancionVigente(idUsuario, AlcanceSancion.PAGOS);
     }
 
     @Transactional(readOnly = true)

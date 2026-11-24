@@ -16,7 +16,7 @@ export const ESTADOS_PEDIDO = {
     clase: 'border-rojizo/30 bg-rojizo/10 text-rojizo',
   },
   IMPAGO: {
-    etiqueta: 'Sin pago',
+    etiqueta: 'Pago vencido',
     clase: 'border-rojizo/30 bg-rojizo/10 text-rojizo',
   },
   INCUMPLIMIENTO: {

@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.temipora.backend_springboot.modelo.ContadoresPedidosDTO;
+import com.temipora.backend_springboot.modelo.DeudaClienteDTO;
 import com.temipora.backend_springboot.modelo.EntregaHitoMultipartRequest;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
@@ -32,6 +33,7 @@ import com.temipora.backend_springboot.modelo.SolicitudRevisionRequest;
 import com.temipora.backend_springboot.modelo.TipoDescarga;
 import com.temipora.backend_springboot.servicios.ConstanciaService;
 import com.temipora.backend_springboot.servicios.DescargaService;
+import com.temipora.backend_springboot.servicios.MoraClienteService;
 import com.temipora.backend_springboot.servicios.PedidoService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -46,16 +48,19 @@ public class PedidoController {
     private final UsuarioService usuarioService;
     private final ConstanciaService constanciaService;
     private final DescargaService descargaService;
+    private final MoraClienteService moraClienteService;
 
     public PedidoController(
             PedidoService pedidoService,
             UsuarioService usuarioService,
             ConstanciaService constanciaService,
-            DescargaService descargaService) {
+            DescargaService descargaService,
+            MoraClienteService moraClienteService) {
         this.pedidoService = pedidoService;
         this.usuarioService = usuarioService;
         this.constanciaService = constanciaService;
         this.descargaService = descargaService;
+        this.moraClienteService = moraClienteService;
     }
 
     @GetMapping("/{idPedido}")
@@ -106,6 +111,12 @@ public class PedidoController {
     public List<PedidoResumenDTO> restringidos(Authentication authentication) {
         return pedidoService.pedidosRestringidos(
             idAutenticado(authentication));
+    }
+
+    @GetMapping("/deudas")
+    @PreAuthorize("hasAnyRole('ARTISTA', 'CLIENTE')")
+    public List<DeudaClienteDTO> deudas(Authentication authentication) {
+        return moraClienteService.deudas(idAutenticado(authentication));
     }
 
     @GetMapping("/recibidos")

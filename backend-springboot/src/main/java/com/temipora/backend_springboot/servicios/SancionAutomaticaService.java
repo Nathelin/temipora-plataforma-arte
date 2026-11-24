@@ -117,6 +117,7 @@ public class SancionAutomaticaService {
         String clave = "AUTO:ENTREGA:" + pedido.getIdPedido() + ":NIVEL2";
         SancionCuenta escalada = sancionService.escalarSistema(
             sancion.getIdSancion(),
+            AlcanceSancion.ENTREGAS,
             motivoNivel2(pedido),
             clave,
             pedido,

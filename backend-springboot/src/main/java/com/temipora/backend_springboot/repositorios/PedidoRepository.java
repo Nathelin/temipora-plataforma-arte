@@ -17,6 +17,7 @@ import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.Pedido;
+import com.temipora.backend_springboot.modelo.TipoHito;
 
 import jakarta.persistence.LockModeType;
 
@@ -87,6 +88,65 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
         """)
     List<Pedido> findEnMoraDeArtista(
         @Param("idArtista") Long idArtista,
+        @Param("estado") EstadoPedido estado);
+
+    /**
+     * Pedidos en curso con la entrega final ya subida y su pago vencido, que
+     * todavía no registraron la mora del cliente y fueron creados después del
+     * corte de sanciones automáticas.
+     */
+    @Query("""
+        select distinct p from Pedido p
+        left join fetch p.hitos h
+        left join fetch h.hitoPresupuesto
+        join fetch p.artista
+        join fetch p.cliente
+        left join fetch p.servicio
+        where p.estado = :estado
+          and p.impagoDesde is null
+          and p.fechaCreacion >= :corte
+          and exists (
+              select h2 from HitoPedido h2
+              where h2.pedido = p
+                and h2.hitoPresupuesto.tipo = :tipo
+                and h2.estadoPago = :pagoPendiente
+                and h2.estadoEntrega = :entregaEntregada
+                and h2.fechaLimitePago is not null
+                and h2.fechaLimitePago < :ahora)
+        """)
+    List<Pedido> findCandidatosImpagoCliente(
+        @Param("estado") EstadoPedido estado,
+        @Param("corte") LocalDateTime corte,
+        @Param("tipo") TipoHito tipo,
+        @Param("pagoPendiente") EstadoPagoHito pagoPendiente,
+        @Param("entregaEntregada") EstadoEntregaHito entregaEntregada,
+        @Param("ahora") LocalDateTime ahora);
+
+    @Query("""
+        select distinct p from Pedido p
+        left join fetch p.hitos h
+        left join fetch h.hitoPresupuesto
+        join fetch p.artista
+        join fetch p.cliente
+        left join fetch p.servicio
+        where p.estado = :estado
+          and p.impagoDesde is not null
+        """)
+    List<Pedido> findConImpago(@Param("estado") EstadoPedido estado);
+
+    @Query("""
+        select distinct p from Pedido p
+        left join fetch p.hitos h
+        left join fetch h.hitoPresupuesto
+        join fetch p.artista
+        join fetch p.cliente
+        left join fetch p.servicio
+        where p.estado = :estado
+          and p.impagoDesde is not null
+          and p.cliente.idUsuario = :idCliente
+        """)
+    List<Pedido> findConImpagoDeCliente(
+        @Param("idCliente") Long idCliente,
         @Param("estado") EstadoPedido estado);
 
     boolean existsByArtistaIdUsuarioAndClienteIdUsuario(

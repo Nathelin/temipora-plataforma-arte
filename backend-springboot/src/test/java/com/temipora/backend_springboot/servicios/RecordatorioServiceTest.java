@@ -138,7 +138,7 @@ class RecordatorioServiceTest {
     }
 
     @Test
-    void encolar_usuarioSancionado_noEncola() {
+    void encolar_pagoSeEncolaSiempre() {
         Pedido pedido = pedido(EstadoPedido.PENDIENTE_PAGO, null, null);
         pedido.setFechaCreacion(LocalDateTime.now().minusHours(25));
         HitoPedido hito = hito(pedido, TipoHito.SENA,
@@ -146,6 +146,21 @@ class RecordatorioServiceTest {
         hito.setFechaLimitePago(LocalDateTime.now().plusDays(5));
         when(hitoPedidoRepository.findSenasPendientes(
             any(), any(), any(), any())).thenReturn(List.of(hito));
+
+        assertThat(service.encolar()).isEqualTo(1);
+        assertThat(capturarFila().getMotivo())
+            .isEqualTo(MotivoRecordatorio.PAGO_SENA);
+    }
+
+    @Test
+    void encolar_artistaSancionado_noEncolaLaEntrega() {
+        LocalDate hoy = LocalDate.now();
+        Pedido pedido = pedido(EstadoPedido.EN_CURSO,
+            hoy.minusDays(10), hoy.plusDays(7));
+        hito(pedido, TipoHito.ENTREGA,
+            EstadoPagoHito.PENDIENTE, EstadoEntregaHito.NO_INICIADO);
+        when(pedidoRepository.findConHitosByEstado(EstadoPedido.EN_CURSO))
+            .thenReturn(List.of(pedido));
         when(sancionService.obtenerVigente(anyLong()))
             .thenReturn(Optional.of(new SancionCuenta()));
 

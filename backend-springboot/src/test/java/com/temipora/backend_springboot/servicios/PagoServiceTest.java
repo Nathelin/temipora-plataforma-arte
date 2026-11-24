@@ -71,6 +71,8 @@ class PagoServiceTest {
     private ProveedorPago proveedorPago;
     @Mock
     private AuditoriaService auditoria;
+    @Mock
+    private SancionMoraClienteService sancionMoraClienteService;
 
     @InjectMocks
     private PagoService pagoService;

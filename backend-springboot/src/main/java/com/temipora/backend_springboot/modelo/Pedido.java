@@ -79,6 +79,14 @@ public class Pedido {
     @Column(name = "mora_desde")
     private LocalDateTime moraDesde;
 
+    /**
+     * Instante del plazo de pago de la entrega final que el cliente incumplió.
+     * Se guarda una vez y no se recalcula: el plazo se corre si el cliente pide
+     * una revisión o si el artista reentrega.
+     */
+    @Column(name = "impago_desde")
+    private LocalDateTime impagoDesde;
+
     @Column(name = "incumplimiento_en")
     private LocalDateTime incumplimientoEn;
 

@@ -578,6 +578,46 @@ class PedidoServiceTest {
     }
 
     @Test
+    void expirarHitos_entregaFinalImpaga_noMarcaImpago() {
+        hito.getHitoPresupuesto().setTipo(TipoHito.ENTREGA);
+        hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
+        hito.setFechaLimitePago(LocalDateTime.now().minusDays(5));
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        when(hitoPedidoRepository
+            .findByEstadoPagoAndFechaLimitePagoBefore(
+                eq(EstadoPagoHito.PENDIENTE), any()))
+            .thenReturn(List.of(hito));
+        when(hitoPedidoRepository.findByIdHitoPedidoForUpdate(HITO))
+            .thenReturn(Optional.of(hito));
+
+        int expirados = pedidoService.expirarHitos();
+
+        assertThat(expirados).isZero();
+        assertThat(hito.getEstadoPago()).isEqualTo(EstadoPagoHito.PENDIENTE);
+        assertThat(pedido.getEstado()).isEqualTo(EstadoPedido.EN_CURSO);
+        verify(pagoService, never()).cancelarPendientes(any());
+    }
+
+    @Test
+    void expirarHitos_dentroDeLaGracia_noMarcaImpago() {
+        hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
+        hito.setFechaLimitePago(LocalDateTime.now().minusDays(1));
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        when(hitoPedidoRepository
+            .findByEstadoPagoAndFechaLimitePagoBefore(
+                eq(EstadoPagoHito.PENDIENTE), any()))
+            .thenReturn(List.of(hito));
+        when(hitoPedidoRepository.findByIdHitoPedidoForUpdate(HITO))
+            .thenReturn(Optional.of(hito));
+        when(hitoFlujoService.diasGraciaPago()).thenReturn(3);
+
+        int expirados = pedidoService.expirarHitos();
+
+        assertThat(expirados).isZero();
+        assertThat(pedido.getEstado()).isEqualTo(EstadoPedido.EN_CURSO);
+    }
+
+    @Test
     void listarRecibidos_conGrupoArchivo_consultaFinalizadosCanceladosEImpagos() {
         when(pedidoRepository.buscarRecibidos(
             eq(ARTISTA), any(), any(), any(), any(Pageable.class)))

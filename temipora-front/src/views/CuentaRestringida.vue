@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { useSesion } from '../composables/useSesion'
+import { usePagoHito } from '../composables/usePagoHito'
+import { formatearPrecio } from '../servicios/moneda'
 import SubirEntregable from '../components/SubirEntregable.vue'
 import CargandoPagina from '../components/CargandoPagina.vue'
 
@@ -12,22 +14,47 @@ const { limpiarSesionLocal } = useSesion()
 const cargando = ref(true)
 const error = ref('')
 const sancion = ref(null)
+const alcance = ref(localStorage.getItem('alcance') || '')
 const items = ref([])
+const deudas = ref([])
 const apelaciones = ref([])
 const contacto = ref('')
 const mensaje = ref('')
 const enviando = ref(false)
 const aviso = ref('')
 const errorApelacion = ref('')
+const errorPago = ref('')
+const pagandoId = ref(null)
+
+const esPagos = computed(() => alcance.value === 'PAGOS')
+const titulo = computed(() => (esPagos.value
+  ? 'Solo podés regularizar tus pagos pendientes'
+  : 'Solo podés entregar los pedidos pendientes'))
+const descripcion = computed(() => (esPagos.value
+  ? 'Tu cuenta quedó limitada porque no pagaste la entrega final de un pedido. Podés pagar la deuda, ver tus notificaciones y apelar; el resto de la plataforma queda bloqueado hasta que regularices.'
+  : 'Tu cuenta quedó limitada porque no entregaste a tiempo. Podés subir los entregables que debés; el resto de la plataforma queda bloqueado hasta que un administrador revise tu caso.'))
 
 const tienePendiente = computed(
   () => apelaciones.value.some((a) => a.estado === 'PENDIENTE'),
 )
 const puedeApelar = computed(() => Boolean(sancion.value) && !tienePendiente.value)
 
+const { pagarHito } = usePagoHito({
+  onExito: (msg) => { aviso.value = msg },
+  onError: (msg) => { errorPago.value = msg },
+  onNoAutorizado: () => router.push({ name: 'login' }),
+})
+
 function fecha(valor) {
   if (!valor) return ''
   return new Date(valor).toLocaleString('es-AR')
+}
+
+function montoDeuda(deuda) {
+  return formatearPrecio(
+    deuda.montoCobro ?? deuda.monto,
+    deuda.monedaCobro || deuda.moneda,
+  )
 }
 
 function salirDeRestriccion() {
@@ -39,9 +66,8 @@ async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    const [sancionRes, listaRes, apelacionesRes, contactoRes] = await Promise.all([
+    const [sancionRes, apelacionesRes, contactoRes] = await Promise.all([
       api.get('/apelaciones/sancion-activa'),
-      api.get('/pedidos/restringido'),
       api.get('/apelaciones'),
       api.get('/contacto').catch(() => ({ data: {} })),
     ])
@@ -54,8 +80,18 @@ async function cargar() {
       return
     }
     sancion.value = actual
+    alcance.value = actual.alcance || alcance.value
     apelaciones.value = apelacionesRes.data || []
 
+    if (esPagos.value) {
+      items.value = []
+      const deudasRes = await api.get('/pedidos/deudas')
+      deudas.value = deudasRes.data || []
+      return
+    }
+
+    deudas.value = []
+    const listaRes = await api.get('/pedidos/restringido')
     const resumenes = listaRes.data || []
     const detalles = await Promise.all(
       resumenes.map((p) => api.get(`/pedidos/${p.idPedido}`)),
@@ -68,7 +104,7 @@ async function cargar() {
     })
   } catch (e) {
     error.value = e.response?.data?.message
-      || 'No se pudo cargar tu panel de entregas.'
+      || 'No se pudo cargar tu panel de restricción.'
   } finally {
     cargando.value = false
   }
@@ -77,6 +113,22 @@ async function cargar() {
 async function alEntregar() {
   aviso.value = 'Entrega subida. El cliente tiene que aprobarla.'
   await cargar()
+}
+
+async function pagarDeuda(deuda) {
+  if (pagandoId.value) return
+  pagandoId.value = deuda.idHitoPedido
+  errorPago.value = ''
+  aviso.value = ''
+  try {
+    await pagarHito(
+      { idHitoPedido: deuda.idHitoPedido, nombre: deuda.nombreHito },
+      deuda.idPedido,
+    )
+    await cargar()
+  } finally {
+    pagandoId.value = null
+  }
 }
 
 async function apelar() {
@@ -119,12 +171,10 @@ onMounted(cargar)
           Cuenta restringida
         </p>
         <h1 class="mt-1 text-2xl font-bold text-granate">
-          Solo podés entregar los pedidos pendientes
+          {{ titulo }}
         </h1>
         <p class="mt-2 text-sm leading-relaxed text-cafe/70">
-          Tu cuenta quedó limitada porque no entregaste a tiempo. Podés subir los
-          entregables que debés; el resto de la plataforma queda bloqueado hasta
-          que un administrador revise tu caso.
+          {{ descripcion }}
         </p>
         <div v-if="sancion" class="mt-4 rounded-xl bg-rosa/10 px-4 py-3 text-sm text-cafe/80">
           <p>{{ sancion.motivo }}</p>
@@ -150,13 +200,60 @@ onMounted(cargar)
         </div>
       </header>
 
-      <CargandoPagina v-if="cargando" tipo="lista" mensaje="Cargando entregas pendientes…" :tarjetas="2" />
+      <CargandoPagina
+        v-if="cargando"
+        tipo="lista"
+        :mensaje="esPagos ? 'Cargando pagos pendientes…' : 'Cargando entregas pendientes…'"
+        :tarjetas="2"
+      />
       <p v-else-if="error" class="rounded-2xl bg-blanco p-6 text-center text-rojizo">
         {{ error }}
       </p>
 
       <template v-else>
-        <section class="space-y-4">
+        <section v-if="esPagos" class="space-y-4">
+          <h2 class="text-lg font-bold text-granate">Pagos pendientes</h2>
+          <p v-if="!deudas.length" class="rounded-2xl bg-blanco p-6 text-sm text-cafe/60">
+            No tenés pagos pendientes. Si ya regularizaste la deuda, la cuenta se
+            habilita sola.
+          </p>
+          <article
+            v-for="deuda in deudas"
+            :key="`${deuda.idPedido}-${deuda.idHitoPedido}`"
+            class="rounded-2xl bg-blanco p-5 shadow-lg shadow-rosa/20"
+          >
+            <p class="text-sm font-semibold text-granate">
+              Pedido #{{ deuda.idPedido }} · {{ deuda.nombreServicio }}
+            </p>
+            <p class="mt-1 text-xs text-cafe/60">
+              Artista: @{{ deuda.nombreUsuarioArtista }}
+            </p>
+            <p class="mt-2 text-sm text-cafe">
+              {{ deuda.nombreHito }} ·
+              <span class="font-semibold">{{ montoDeuda(deuda) }}</span>
+            </p>
+            <p v-if="deuda.fechaLimitePago" class="mt-1 text-xs text-rojizo">
+              Venció el {{ fecha(deuda.fechaLimitePago) }}
+              <span v-if="deuda.diasAtraso > 0">
+                · {{ deuda.diasAtraso }} día(s) de atraso
+              </span>
+            </p>
+            <button
+              v-if="deuda.puedePagar"
+              type="button"
+              :disabled="pagandoId === deuda.idHitoPedido"
+              class="mt-3 rounded-full bg-coral px-5 py-2 text-sm font-semibold text-white transition hover:bg-rojizo disabled:cursor-not-allowed disabled:bg-coral/40"
+              @click="pagarDeuda(deuda)"
+            >
+              {{ pagandoId === deuda.idHitoPedido ? 'Redirigiendo…' : 'Pagar' }}
+            </button>
+          </article>
+          <p v-if="errorPago" class="rounded-lg border border-rojizo/25 bg-rojizo/5 px-3 py-2 text-sm text-rojizo" role="alert">
+            {{ errorPago }}
+          </p>
+        </section>
+
+        <section v-else class="space-y-4">
           <h2 class="text-lg font-bold text-granate">Entregas pendientes</h2>
           <p v-if="!items.length" class="rounded-2xl bg-blanco p-6 text-sm text-cafe/60">
             No tenés entregables pendientes. Si tu caso fue revisado, un

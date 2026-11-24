@@ -57,6 +57,7 @@ public class PagoService {
     private final PedidoCierreService pedidoCierreService;
     private final ProveedorPago proveedorPago;
     private final AuditoriaService auditoria;
+    private final SancionMoraClienteService sancionMoraClienteService;
 
     public PagoService(
             PagoRepository pagoRepository,
@@ -67,7 +68,8 @@ public class PagoService {
             HitoFlujoService hitoFlujoService,
             PedidoCierreService pedidoCierreService,
             ProveedorPago proveedorPago,
-            AuditoriaService auditoria) {
+            AuditoriaService auditoria,
+            SancionMoraClienteService sancionMoraClienteService) {
         this.pagoRepository = pagoRepository;
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.pedidoRepository = pedidoRepository;
@@ -77,6 +79,7 @@ public class PagoService {
         this.pedidoCierreService = pedidoCierreService;
         this.proveedorPago = proveedorPago;
         this.auditoria = auditoria;
+        this.sancionMoraClienteService = sancionMoraClienteService;
     }
 
     @Transactional
@@ -373,8 +376,17 @@ public class PagoService {
         }
 
         hitoPedidoRepository.save(hito);
+        boolean teniaImpago = pedido.getImpagoDesde() != null;
+        if (teniaImpago) {
+            pedido.setImpagoDesde(null);
+        }
         pedidoRepository.save(pedido);
         pagoRepository.save(pago);
+
+        if (teniaImpago) {
+            sancionMoraClienteService.curarSiCorresponde(
+                pedido.getCliente().getIdUsuario());
+        }
 
         notificarPagoRecibido(pedido, hito);
 

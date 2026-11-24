@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -202,6 +203,10 @@ public class PedidoService {
         if (solicitud.getCliente() == null
                 || !solicitud.getCliente().getIdUsuario().equals(idCliente)) {
             throw new AccesoDenegadoException("No podés pagar esta solicitud.");
+        }
+        if (sancionService.tieneSancionDeCompra(idCliente)) {
+            throw new ConflictoException(
+                MoraClienteService.MENSAJE_COMPRA_BLOQUEADA);
         }
 
         Optional<Pedido> existente = pedidoRepository
@@ -1152,6 +1157,15 @@ public class PedidoService {
                     || !hito.getFechaLimitePago().isBefore(ahora)) {
                 continue;
             }
+            // La entrega final impaga no cierra el pedido: la gestiona
+            // MoraClienteService para conservar la deuda y poder cobrarla.
+            if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
+                continue;
+            }
+            if (ahora.isBefore(hito.getFechaLimitePago()
+                    .plusDays(hitoFlujoService.diasGraciaPago()))) {
+                continue;
+            }
             Pedido pedido = pedidoRepository.findByIdPedidoForUpdate(
                     hito.getPedido().getIdPedido())
                 .orElse(null);
@@ -1189,6 +1203,21 @@ public class PedidoService {
             expirados++;
         }
         return expirados;
+    }
+
+    /**
+     * Días que le quedan al cliente antes de que se le suspendan las compras.
+     * Se cuenta hasta el fin de la gracia y nunca es negativo.
+     */
+    private Integer diasGraciaPagoRestantes(Pedido pedido) {
+        if (pedido.getImpagoDesde() == null) {
+            return null;
+        }
+        LocalDateTime finGracia = pedido.getImpagoDesde()
+            .plusDays(hitoFlujoService.diasGraciaPago());
+        long dias = ChronoUnit.DAYS.between(
+            LocalDateTime.now().toLocalDate(), finGracia.toLocalDate());
+        return (int) Math.max(0, dias);
     }
 
     private PedidoDTO construirDTO(Pedido pedido, Long idVista) {
@@ -1345,6 +1374,9 @@ public class PedidoService {
             .entregaAtrasada(PedidoFechas.entregaAtrasada(
                 pedido, LocalDate.now()))
             .finalizadoEn(pedido.getFinalizadoEn())
+            .impagoDesde(pedido.getImpagoDesde())
+            .pagoVencido(pedido.getImpagoDesde() != null)
+            .diasGraciaPagoRestantes(diasGraciaPagoRestantes(pedido))
             .precioFinal(pedido.getPresupuesto().getPrecioFinal())
             .precioFinalCobro(pedido.getPresupuesto().getPrecioFinalCobro())
             .precioFinalMostrado(PresupuestoDTO.totalMostrado(
@@ -1529,6 +1561,9 @@ public class PedidoService {
             .diasDemoraCliente(PedidoFechas.diasDemoraCliente(pedido))
             .entregaAtrasada(PedidoFechas.entregaAtrasada(
                 pedido, LocalDate.now()))
+            .impagoDesde(pedido.getImpagoDesde())
+            .pagoVencido(pedido.getImpagoDesde() != null)
+            .diasGraciaPagoRestantes(diasGraciaPagoRestantes(pedido))
             .precioFinalCobro(pedido.getPresupuesto().getPrecioFinalCobro())
             .monedaCobro(pedido.getPresupuesto().getMonedaCobro() != null
                 ? pedido.getPresupuesto().getMonedaCobro().getCodigo()

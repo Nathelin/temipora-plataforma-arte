@@ -74,4 +74,12 @@ public class PedidoConfigRequest {
     @Min(value = 7, message = "El cierre tras el bloqueo debe ser al menos 7 días.")
     @Max(value = 180, message = "El cierre tras el bloqueo no puede superar los 180 días.")
     private Integer diasCierreTrasBloqueo;
+
+    @Min(value = 1, message = "La gracia de pago debe ser al menos 1 día.")
+    @Max(value = 30, message = "La gracia de pago no puede superar los 30 días.")
+    private Integer diasGraciaPago;
+
+    @Min(value = 1, message = "La sanción de compras debe durar al menos 1 día.")
+    @Max(value = 90, message = "La sanción de compras no puede superar los 90 días.")
+    private Integer diasSancionCompras;
 }

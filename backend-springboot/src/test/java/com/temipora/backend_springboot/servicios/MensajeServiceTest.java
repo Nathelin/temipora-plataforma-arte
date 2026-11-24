@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.context.ApplicationEventPublisher;
@@ -65,8 +66,16 @@ class MensajeServiceTest {
     @Mock
     private ApplicationEventPublisher eventoPublisher;
 
+    @Mock
+    private MoraClienteService moraClienteService;
+
     @InjectMocks
     private MensajeService mensajeService;
+
+    @BeforeEach
+    void permitirChat() {
+        when(moraClienteService.chatPermitido(any(), any())).thenReturn(true);
+    }
 
     @Test
     void enviar_noParticipante_lanzaNoEncontrada() {
@@ -130,6 +139,23 @@ class MensajeServiceTest {
                 10L, 1L, request("Hola")))
             .isInstanceOf(ConflictoException.class)
             .hasMessageContaining("límite");
+    }
+
+    @Test
+    void enviar_conChatBloqueado_lanzaConflicto() {
+        Conversacion conversacion = conversacion(
+            EstadoConversacion.ACEPTADA,
+            usuario(1L, "cliente", ERol.CLIENTE),
+            usuario(2L, "artista", ERol.ARTISTA));
+        prepararEnvio(conversacion, new ConfiguracionMensajeria());
+        when(moraClienteService.chatPermitido(1L, 2L)).thenReturn(false);
+
+        assertThatThrownBy(() -> mensajeService.enviar(
+                10L, 1L, request("Hola")))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("pago pendiente");
+
+        verify(mensajeRepository, never()).save(any(Mensaje.class));
     }
 
     @Test

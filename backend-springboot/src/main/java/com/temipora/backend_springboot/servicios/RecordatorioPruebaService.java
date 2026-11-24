@@ -51,7 +51,11 @@ public class RecordatorioPruebaService {
         int gracia = config.getDiasGraciaEntrega() != null
             ? config.getDiasGraciaEntrega()
             : ConfiguracionPedido.DIAS_GRACIA_ENTREGA_POR_DEFECTO;
-        if (enviarGrupo(usuario, pagosDeMuestra(), true, false, "pago")) {
+        int diasCompras = config.getDiasSancionCompras() != null
+            ? config.getDiasSancionCompras()
+            : ConfiguracionPedido.DIAS_SANCION_COMPRAS_POR_DEFECTO;
+        if (enviarGrupo(usuario, pagosDeMuestra(gracia, diasCompras), true, false,
+                "pago")) {
             enviados++;
         }
         if (enviarGrupo(usuario, entregasDeMuestra(gracia), false, true,
@@ -90,7 +94,8 @@ public class RecordatorioPruebaService {
             && envio.getEstado() == EstadoEnvioEmail.ENVIADO;
     }
 
-    private List<EmailPlantillaService.RecordatorioEmail> pagosDeMuestra() {
+    private List<EmailPlantillaService.RecordatorioEmail> pagosDeMuestra(
+            int gracia, int diasCompras) {
         return List.of(new EmailPlantillaService.RecordatorioEmail(
             "PAGO",
             null,
@@ -103,7 +108,7 @@ public class RecordatorioPruebaService {
             "ARS",
             true,
             false,
-            null));
+            consecuenciaPago(gracia, diasCompras)));
     }
 
     private List<EmailPlantillaService.RecordatorioEmail> entregasDeMuestra(
@@ -121,6 +126,14 @@ public class RecordatorioPruebaService {
             true,
             false,
             consecuenciaEntrega(gracia)));
+    }
+
+    private String consecuenciaPago(int gracia, int diasCompras) {
+        int total = gracia + diasCompras;
+        return "Si no pagás, en " + dias(gracia)
+            + " se suspenden tus compras y solo podés mensajear al artista al que"
+            + " le debés. Si el impago sigue, a los " + dias(total)
+            + " del vencimiento la cuenta queda limitada a pagos.";
     }
 
     private String consecuenciaEntrega(int gracia) {

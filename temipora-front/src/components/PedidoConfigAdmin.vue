@@ -17,10 +17,16 @@ const diasGraciaEntrega = ref('3')
 const diasSancionVentas = ref('14')
 const diasReapelacion = ref('7')
 const diasCierreTrasBloqueo = ref('30')
+const diasGraciaPago = ref('3')
+const diasSancionCompras = ref('27')
 const procesandoMails = ref(false)
 const enviandoPrueba = ref(false)
 const mensajeMails = ref('')
 const errorMails = ref('')
+const procesandoSanciones = ref(false)
+const procesandoImpagos = ref(false)
+const mensajeSanciones = ref('')
+const errorSanciones = ref('')
 const maxHitos = ref('4')
 const porcentajeMaxPrimerHito = ref('50')
 const montoMinimoCuota = ref('1')
@@ -39,6 +45,8 @@ async function cargar() {
     diasSancionVentas.value = res.data?.diasSancionVentas ?? 14
     diasReapelacion.value = res.data?.diasReapelacion ?? 7
     diasCierreTrasBloqueo.value = res.data?.diasCierreTrasBloqueo ?? 30
+    diasGraciaPago.value = res.data?.diasGraciaPago ?? 3
+    diasSancionCompras.value = res.data?.diasSancionCompras ?? 27
     maxHitos.value = res.data?.maxHitos ?? 4
     porcentajeMaxPrimerHito.value = res.data?.porcentajeMaxPrimerHito ?? 50
     montoMinimoCuota.value = res.data?.montoMinimoCuota ?? 1
@@ -93,6 +101,8 @@ async function guardar() {
     entero(diasSancionVentas.value, 1, 60, 'La sanción de ventas'),
     entero(diasReapelacion.value, 1, 90, 'La espera entre apelaciones'),
     entero(diasCierreTrasBloqueo.value, 7, 180, 'El cierre tras el bloqueo'),
+    entero(diasGraciaPago.value, 1, 30, 'La gracia de pago'),
+    entero(diasSancionCompras.value, 1, 90, 'La sanción de compras'),
     entero(maxHitos.value, 1, 6, 'El máximo de hitos'),
     decimal(porcentajeMaxPrimerHito.value, 1, 100, 'El porcentaje máximo del primer hito'),
     decimal(montoMinimoCuota.value, 0, 10000000, 'El monto mínimo por cuota'),
@@ -114,6 +124,8 @@ async function guardar() {
       diasSancionVentas: Number(diasSancionVentas.value),
       diasReapelacion: Number(diasReapelacion.value),
       diasCierreTrasBloqueo: Number(diasCierreTrasBloqueo.value),
+      diasGraciaPago: Number(diasGraciaPago.value),
+      diasSancionCompras: Number(diasSancionCompras.value),
       maxHitos: Number(maxHitos.value),
       porcentajeMaxPrimerHito: Number(String(porcentajeMaxPrimerHito.value).replace(',', '.')),
       montoMinimoCuota: Number(String(montoMinimoCuota.value).replace(',', '.')),
@@ -168,6 +180,47 @@ async function enviarRecordatoriosDePrueba() {
       || 'No se pudieron enviar los recordatorios de prueba.'
   } finally {
     enviandoPrueba.value = false
+  }
+}
+
+async function procesarSancionesArtistas() {
+  if (procesandoSanciones.value) return
+  procesandoSanciones.value = true
+  mensajeSanciones.value = ''
+  errorSanciones.value = ''
+  try {
+    const res = await api.post('/admin/incumplimientos/procesar')
+    const r = res.data || {}
+    mensajeSanciones.value = `${Number(r.morasRegistradas || 0)} mora(s), `
+      + `${Number(r.nivel1Aplicados || 0)} nivel 1, `
+      + `${Number(r.sancionesEscaladas || 0)} escalada(s), `
+      + `${Number(r.sancionesCuradas || 0)} curada(s), `
+      + `${Number(r.pedidosCerrados || 0)} pedido(s) cerrado(s).`
+  } catch (e) {
+    errorSanciones.value = e.response?.data?.message
+      || 'No se pudieron procesar las sanciones de artistas.'
+  } finally {
+    procesandoSanciones.value = false
+  }
+}
+
+async function procesarImpagosClientes() {
+  if (procesandoImpagos.value) return
+  procesandoImpagos.value = true
+  mensajeSanciones.value = ''
+  errorSanciones.value = ''
+  try {
+    const res = await api.post('/admin/impagos-cliente/procesar')
+    const r = res.data || {}
+    mensajeSanciones.value = `${Number(r.impagosRegistrados || 0)} impago(s), `
+      + `${Number(r.nivel1Aplicados || 0)} nivel 1, `
+      + `${Number(r.sancionesEscaladas || 0)} escalada(s), `
+      + `${Number(r.sancionesCuradas || 0)} curada(s).`
+  } catch (e) {
+    errorSanciones.value = e.response?.data?.message
+      || 'No se pudieron procesar los impagos de clientes.'
+  } finally {
+    procesandoImpagos.value = false
   }
 }
 </script>
@@ -393,6 +446,45 @@ async function enviarRecordatoriosDePrueba() {
                 incumplimiento.
               </p>
             </div>
+
+            <h3 class="text-sm font-semibold text-granate sm:col-span-2">
+              Cliente moroso
+            </h3>
+            <div>
+              <label for="dias-gracia-pago" class="mb-2 block text-sm text-cafe">
+                Gracia antes de suspender compras (días) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="dias-gracia-pago"
+                v-model="diasGraciaPago"
+                type="number"
+                min="1"
+                max="30"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Días extra después del pago vencido de la entrega final antes de
+                suspender las compras y el chat con terceros.
+              </p>
+            </div>
+            <div>
+              <label for="dias-sancion-compras" class="mb-2 block text-sm text-cafe">
+                Duración de la suspensión de compras (días) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="dias-sancion-compras"
+                v-model="diasSancionCompras"
+                type="number"
+                min="1"
+                max="90"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Al terminar, si sigue el impago, la cuenta pasa a “solo pagos”.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -437,6 +529,32 @@ async function enviarRecordatoriosDePrueba() {
           </p>
           <p v-if="mensajeMails" class="mt-3 text-sm text-green-700">{{ mensajeMails }}</p>
           <p v-if="errorMails" class="mt-3 text-sm text-rojizo">{{ errorMails }}</p>
+        </div>
+
+        <div class="border-t border-rosa/40 pt-6">
+          <h2 class="mb-2 text-base text-granate">Procesos automáticos</h2>
+          <p class="text-xs leading-relaxed text-cafe/50">
+            Ejecutá ahora la detección de mora y la escalada de sanciones sin
+            esperar al programador.
+          </p>
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              :disabled="procesandoSanciones"
+              class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-coral px-5 text-sm font-semibold text-coral transition hover:bg-coral/10 disabled:opacity-50"
+              @click="procesarSancionesArtistas"
+            >
+              {{ procesandoSanciones ? 'Procesando...' : 'Procesar sanciones de artistas' }}
+            </button>
+            <button
+              :disabled="procesandoImpagos"
+              class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-coral px-5 text-sm font-semibold text-coral transition hover:bg-coral/10 disabled:opacity-50"
+              @click="procesarImpagosClientes"
+            >
+              {{ procesandoImpagos ? 'Procesando...' : 'Procesar impagos de clientes' }}
+            </button>
+          </div>
+          <p v-if="mensajeSanciones" class="mt-3 text-sm text-green-700">{{ mensajeSanciones }}</p>
+          <p v-if="errorSanciones" class="mt-3 text-sm text-rojizo">{{ errorSanciones }}</p>
         </div>
       </div>
 
@@ -486,6 +604,14 @@ async function enviarRecordatoriosDePrueba() {
           <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Cierre tras el bloqueo</dt>
             <dd class="text-cafe">{{ config.diasCierreTrasBloqueo }} días</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Gracia de pago del cliente</dt>
+            <dd class="text-cafe">{{ config.diasGraciaPago }} días</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Suspensión de compras</dt>
+            <dd class="text-cafe">{{ config.diasSancionCompras }} días</dd>
           </div>
           <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Sanciones automáticas desde</dt>

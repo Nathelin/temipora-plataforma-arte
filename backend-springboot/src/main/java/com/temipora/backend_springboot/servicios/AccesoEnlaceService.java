@@ -110,6 +110,7 @@ public class AccesoEnlaceService {
         }
 
         boolean restringido = false;
+        AlcanceSancion alcanceRestringido = null;
         if (usuario != null) {
             var sancionesVigentes = sancionCuentaRepository.findVigentesByUsuarioId(
                 usuario.getIdUsuario(), EstadoSancion.ACTIVA, ahora);
@@ -121,7 +122,11 @@ public class AccesoEnlaceService {
                         "Tu cuenta se encuentra inhabilitada. Motivo: " + sancion.getMotivo()
                             + ". Contacto: " + contacto.getEmail());
                 }
-                restringido = sancion.getAlcance() == AlcanceSancion.ENTREGAS;
+                restringido = sancion.getAlcance() == AlcanceSancion.ENTREGAS
+                    || sancion.getAlcance() == AlcanceSancion.PAGOS;
+                if (restringido) {
+                    alcanceRestringido = sancion.getAlcance();
+                }
             }
         }
 
@@ -147,7 +152,7 @@ public class AccesoEnlaceService {
         respuesta.put("idReferencia", token.getIdReferencia());
         respuesta.put("restringido", restringido);
         if (restringido) {
-            respuesta.put("alcance", "ENTREGAS");
+            respuesta.put("alcance", alcanceRestringido.name());
         }
 
         auditarFallo(nombreUsuario, proposito, null);

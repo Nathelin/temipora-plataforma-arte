@@ -70,6 +70,7 @@ public class ConversacionService {
     private final NotificacionService notificacionService;
     private final IndicadorEscritura indicadorEscritura;
     private final ApplicationEventPublisher eventoPublisher;
+    private final MoraClienteService moraClienteService;
 
     public ConversacionService(
             ConversacionRepository conversacionRepository,
@@ -80,7 +81,8 @@ public class ConversacionService {
             ConfiguracionMensajeriaService configuracionService,
             NotificacionService notificacionService,
             IndicadorEscritura indicadorEscritura,
-            ApplicationEventPublisher eventoPublisher) {
+            ApplicationEventPublisher eventoPublisher,
+            MoraClienteService moraClienteService) {
         this.conversacionRepository = conversacionRepository;
         this.participanteRepository = participanteRepository;
         this.accionRepository = accionRepository;
@@ -90,6 +92,7 @@ public class ConversacionService {
         this.notificacionService = notificacionService;
         this.indicadorEscritura = indicadorEscritura;
         this.eventoPublisher = eventoPublisher;
+        this.moraClienteService = moraClienteService;
     }
 
     @Transactional
@@ -109,6 +112,11 @@ public class ConversacionService {
             .orElseThrow(() -> new NoSuchElementException(
                 "No existe el usuario @" + nombreDestinatario + "."));
         validarDestinatario(remitente, destinatario);
+        if (!moraClienteService.chatPermitido(
+                remitente.getIdUsuario(), destinatario.getIdUsuario())) {
+            throw new ConflictoException(
+                MoraClienteService.MENSAJE_CHAT_BLOQUEADO);
+        }
 
         String motivo = TextoMensajeria.obligatorio(
             request.getMotivoContacto(), config.getLongitudMaximaMotivo(),
@@ -182,7 +190,9 @@ public class ConversacionService {
             Usuario artista,
             Long idSolicitud,
             String nombreServicio) {
-        if (!participantesValidos(cliente, artista)) {
+        if (!participantesValidos(cliente, artista)
+                || !moraClienteService.chatPermitido(
+                    cliente.getIdUsuario(), artista.getIdUsuario())) {
             return;
         }
 
@@ -489,6 +499,14 @@ public class ConversacionService {
                 || !otro.isEstadoCuenta()) {
             return relacion(EstadoRelacionMensaje.NINGUNA, null, false,
                 "El usuario no está disponible para recibir mensajes.", null);
+        }
+
+        if (!moraClienteService.chatPermitido(
+                idUsuario, otro.getIdUsuario())) {
+            return conContraparte(
+                relacion(EstadoRelacionMensaje.NINGUNA, null, false,
+                    MoraClienteService.MENSAJE_CHAT_BLOQUEADO, null),
+                otro);
         }
 
         Optional<Conversacion> existente = conversacionRepository

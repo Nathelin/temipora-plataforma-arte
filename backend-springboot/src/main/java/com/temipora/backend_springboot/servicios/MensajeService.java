@@ -42,6 +42,7 @@ public class MensajeService {
     private final ConfiguracionMensajeriaService configuracionService;
     private final IndicadorEscritura indicadorEscritura;
     private final ApplicationEventPublisher eventoPublisher;
+    private final MoraClienteService moraClienteService;
 
     public MensajeService(
             MensajeRepository mensajeRepository,
@@ -50,7 +51,8 @@ public class MensajeService {
             UsuarioRepository usuarioRepository,
             ConfiguracionMensajeriaService configuracionService,
             IndicadorEscritura indicadorEscritura,
-            ApplicationEventPublisher eventoPublisher) {
+            ApplicationEventPublisher eventoPublisher,
+            MoraClienteService moraClienteService) {
         this.mensajeRepository = mensajeRepository;
         this.conversacionRepository = conversacionRepository;
         this.participanteRepository = participanteRepository;
@@ -58,6 +60,7 @@ public class MensajeService {
         this.configuracionService = configuracionService;
         this.indicadorEscritura = indicadorEscritura;
         this.eventoPublisher = eventoPublisher;
+        this.moraClienteService = moraClienteService;
     }
 
     @Transactional
@@ -84,6 +87,11 @@ public class MensajeService {
         if (!contraparte.isEstadoCuenta()) {
             throw new ConflictoException(
                 "El usuario no está disponible para recibir mensajes.");
+        }
+        if (!moraClienteService.chatPermitido(
+                remitente.getIdUsuario(), contraparte.getIdUsuario())) {
+            throw new ConflictoException(
+                MoraClienteService.MENSAJE_CHAT_BLOQUEADO);
         }
 
         ConfiguracionMensajeria config = configuracionService.obtener();

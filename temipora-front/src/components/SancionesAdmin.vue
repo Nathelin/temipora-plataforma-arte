@@ -39,6 +39,8 @@ const nombresAlcance = {
   ACCESO: 'Acceso completo',
   VENTAS: 'Ventas',
   ENTREGAS: 'Solo entregas',
+  COMPRAS: 'Compras suspendidas',
+  PAGOS: 'Solo pagos',
 }
 
 const nombresOrigen = {

@@ -98,6 +98,13 @@ public class HitoFlujoService {
             : ConfiguracionPedido.DIAS_REENTREGA_POR_DEFECTO;
     }
 
+    public int diasGraciaPago() {
+        ConfiguracionPedido config = configuracionPedidoService.obtener();
+        return config.getDiasGraciaPago() != null
+            ? config.getDiasGraciaPago()
+            : ConfiguracionPedido.DIAS_GRACIA_PAGO_POR_DEFECTO;
+    }
+
     private String nombreServicio(Pedido pedido) {
         return pedido.getServicio() != null && pedido.getServicio().getNombre() != null
             ? pedido.getServicio().getNombre()

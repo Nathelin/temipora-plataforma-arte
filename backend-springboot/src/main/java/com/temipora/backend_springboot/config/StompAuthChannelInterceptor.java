@@ -90,10 +90,11 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
                 : userDetailsService.loadUserByUsername(nombreUsuario);
             if (userDetailsService instanceof AccesoUsuarioService acceso
                     && acceso.restriccionVigente(nombreUsuario)
-                        .filter(alcance -> alcance == AlcanceSancion.ENTREGAS)
+                        .filter(alcance -> alcance == AlcanceSancion.ENTREGAS
+                            || alcance == AlcanceSancion.PAGOS)
                         .isPresent()) {
                 throw new MessagingException(
-                    "La cuenta está restringida a entregas.");
+                    "La cuenta está restringida y no puede usar la mensajería.");
             }
         } catch (CuentaSancionadaException e) {
             throw new MessagingException("La cuenta está inhabilitada.");

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.EmailRecordatorioPendiente;
 import com.temipora.backend_springboot.modelo.EnvioEmail;
@@ -81,9 +82,12 @@ public class RecordatorioProcesador {
             omitirPendientes(idUsuario);
             return false;
         }
-        if (sancionService.obtenerVigente(idUsuario).isPresent()) {
+        var sancionVigente = sancionService.obtenerVigente(idUsuario);
+        if (sancionVigente.isPresent()
+                && sancionVigente.get().getAlcance() == AlcanceSancion.ACCESO) {
             return false;
         }
+        boolean sancionado = sancionVigente.isPresent();
 
         List<EmailRecordatorioPendiente> pendientes = repository
             .findByUsuarioIdUsuarioAndEstadoOrderByCreadoEnAsc(
@@ -102,9 +106,13 @@ public class RecordatorioProcesador {
         int gracia = config.getDiasGraciaEntrega() != null
             ? config.getDiasGraciaEntrega()
             : ConfiguracionPedido.DIAS_GRACIA_ENTREGA_POR_DEFECTO;
+        int diasCompras = config.getDiasSancionCompras() != null
+            ? config.getDiasSancionCompras()
+            : ConfiguracionPedido.DIAS_SANCION_COMPRAS_POR_DEFECTO;
 
         for (EmailRecordatorioPendiente fila : pendientes) {
-            EmailPlantillaService.RecordatorioEmail item = item(fila, gracia);
+            EmailPlantillaService.RecordatorioEmail item =
+                item(fila, gracia, diasCompras, sancionado);
             if (item == null) {
                 fila.setEstado(EstadoEmailRecordatorio.OMITIDO);
                 continue;
@@ -197,9 +205,17 @@ public class RecordatorioProcesador {
     }
 
     private EmailPlantillaService.RecordatorioEmail item(
-            EmailRecordatorioPendiente fila, int gracia) {
+            EmailRecordatorioPendiente fila,
+            int gracia,
+            int diasCompras,
+            boolean sancionado) {
         Pedido pedido = fila.getPedido();
         if (pedido == null || fila.getMotivo() == null) {
+            return null;
+        }
+        // Una sanción no impide el recordatorio de pago (es la salida), pero sí
+        // omite los de entrega mientras la cuenta esté restringida.
+        if (sancionado && !fila.getMotivo().esPago()) {
             return null;
         }
         String servicio = nombreServicio(pedido);
@@ -234,7 +250,7 @@ public class RecordatorioProcesador {
                 moneda,
                 fila.getMotivo().esUrgente(),
                 fila.getMotivo().esAlerta(),
-                null);
+                consecuenciaPago(fila.getMotivo(), gracia, diasCompras));
         }
 
         String cliente = pedido.getCliente() != null
@@ -264,6 +280,20 @@ public class RecordatorioProcesador {
             fila.getMotivo().esUrgente(),
             fila.getMotivo().esAlerta(),
             consecuenciaEntrega(fila.getMotivo(), gracia));
+    }
+
+    private String consecuenciaPago(
+            MotivoRecordatorio motivo, int gracia, int diasCompras) {
+        if (motivo != MotivoRecordatorio.PAGO_7D
+                && motivo != MotivoRecordatorio.PAGO_72H
+                && motivo != MotivoRecordatorio.PAGO_24H) {
+            return null;
+        }
+        int total = gracia + diasCompras;
+        return "Si no pagás, en " + dias(gracia)
+            + " se suspenden tus compras y solo podés mensajear al artista al que"
+            + " le debés. Si el impago sigue, a los " + dias(total)
+            + " del vencimiento la cuenta queda limitada a pagos.";
     }
 
     private String consecuenciaEntrega(MotivoRecordatorio motivo, int gracia) {

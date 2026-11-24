@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.context.ApplicationEventPublisher;
@@ -86,8 +87,31 @@ class ConversacionServiceTest {
     @Mock
     private ApplicationEventPublisher eventoPublisher;
 
+    @Mock
+    private MoraClienteService moraClienteService;
+
     @InjectMocks
     private ConversacionService conversacionService;
+
+    @BeforeEach
+    void permitirChat() {
+        when(moraClienteService.chatPermitido(any(), any())).thenReturn(true);
+    }
+
+    @Test
+    void crear_conChatBloqueado_lanzaConflicto() {
+        Usuario remitente = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario destinatario = usuario(2L, "artista", ERol.ARTISTA);
+        prepararCreacion(remitente, destinatario);
+        when(moraClienteService.chatPermitido(1L, 2L)).thenReturn(false);
+
+        assertThatThrownBy(() -> conversacionService.crear(
+                1L, request("artista", "Consulta", "Hola.")))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("pago pendiente");
+
+        verify(conversacionRepository, never()).save(any(Conversacion.class));
+    }
 
     @Test
     void crear_ok_creaPendienteYNotificaAlDestinatario() {

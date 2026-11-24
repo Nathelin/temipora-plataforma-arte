@@ -27,7 +27,9 @@ public class ConfiguracionPedidoService {
         CampoAuditado.de("diasGraciaEntrega", "Días de gracia de entrega"),
         CampoAuditado.de("diasSancionVentas", "Duración de la sanción de ventas"),
         CampoAuditado.de("diasReapelacion", "Días entre apelaciones"),
-        CampoAuditado.de("diasCierreTrasBloqueo", "Días para cerrar tras el bloqueo"));
+        CampoAuditado.de("diasCierreTrasBloqueo", "Días para cerrar tras el bloqueo"),
+        CampoAuditado.de("diasGraciaPago", "Días de gracia de pago del cliente"),
+        CampoAuditado.de("diasSancionCompras", "Duración de la sanción de compras"));
 
     private final ConfiguracionPedidoRepository configuracionRepository;
     private final AuditoriaService auditoria;
@@ -66,6 +68,10 @@ public class ConfiguracionPedidoService {
                     ConfiguracionPedido.DIAS_REAPELACION_POR_DEFECTO);
                 nueva.setDiasCierreTrasBloqueo(
                     ConfiguracionPedido.DIAS_CIERRE_TRAS_BLOQUEO_POR_DEFECTO);
+                nueva.setDiasGraciaPago(
+                    ConfiguracionPedido.DIAS_GRACIA_PAGO_POR_DEFECTO);
+                nueva.setDiasSancionCompras(
+                    ConfiguracionPedido.DIAS_SANCION_COMPRAS_POR_DEFECTO);
                 return configuracionRepository.save(nueva);
             });
         if (config.getSancionesAutomaticasDesde() == null) {
@@ -103,6 +109,14 @@ public class ConfiguracionPedidoService {
             "La espera entre apelaciones debe estar entre 1 y 90 días.");
         validarRango(request.getDiasCierreTrasBloqueo(), 7, 180,
             "El cierre tras el bloqueo debe estar entre 7 y 180 días.");
+        if (request.getDiasGraciaPago() != null) {
+            validarRango(request.getDiasGraciaPago(), 1, 30,
+                "La gracia de pago debe estar entre 1 y 30 días.");
+        }
+        if (request.getDiasSancionCompras() != null) {
+            validarRango(request.getDiasSancionCompras(), 1, 90,
+                "La sanción de compras debe estar entre 1 y 90 días.");
+        }
 
         BigDecimal porcentajeMaximo = decimal(
             request.getPorcentajeMaxPrimerHito(),
@@ -134,6 +148,12 @@ public class ConfiguracionPedidoService {
         config.setDiasSancionVentas(request.getDiasSancionVentas());
         config.setDiasReapelacion(request.getDiasReapelacion());
         config.setDiasCierreTrasBloqueo(request.getDiasCierreTrasBloqueo());
+        config.setDiasGraciaPago(request.getDiasGraciaPago() != null
+            ? request.getDiasGraciaPago()
+            : config.getDiasGraciaPago());
+        config.setDiasSancionCompras(request.getDiasSancionCompras() != null
+            ? request.getDiasSancionCompras()
+            : config.getDiasSancionCompras());
         config.setFechaActualizacion(LocalDateTime.now());
         ConfiguracionPedido guardada = configuracionRepository.save(config);
         auditoria.registrar(

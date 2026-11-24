@@ -84,6 +84,24 @@ public class RecordatorioService {
             total += encolarPago(hito, MotivoRecordatorio.PAGO_SENA);
         }
 
+        // Aviso semanal solo para la entrega final, que se paga después de la
+        // entrega y tiene una ventana más larga.
+        List<HitoPedido> entregasPorVencer =
+            hitoPedidoRepository.findPagosPorVencer(
+                EstadoPagoHito.PENDIENTE,
+                List.of(TipoHito.ENTREGA),
+                List.of(EstadoPedido.EN_CURSO),
+                ahora,
+                ahora.plusDays(DIAS_AVISO_SEMANAL));
+        for (HitoPedido hito : entregasPorVencer) {
+            LocalDateTime limite = hito.getFechaLimitePago();
+            if (limite == null
+                    || !limite.isAfter(ahora.plusHours(HORAS_AVISO_72))) {
+                continue;
+            }
+            total += encolarPago(hito, MotivoRecordatorio.PAGO_7D);
+        }
+
         List<HitoPedido> porVencer = hitoPedidoRepository.findPagosPorVencer(
             EstadoPagoHito.PENDIENTE,
             List.of(TipoHito.SENA, TipoHito.CUOTA, TipoHito.ENTREGA),
@@ -119,9 +137,8 @@ public class RecordatorioService {
         if (pedido == null || pedido.getCliente() == null) {
             return 0;
         }
-        if (estaSancionado(pedido.getCliente().getIdUsuario())) {
-            return 0;
-        }
+        // Los recordatorios de pago no se suprimen por una sanción: son el
+        // aviso que le permite al cliente desbloquear la cuenta.
         String clave = clave(motivo, pedido, hito, hito.getFechaLimitePago());
         if (recordatorioRepository.existsByClave(clave)) {
             return 0;
