@@ -38,7 +38,9 @@
                   <td class="header-tag" align="right" valign="middle">
                     <span th:if="${urgente}"
                           style="display:inline-block;background:#c2185b;color:#ffffff;border-radius:999px;padding:6px 14px;font-size:12px;font-weight:800;letter-spacing:0.04em;">URGENTE</span>
-                    <span th:unless="${urgente}"
+                    <span th:if="${alerta and !urgente}"
+                          style="display:inline-block;background:#b45309;color:#ffffff;border-radius:999px;padding:6px 14px;font-size:12px;font-weight:800;letter-spacing:0.04em;">ATENCIÓN</span>
+                    <span th:unless="${urgente or alerta}"
                           style="display:inline-block;background:#8a5a6a;color:#ffffff;border-radius:999px;padding:6px 14px;font-size:12px;font-weight:700;letter-spacing:0.02em;">Recordatorio</span>
                   </td>
                 </tr>
@@ -52,7 +54,8 @@
                 Hola, <span th:text="${nombre}">Ana</span>
               </h1>
               <p style="margin:0 0 10px;font-size:15px;line-height:1.65;color:#6e3b4d;">
-                Tenés movimientos pendientes en tus pedidos. Acá va el detalle.
+                Tenés pendientes en tus pedidos. Si no los resolvés, tu cuenta
+                puede quedar limitada. Acá va el detalle.
               </p>
 
               <div th:if="${!#lists.isEmpty(pagos)}" style="margin-top:22px;">

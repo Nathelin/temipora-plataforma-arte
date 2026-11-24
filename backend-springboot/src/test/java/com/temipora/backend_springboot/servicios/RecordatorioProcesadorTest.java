@@ -107,9 +107,11 @@ class RecordatorioProcesadorTest {
             eq(1L), eq(EstadoEmailRecordatorio.PENDIENTE), any()))
             .thenReturn(new ArrayList<>(List.of(filaPago, filaEntrega)));
         when(emailPlantillaService.asuntoRecordatorio(
-            eq(true), eq(false), anyBoolean())).thenReturn("Pagos");
+            eq(true), eq(false), anyBoolean(), anyBoolean(), anyBoolean()))
+            .thenReturn("Pagos");
         when(emailPlantillaService.asuntoRecordatorio(
-            eq(false), eq(true), anyBoolean())).thenReturn("Entregas");
+            eq(false), eq(true), anyBoolean(), anyBoolean(), anyBoolean()))
+            .thenReturn("Entregas");
         when(emailPlantillaService.recordatorio(any(), any(), any(), any()))
             .thenReturn("<html>ok</html>");
         EnvioEmail envio = new EnvioEmail();
@@ -155,7 +157,8 @@ class RecordatorioProcesadorTest {
 
     private void prepararEnvio(String html) {
         when(emailPlantillaService.asuntoRecordatorio(
-            anyBoolean(), anyBoolean(), anyBoolean())).thenReturn("Asunto");
+            anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(),
+            anyBoolean())).thenReturn("Asunto");
         when(emailPlantillaService.recordatorio(any(), any(), any(), any()))
             .thenReturn(html);
         EnvioEmail envio = new EnvioEmail();

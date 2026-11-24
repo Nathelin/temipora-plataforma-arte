@@ -79,12 +79,12 @@ class RecordatorioPruebaServiceTest {
 
         List<String> asunto = asuntos.getAllValues();
         List<String> html = htmls.getAllValues();
-        assertThat(asunto.get(0)).contains("pagos pendientes");
+        assertThat(asunto.get(0)).contains("pagá hoy");
         assertThat(html.get(0)).contains("Pago pendiente");
         assertThat(html.get(0)).contains("Cuota 2");
         assertThat(html.get(0)).doesNotContain("Entrega pendiente");
 
-        assertThat(asunto.get(1)).contains("entrega");
+        assertThat(asunto.get(1)).contains("entregá hoy");
         assertThat(html.get(1)).contains("Entrega pendiente");
         assertThat(html.get(1)).contains("Boceto");
         assertThat(html.get(1)).contains("se suspenden tus ventas");
