@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -97,6 +98,36 @@ public class NotificacionService {
 
         Notificacion guardada = notificacionRepository.save(notificacion);
         return NotificacionDTO.desdeNotificacionUsuario(guardada.getDestinatarios().get(0));
+    }
+
+    /**
+     * Crea la notificación, o actualiza la que el usuario todavía no leyó del
+     * mismo tipo y referencia. Sirve para recordatorios escalonados: la campana
+     * mantiene una sola entrada por pedido en lugar de repetir cada aviso.
+     */
+    @Transactional
+    public NotificacionDTO crearOActualizarParaUsuario(
+            Long idUsuario,
+            String codigoTipo,
+            String nombre,
+            String descripcion,
+            Long idReferencia,
+            String tipoReferencia) {
+        Optional<NotificacionUsuario> existente = notificacionUsuarioRepository
+            .findNoLeidasPorTipoYReferencia(
+                idUsuario, codigoTipo, idReferencia, PageRequest.of(0, 1))
+            .stream()
+            .findFirst();
+        if (existente.isPresent()) {
+            Notificacion notificacion = existente.get().getNotificacion();
+            notificacion.setNombre(limitar(nombre, LARGO_NOMBRE));
+            notificacion.setDescripcion(limitar(descripcion, LARGO_DESCRIPCION));
+            notificacion.setFechaActualizacion(LocalDateTime.now());
+            notificacionRepository.save(notificacion);
+            return NotificacionDTO.desdeNotificacionUsuario(existente.get());
+        }
+        return crearParaUsuario(
+            idUsuario, codigoTipo, nombre, descripcion, idReferencia, tipoReferencia);
     }
 
     @Transactional(readOnly = true)

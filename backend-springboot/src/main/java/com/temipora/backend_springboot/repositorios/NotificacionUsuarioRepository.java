@@ -79,4 +79,22 @@ public interface NotificacionUsuarioRepository extends JpaRepository<Notificacio
 
     Optional<NotificacionUsuario> findByNotificacionIdNotificacionAndUsuarioIdUsuario(
             Long idNotificacion, Long idUsuario);
+
+    @Query("""
+        SELECT nu
+        FROM NotificacionUsuario nu
+        JOIN FETCH nu.notificacion n
+        JOIN FETCH n.tipoNotificacion t
+        WHERE nu.usuario.idUsuario = :idUsuario
+          AND nu.leida = false
+          AND n.estado = 'ACTIVA'
+          AND t.codigo = :codigo
+          AND n.idReferencia = :idReferencia
+        ORDER BY n.fechaCreacion DESC
+        """)
+    List<NotificacionUsuario> findNoLeidasPorTipoYReferencia(
+            @Param("idUsuario") Long idUsuario,
+            @Param("codigo") String codigo,
+            @Param("idReferencia") Long idReferencia,
+            Pageable pageable);
 }

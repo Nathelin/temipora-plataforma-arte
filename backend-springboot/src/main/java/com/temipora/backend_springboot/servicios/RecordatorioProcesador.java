@@ -44,6 +44,9 @@ public class RecordatorioProcesador {
     private static final int MAX_INTENTOS = 3;
     private static final int MAX_LOTE = 50;
     private static final int VIGENCIA_ENLACE_HORAS = 72;
+    private static final String NOTIF_PAGO = "PAGO_POR_VENCER";
+    private static final String NOTIF_ENTREGA = "ENTREGA_POR_VENCER";
+    private static final String TIPO_REFERENCIA = "PEDIDO";
     private static final DateTimeFormatter FECHA =
         DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -54,6 +57,7 @@ public class RecordatorioProcesador {
     private final EmailPlantillaService emailPlantillaService;
     private final EnvioEmailService envioEmailService;
     private final AccesoEnlaceService accesoEnlaceService;
+    private final NotificacionService notificacionService;
 
     public RecordatorioProcesador(
             EmailRecordatorioPendienteRepository repository,
@@ -62,7 +66,8 @@ public class RecordatorioProcesador {
             ConfiguracionPedidoService configuracionPedidoService,
             EmailPlantillaService emailPlantillaService,
             EnvioEmailService envioEmailService,
-            AccesoEnlaceService accesoEnlaceService) {
+            AccesoEnlaceService accesoEnlaceService,
+            NotificacionService notificacionService) {
         this.repository = repository;
         this.usuarioRepository = usuarioRepository;
         this.sancionService = sancionService;
@@ -70,6 +75,7 @@ public class RecordatorioProcesador {
         this.emailPlantillaService = emailPlantillaService;
         this.envioEmailService = envioEmailService;
         this.accesoEnlaceService = accesoEnlaceService;
+        this.notificacionService = notificacionService;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -117,6 +123,7 @@ public class RecordatorioProcesador {
                 fila.setEstado(EstadoEmailRecordatorio.OMITIDO);
                 continue;
             }
+            notificarRecordatorio(fila, item);
             if (item.esPago()) {
                 pagos.add(item);
                 filasPago.add(fila);
@@ -192,6 +199,34 @@ public class RecordatorioProcesador {
             incrementarIntentos(filas);
             return false;
         }
+    }
+
+    /**
+     * Refleja el recordatorio en la campana. La campana mantiene una sola
+     * entrada por pedido y tipo mientras siga sin leer: los pasos de la
+     * escalera actualizan esa entrada en lugar de acumular duplicados.
+     */
+    private void notificarRecordatorio(
+            EmailRecordatorioPendiente fila,
+            EmailPlantillaService.RecordatorioEmail item) {
+        if (fila.getUsuario() == null) {
+            return;
+        }
+        boolean pago = item.esPago();
+        String nombre = pago ? "Pago por vencer" : "Entrega por vencer";
+        String descripcion = pago
+            ? "El pago de '" + item.detalle() + "' del pedido #"
+                + item.idPedido() + " vence el " + item.vence()
+                + ". Regularizalo para que el pedido siga avanzando."
+            : "Tenés que entregar '" + item.detalle() + "' del pedido #"
+                + item.idPedido() + " antes del " + item.vence() + ".";
+        notificacionService.crearOActualizarParaUsuario(
+            fila.getUsuario().getIdUsuario(),
+            pago ? NOTIF_PAGO : NOTIF_ENTREGA,
+            nombre,
+            descripcion,
+            item.idPedido(),
+            TIPO_REFERENCIA);
     }
 
     private boolean hayUrgente(

@@ -61,6 +61,8 @@ class RecordatorioProcesadorTest {
     private EnvioEmailService envioEmailService;
     @Mock
     private AccesoEnlaceService accesoEnlaceService;
+    @Mock
+    private NotificacionService notificacionService;
 
     @InjectMocks
     private RecordatorioProcesador procesador;
@@ -86,6 +88,9 @@ class RecordatorioProcesadorTest {
         verify(envioEmailService).enviar(
             eq(usuario), eq("RECORDATORIO"), any(), any(),
             anyString(), eq("<html>ok</html>"), anyString());
+        verify(notificacionService).crearOActualizarParaUsuario(
+            eq(1L), eq("PAGO_POR_VENCER"), any(), any(),
+            eq(10L), eq("PEDIDO"));
     }
 
     @Test
@@ -125,6 +130,12 @@ class RecordatorioProcesadorTest {
             .isEqualTo(EstadoEmailRecordatorio.ENVIADO);
         assertThat(filaEntrega.getEstado())
             .isEqualTo(EstadoEmailRecordatorio.ENVIADO);
+        verify(notificacionService).crearOActualizarParaUsuario(
+            eq(1L), eq("PAGO_POR_VENCER"), any(), any(),
+            eq(10L), eq("PEDIDO"));
+        verify(notificacionService).crearOActualizarParaUsuario(
+            eq(1L), eq("ENTREGA_POR_VENCER"), any(), any(),
+            eq(11L), eq("PEDIDO"));
     }
 
     private void prepararUsuario(Usuario usuario) {
