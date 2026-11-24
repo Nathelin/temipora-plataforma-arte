@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import api from '../servicios/api'
 import { formatearMonto } from '../servicios/moneda'
+import ModalConfirmacion from './ModalConfirmacion.vue'
 
 const cargando = ref(true)
 const guardando = ref(false)
@@ -23,10 +24,10 @@ const procesandoMails = ref(false)
 const enviandoPrueba = ref(false)
 const mensajeMails = ref('')
 const errorMails = ref('')
-const procesandoSanciones = ref(false)
-const procesandoImpagos = ref(false)
-const mensajeSanciones = ref('')
-const errorSanciones = ref('')
+const reenviando = ref(false)
+const confirmandoReenvio = ref(false)
+const mensajeReenvio = ref('')
+const errorReenvio = ref('')
 const maxHitos = ref('4')
 const porcentajeMaxPrimerHito = ref('50')
 const montoMinimoCuota = ref('1')
@@ -183,44 +184,22 @@ async function enviarRecordatoriosDePrueba() {
   }
 }
 
-async function procesarSancionesArtistas() {
-  if (procesandoSanciones.value) return
-  procesandoSanciones.value = true
-  mensajeSanciones.value = ''
-  errorSanciones.value = ''
+async function reenviarRecordatorios() {
+  confirmandoReenvio.value = false
+  if (reenviando.value) return
+  reenviando.value = true
+  mensajeReenvio.value = ''
+  errorReenvio.value = ''
   try {
-    const res = await api.post('/admin/incumplimientos/procesar')
-    const r = res.data || {}
-    mensajeSanciones.value = `${Number(r.morasRegistradas || 0)} mora(s), `
-      + `${Number(r.nivel1Aplicados || 0)} nivel 1, `
-      + `${Number(r.sancionesEscaladas || 0)} escalada(s), `
-      + `${Number(r.sancionesCuradas || 0)} curada(s), `
-      + `${Number(r.pedidosCerrados || 0)} pedido(s) cerrado(s).`
+    const res = await api.post('/admin/recordatorios/reenviar')
+    const reabiertos = Number(res.data?.reabiertos || 0)
+    const enviados = Number(res.data?.enviados || 0)
+    mensajeReenvio.value = `Se reabrieron ${reabiertos} recordatorio(s) y se enviaron ${enviados}.`
   } catch (e) {
-    errorSanciones.value = e.response?.data?.message
-      || 'No se pudieron procesar las sanciones de artistas.'
+    errorReenvio.value = e.response?.data?.message
+      || 'No se pudieron reenviar los recordatorios.'
   } finally {
-    procesandoSanciones.value = false
-  }
-}
-
-async function procesarImpagosClientes() {
-  if (procesandoImpagos.value) return
-  procesandoImpagos.value = true
-  mensajeSanciones.value = ''
-  errorSanciones.value = ''
-  try {
-    const res = await api.post('/admin/impagos-cliente/procesar')
-    const r = res.data || {}
-    mensajeSanciones.value = `${Number(r.impagosRegistrados || 0)} impago(s), `
-      + `${Number(r.nivel1Aplicados || 0)} nivel 1, `
-      + `${Number(r.sancionesEscaladas || 0)} escalada(s), `
-      + `${Number(r.sancionesCuradas || 0)} curada(s).`
-  } catch (e) {
-    errorSanciones.value = e.response?.data?.message
-      || 'No se pudieron procesar los impagos de clientes.'
-  } finally {
-    procesandoImpagos.value = false
+    reenviando.value = false
   }
 }
 </script>
@@ -377,23 +356,6 @@ async function procesarImpagosClientes() {
 
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
-              <label for="dias-gracia-entrega" class="mb-2 block text-sm text-cafe">
-                Gracia antes de pausar ventas (días) <span class="text-rojizo">*</span>
-              </label>
-              <input
-                id="dias-gracia-entrega"
-                v-model="diasGraciaEntrega"
-                type="number"
-                min="1"
-                max="30"
-                step="1"
-                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
-              />
-              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
-                Días extra después del plazo de entrega antes de suspender las ventas.
-              </p>
-            </div>
-            <div>
               <label for="dias-sancion-ventas" class="mb-2 block text-sm text-cafe">
                 Duración de la suspensión de ventas (días) <span class="text-rojizo">*</span>
               </label>
@@ -522,39 +484,24 @@ async function procesarImpagosClientes() {
             >
               {{ enviandoPrueba ? 'Enviando...' : 'Enviar recordatorios de prueba' }}
             </button>
+            <button
+              :disabled="reenviando"
+              class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition hover:bg-rosa/20 disabled:opacity-50"
+              @click="confirmandoReenvio = true"
+            >
+              {{ reenviando ? 'Reenviando...' : 'Reenviar recordatorios vigentes' }}
+            </button>
           </div>
           <p class="mt-3 text-xs leading-relaxed text-cafe/50">
             La prueba envía dos mails separados a tu correo: uno de pagos y otro
-            de entregas. No encola ni modifica pedidos.
+            de entregas. No encola ni modifica pedidos. El reenvío vuelve a mandar
+            los recordatorios que ya se enviaron y todavía cumplen las
+            condiciones.
           </p>
           <p v-if="mensajeMails" class="mt-3 text-sm text-green-700">{{ mensajeMails }}</p>
           <p v-if="errorMails" class="mt-3 text-sm text-rojizo">{{ errorMails }}</p>
-        </div>
-
-        <div class="border-t border-rosa/40 pt-6">
-          <h2 class="mb-2 text-base text-granate">Procesos automáticos</h2>
-          <p class="text-xs leading-relaxed text-cafe/50">
-            Ejecutá ahora la detección de mora y la escalada de sanciones sin
-            esperar al programador.
-          </p>
-          <div class="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              :disabled="procesandoSanciones"
-              class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-coral px-5 text-sm font-semibold text-coral transition hover:bg-coral/10 disabled:opacity-50"
-              @click="procesarSancionesArtistas"
-            >
-              {{ procesandoSanciones ? 'Procesando...' : 'Procesar sanciones de artistas' }}
-            </button>
-            <button
-              :disabled="procesandoImpagos"
-              class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-coral px-5 text-sm font-semibold text-coral transition hover:bg-coral/10 disabled:opacity-50"
-              @click="procesarImpagosClientes"
-            >
-              {{ procesandoImpagos ? 'Procesando...' : 'Procesar impagos de clientes' }}
-            </button>
-          </div>
-          <p v-if="mensajeSanciones" class="mt-3 text-sm text-green-700">{{ mensajeSanciones }}</p>
-          <p v-if="errorSanciones" class="mt-3 text-sm text-rojizo">{{ errorSanciones }}</p>
+          <p v-if="mensajeReenvio" class="mt-3 text-sm text-green-700">{{ mensajeReenvio }}</p>
+          <p v-if="errorReenvio" class="mt-3 text-sm text-rojizo">{{ errorReenvio }}</p>
         </div>
       </div>
 
@@ -588,10 +535,6 @@ async function procesarImpagosClientes() {
           <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Plazo de reentrega</dt>
             <dd class="text-cafe">{{ config.diasReentrega }} días</dd>
-          </div>
-          <div class="flex justify-between gap-3">
-            <dt class="text-xs text-cafe/50">Gracia de entrega</dt>
-            <dd class="text-cafe">{{ config.diasGraciaEntrega }} días</dd>
           </div>
           <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Suspensión de ventas</dt>
@@ -631,5 +574,15 @@ async function procesarImpagosClientes() {
         </p>
       </aside>
     </div>
+
+    <ModalConfirmacion
+      :abierto="confirmandoReenvio"
+      titulo="Reenviar recordatorios ya enviados"
+      mensaje="Se van a volver a enviar los recordatorios vigentes a los destinatarios reales. Es para pruebas y demos: en producción puede mandar correos duplicados."
+      texto-confirmar="Reenviar"
+      :confirmar-habilitado="!reenviando"
+      @confirmar="reenviarRecordatorios"
+      @cerrar="confirmandoReenvio = false"
+    />
   </div>
 </template>

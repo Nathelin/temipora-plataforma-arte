@@ -105,6 +105,7 @@ export const ETIQUETAS_ACCION = {
   PEDIDO_FINALIZAR: 'Finalizó un pedido',
   PEDIDO_CERRAR_INCUMPLIMIENTO: 'Cerró un pedido por incumplimiento',
   PEDIDO_MORA_DETECTAR: 'Registró una mora de entrega',
+  PEDIDO_MORA_CURAR: 'Curó una mora de entrega',
   PEDIDO_IMPAGO_DETECTAR: 'Registró un impago de entrega final',
   PEDIDO_IMPAGO_CURAR: 'Curó un impago de entrega final',
   PEDIDO_PUBLICACION_AUTORIZAR: 'Autorizó la publicación de un pedido',

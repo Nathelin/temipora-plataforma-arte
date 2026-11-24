@@ -113,6 +113,9 @@ class PedidoServiceTest {
     @Mock
     private SancionService sancionService;
 
+    @Mock
+    private EntregaPendienteService entregaPendienteService;
+
     @InjectMocks
     private PedidoService pedidoService;
 
@@ -340,6 +343,25 @@ class PedidoServiceTest {
         assertThat(hito.getFechaEntrega()).isNotNull();
         assertThat(hito.getFechaLimiteAprobacion()).isNotNull();
         verify(entregaService).crear(eq(pedido), eq(hito), any(), any());
+    }
+
+    @Test
+    void entregar_fueraDePlazo_registraLaMora() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PAGADO);
+        bloquearPedidoYHito();
+        LocalDateTime plazo = LocalDateTime.now().minusDays(2);
+        when(entregaPendienteService.plazoVigente(pedido, hito))
+            .thenReturn(plazo);
+
+        pedidoService.entregar(
+            PEDIDO, HITO, ARTISTA,
+            new EntregaHitoMultipartRequest(), List.<MultipartFile>of());
+
+        assertThat(pedido.getMoraDesde()).isEqualTo(plazo);
+        verify(auditoria).registrarSistema(
+            eq(AccionesAdmin.PEDIDO_MORA_DETECTAR), eq("Pedido"),
+            eq(PEDIDO), any());
     }
 
     @Test

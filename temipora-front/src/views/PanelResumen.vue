@@ -60,11 +60,6 @@ const perfilPublico = computed(() =>
 )
 
 const SALUD_ESTADOS = {
-  EN_GRACIA: {
-    etiqueta: 'Período de gracia',
-    descripcion: 'Todavía podés entregar sin que se suspendan tus ventas.',
-    clase: 'border-durazno bg-durazno/25 text-cafe',
-  },
   VENTAS_SUSPENDIDAS: {
     etiqueta: 'Ventas suspendidas',
     descripcion: 'Tu catálogo está pausado. Podés seguir entregando los pedidos abiertos.',
@@ -96,15 +91,6 @@ const puedeApelar = computed(() => (
   Boolean(saludCuenta.value?.idSancion)
   && !saludCuenta.value?.apelacionPendiente
 ))
-
-const textoGracia = computed(() => {
-  const dias = saludCuenta.value?.diasGraciaRestantes
-  if (dias == null) return ''
-  if (dias <= 0) {
-    return 'La gracia vence hoy. Si no entregás, se suspenden tus ventas.'
-  }
-  return `Te ${dias === 1 ? 'queda' : 'quedan'} ${dias} ${dias === 1 ? 'día' : 'días'} para entregar antes de que se suspendan tus ventas.`
-})
 
 const mostrarApelacion = ref(false)
 const mensajeApelacion = ref('')
@@ -638,20 +624,9 @@ onMounted(() => {
             <p class="text-xs font-semibold uppercase tracking-[0.14em]">Salud de la cuenta</p>
             <h2 class="mt-1 font-display text-xl font-bold">{{ saludEstado?.etiqueta }}</h2>
           </div>
-          <span
-            v-if="saludCuenta.diasGraciaRestantes != null"
-            class="rounded-full bg-blanco/70 px-3 py-1 text-xs font-semibold"
-          >
-            {{ saludCuenta.diasGraciaRestantes > 0
-              ? `${saludCuenta.diasGraciaRestantes} ${saludCuenta.diasGraciaRestantes === 1 ? 'día' : 'días'}`
-              : 'Gracia vencida' }}
-          </span>
         </div>
 
         <p class="mt-2 text-sm leading-relaxed">{{ saludEstado?.descripcion }}</p>
-        <p v-if="saludCuenta.estado === 'EN_GRACIA'" class="mt-2 text-sm font-semibold">
-          {{ textoGracia }}
-        </p>
         <p
           v-if="saludCuenta.estado === 'VENTAS_SUSPENDIDAS' && saludCuenta.fechaFin"
           class="mt-2 text-sm"

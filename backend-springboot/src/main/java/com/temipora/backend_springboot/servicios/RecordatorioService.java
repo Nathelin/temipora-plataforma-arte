@@ -72,6 +72,27 @@ public class RecordatorioService {
         return enviados;
     }
 
+    /**
+     * Reabre los recordatorios ya enviados (o fallidos) para poder reenviarlos.
+     * Pensado para pruebas y demos: el envío normal es idempotente y no repite
+     * un recordatorio ya enviado. El procesador vuelve a validar las
+     * condiciones y omite los que ya no corresponden.
+     */
+    @Transactional
+    public int reabrirEnviados() {
+        List<EmailRecordatorioPendiente> filas = recordatorioRepository.findByEstadoIn(
+            List.of(EstadoEmailRecordatorio.ENVIADO,
+                EstadoEmailRecordatorio.FALLIDO));
+        for (EmailRecordatorioPendiente fila : filas) {
+            fila.setEstado(EstadoEmailRecordatorio.PENDIENTE);
+            fila.setIntentos(0);
+            fila.setEnviadoEn(null);
+            fila.setIdLote(null);
+        }
+        recordatorioRepository.saveAll(filas);
+        return filas.size();
+    }
+
     private int encolarPagos(LocalDateTime ahora) {
         int total = 0;
 

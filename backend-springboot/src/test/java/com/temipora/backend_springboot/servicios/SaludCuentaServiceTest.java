@@ -1,16 +1,11 @@
 package com.temipora.backend_springboot.servicios;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -19,15 +14,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.modelo.ApelacionSancion;
-import com.temipora.backend_springboot.modelo.CatalogoPausadoDTO;
-import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.EstadoApelacion;
-import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.Producto;
 import com.temipora.backend_springboot.modelo.SancionCuenta;
 import com.temipora.backend_springboot.modelo.Servicio;
 import com.temipora.backend_springboot.repositorios.ApelacionSancionRepository;
-import com.temipora.backend_springboot.repositorios.PedidoRepository;
 import com.temipora.backend_springboot.repositorios.ProductoRepository;
 import com.temipora.backend_springboot.repositorios.PublicacionReventaRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
@@ -40,13 +31,7 @@ class SaludCuentaServiceTest {
     @Mock
     private SancionService sancionService;
     @Mock
-    private ConfiguracionPedidoService configuracionPedidoService;
-    @Mock
-    private EntregaPendienteService entregaPendienteService;
-    @Mock
     private ApelacionSancionRepository apelacionSancionRepository;
-    @Mock
-    private PedidoRepository pedidoRepository;
     @Mock
     private ServicioRepository servicioRepository;
     @Mock
@@ -57,15 +42,8 @@ class SaludCuentaServiceTest {
     @InjectMocks
     private SaludCuentaService service;
 
-    @BeforeEach
-    void setUp() {
-        ConfiguracionPedido config = new ConfiguracionPedido();
-        config.setDiasGraciaEntrega(3);
-        when(configuracionPedidoService.obtener()).thenReturn(config);
-    }
-
     @Test
-    void alDia_sinSancionNiMora() {
+    void alDia_sinSancion() {
         when(sancionService.obtenerVigente(ARTISTA))
             .thenReturn(Optional.empty());
 
@@ -73,43 +51,6 @@ class SaludCuentaServiceTest {
 
         assertThat(salud.dto().getEstado()).isEqualTo("AL_DIA");
         assertThat(salud.dto().getDiasGraciaRestantes()).isNull();
-        assertThat(salud.diasGraciaPorPedido()).isEmpty();
-    }
-
-    @Test
-    void enGracia_cuandoElPlazoVencidoYQuedanDias() {
-        Pedido pedido = pedido(10L);
-        when(pedidoRepository
-            .findByArtistaIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
-                eq(ARTISTA), any(), any()))
-            .thenReturn(List.of(pedido));
-        when(entregaPendienteService.plazoVigente(pedido))
-            .thenReturn(LocalDate.now().minusDays(2).atTime(23, 59));
-        when(sancionService.obtenerVigente(ARTISTA))
-            .thenReturn(Optional.empty());
-
-        SaludCuentaService.Salud salud = service.salud(ARTISTA);
-
-        assertThat(salud.dto().getEstado()).isEqualTo("EN_GRACIA");
-        assertThat(salud.dto().getDiasGraciaRestantes()).isEqualTo(1);
-        assertThat(salud.diasGraciaPorPedido()).containsEntry(10L, 1);
-    }
-
-    @Test
-    void noMarcaRiesgoSiElPlazoEstaLejos() {
-        Pedido pedido = pedido(10L);
-        when(pedidoRepository
-            .findByArtistaIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
-                eq(ARTISTA), any(), any()))
-            .thenReturn(List.of(pedido));
-        when(entregaPendienteService.plazoVigente(pedido))
-            .thenReturn(LocalDate.now().plusDays(2).atTime(23, 59));
-        when(sancionService.obtenerVigente(ARTISTA))
-            .thenReturn(Optional.empty());
-
-        SaludCuentaService.Salud salud = service.salud(ARTISTA);
-
-        assertThat(salud.dto().getEstado()).isEqualTo("AL_DIA");
         assertThat(salud.diasGraciaPorPedido()).isEmpty();
     }
 
@@ -179,11 +120,5 @@ class SaludCuentaServiceTest {
             .alcance(alcance)
             .motivo(motivo)
             .build();
-    }
-
-    private Pedido pedido(Long id) {
-        Pedido pedido = new Pedido();
-        pedido.setIdPedido(id);
-        return pedido;
     }
 }

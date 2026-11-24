@@ -24,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.EmailRecordatorioPendiente;
+import com.temipora.backend_springboot.modelo.EstadoEmailRecordatorio;
 import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
@@ -69,6 +70,28 @@ class RecordatorioServiceTest {
             .thenReturn(false);
         lenient().when(recordatorioRepository.save(any()))
             .thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    void reabrirEnviados_vuelveALaColaYReseteaElEnvio() {
+        EmailRecordatorioPendiente fila = new EmailRecordatorioPendiente();
+        fila.setEstado(EstadoEmailRecordatorio.ENVIADO);
+        fila.setIntentos(2);
+        fila.setEnviadoEn(LocalDateTime.now());
+        fila.setIdLote("lote");
+        when(recordatorioRepository.findByEstadoIn(List.of(
+                EstadoEmailRecordatorio.ENVIADO,
+                EstadoEmailRecordatorio.FALLIDO)))
+            .thenReturn(List.of(fila));
+
+        int reabiertos = service.reabrirEnviados();
+
+        assertThat(reabiertos).isEqualTo(1);
+        assertThat(fila.getEstado()).isEqualTo(EstadoEmailRecordatorio.PENDIENTE);
+        assertThat(fila.getIntentos()).isZero();
+        assertThat(fila.getEnviadoEn()).isNull();
+        assertThat(fila.getIdLote()).isNull();
+        verify(recordatorioRepository).saveAll(List.of(fila));
     }
 
     @Test

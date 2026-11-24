@@ -48,17 +48,17 @@ public class RecordatorioPruebaService {
         }
         int enviados = 0;
         ConfiguracionPedido config = configuracionPedidoService.obtener();
-        int gracia = config.getDiasGraciaEntrega() != null
-            ? config.getDiasGraciaEntrega()
-            : ConfiguracionPedido.DIAS_GRACIA_ENTREGA_POR_DEFECTO;
+        int graciaPago = config.getDiasGraciaPago() != null
+            ? config.getDiasGraciaPago()
+            : ConfiguracionPedido.DIAS_GRACIA_PAGO_POR_DEFECTO;
         int diasCompras = config.getDiasSancionCompras() != null
             ? config.getDiasSancionCompras()
             : ConfiguracionPedido.DIAS_SANCION_COMPRAS_POR_DEFECTO;
-        if (enviarGrupo(usuario, pagosDeMuestra(gracia, diasCompras), true, false,
+        if (enviarGrupo(usuario, pagosDeMuestra(graciaPago, diasCompras), true, false,
                 "pago")) {
             enviados++;
         }
-        if (enviarGrupo(usuario, entregasDeMuestra(gracia), false, true,
+        if (enviarGrupo(usuario, entregasDeMuestra(), false, true,
                 "entrega")) {
             enviados++;
         }
@@ -111,8 +111,7 @@ public class RecordatorioPruebaService {
             consecuenciaPago(gracia, diasCompras)));
     }
 
-    private List<EmailPlantillaService.RecordatorioEmail> entregasDeMuestra(
-            int gracia) {
+    private List<EmailPlantillaService.RecordatorioEmail> entregasDeMuestra() {
         return List.of(new EmailPlantillaService.RecordatorioEmail(
             "ENTREGA",
             null,
@@ -125,7 +124,7 @@ public class RecordatorioPruebaService {
             "ARS",
             true,
             false,
-            consecuenciaEntrega(gracia)));
+            consecuenciaEntrega()));
     }
 
     private String consecuenciaPago(int gracia, int diasCompras) {
@@ -136,11 +135,11 @@ public class RecordatorioPruebaService {
             + " del vencimiento la cuenta queda limitada a pagos.";
     }
 
-    private String consecuenciaEntrega(int gracia) {
-        return "Vence hoy. Si no entregás, en " + dias(gracia)
-            + " se suspenden tus ventas. Si la demora continúa, tu cuenta "
-            + "queda limitada solo a entregar los pedidos abiertos: no podés "
-            + "usar el resto del sitio hasta que un administrador te reintegre.";
+    private String consecuenciaEntrega() {
+        return "Vence hoy. Si no entregás, se suspenden tus ventas. Si la"
+            + " demora continúa, tu cuenta queda limitada solo a entregar los"
+            + " pedidos abiertos: no podés usar el resto del sitio hasta que un"
+            + " administrador te reintegre.";
     }
 
     private String dias(int cantidad) {

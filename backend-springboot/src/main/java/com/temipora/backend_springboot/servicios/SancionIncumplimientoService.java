@@ -62,9 +62,6 @@ public class SancionIncumplimientoService {
     public Resumen procesar() {
         ConfiguracionPedido config = configuracionPedidoService.obtener();
         LocalDateTime ahora = LocalDateTime.now();
-        int gracia = config.getDiasGraciaEntrega() != null
-            ? config.getDiasGraciaEntrega()
-            : ConfiguracionPedido.DIAS_GRACIA_ENTREGA_POR_DEFECTO;
         int diasVentas = config.getDiasSancionVentas() != null
             ? config.getDiasSancionVentas()
             : ConfiguracionPedido.DIAS_SANCION_VENTAS_POR_DEFECTO;
@@ -73,7 +70,7 @@ public class SancionIncumplimientoService {
             : ConfiguracionPedido.DIAS_CIERRE_TRAS_BLOQUEO_POR_DEFECTO;
 
         Resumen curacion = curarOEscalar(ahora);
-        int nivel1 = aplicarNivel1(ahora, gracia, diasVentas);
+        int nivel1 = aplicarNivel1(ahora, diasVentas);
         int cerrados = cerrarPedidos(ahora, diasCierre);
         return new Resumen(
             curacion.curados(), curacion.escalados(), nivel1, cerrados);
@@ -103,7 +100,7 @@ public class SancionIncumplimientoService {
     }
 
     private int aplicarNivel1(
-            LocalDateTime ahora, int gracia, int diasVentas) {
+            LocalDateTime ahora, int diasVentas) {
         Map<Long, Pedido> disparadores = new LinkedHashMap<>();
         for (Pedido pedido : pedidoRepository.findEnMora(EstadoPedido.EN_CURSO)) {
             if (pedido.getMoraDesde() == null || !enMora(pedido, ahora)) {
@@ -119,7 +116,7 @@ public class SancionIncumplimientoService {
         for (Map.Entry<Long, Pedido> entrada : disparadores.entrySet()) {
             Pedido pedido = entrada.getValue();
             LocalDateTime plazo = entregaPendienteService.plazoVigente(pedido);
-            if (plazo == null || ahora.isBefore(plazo.plusDays(gracia))) {
+            if (plazo == null || !ahora.isAfter(plazo)) {
                 continue;
             }
             if (sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(

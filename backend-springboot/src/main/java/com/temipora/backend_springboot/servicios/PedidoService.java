@@ -154,6 +154,7 @@ public class PedidoService {
     private final CuposEventPublisher cuposEventPublisher;
     private final CierreEmailService cierreEmailService;
     private final SancionService sancionService;
+    private final EntregaPendienteService entregaPendienteService;
 
     public PedidoService(
             PedidoRepository pedidoRepository,
@@ -173,7 +174,8 @@ public class PedidoService {
             ArancelEstimadoService arancelEstimadoService,
             CuposEventPublisher cuposEventPublisher,
             CierreEmailService cierreEmailService,
-            SancionService sancionService) {
+            SancionService sancionService,
+            EntregaPendienteService entregaPendienteService) {
         this.pedidoRepository = pedidoRepository;
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.pagoRepository = pagoRepository;
@@ -192,6 +194,7 @@ public class PedidoService {
         this.cuposEventPublisher = cuposEventPublisher;
         this.cierreEmailService = cierreEmailService;
         this.sancionService = sancionService;
+        this.entregaPendienteService = entregaPendienteService;
     }
 
     @Transactional
@@ -381,9 +384,14 @@ public class PedidoService {
             throw new ConflictoException("La cuota todavía no está paga.");
         }
 
+        LocalDateTime ahora = LocalDateTime.now();
+        LocalDateTime plazoEntrega =
+            entregaPendienteService.plazoVigente(pedido, hito);
+        boolean entregaTardia = plazoEntrega != null
+            && ahora.isAfter(plazoEntrega);
+
         EntregaHito entrega = entregaService.crear(pedido, hito, request, archivos);
 
-        LocalDateTime ahora = LocalDateTime.now();
         hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
         hito.setFechaEntrega(ahora);
         hito.setFechaLimiteAprobacion(null);
@@ -396,6 +404,16 @@ public class PedidoService {
                 ahora.plusDays(hitoFlujoService.diasAprobacion()));
         }
         hitoPedidoRepository.save(hito);
+        if (entregaTardia && pedido.getMoraDesde() == null) {
+            // La entrega llegó tarde: la mora nace acá, sin esperar al job.
+            pedido.setMoraDesde(plazoEntrega);
+            pedidoRepository.save(pedido);
+            auditoria.registrarSistema(
+                AccionesAdmin.PEDIDO_MORA_DETECTAR, ENTIDAD_PEDIDO,
+                pedido.getIdPedido(),
+                "Registró la mora de entrega al subir el entregable fuera de plazo"
+                    + " (vencido el " + plazoEntrega.toLocalDate() + ")");
+        }
         auditoria.registrar(
             AccionesAdmin.ENTREGA_CREAR, ENTIDAD_ENTREGA, entrega.getIdEntrega(),
             "Entregó el hito '" + hito.getHitoPresupuesto().getNombre() + "' del pedido #"
@@ -443,6 +461,7 @@ public class PedidoService {
             antesHito, hito, CAMPOS_HITO);
         HitoPedido siguiente = hitoFlujoService.habilitarSiguiente(
             pedido, hito, ahora);
+        limpiarMoraSiCorresponde(pedido, ahora);
         notificarAprobado(pedido, hito, false);
         if (siguiente == null) {
             pedidoCierreService.finalizar(pedido, ahora);
@@ -1218,6 +1237,23 @@ public class PedidoService {
         long dias = ChronoUnit.DAYS.between(
             LocalDateTime.now().toLocalDate(), finGracia.toLocalDate());
         return (int) Math.max(0, dias);
+    }
+
+    /**
+     * Limpia la mora cuando el cliente aprobó todo lo pendiente. Sin esto el
+     * pedido queda marcado como en mora para siempre y se congelan la escalera
+     * de pagos y la aprobación automática.
+     */
+    private void limpiarMoraSiCorresponde(Pedido pedido, LocalDateTime ahora) {
+        if (pedido.getMoraDesde() == null
+                || entregaPendienteService.estaEnMora(pedido, ahora)) {
+            return;
+        }
+        pedido.setMoraDesde(null);
+        pedidoRepository.save(pedido);
+        auditoria.registrarSistema(
+            AccionesAdmin.PEDIDO_MORA_CURAR, ENTIDAD_PEDIDO, pedido.getIdPedido(),
+            "Limpió la mora: el cliente aprobó los entregables pendientes");
     }
 
     private PedidoDTO construirDTO(Pedido pedido, Long idVista) {

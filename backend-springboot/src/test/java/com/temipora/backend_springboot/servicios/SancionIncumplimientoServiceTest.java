@@ -153,19 +153,21 @@ class SancionIncumplimientoServiceTest {
     }
 
     @Test
-    void procesar_noAplicaNivel1DentroDeLaGracia() {
+    void procesar_aplicaNivel1ApenasVenceElPlazo() {
         Pedido pedido = pedido(LocalDateTime.now().minusDays(1));
         when(configuracionPedidoService.obtener()).thenReturn(configuracion());
         when(pedidoRepository.findEnMora(EstadoPedido.EN_CURSO))
             .thenReturn(List.of(pedido));
         when(entregaPendienteService.plazoVigente(pedido))
             .thenReturn(LocalDateTime.now().minusDays(1));
+        when(sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
+                eq(7L), eq(EstadoSancion.ACTIVA)))
+            .thenReturn(Optional.empty());
 
         SancionIncumplimientoService.Resumen resumen = service.procesar();
 
-        assertThat(resumen.nivel1Aplicados()).isZero();
-        verify(sancionAutomaticaService, never())
-            .aplicarNivel1(any(), anyInt());
+        assertThat(resumen.nivel1Aplicados()).isEqualTo(1);
+        verify(sancionAutomaticaService).aplicarNivel1(pedido, 14);
     }
 
     @Test

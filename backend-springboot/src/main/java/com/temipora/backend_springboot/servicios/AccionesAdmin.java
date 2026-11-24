@@ -95,6 +95,7 @@ public final class AccionesAdmin {
     public static final String APELACION_RESOLVER = "APELACION_RESOLVER";
     public static final String PEDIDO_CERRAR_INCUMPLIMIENTO = "PEDIDO_CERRAR_INCUMPLIMIENTO";
     public static final String PEDIDO_MORA_DETECTAR = "PEDIDO_MORA_DETECTAR";
+    public static final String PEDIDO_MORA_CURAR = "PEDIDO_MORA_CURAR";
     public static final String PEDIDO_IMPAGO_DETECTAR = "PEDIDO_IMPAGO_DETECTAR";
     public static final String PEDIDO_IMPAGO_CURAR = "PEDIDO_IMPAGO_CURAR";
     public static final String USUARIO_CAMBIAR_CORREO = "USUARIO_CAMBIAR_CORREO";

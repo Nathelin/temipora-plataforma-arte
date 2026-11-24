@@ -103,16 +103,16 @@ public class RecordatorioProcesador {
         List<EmailRecordatorioPendiente> filasPago = new ArrayList<>();
         List<EmailRecordatorioPendiente> filasEntrega = new ArrayList<>();
         ConfiguracionPedido config = configuracionPedidoService.obtener();
-        int gracia = config.getDiasGraciaEntrega() != null
-            ? config.getDiasGraciaEntrega()
-            : ConfiguracionPedido.DIAS_GRACIA_ENTREGA_POR_DEFECTO;
+        int graciaPago = config.getDiasGraciaPago() != null
+            ? config.getDiasGraciaPago()
+            : ConfiguracionPedido.DIAS_GRACIA_PAGO_POR_DEFECTO;
         int diasCompras = config.getDiasSancionCompras() != null
             ? config.getDiasSancionCompras()
             : ConfiguracionPedido.DIAS_SANCION_COMPRAS_POR_DEFECTO;
 
         for (EmailRecordatorioPendiente fila : pendientes) {
             EmailPlantillaService.RecordatorioEmail item =
-                item(fila, gracia, diasCompras, sancionado);
+                item(fila, graciaPago, diasCompras, sancionado);
             if (item == null) {
                 fila.setEstado(EstadoEmailRecordatorio.OMITIDO);
                 continue;
@@ -206,7 +206,7 @@ public class RecordatorioProcesador {
 
     private EmailPlantillaService.RecordatorioEmail item(
             EmailRecordatorioPendiente fila,
-            int gracia,
+            int graciaPago,
             int diasCompras,
             boolean sancionado) {
         Pedido pedido = fila.getPedido();
@@ -250,7 +250,7 @@ public class RecordatorioProcesador {
                 moneda,
                 fila.getMotivo().esUrgente(),
                 fila.getMotivo().esAlerta(),
-                consecuenciaPago(fila.getMotivo(), gracia, diasCompras));
+                consecuenciaPago(fila.getMotivo(), graciaPago, diasCompras));
         }
 
         String cliente = pedido.getCliente() != null
@@ -279,33 +279,33 @@ public class RecordatorioProcesador {
             moneda,
             fila.getMotivo().esUrgente(),
             fila.getMotivo().esAlerta(),
-            consecuenciaEntrega(fila.getMotivo(), gracia));
+            consecuenciaEntrega(fila.getMotivo()));
     }
 
     private String consecuenciaPago(
-            MotivoRecordatorio motivo, int gracia, int diasCompras) {
+            MotivoRecordatorio motivo, int graciaPago, int diasCompras) {
         if (motivo != MotivoRecordatorio.PAGO_7D
                 && motivo != MotivoRecordatorio.PAGO_72H
                 && motivo != MotivoRecordatorio.PAGO_24H) {
             return null;
         }
-        int total = gracia + diasCompras;
-        return "Si no pagás, en " + dias(gracia)
+        int total = graciaPago + diasCompras;
+        return "Si no pagás, en " + dias(graciaPago)
             + " se suspenden tus compras y solo podés mensajear al artista al que"
             + " le debés. Si el impago sigue, a los " + dias(total)
             + " del vencimiento la cuenta queda limitada a pagos.";
     }
 
-    private String consecuenciaEntrega(MotivoRecordatorio motivo, int gracia) {
+    private String consecuenciaEntrega(MotivoRecordatorio motivo) {
         if (motivo == MotivoRecordatorio.ENTREGA_1D) {
-            return "Mañana vence el plazo. Si no entregás, en "
-                + dias(gracia) + " se suspenden tus ventas.";
+            return "Mañana vence el plazo. Si no entregás, se suspenden tus"
+                + " ventas.";
         }
         if (motivo == MotivoRecordatorio.ENTREGA_HOY) {
-            return "Vence hoy. Si no entregás, en " + dias(gracia)
-                + " se suspenden tus ventas. Si la demora continúa, tu cuenta "
-                + "queda limitada solo a entregar los pedidos abiertos: no podés "
-                + "usar el resto del sitio hasta que un administrador te reintegre.";
+            return "Vence hoy. Si no entregás, se suspenden tus ventas. Si la"
+                + " demora continúa, tu cuenta queda limitada solo a entregar"
+                + " los pedidos abiertos: no podés usar el resto del sitio hasta"
+                + " que un administrador te reintegre.";
         }
         return null;
     }

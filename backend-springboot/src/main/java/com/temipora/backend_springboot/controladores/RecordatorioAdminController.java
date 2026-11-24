@@ -46,6 +46,22 @@ public class RecordatorioAdminController {
     }
 
     /**
+     * Reabre los recordatorios ya enviados y los vuelve a mandar si todavía
+     * cumplen las condiciones. Pensado para pruebas y demos.
+     */
+    @PostMapping("/reenviar")
+    public Map<String, Object> reenviar() {
+        int reabiertos = recordatorioService.reabrirEnviados();
+        int encolados = recordatorioService.encolar();
+        int enviados = recordatorioService.procesarPendientes();
+        Map<String, Object> respuesta = new LinkedHashMap<>();
+        respuesta.put("reabiertos", reabiertos);
+        respuesta.put("encolados", encolados);
+        respuesta.put("enviados", enviados);
+        return respuesta;
+    }
+
+    /**
      * Manda dos muestras al correo del admin: una de pagos y otra de entregas.
      * No encola nada ni toca pedidos.
      */

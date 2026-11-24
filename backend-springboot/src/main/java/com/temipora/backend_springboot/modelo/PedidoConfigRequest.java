@@ -55,7 +55,6 @@ public class PedidoConfigRequest {
         message = "El monto mínimo admite hasta 2 decimales.")
     private BigDecimal montoMinimoCuota;
 
-    @NotNull(message = "Los días de gracia de entrega son obligatorios.")
     @Min(value = 1, message = "La gracia de entrega debe ser al menos 1 día.")
     @Max(value = 30, message = "La gracia de entrega no puede superar los 30 días.")
     private Integer diasGraciaEntrega;

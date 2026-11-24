@@ -90,6 +90,20 @@ class MoraServiceTest {
     }
 
     @Test
+    void detectar_entregadoEsperandoAprobacion_noRegistra() {
+        when(configuracionPedidoService.obtener()).thenReturn(configuracion());
+        Pedido pedido = pedido(LocalDate.now().minusDays(10),
+            EstadoPagoHito.PAGADO, EstadoEntregaHito.ENTREGADO);
+        when(pedidoRepository.findCandidatosMora(any(), any()))
+            .thenReturn(List.of(pedido));
+
+        assertThat(moraService.detectar()).isZero();
+        assertThat(pedido.getMoraDesde()).isNull();
+        verify(notificacionService, never()).crearParaUsuario(
+            anyLong(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     void detectar_cuotaImpagaNoGeneraMora() {
         when(configuracionPedidoService.obtener()).thenReturn(configuracion());
         Pedido pedido = pedido(LocalDate.now().minusDays(10),

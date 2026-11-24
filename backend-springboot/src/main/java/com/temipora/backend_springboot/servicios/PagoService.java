@@ -368,6 +368,13 @@ public class PagoService {
         if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
             hito.setEstadoEntrega(EstadoEntregaHito.APROBADO);
             hito.setFechaAprobacion(ahora);
+            if (pedido.getMoraDesde() != null) {
+                pedido.setMoraDesde(null);
+                auditoria.registrarSistema(
+                    AccionesAdmin.PEDIDO_MORA_CURAR, ENTIDAD_PEDIDO,
+                    pedido.getIdPedido(),
+                    "Limpió la mora al pagarse la entrega final");
+            }
         } else if (!hito.getHitoPresupuesto().isRequiereEntrega()) {
             hito.setEstadoEntrega(EstadoEntregaHito.APROBADO);
             hito.setFechaAprobacion(ahora);

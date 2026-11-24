@@ -101,8 +101,10 @@ public class ConfiguracionPedidoService {
             "El plazo de reentrega debe estar entre 1 y 60 días.");
         validarRango(request.getMaxHitos(), 1, 6,
             "El máximo de hitos debe estar entre 1 y 6.");
-        validarRango(request.getDiasGraciaEntrega(), 1, 30,
-            "La gracia de entrega debe estar entre 1 y 30 días.");
+        if (request.getDiasGraciaEntrega() != null) {
+            validarRango(request.getDiasGraciaEntrega(), 1, 30,
+                "La gracia de entrega debe estar entre 1 y 30 días.");
+        }
         validarRango(request.getDiasSancionVentas(), 1, 60,
             "La sanción de ventas debe estar entre 1 y 60 días.");
         validarRango(request.getDiasReapelacion(), 1, 90,
@@ -144,7 +146,9 @@ public class ConfiguracionPedidoService {
         config.setPorcentajeMaxPrimerHito(
             porcentajeMaximo.setScale(2, RoundingMode.HALF_UP));
         config.setMontoMinimoCuota(montoMinimo.setScale(2, RoundingMode.HALF_UP));
-        config.setDiasGraciaEntrega(request.getDiasGraciaEntrega());
+        config.setDiasGraciaEntrega(request.getDiasGraciaEntrega() != null
+            ? request.getDiasGraciaEntrega()
+            : config.getDiasGraciaEntrega());
         config.setDiasSancionVentas(request.getDiasSancionVentas());
         config.setDiasReapelacion(request.getDiasReapelacion());
         config.setDiasCierreTrasBloqueo(request.getDiasCierreTrasBloqueo());
