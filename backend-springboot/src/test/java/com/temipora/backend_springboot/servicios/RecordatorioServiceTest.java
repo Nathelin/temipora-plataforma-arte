@@ -256,10 +256,10 @@ class RecordatorioServiceTest {
     void procesarPendientes_delegaEnElProcesador() {
         when(recordatorioRepository.findUsuariosConPendientes(any()))
             .thenReturn(List.of(1L, 2L));
-        when(procesador.procesar(1L)).thenReturn(true);
-        when(procesador.procesar(2L)).thenReturn(false);
+        when(procesador.procesar(1L)).thenReturn(2);
+        when(procesador.procesar(2L)).thenReturn(0);
 
-        assertThat(service.procesarPendientes()).isEqualTo(1);
+        assertThat(service.procesarPendientes()).isEqualTo(2);
         verify(procesador).procesar(1L);
         verify(procesador).procesar(2L);
     }

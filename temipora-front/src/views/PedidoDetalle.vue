@@ -157,11 +157,6 @@ const prorrogaBloqueante = computed(() => Boolean(
   pedido.value?.puedeResponderProrroga && prorrogaPendiente.value,
 ))
 const prorrogaUsada = computed(() => prorrogas.value.length > 0)
-const motivoProrrogaAceptada = computed(
-  () => prorrogas.value.find(
-    (prorroga) => prorroga.estado === 'ACEPTADA',
-  )?.motivo || '',
-)
 const solicitarProrrogaAbierto = ref(false)
 const procesandoProrroga = ref(false)
 const errorProrroga = ref('')
@@ -1105,12 +1100,6 @@ onMounted(async () => {
             >
               Se corre si el cliente paga tarde una cuota o acepta una prórroga; el
               atraso del artista no la mueve.
-            </dd>
-            <dd
-              v-if="motivoProrrogaAceptada"
-              class="mt-1 text-[11px] leading-relaxed text-cafe/55"
-            >
-              Motivo de la prórroga: {{ motivoProrrogaAceptada }}
             </dd>
             <dd v-if="pedido.entregaAtrasada" class="mt-1">
               <span class="inline-flex rounded-full bg-rojizo/10 px-2 py-0.5 text-[11px] font-semibold text-rojizo">

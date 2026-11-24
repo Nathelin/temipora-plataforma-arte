@@ -22,7 +22,7 @@ import com.temipora.backend_springboot.repositorios.PedidoRepository;
 
 /**
  * Encola los recordatorios de pago (clientes) y de entrega (artistas) y
- * dispara el envío agrupado por usuario.
+ * dispara el envío de cada recordatorio pendiente en su propio correo.
  */
 @Service
 public class RecordatorioService {
@@ -65,9 +65,7 @@ public class RecordatorioService {
             EstadoEmailRecordatorio.PENDIENTE);
         int enviados = 0;
         for (Long idUsuario : usuarios) {
-            if (procesador.procesar(idUsuario)) {
-                enviados++;
-            }
+            enviados += procesador.procesar(idUsuario);
         }
         return enviados;
     }

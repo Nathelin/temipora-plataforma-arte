@@ -79,9 +79,9 @@ class RecordatorioProcesadorTest {
             eq(1L), eq(EstadoEmailRecordatorio.PENDIENTE), any()))
             .thenReturn(new ArrayList<>(List.of(fila)));
 
-        boolean enviado = procesador.procesar(1L);
+        int enviados = procesador.procesar(1L);
 
-        assertThat(enviado).isTrue();
+        assertThat(enviados).isEqualTo(1);
         assertThat(fila.getEstado()).isEqualTo(EstadoEmailRecordatorio.ENVIADO);
         assertThat(fila.getEnviadoEn()).isNotNull();
         assertThat(fila.getIdLote()).isNotNull();
@@ -120,9 +120,9 @@ class RecordatorioProcesadorTest {
             any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(envio);
 
-        boolean enviado = procesador.procesar(1L);
+        int enviados = procesador.procesar(1L);
 
-        assertThat(enviado).isTrue();
+        assertThat(enviados).isEqualTo(2);
         ArgumentCaptor<String> asuntos = ArgumentCaptor.forClass(String.class);
         verify(envioEmailService, times(2)).enviar(
             eq(usuario), eq("RECORDATORIO"), any(), any(),
@@ -138,6 +138,33 @@ class RecordatorioProcesadorTest {
         verify(notificacionService).crearOActualizarParaUsuario(
             eq(1L), eq("ENTREGA_POR_VENCER"), any(), any(),
             eq(11L), eq("PEDIDO"));
+    }
+
+    @Test
+    void procesar_dosRecordatoriosDeEntrega_mandaDosCorreosSeparados() {
+        Usuario usuario = usuario(1L);
+        Pedido pedido = pedidoEntrega(usuario, 12L);
+        EmailRecordatorioPendiente ayer = fila(
+            pedido, MotivoRecordatorio.ENTREGA_1D);
+        EmailRecordatorioPendiente hoy = fila(
+            pedido, MotivoRecordatorio.ENTREGA_HOY);
+        prepararUsuario(usuario);
+        prepararEnvio("<html>ok</html>");
+        when(repository.findByUsuarioIdUsuarioAndEstadoOrderByCreadoEnAsc(
+            eq(1L), eq(EstadoEmailRecordatorio.PENDIENTE), any()))
+            .thenReturn(new ArrayList<>(List.of(ayer, hoy)));
+
+        int enviados = procesador.procesar(1L);
+
+        assertThat(enviados).isEqualTo(2);
+        verify(envioEmailService, times(2)).enviar(
+            eq(usuario), eq("RECORDATORIO"), any(), any(),
+            anyString(), eq("<html>ok</html>"), anyString());
+        assertThat(ayer.getIdLote()).isNotNull();
+        assertThat(hoy.getIdLote()).isNotNull();
+        assertThat(ayer.getIdLote()).isNotEqualTo(hoy.getIdLote());
+        assertThat(ayer.getEstado()).isEqualTo(EstadoEmailRecordatorio.ENVIADO);
+        assertThat(hoy.getEstado()).isEqualTo(EstadoEmailRecordatorio.ENVIADO);
     }
 
     private void prepararUsuario(Usuario usuario) {

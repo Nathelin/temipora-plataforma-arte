@@ -13,6 +13,7 @@ import com.lowagie.text.pdf.parser.PdfTextExtractor;
 import com.temipora.backend_springboot.modelo.HitoPedidoDTO;
 import com.temipora.backend_springboot.modelo.PagoDTO;
 import com.temipora.backend_springboot.modelo.PedidoDTO;
+import com.temipora.backend_springboot.modelo.ProrrogaDTO;
 import com.temipora.backend_springboot.modelo.UsuarioResumenDTO;
 
 class ConstanciaServiceTest {
@@ -31,12 +32,50 @@ class ConstanciaServiceTest {
             .contains("Documento contractual del pedido")
             .contains("Importes")
             .contains("Plan de pagos")
+            .contains("Prórrogas del plazo")
             .contains("Entregas")
             .contains("Pagos")
             .contains("Cifras en ARS")
             .contains("Seña")
+            .contains("El pedido no tiene prórrogas del plazo registradas.")
             .doesNotContain("Notas")
-            .containsPattern("Página\\s+1\\s+de\\s*1");
+            .containsPattern("Página\\s+1\\s+de\\s*\\d+");
+    }
+
+    @Test
+    void muestraLasProrrogasDelPlazoAceptadas() throws Exception {
+        PedidoDTO pedido = PedidoDTO.builder()
+            .idPedido(15L)
+            .cliente(usuario(1L, "cliente"))
+            .artista(usuario(2L, "artista"))
+            .nombreServicio("Ilustración")
+            .estado("EN_CURSO")
+            .limiteEntrega(java.time.LocalDate.of(2026, 12, 12))
+            .fechaEntregaPrevista(java.time.LocalDate.of(2026, 12, 19))
+            .precioFinalMostrado(new BigDecimal("100.00"))
+            .monedaMostrada("ARS")
+            .hitos(List.of())
+            .prorrogas(List.of(ProrrogaDTO.builder()
+                .idProrroga(9L)
+                .diasSolicitados(7)
+                .motivo("Se retrasó la impresión de la pieza")
+                .estado("ACEPTADA")
+                .fechaSolicitud(LocalDateTime.of(2026, 12, 5, 9, 30))
+                .fechaRespuesta(LocalDateTime.of(2026, 12, 5, 14, 0))
+                .entregaPrevistaAntes(java.time.LocalDate.of(2026, 12, 12))
+                .entregaPrevistaDespues(java.time.LocalDate.of(2026, 12, 19))
+                .build()))
+            .build();
+
+        String texto = texto(constanciaService.generar(pedido));
+
+        assertThat(texto)
+            .contains("ENTREGA PROMETIDA")
+            .contains("ENTREGA VIGENTE")
+            .contains("Prórrogas del plazo")
+            .contains("impresión")
+            .contains("Aceptada")
+            .contains("Respuesta");
     }
 
     @Test
