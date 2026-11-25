@@ -185,6 +185,8 @@ onMounted(cargar)
       descripcion="El proceso detecta clientes que no compraron en la ventana configurada o que no se loguearon en la otra, les arma una campaña con servicios recomendados y les envía una oferta."
     />
 
+    <AdminTabs />
+
     <p v-if="cargando" class="py-10 text-center text-cafe/60">Cargando...</p>
     <p v-else-if="error" class="py-10 text-center text-rojizo">{{ error }}</p>
 

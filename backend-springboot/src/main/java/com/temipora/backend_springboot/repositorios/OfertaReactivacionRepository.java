@@ -65,4 +65,28 @@ public interface OfertaReactivacionRepository
         @Param("ids") Collection<Long> ids,
         @Param("estados") Collection<EstadoOfertaReactivacion> estados,
         @Param("ahora") LocalDateTime ahora);
+
+    boolean existsByCampanaIdCampanaAndEstado(
+        Long idCampana,
+        EstadoOfertaReactivacion estado);
+
+    @Query("""
+        SELECT o.estado, COUNT(o) FROM OfertaReactivacion o
+        WHERE o.fechaCreacion >= :desde
+          AND o.fechaCreacion < :hasta
+        GROUP BY o.estado
+        """)
+    List<Object[]> contarPorEstadoEntre(
+        @Param("desde") LocalDateTime desde,
+        @Param("hasta") LocalDateTime hasta);
+
+    @Query("""
+        SELECT COUNT(o) FROM OfertaReactivacion o
+        WHERE o.fechaCreacion >= :desde
+          AND o.fechaCreacion < :hasta
+          AND o.fechaReserva IS NOT NULL
+        """)
+    long contarAceptadasEntre(
+        @Param("desde") LocalDateTime desde,
+        @Param("hasta") LocalDateTime hasta);
 }

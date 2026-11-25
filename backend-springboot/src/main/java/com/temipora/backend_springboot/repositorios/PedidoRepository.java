@@ -300,4 +300,104 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
         @Param("entregaEntregada") EstadoEntregaHito entregaEntregada,
         @Param("idServicio") Long idServicio,
         @Param("patron") String patron);
+
+    @Query(value = """
+        select p from Pedido p
+        join fetch p.presupuesto pr
+        join fetch p.cliente c
+        join fetch p.artista a
+        join fetch p.servicio s
+        left join fetch pr.ofertaReactivacion o
+        left join fetch o.campana
+        where pr.descuentoMonto > 0
+          and p.fechaCreacion >= :desde
+          and p.fechaCreacion < :hasta
+          and (:patron = ''
+               or lower(c.nombreUsuario) like concat('%', :patron, '%')
+               or lower(c.nombreDisplay) like concat('%', :patron, '%')
+               or lower(c.nombre) like concat('%', :patron, '%')
+               or lower(c.apellido) like concat('%', :patron, '%')
+               or lower(a.nombreUsuario) like concat('%', :patron, '%')
+               or lower(a.nombreDisplay) like concat('%', :patron, '%')
+               or lower(s.nombre) like concat('%', :patron, '%'))
+          and (:comisionCero = false or pr.comisionPorcentaje = 0)
+        """,
+        countQuery = """
+        select count(p) from Pedido p
+        join p.presupuesto pr
+        join p.cliente c
+        join p.artista a
+        join p.servicio s
+        where pr.descuentoMonto > 0
+          and p.fechaCreacion >= :desde
+          and p.fechaCreacion < :hasta
+          and (:patron = ''
+               or lower(c.nombreUsuario) like concat('%', :patron, '%')
+               or lower(c.nombreDisplay) like concat('%', :patron, '%')
+               or lower(c.nombre) like concat('%', :patron, '%')
+               or lower(c.apellido) like concat('%', :patron, '%')
+               or lower(a.nombreUsuario) like concat('%', :patron, '%')
+               or lower(a.nombreDisplay) like concat('%', :patron, '%')
+               or lower(s.nombre) like concat('%', :patron, '%'))
+          and (:comisionCero = false or pr.comisionPorcentaje = 0)
+        """)
+    Page<Pedido> buscarConDescuento(
+        @Param("desde") LocalDateTime desde,
+        @Param("hasta") LocalDateTime hasta,
+        @Param("patron") String patron,
+        @Param("comisionCero") boolean comisionCero,
+        Pageable pageable);
+
+    @Query("""
+        select count(p),
+               coalesce(sum(pr.descuentoMontoCobro), 0),
+               coalesce(sum(case when pr.comisionPorcentaje = 0 then 1 else 0 end), 0),
+               coalesce(sum(case when pr.comisionPorcentaje = 0 then pr.descuentoMontoCobro else 0 end), 0),
+               coalesce(sum(pr.precioFinalClienteCobro), 0),
+               coalesce(sum(pr.precioFinalCobro), 0),
+               coalesce(sum(pr.comisionMontoCobro), 0)
+        from Pedido p
+        join p.presupuesto pr
+        join p.cliente c
+        join p.artista a
+        join p.servicio s
+        where pr.descuentoMonto > 0
+          and p.fechaCreacion >= :desde
+          and p.fechaCreacion < :hasta
+          and (:patron = ''
+               or lower(c.nombreUsuario) like concat('%', :patron, '%')
+               or lower(c.nombreDisplay) like concat('%', :patron, '%')
+               or lower(c.nombre) like concat('%', :patron, '%')
+               or lower(c.apellido) like concat('%', :patron, '%')
+               or lower(a.nombreUsuario) like concat('%', :patron, '%')
+               or lower(a.nombreDisplay) like concat('%', :patron, '%')
+               or lower(s.nombre) like concat('%', :patron, '%'))
+          and (:comisionCero = false or pr.comisionPorcentaje = 0)
+        """)
+    List<Object[]> resumirConDescuento(
+        @Param("desde") LocalDateTime desde,
+        @Param("hasta") LocalDateTime hasta,
+        @Param("patron") String patron,
+        @Param("comisionCero") boolean comisionCero);
+
+    @Query("""
+        select count(p) from Pedido p
+        join p.cliente c
+        join p.artista a
+        join p.servicio s
+        where p.fechaCreacion >= :desde
+          and p.fechaCreacion < :hasta
+          and (:patron = ''
+               or lower(c.nombreUsuario) like concat('%', :patron, '%')
+               or lower(c.nombreDisplay) like concat('%', :patron, '%')
+               or lower(c.nombre) like concat('%', :patron, '%')
+               or lower(c.apellido) like concat('%', :patron, '%')
+               or lower(a.nombreUsuario) like concat('%', :patron, '%')
+               or lower(a.nombreDisplay) like concat('%', :patron, '%')
+               or lower(s.nombre) like concat('%', :patron, '%'))
+        """)
+    long contarPedidosPeriodo(
+        @Param("desde") LocalDateTime desde,
+        @Param("hasta") LocalDateTime hasta,
+        @Param("patron") String patron);
 }

@@ -164,6 +164,9 @@ public class OfertaReactivacionService {
                 "La oferta venció. Podés solicitar el servicio sin descuento.");
         }
         oferta.setEstado(EstadoOfertaReactivacion.RESERVADA);
+        if (oferta.getFechaReserva() == null) {
+            oferta.setFechaReserva(ahora);
+        }
         return oferta;
     }
 
@@ -173,6 +176,26 @@ public class OfertaReactivacionService {
             return;
         }
         oferta.setEstado(EstadoOfertaReactivacion.UTILIZADA);
+        if (oferta.getFechaUtilizada() == null) {
+            oferta.setFechaUtilizada(LocalDateTime.now());
+        }
         ofertaRepository.save(oferta);
+    }
+
+    @Transactional
+    public int cerrarCampanasVencidas() {
+        List<CampanaReactivacion> vencidas = campanaRepository
+            .findByEstadoAndFechaVencimientoBefore(
+                EstadoCampanaReactivacion.ACTIVA, LocalDateTime.now());
+        for (CampanaReactivacion campana : vencidas) {
+            boolean utilizada = ofertaRepository
+                .existsByCampanaIdCampanaAndEstado(
+                    campana.getIdCampana(),
+                    EstadoOfertaReactivacion.UTILIZADA);
+            campana.setEstado(utilizada
+                ? EstadoCampanaReactivacion.UTILIZADA
+                : EstadoCampanaReactivacion.VENCIDA);
+        }
+        return vencidas.size();
     }
 }

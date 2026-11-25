@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.repositorios;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,4 +46,17 @@ public interface CampanaReactivacionRepository
     List<CampanaReactivacion> findConOfertasPorUsuario(
         @Param("idUsuario") Long idUsuario,
         @Param("estado") EstadoCampanaReactivacion estado);
+
+    List<CampanaReactivacion> findByEstadoAndFechaVencimientoBefore(
+        EstadoCampanaReactivacion estado,
+        LocalDateTime fecha);
+
+    @Query("""
+        SELECT COUNT(c) FROM CampanaReactivacion c
+        WHERE c.fechaCreacion >= :desde
+          AND c.fechaCreacion < :hasta
+        """)
+    long contarEntre(
+        @Param("desde") LocalDateTime desde,
+        @Param("hasta") LocalDateTime hasta);
 }

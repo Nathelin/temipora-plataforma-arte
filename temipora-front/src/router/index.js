@@ -19,6 +19,7 @@ const MonedasAdmin = () => import('../components/MonedasAdmin.vue')
 const PresupuestoAdmin = () => import('../components/PresupuestoAdmin.vue')
 const ComisionAdmin = () => import('../components/ComisionAdmin.vue')
 const PromocionesAdmin = () => import('../components/PromocionesAdmin.vue')
+const DescuentosPromocionesAdmin = () => import('../components/DescuentosPromocionesAdmin.vue')
 const SustitucionesAdmin = () => import('../components/SustitucionesAdmin.vue')
 const PedidoConfigAdmin = () => import('../components/PedidoConfigAdmin.vue')
 const ConfiguracionBajaCuentaAdmin = () => import('../components/ConfiguracionBajaCuentaAdmin.vue')
@@ -527,6 +528,12 @@ const routes = [
         name: 'admin-promociones',
         component: PromocionesAdmin,
         meta: { title: 'Promociones' },
+      },
+      {
+        path: 'campanas/promociones/descuentos',
+        name: 'admin-promociones-descuentos',
+        component: DescuentosPromocionesAdmin,
+        meta: { title: 'Promociones - Descuentos aplicados' },
       },
       {
         path: 'campanas/sustituciones',

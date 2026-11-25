@@ -55,6 +55,13 @@ export const SECCIONES_CON_TABS = [
       { etiqueta: 'Reglas de pedidos', to: '/admin/ajustes/pedidos' },
     ],
   },
+  {
+    id: 'promociones',
+    tabs: [
+      { etiqueta: 'Configuración', to: '/admin/campanas/promociones' },
+      { etiqueta: 'Descuentos aplicados', to: '/admin/campanas/promociones/descuentos' },
+    ],
+  },
 ]
 
 export function tabsDeRuta(path) {

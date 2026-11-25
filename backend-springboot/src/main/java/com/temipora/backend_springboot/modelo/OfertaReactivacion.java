@@ -61,6 +61,12 @@ public class OfertaReactivacion {
     @Column(name = "fecha_vencimiento", nullable = false)
     private LocalDateTime fechaVencimiento;
 
+    @Column(name = "fecha_reserva")
+    private LocalDateTime fechaReserva;
+
+    @Column(name = "fecha_utilizada")
+    private LocalDateTime fechaUtilizada;
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_solicitud")
     private Solicitud solicitud;
