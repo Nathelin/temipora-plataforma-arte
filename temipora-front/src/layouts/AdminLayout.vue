@@ -71,7 +71,7 @@ const grupos = [
       {
         nombre: 'Sanciones',
         to: '/admin/sanciones',
-        rutas: ['/admin/sanciones', '/admin/apelaciones'],
+        rutas: ['/admin/sanciones', '/admin/apelaciones', '/admin/sanciones/pruebas'],
         icono: Ban,
       },
       { nombre: 'Bajas de cuenta', to: '/admin/ajustes/bajas-cuenta', icono: UserX },

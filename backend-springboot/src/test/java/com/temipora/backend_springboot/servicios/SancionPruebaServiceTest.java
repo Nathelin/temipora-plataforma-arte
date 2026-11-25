@@ -1,6 +1,7 @@
 package com.temipora.backend_springboot.servicios;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -208,6 +209,166 @@ class SancionPruebaServiceTest {
         assertThat(resultado.mensaje()).contains("reabierto");
     }
 
+    @Test
+    void simularAprobacion_enNivel2_revierteYReincorpora() {
+        Usuario usuario = artista();
+        Pedido pedido = pedido();
+        SancionCuenta sancion = sancion(AlcanceSancion.ACCESO);
+        sancion.setPedido(pedido);
+        sancion.setHitoPedido(pedido.getHitos().get(0));
+        prepararEstado(usuario, null, List.of(pedido));
+        when(sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
+                usuario.getIdUsuario(), EstadoSancion.ACTIVA))
+            .thenReturn(Optional.of(sancion), Optional.of(sancion),
+                Optional.empty());
+        when(pedidoRepository.save(any(Pedido.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+        when(moraService.detectar()).thenReturn(0);
+        when(sancionIncumplimientoService.procesar())
+            .thenReturn(new SancionIncumplimientoService.Resumen(0, 0, 0, 0));
+
+        SancionPruebaService.ResultadoPrueba resultado =
+            service.simularAprobacion("ArtistaMoroso");
+
+        verify(sancionAutomaticaService).revertirYRestaurar(
+            eq(4L), anyString());
+        assertThat(resultado.mensaje()).contains("revirtió el Nivel 2");
+    }
+
+    @Test
+    void forzarNivel2_sinSancion_lanzaError() {
+        prepararEstado(artista(), null, List.of(pedido()));
+
+        assertThatThrownBy(() -> service.forzarNivel2("ArtistaMoroso"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Nivel 1");
+    }
+
+    @Test
+    void forzarNivel2_yaEnAcceso_devuelveMensaje() {
+        Usuario usuario = artista();
+        SancionCuenta sancion = sancion(AlcanceSancion.ACCESO);
+        prepararEstado(usuario, sancion, List.of(pedido()));
+        when(sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
+                usuario.getIdUsuario(), EstadoSancion.ACTIVA))
+            .thenReturn(Optional.of(sancion));
+
+        SancionPruebaService.ResultadoPrueba resultado =
+            service.forzarNivel2("ArtistaMoroso");
+
+        assertThat(resultado.mensaje()).contains("ya está en Nivel 2");
+    }
+
+    @Test
+    void prepararNivel1_sinPedidos_lanzaError() {
+        prepararEstado(artista(), null, List.of());
+
+        assertThatThrownBy(() -> service.prepararNivel1("ArtistaMoroso"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("pedidos en curso");
+    }
+
+    @Test
+    void estado_usuarioNoArtista_lanzaError() {
+        Usuario cliente = Usuario.builder()
+            .idUsuario(1L)
+            .nombreUsuario("Cliente")
+            .rol(Rol.builder().nombre(ERol.CLIENTE).build())
+            .build();
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("Cliente"))
+            .thenReturn(Optional.of(cliente));
+
+        assertThatThrownBy(() -> service.estado("Cliente"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("ARTISTA");
+    }
+
+    @Test
+    void revertirTodo_sinSancion_reabreElPedido() {
+        Usuario usuario = artista();
+        Pedido pedido = pedido();
+        pedido.setLimiteEntrega(LocalDate.now().minusDays(5));
+        pedido.setMoraDesde(LocalDateTime.now().minusDays(5));
+        prepararEstado(usuario, null, List.of(pedido));
+        when(sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
+                usuario.getIdUsuario(), EstadoSancion.ACTIVA))
+            .thenReturn(Optional.empty());
+        when(pedidoRepository.save(any(Pedido.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        SancionPruebaService.ResultadoPrueba resultado =
+            service.revertirTodo("ArtistaMoroso");
+
+        assertThat(resultado.mensaje()).contains("reabierto");
+        assertThat(pedido.getLimiteEntrega()).isAfter(LocalDate.now());
+    }
+
+    @Test
+    void prepararNivel1_conEntregaFinal_apruebaLaEtapaPreviaYExigeLaEntrega() {
+        Usuario usuario = artista();
+        Pedido pedido = pedidoConEntregaFinal();
+        SancionCuenta sancion = sancionEntregas();
+        prepararEstado(usuario, sancion, List.of(pedido));
+        when(sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
+                usuario.getIdUsuario(), EstadoSancion.ACTIVA))
+            .thenReturn(Optional.empty(), Optional.of(sancion));
+        when(pedidoRepository.save(any(Pedido.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+        when(moraService.detectar()).thenReturn(0);
+        when(sancionIncumplimientoService.procesar())
+            .thenReturn(new SancionIncumplimientoService.Resumen(0, 0, 1, 0));
+
+        SancionPruebaService.ResultadoPrueba resultado =
+            service.prepararNivel1("ArtistaMoroso");
+
+        assertThat(pedido.getHitos().get(0).getEstadoEntrega())
+            .isEqualTo(EstadoEntregaHito.APROBADO);
+        assertThat(pedido.getHitos().get(1).getEstadoPago())
+            .isEqualTo(EstadoPagoHito.PENDIENTE);
+        assertThat(pedido.getHitos().get(1).getEstadoEntrega())
+            .isEqualTo(EstadoEntregaHito.NO_INICIADO);
+        assertThat(resultado.mensaje()).contains("Nivel 1 aplicado");
+    }
+
+    @Test
+    void prepararNivel1_conEtapaPreviaAprobada_noLaModifica() {
+        Usuario usuario = artista();
+        Pedido pedido = pedidoConEntregaFinal();
+        pedido.getHitos().get(0)
+            .setEstadoEntrega(EstadoEntregaHito.APROBADO);
+        SancionCuenta sancion = sancionEntregas();
+        prepararEstado(usuario, sancion, List.of(pedido));
+        when(sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
+                usuario.getIdUsuario(), EstadoSancion.ACTIVA))
+            .thenReturn(Optional.empty(), Optional.of(sancion));
+        when(pedidoRepository.save(any(Pedido.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+        when(moraService.detectar()).thenReturn(0);
+        when(sancionIncumplimientoService.procesar())
+            .thenReturn(new SancionIncumplimientoService.Resumen(0, 0, 1, 0));
+
+        service.prepararNivel1("ArtistaMoroso");
+
+        assertThat(pedido.getHitos().get(0).getEstadoEntrega())
+            .isEqualTo(EstadoEntregaHito.APROBADO);
+        assertThat(pedido.getHitos().get(1).getEstadoEntrega())
+            .isEqualTo(EstadoEntregaHito.NO_INICIADO);
+    }
+
+    @Test
+    void forzarNivel2_conAlcanceVentas_lanzaError() {
+        Usuario usuario = artista();
+        SancionCuenta sancion = sancion(AlcanceSancion.VENTAS);
+        prepararEstado(usuario, sancion, List.of(pedido()));
+        when(sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
+                usuario.getIdUsuario(), EstadoSancion.ACTIVA))
+            .thenReturn(Optional.of(sancion));
+
+        assertThatThrownBy(() -> service.forzarNivel2("ArtistaMoroso"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("restricción a entregas");
+    }
+
     private void prepararEstado(
             Usuario usuario, SancionCuenta sancion, List<Pedido> pedidos) {
         when(usuarioRepository.findByNombreUsuarioIgnoreCase(
@@ -275,12 +436,61 @@ class SancionPruebaServiceTest {
         return pedido;
     }
 
+    private Pedido pedidoConEntregaFinal() {
+        Pedido pedido = new Pedido();
+        pedido.setIdPedido(31L);
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        pedido.setFechaCreacion(LocalDateTime.now().minusDays(10));
+        pedido.setFechaInicio(LocalDate.now().minusDays(10));
+        pedido.setLimiteEntrega(LocalDate.now().plusDays(3));
+        pedido.setArtista(artista());
+        pedido.setCliente(Usuario.builder()
+            .idUsuario(7L)
+            .nombreUsuario("Cliente2")
+            .build());
+        Servicio servicio = new Servicio();
+        servicio.setIdServicio(22L);
+        servicio.setNombre("Retrato angelical");
+        pedido.setServicio(servicio);
+
+        HitoPresupuesto cuota = new HitoPresupuesto();
+        cuota.setOrden(0);
+        cuota.setTipo(TipoHito.CUOTA);
+        cuota.setNombre("Cuota");
+        cuota.setRequiereEntrega(false);
+        HitoPedido hitoCuota = new HitoPedido();
+        hitoCuota.setIdHitoPedido(53L);
+        hitoCuota.setHitoPresupuesto(cuota);
+        hitoCuota.setOrden(0);
+        hitoCuota.setEstadoPago(EstadoPagoHito.PAGADO);
+        hitoCuota.setEstadoEntrega(EstadoEntregaHito.NO_INICIADO);
+        pedido.agregarHito(hitoCuota);
+
+        HitoPresupuesto entrega = new HitoPresupuesto();
+        entrega.setOrden(1);
+        entrega.setTipo(TipoHito.ENTREGA);
+        entrega.setNombre("Entrega final");
+        entrega.setRequiereEntrega(true);
+        HitoPedido hitoEntrega = new HitoPedido();
+        hitoEntrega.setIdHitoPedido(54L);
+        hitoEntrega.setHitoPresupuesto(entrega);
+        hitoEntrega.setOrden(1);
+        hitoEntrega.setEstadoPago(EstadoPagoHito.PENDIENTE);
+        hitoEntrega.setEstadoEntrega(EstadoEntregaHito.NO_INICIADO);
+        pedido.agregarHito(hitoEntrega);
+        return pedido;
+    }
+
     private SancionCuenta sancionEntregas() {
+        return sancion(AlcanceSancion.ENTREGAS);
+    }
+
+    private SancionCuenta sancion(AlcanceSancion alcance) {
         return SancionCuenta.builder()
             .idSancion(4L)
             .usuario(artista())
             .tipo(TipoSancion.SUSPENSION)
-            .alcance(AlcanceSancion.ENTREGAS)
+            .alcance(alcance)
             .origen(OrigenSancion.AUTOMATICA)
             .estado(EstadoSancion.ACTIVA)
             .motivo("No entregó la seña.")

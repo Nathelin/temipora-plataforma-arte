@@ -229,6 +229,8 @@ public class UsuarioService {
             if (sancion != null) {
                 dto.setSancionado(true);
                 dto.setSancionTipo(sancion.getTipo().name());
+                dto.setSancionAlcance(sancion.getAlcance() != null
+                    ? sancion.getAlcance().name() : null);
             }
             return dto;
         });

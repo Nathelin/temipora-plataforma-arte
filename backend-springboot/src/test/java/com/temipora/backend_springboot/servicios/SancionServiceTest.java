@@ -18,11 +18,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EstadoSancion;
 import com.temipora.backend_springboot.modelo.OrigenSancion;
+import com.temipora.backend_springboot.modelo.PaginaDTO;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.SancionCuenta;
 import com.temipora.backend_springboot.modelo.SancionCuentaDTO;
@@ -255,6 +260,123 @@ class SancionServiceTest {
 
         assertThat(estado.isSancionado()).isTrue();
         assertThat(estado.getSancionActual().getIdSancion()).isEqualTo(10L);
+    }
+
+    @Test
+    void restriccionesVigentes_detectanVentasEntregasYCompras() {
+        Usuario usuario = usuario(1L, "cliente", ERol.CLIENTE);
+        SancionCuenta restriccion = sancion(
+            10L, usuario, AlcanceSancion.ENTREGAS);
+        when(sancionRepository.findVigentesByUsuarioId(
+                eq(1L), eq(EstadoSancion.ACTIVA), any()))
+            .thenReturn(List.of(restriccion));
+
+        assertThat(sancionService.tieneSancionQueImpideVender(1L)).isTrue();
+        assertThat(sancionService.tieneSancionDeEntrega(1L)).isTrue();
+        assertThat(sancionService.tieneSancionDeCompra(1L)).isFalse();
+        assertThat(sancionService.tieneAlgunaSancionVigente(1L)).isTrue();
+    }
+
+    @Test
+    void vigentesDe_mapeaPorUsuario() {
+        Usuario usuario = usuario(1L, "cliente", ERol.CLIENTE);
+        SancionCuenta restriccion = sancion(
+            10L, usuario, AlcanceSancion.ENTREGAS);
+        when(sancionRepository.findVigentesByUsuarioIds(
+                any(), eq(EstadoSancion.ACTIVA), any()))
+            .thenReturn(List.of(restriccion));
+
+        assertThat(sancionService.vigentesDe(List.of(1L)))
+            .containsKey(1L);
+    }
+
+    @Test
+    void historial_mapeaSanciones() {
+        SancionCuenta restriccion = sancion(
+            10L, usuario(1L, "cliente", ERol.CLIENTE),
+            AlcanceSancion.ENTREGAS);
+        when(sancionRepository.findByUsuarioIdUsuarioOrderByFechaInicioDesc(1L))
+            .thenReturn(List.of(restriccion));
+
+        assertThat(sancionService.historial(1L)).hasSize(1);
+    }
+
+    @Test
+    void listar_devuelveLaPaginaDelRepositorio() {
+        SancionCuenta restriccion = sancion(
+            10L, usuario(1L, "cliente", ERol.CLIENTE),
+            AlcanceSancion.ENTREGAS);
+        when(sancionRepository.findAll(
+                any(Specification.class), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(
+                List.of(restriccion), PageRequest.of(0, 10), 1));
+
+        PaginaDTO<SancionCuentaDTO> pagina = sancionService.listar(
+            null, null, null, null, 0, 10);
+
+        assertThat(pagina.getContenido()).hasSize(1);
+        assertThat(pagina.getTotalElementos()).isEqualTo(1);
+    }
+
+    @Test
+    void escalarSistema_actualizaAlcanceMotivoYFechas() {
+        SancionCuenta sancion = sancion(
+            10L, usuario(1L, "cliente", ERol.CLIENTE),
+            AlcanceSancion.VENTAS);
+        when(sancionRepository.findById(10L)).thenReturn(Optional.of(sancion));
+        when(sancionRepository.save(any(SancionCuenta.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        SancionCuenta escalada = sancionService.escalarSistema(
+            10L,
+            AlcanceSancion.ACCESO,
+            "nuevo motivo",
+            "AUTO:NUEVA",
+            null,
+            null,
+            LocalDateTime.now().minusDays(2));
+
+        assertThat(escalada.getTipo()).isEqualTo(TipoSancion.INHABILITACION);
+        assertThat(escalada.getAlcance()).isEqualTo(AlcanceSancion.ACCESO);
+        assertThat(escalada.getMotivo()).isEqualTo("nuevo motivo");
+        assertThat(escalada.getFechaFin()).isNull();
+        assertThat(escalada.getClave()).isEqualTo("AUTO:NUEVA");
+        assertThat(escalada.getFechaEscalada()).isNotNull();
+    }
+
+    @Test
+    void revertirSistema_liberaLaClaveYRegistraLaReversion() {
+        SancionCuenta sancion = sancion(
+            10L, usuario(1L, "cliente", ERol.CLIENTE),
+            AlcanceSancion.ENTREGAS);
+        sancion.setClave("AUTO:ENTREGA:31:NIVEL1");
+        when(sancionRepository.findById(10L)).thenReturn(Optional.of(sancion));
+        when(sancionRepository.save(any(SancionCuenta.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        SancionCuenta revertida = sancionService.revertirSistema(
+            10L, "Se curó la mora");
+
+        assertThat(revertida.getEstado())
+            .isEqualTo(EstadoSancion.REVERTIDA);
+        assertThat(revertida.getClave()).isNull();
+        assertThat(revertida.getFechaReversion()).isNotNull();
+        assertThat(revertida.getObservacionReversion())
+            .isEqualTo("Se curó la mora");
+    }
+
+    private SancionCuenta sancion(
+            Long id, Usuario usuario, AlcanceSancion alcance) {
+        return SancionCuenta.builder()
+            .idSancion(id)
+            .usuario(usuario)
+            .tipo(TipoSancion.SUSPENSION)
+            .alcance(alcance)
+            .estado(EstadoSancion.ACTIVA)
+            .motivo("motivo")
+            .fechaInicio(LocalDateTime.now().minusHours(1))
+            .fechaFin(LocalDateTime.now().plusDays(5))
+            .build();
     }
 
     private SancionRequest request(

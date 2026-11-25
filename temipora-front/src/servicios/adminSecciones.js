@@ -4,6 +4,7 @@ export const SECCIONES_CON_TABS = [
     tabs: [
       { etiqueta: 'Sanciones', to: '/admin/sanciones' },
       { etiqueta: 'Apelaciones', to: '/admin/apelaciones' },
+      { etiqueta: 'Pruebas', to: '/admin/sanciones/pruebas' },
     ],
   },
   {

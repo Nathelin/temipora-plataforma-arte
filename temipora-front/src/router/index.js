@@ -6,6 +6,7 @@ import MainLayout from '../layouts/MainLayout.vue'
 const Login = () => import('../components/Login.vue')
 const Usuarios = () => import('../components/Usuarios.vue')
 const SancionesAdmin = () => import('../components/SancionesAdmin.vue')
+const AdminSancionesPruebas = () => import('../views/AdminSancionesPruebas.vue')
 const AnclajeAdmin = () => import('../components/AnclajeAdmin.vue')
 const TiposAdmin = () => import('../components/TiposAdmin.vue')
 const EtiquetasAdmin = () => import('../components/EtiquetasAdmin.vue')
@@ -414,6 +415,12 @@ const routes = [
         name: 'admin-sanciones',
         component: SancionesAdmin,
         meta: { title: 'Sanciones de cuentas' },
+      },
+      {
+        path: 'sanciones/pruebas',
+        name: 'admin-sanciones-pruebas',
+        component: AdminSancionesPruebas,
+        meta: { title: 'Pruebas de sanciones' },
       },
       {
         path: 'apelaciones',

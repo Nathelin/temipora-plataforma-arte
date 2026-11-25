@@ -39,6 +39,7 @@ import com.temipora.backend_springboot.modelo.ConversacionAccion;
 import com.temipora.backend_springboot.modelo.ConversacionDTO;
 import com.temipora.backend_springboot.modelo.ConversacionParticipante;
 import com.temipora.backend_springboot.modelo.ConversacionResumenDTO;
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EstadoConversacion;
 import com.temipora.backend_springboot.modelo.EstadoRelacionMensaje;
@@ -90,6 +91,9 @@ class ConversacionServiceTest {
     @Mock
     private MoraClienteService moraClienteService;
 
+    @Mock
+    private SancionService sancionService;
+
     @InjectMocks
     private ConversacionService conversacionService;
 
@@ -111,6 +115,148 @@ class ConversacionServiceTest {
             .hasMessageContaining("pago pendiente");
 
         verify(conversacionRepository, never()).save(any(Conversacion.class));
+    }
+
+    @Test
+    void crear_conDestinatarioSancionado_lanzaConflicto() {
+        Usuario remitente = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario destinatario = usuario(2L, "artista", ERol.ARTISTA);
+        prepararCreacion(remitente, destinatario);
+        when(sancionService.tieneSancionVigente(
+                eq(2L), eq(AlcanceSancion.ENTREGAS))).thenReturn(true);
+
+        assertThatThrownBy(() -> conversacionService.crear(
+                1L, request("artista", "Consulta", "Hola.")))
+            .isInstanceOf(ConflictoException.class)
+            .hasMessageContaining("limitada por un incumplimiento");
+
+        verify(conversacionRepository, never()).save(any(Conversacion.class));
+    }
+
+    @Test
+    void estadoConUsuario_remitenteAdmin_devuelveNoDisponible() {
+        Usuario admin = usuario(1L, "admin", ERol.ADMIN);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        when(configuracionService.obtener()).thenReturn(new ConfiguracionMensajeria());
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(admin));
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("artista"))
+            .thenReturn(Optional.of(artista));
+
+        var estado = conversacionService.estadoConUsuario(1L, "artista");
+
+        assertThat(estado.getEstadoRelacion())
+            .isEqualTo(EstadoRelacionMensaje.NINGUNA);
+        assertThat(estado.isPuedeSolicitar()).isFalse();
+    }
+
+    @Test
+    void estadoConUsuario_sinConversacion_permiteSolicitar() {
+        Usuario yo = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        when(configuracionService.obtener()).thenReturn(new ConfiguracionMensajeria());
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(yo));
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("artista"))
+            .thenReturn(Optional.of(artista));
+        when(conversacionRepository.buscarPorPar(1L, 2L))
+            .thenReturn(Optional.empty());
+
+        var estado = conversacionService.estadoConUsuario(1L, "artista");
+
+        assertThat(estado.getEstadoRelacion())
+            .isEqualTo(EstadoRelacionMensaje.NINGUNA);
+        assertThat(estado.isPuedeSolicitar()).isTrue();
+        assertThat(estado.getContraparte().getIdUsuario()).isEqualTo(2L);
+    }
+
+    @Test
+    void estadoConUsuario_destinatarioSancionado_noPermiteSolicitar() {
+        Usuario yo = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        when(configuracionService.obtener()).thenReturn(new ConfiguracionMensajeria());
+        when(usuarioRepository.findByIdUsuario(1L)).thenReturn(Optional.of(yo));
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("artista"))
+            .thenReturn(Optional.of(artista));
+        when(sancionService.tieneSancionVigente(
+                eq(2L), eq(AlcanceSancion.ENTREGAS))).thenReturn(true);
+
+        var estado = conversacionService.estadoConUsuario(1L, "artista");
+
+        assertThat(estado.getEstadoRelacion())
+            .isEqualTo(EstadoRelacionMensaje.NINGUNA);
+        assertThat(estado.isPuedeSolicitar()).isFalse();
+        assertThat(estado.getMotivoNoSolicitable())
+            .contains("limitada por un incumplimiento");
+    }
+
+    @Test
+    void estadoConUsuario_conConversacionAceptada_devuelveAceptada() {
+        Usuario yo = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        prepararEstadoConversacion(yo, artista,
+            conversacion(EstadoConversacion.ACEPTADA, yo, artista));
+
+        var estado = conversacionService.estadoConUsuario(1L, "artista");
+
+        assertThat(estado.getEstadoRelacion())
+            .isEqualTo(EstadoRelacionMensaje.ACEPTADA);
+        assertThat(estado.getIdConversacion()).isEqualTo(10L);
+        assertThat(estado.isPuedeSolicitar()).isFalse();
+    }
+
+    @Test
+    void estadoConUsuario_conSolicitudPendienteEnviada_devuelveEnviada() {
+        Usuario yo = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        prepararEstadoConversacion(yo, artista,
+            conversacion(EstadoConversacion.PENDIENTE, yo, artista));
+
+        var estado = conversacionService.estadoConUsuario(1L, "artista");
+
+        assertThat(estado.getEstadoRelacion())
+            .isEqualTo(EstadoRelacionMensaje.PENDIENTE_ENVIADA);
+        assertThat(estado.isPuedeSolicitar()).isFalse();
+    }
+
+    @Test
+    void estadoConUsuario_conSolicitudPendienteRecibida_devuelveRecibida() {
+        Usuario yo = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        prepararEstadoConversacion(yo, artista,
+            conversacion(EstadoConversacion.PENDIENTE, artista, yo));
+
+        var estado = conversacionService.estadoConUsuario(1L, "artista");
+
+        assertThat(estado.getEstadoRelacion())
+            .isEqualTo(EstadoRelacionMensaje.PENDIENTE_RECIBIDA);
+        assertThat(estado.isPuedeSolicitar()).isFalse();
+    }
+
+    @Test
+    void estadoConUsuario_conConversacionCancelada_permiteReenviar() {
+        Usuario yo = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        prepararEstadoConversacion(yo, artista,
+            conversacion(EstadoConversacion.CANCELADA, yo, artista));
+
+        var estado = conversacionService.estadoConUsuario(1L, "artista");
+
+        assertThat(estado.getEstadoRelacion())
+            .isEqualTo(EstadoRelacionMensaje.CANCELADA);
+        assertThat(estado.isPuedeSolicitar()).isTrue();
+    }
+
+    @Test
+    void estadoConUsuario_conConversacionVencida_permiteReenviar() {
+        Usuario yo = usuario(1L, "cliente", ERol.CLIENTE);
+        Usuario artista = usuario(2L, "artista", ERol.ARTISTA);
+        prepararEstadoConversacion(yo, artista,
+            conversacion(EstadoConversacion.VENCIDA, yo, artista));
+
+        var estado = conversacionService.estadoConUsuario(1L, "artista");
+
+        assertThat(estado.getEstadoRelacion())
+            .isEqualTo(EstadoRelacionMensaje.VENCIDA);
+        assertThat(estado.isPuedeSolicitar()).isTrue();
     }
 
     @Test
@@ -740,6 +886,18 @@ class ConversacionServiceTest {
         participante.setUsuario(usuario);
         participante.setArchivada(archivada);
         return participante;
+    }
+
+    private void prepararEstadoConversacion(
+            Usuario yo, Usuario otro, Conversacion conversacion) {
+        when(configuracionService.obtener())
+            .thenReturn(new ConfiguracionMensajeria());
+        when(usuarioRepository.findByIdUsuario(1L))
+            .thenReturn(Optional.of(yo));
+        when(usuarioRepository.findByNombreUsuarioIgnoreCase("artista"))
+            .thenReturn(Optional.of(otro));
+        when(conversacionRepository.buscarPorPar(1L, 2L))
+            .thenReturn(Optional.of(conversacion));
     }
 
     private void prepararCreacion(Usuario remitente, Usuario destinatario) {

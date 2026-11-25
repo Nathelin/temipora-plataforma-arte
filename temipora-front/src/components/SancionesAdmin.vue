@@ -4,7 +4,6 @@ import { useRoute } from 'vue-router'
 import api from '../servicios/api'
 import { formatearFechaHora } from '../servicios/fechas'
 import AdminPageHeader from './admin/AdminPageHeader.vue'
-import SancionPruebasAdmin from './SancionPruebasAdmin.vue'
 
 const route = useRoute()
 
@@ -201,8 +200,6 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
     </AdminPageHeader>
 
     <AdminTabs />
-
-    <SancionPruebasAdmin />
 
     <div class="mb-6 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
       <input
