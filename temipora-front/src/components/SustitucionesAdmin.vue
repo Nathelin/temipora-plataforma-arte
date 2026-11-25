@@ -200,6 +200,8 @@ onMounted(cargar)
       descripcion="Cuando un servicio no puede recibir una solicitud, la plataforma ofrece servicios parecidos de otros artistas que sí tienen cupo. Acá definís cuántas alternativas se muestran y con qué criterio se eligen."
     />
 
+    <AdminTabs />
+
     <p v-if="cargando" class="py-10 text-center text-cafe/60">Cargando...</p>
     <p v-else-if="error" class="py-10 text-center text-rojizo">{{ error }}</p>
 

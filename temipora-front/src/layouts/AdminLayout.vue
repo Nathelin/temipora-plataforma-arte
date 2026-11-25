@@ -115,7 +115,12 @@ const grupos = [
         rutas: ['/admin/campanas/promociones', '/admin/campanas/promociones/descuentos'],
         icono: Megaphone,
       },
-      { nombre: 'Sustituciones de artistas', to: '/admin/campanas/sustituciones', icono: Users },
+      {
+        nombre: 'Sustituciones de artistas',
+        to: '/admin/campanas/sustituciones',
+        rutas: ['/admin/campanas/sustituciones', '/admin/campanas/sustituciones/historial'],
+        icono: Users,
+      },
       { nombre: 'Comisiones', to: '/admin/ajustes/comisiones', icono: Percent },
       {
         nombre: 'Monedas y cotización',

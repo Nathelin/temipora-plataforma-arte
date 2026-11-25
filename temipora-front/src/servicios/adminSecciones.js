@@ -62,6 +62,13 @@ export const SECCIONES_CON_TABS = [
       { etiqueta: 'Descuentos aplicados', to: '/admin/campanas/promociones/descuentos' },
     ],
   },
+  {
+    id: 'sustituciones',
+    tabs: [
+      { etiqueta: 'Configuración', to: '/admin/campanas/sustituciones' },
+      { etiqueta: 'Historial', to: '/admin/campanas/sustituciones/historial' },
+    ],
+  },
 ]
 
 export function tabsDeRuta(path) {

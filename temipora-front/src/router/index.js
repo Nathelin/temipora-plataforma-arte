@@ -21,6 +21,7 @@ const ComisionAdmin = () => import('../components/ComisionAdmin.vue')
 const PromocionesAdmin = () => import('../components/PromocionesAdmin.vue')
 const DescuentosPromocionesAdmin = () => import('../components/DescuentosPromocionesAdmin.vue')
 const SustitucionesAdmin = () => import('../components/SustitucionesAdmin.vue')
+const HistorialSustitucionesAdmin = () => import('../components/HistorialSustitucionesAdmin.vue')
 const PedidoConfigAdmin = () => import('../components/PedidoConfigAdmin.vue')
 const ConfiguracionBajaCuentaAdmin = () => import('../components/ConfiguracionBajaCuentaAdmin.vue')
 const ConfiguracionMensajeriaAdmin = () => import('../components/ConfiguracionMensajeriaAdmin.vue')
@@ -540,6 +541,12 @@ const routes = [
         name: 'admin-sustituciones',
         component: SustitucionesAdmin,
         meta: { title: 'Sustituciones de artistas' },
+      },
+      {
+        path: 'campanas/sustituciones/historial',
+        name: 'admin-sustituciones-historial',
+        component: HistorialSustitucionesAdmin,
+        meta: { title: 'Sustituciones - Historial' },
       },
       {
         path: 'ajustes/pedidos',
