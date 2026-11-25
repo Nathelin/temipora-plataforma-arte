@@ -213,7 +213,17 @@ const tarjetas = computed(() => {
 
 function diasHasta(valor) {
   if (!valor) return Number.POSITIVE_INFINITY
-  const fecha = new Date(valor)
+  const texto = String(valor)
+  // Las fechas sin hora (YYYY-MM-DD) se comparan por día: parsearlas con
+  // `new Date` las toma como UTC y el resultado cambia según la zona horaria.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) {
+    const [anio, mes, dia] = texto.split('-').map(Number)
+    const objetivo = new Date(anio, mes - 1, dia)
+    const hoy = new Date()
+    hoy.setHours(0, 0, 0, 0)
+    return Math.round((objetivo - hoy) / 86400000)
+  }
+  const fecha = new Date(texto)
   if (Number.isNaN(fecha.getTime())) return Number.POSITIVE_INFINITY
   return Math.ceil((fecha.getTime() - Date.now()) / 86400000)
 }
@@ -291,7 +301,9 @@ const atenciones = computed(() => {
         to,
         icono: ICONOS.alerta,
         tono: 'alerta',
-        meta: 'Espera tu nueva versión',
+        meta: primero.fechaLimiteReentrega
+          ? textoVencimiento(primero.fechaLimiteReentrega)
+          : 'Espera tu nueva versión',
       })
       continue
     }
@@ -324,7 +336,12 @@ const atenciones = computed(() => {
       continue
     }
 
-    const limite = primero.fechaLimitePago || pedido?.fechaEntregaPrevista || pedido?.limiteEntrega
+    // Para una entrega manda la fecha de entrega prevista del pedido. El
+    // `fechaLimitePago` del hito es el plazo del cliente (por ejemplo, el de la
+    // seña) y no tiene relación con cuándo debe entregar el artista.
+    const limite = pedido?.fechaEntregaPrevista
+      || pedido?.limiteEntrega
+      || primero.fechaLimitePago
     items.push({
       clave: `entrega-${grupo.idPedido}`,
       titulo: `Falta subir tu entrega${extra}`,

@@ -52,7 +52,7 @@ function aplicarContador(data) {
   porCategoria.value = data?.porCategoria || {}
 }
 
-async function refrescarContador() {
+async function refrescarContador(silencioso = false) {
   sincronizarSesion()
   if (!haySesion()) {
     noLeidas.value = 0
@@ -61,7 +61,9 @@ async function refrescarContador() {
   }
   const turno = ++secuenciaContador
   try {
-    const res = await cargarContadorNotificaciones()
+    const res = await cargarContadorNotificaciones({
+      meta: { silenciosa: silencioso },
+    })
     if (turno !== secuenciaContador) return
     aplicarContador(res.data)
   } catch (e) {
@@ -169,7 +171,9 @@ async function cargarRecientes({ silencioso = false } = {}) {
 
   cargaRecientesEnCurso = (async () => {
     try {
-      const res = await cargarNotificacionesRecientes(LIMITE_RECIENTES)
+      const res = await cargarNotificacionesRecientes(LIMITE_RECIENTES, {
+        meta: { silenciosa: silencioso },
+      })
       if (turno !== secuenciaRecientes) return
       recientes.value = res.data || []
     } catch (e) {
@@ -273,7 +277,7 @@ function iniciarPolling(ms = INTERVALO_MS) {
   detenerPolling()
   intervalo = window.setInterval(() => {
     if (document.visibilityState === 'visible') {
-      void refrescarContador()
+      void refrescarContador(true)
     }
   }, ms)
 }

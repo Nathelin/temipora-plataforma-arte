@@ -696,6 +696,44 @@ router.beforeEach((to, from, next) => {
   next()
 })
 
+const CLAVE_RECARGA_CHUNK = 'temipora-recarga-por-chunk'
+
+router.onError((error, to) => {
+  const mensaje = String(error?.message || '')
+  if (!/dynamically imported module|Importing a module script failed|Failed to fetch/i.test(mensaje)) {
+    return
+  }
+  let yaRecargo = false
+  try {
+    yaRecargo = sessionStorage.getItem(CLAVE_RECARGA_CHUNK) === '1'
+  } catch {
+    // sessionStorage no disponible: no intentamos recargar para evitar bucles.
+    return
+  }
+  if (yaRecargo) {
+    try {
+      sessionStorage.removeItem(CLAVE_RECARGA_CHUNK)
+    } catch {
+      // sin almacenamiento, nada que limpiar.
+    }
+    return
+  }
+  try {
+    sessionStorage.setItem(CLAVE_RECARGA_CHUNK, '1')
+  } catch {
+    return
+  }
+  window.location.assign(to?.fullPath || window.location.href)
+})
+
+router.afterEach(() => {
+  try {
+    sessionStorage.removeItem(CLAVE_RECARGA_CHUNK)
+  } catch {
+    // sin almacenamiento, nada que limpiar.
+  }
+})
+
 const rutasPrecargadas = new Set()
 
 /**

@@ -64,7 +64,9 @@ async function cargar({ silencioso = false } = {}) {
 
   cargaEnCurso = (async () => {
     try {
-      const res = await api.get('/panel-artista/resumen')
+      const res = await api.get('/panel-artista/resumen', {
+        meta: { silenciosa: silencioso },
+      })
       resumen.value = res.data || null
     } catch (e) {
       if (e.response?.status === 401) {

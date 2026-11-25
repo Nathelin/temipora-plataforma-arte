@@ -6,6 +6,7 @@ import ImagenOptimizada from '../components/ImagenOptimizada.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import MenuTemaMovil from '../components/MenuTemaMovil.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
+import SpinnerCarga from '../components/SpinnerCarga.vue'
 import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
 import { useMensajes } from '../composables/useMensajes'
 import { useMensajeriaSocket } from '../composables/useMensajeriaSocket'
@@ -61,6 +62,7 @@ onMounted(() => {
 const menuAbierto = ref(false)
 const menuMovilAbierto = ref(false)
 const temaMovilAbierto = ref(false)
+const saliendo = ref(false)
 const contenedorMenu = ref(null)
 const contenedorNav = ref(null)
 
@@ -197,7 +199,9 @@ onBeforeUnmount(() => {
   desconectarSocket()
 })
 
-function cerrarSesion() {
+async function cerrarSesion() {
+  if (saliendo.value) return
+  saliendo.value = true
   localStorage.removeItem('token')
   localStorage.removeItem('rol')
   localStorage.removeItem('nombreUsuario')
@@ -209,7 +213,11 @@ function cerrarSesion() {
   limpiarMensajes()
   limpiarCarrito()
   desconectarSocket()
-  router.push({ name: 'login' })
+  try {
+    await router.push({ name: 'login' })
+  } finally {
+    saliendo.value = false
+  }
 }
 
 function irAPerfil() {
@@ -220,6 +228,17 @@ function irAPerfil() {
 
 <template>
   <div class="min-h-screen w-full flex flex-col bg-crema text-cafe">
+    <div
+      v-if="saliendo"
+      class="fixed inset-0 z-[130] flex items-center justify-center bg-granate/30 px-4 backdrop-blur-sm"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="flex items-center gap-3 rounded-2xl bg-blanco px-5 py-4 shadow-xl">
+        <SpinnerCarga tamano="md" etiqueta="Cerrando sesión" />
+        <span class="text-sm text-cafe">Cerrando sesión…</span>
+      </div>
+    </div>
     <header class="sticky top-0 z-30 border-b border-rosa/40 bg-crema/85 backdrop-blur-md">
       <div class="mx-auto flex h-14 max-w-screen-2xl items-center justify-between gap-4 px-4 sm:h-16 sm:px-8">
         <!-- Marca y navegación -->
@@ -431,11 +450,14 @@ function irAPerfil() {
                   Apariencia
                 </button>
                 <button
-                  class="mt-1 w-full rounded-xl border-t border-rosa/30 px-3.5 py-2.5 text-left text-sm text-rojizo transition hover:bg-rosa/20"
+                  class="mt-1 flex w-full items-center gap-2 rounded-xl border-t border-rosa/30 px-3.5 py-2.5 text-left text-sm text-rojizo transition hover:bg-rosa/20 disabled:cursor-wait disabled:opacity-60"
                   role="menuitem"
+                  :disabled="saliendo"
+                  :aria-busy="saliendo"
                   @click="menuAbierto = false; cerrarSesion()"
                 >
-                  Cerrar sesión
+                  <SpinnerCarga v-if="saliendo" etiqueta="Cerrando sesión" />
+                  {{ saliendo ? 'Cerrando sesión…' : 'Cerrar sesión' }}
                 </button>
               </div>
             </div>
@@ -603,10 +625,13 @@ function irAPerfil() {
                 />
                 <button
                   type="button"
-                  class="flex w-full items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold text-rojizo transition hover:bg-rosa/20"
+                  class="flex w-full items-center gap-2 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-rojizo transition hover:bg-rosa/20 disabled:cursor-wait disabled:opacity-60"
+                  :disabled="saliendo"
+                  :aria-busy="saliendo"
                   @click="menuMovilAbierto = false; cerrarSesion()"
                 >
-                  Cerrar sesión
+                  <SpinnerCarga v-if="saliendo" etiqueta="Cerrando sesión" />
+                  {{ saliendo ? 'Cerrando sesión…' : 'Cerrar sesión' }}
                 </button>
               </div>
             </div>

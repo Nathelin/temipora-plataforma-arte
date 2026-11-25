@@ -2,6 +2,7 @@
 import { onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import AvisoActualizacion from './components/AvisoActualizacion.vue'
+import BarraCargaGlobal from './components/BarraCargaGlobal.vue'
 import ConfirmacionSalida from './components/ConfirmacionSalida.vue'
 import NotificacionToast from './components/NotificacionToast.vue'
 import { useNotificacionesSistema } from './composables/useNotificacionesSistema'
@@ -30,6 +31,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <BarraCargaGlobal />
   <router-view />
   <AvisoActualizacion />
   <ConfirmacionSalida />

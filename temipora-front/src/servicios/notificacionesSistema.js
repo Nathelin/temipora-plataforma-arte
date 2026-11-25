@@ -4,12 +4,15 @@ export function listarNotificaciones(params) {
   return api.get('/notificaciones', { params })
 }
 
-export function cargarNotificacionesRecientes(limite) {
-  return api.get('/notificaciones/recientes', { params: { limite } })
+export function cargarNotificacionesRecientes(limite, opciones = {}) {
+  return api.get('/notificaciones/recientes', {
+    ...opciones,
+    params: { limite },
+  })
 }
 
-export function cargarContadorNotificaciones() {
-  return api.get('/notificaciones/contador')
+export function cargarContadorNotificaciones(opciones = {}) {
+  return api.get('/notificaciones/contador', opciones)
 }
 
 export function marcarNotificacionLeida(idNotificacionUsuario) {
