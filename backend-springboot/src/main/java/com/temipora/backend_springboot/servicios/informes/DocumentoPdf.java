@@ -23,7 +23,7 @@ import com.lowagie.text.pdf.PdfWriter;
  */
 public final class DocumentoPdf {
 
-    private static final int COLUMNAS_METADATOS = 4;
+    private static final int COLUMNAS_METADATOS = 5;
 
     private final Document documento;
     private final ByteArrayOutputStream salida = new ByteArrayOutputStream();
@@ -31,13 +31,15 @@ public final class DocumentoPdf {
     private final String referencia;
     private final String pie;
     private final String detallePie;
+    private final EmisorPdf emisor;
 
     private DocumentoPdf(
             Rectangle pagina, String tipo, String referencia, String codigo,
-            String pie) {
+            String pie, EmisorPdf emisor) {
         this.tipo = tipo;
         this.referencia = referencia;
         this.pie = pie;
+        this.emisor = emisor;
         this.detallePie = "Ref. " + (codigo == null ? "—" : codigo)
             + "  ·  Zona horaria: Argentina (UTC-3)"
             + "  ·  Datos al "
@@ -49,19 +51,32 @@ public final class DocumentoPdf {
 
     public static DocumentoPdf vertical(
             String tipo, String referencia, String pie) {
-        return vertical(tipo, referencia, referencia, pie);
+        return vertical(tipo, referencia, referencia, pie, null);
+    }
+
+    public static DocumentoPdf vertical(
+            String tipo, String referencia, String pie, EmisorPdf emisor) {
+        return vertical(tipo, referencia, referencia, pie, emisor);
     }
 
     public static DocumentoPdf vertical(
             String tipo, String referencia, String codigo, String pie) {
-        return new DocumentoPdf(PageSize.A4, tipo, referencia, codigo, pie);
+        return vertical(tipo, referencia, codigo, pie, null);
+    }
+
+    public static DocumentoPdf vertical(
+            String tipo, String referencia, String codigo, String pie,
+            EmisorPdf emisor) {
+        return new DocumentoPdf(
+            PageSize.A4, tipo, referencia, codigo, pie, emisor);
     }
 
     public void abrir() {
         try {
             PdfWriter escritor = PdfWriter.getInstance(documento, salida);
             escritor.setPageEvent(new EncabezadoPiePdf(
-                tipo, referencia, pie, detallePie));
+                tipo, referencia, pie, detallePie,
+                emisor == null ? null : emisor.descripcion()));
             documento.addTitle(tipo);
             documento.addAuthor("Temipora");
             documento.addCreator("Temipora");
@@ -105,6 +120,10 @@ public final class DocumentoPdf {
         for (int indice = 0; indice < pares.length; indice += 2) {
             String valor = indice + 1 < pares.length ? pares[indice + 1] : "";
             tabla.addCell(celdaDato(pares[indice], valor));
+            celdas++;
+        }
+        if (emisor != null) {
+            tabla.addCell(celdaDato("Emitido por", emisor.descripcion()));
             celdas++;
         }
         while (celdas % COLUMNAS_METADATOS != 0) {

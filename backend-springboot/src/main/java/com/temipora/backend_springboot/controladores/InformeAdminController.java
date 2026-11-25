@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.temipora.backend_springboot.modelo.InformeAdminDTO;
 import com.temipora.backend_springboot.servicios.InformeAdminPdfService;
 import com.temipora.backend_springboot.servicios.InformeAdminService;
+import com.temipora.backend_springboot.servicios.UsuarioService;
 import com.temipora.backend_springboot.servicios.informes.FormatoPdf;
 
 @RestController
@@ -25,12 +27,15 @@ public class InformeAdminController {
 
     private final InformeAdminService informeAdminService;
     private final InformeAdminPdfService informeAdminPdfService;
+    private final UsuarioService usuarioService;
 
     public InformeAdminController(
             InformeAdminService informeAdminService,
-            InformeAdminPdfService informeAdminPdfService) {
+            InformeAdminPdfService informeAdminPdfService,
+            UsuarioService usuarioService) {
         this.informeAdminService = informeAdminService;
         this.informeAdminPdfService = informeAdminPdfService;
+        this.usuarioService = usuarioService;
     }
 
     @GetMapping("/ventas")
@@ -45,13 +50,15 @@ public class InformeAdminController {
 
     @GetMapping("/ventas/pdf")
     public ResponseEntity<byte[]> ventasPdf(
+            Authentication authentication,
             @RequestParam(required = false) String desde,
             @RequestParam(required = false) String hasta,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) String agrupacion) {
         InformeAdminDTO informe = informeAdminService.generar(
             desde, hasta, tipo, agrupacion);
-        byte[] pdf = informeAdminPdfService.generar(informe);
+        byte[] pdf = informeAdminPdfService.generar(
+            informe, usuarioService.emisor(authentication.getName()));
 
         ContentDisposition disposition = ContentDisposition.attachment()
             .filename("informe-ventas-comisiones-"

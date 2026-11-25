@@ -10,6 +10,7 @@ import com.temipora.backend_springboot.modelo.InformeItemDTO;
 import com.temipora.backend_springboot.modelo.InformeTotalesDTO;
 import com.temipora.backend_springboot.modelo.InformeVentasDTO;
 import com.temipora.backend_springboot.servicios.informes.DocumentoPdf;
+import com.temipora.backend_springboot.servicios.informes.EmisorPdf;
 import com.temipora.backend_springboot.servicios.informes.FormatoPdf;
 import com.temipora.backend_springboot.servicios.informes.TablaPdf;
 
@@ -20,20 +21,19 @@ public class InformePdfService {
     private static final String PIE =
         "Documento interno del artista · generado automáticamente por Temipora";
 
-    public byte[] generar(InformeVentasDTO informe, String nombreArtista) {
+    public byte[] generar(InformeVentasDTO informe, EmisorPdf emisor) {
         String desde = FormatoPdf.fecha(informe.periodo().desde());
         String hasta = FormatoPdf.fecha(informe.periodo().hasta());
         String moneda = FormatoPdf.moneda(informe.moneda());
-        String artista = "@" + FormatoPdf.texto(nombreArtista);
 
         DocumentoPdf documento = DocumentoPdf.vertical(
-            TIPO, desde + " al " + hasta, referencia(informe), PIE);
+            TIPO, desde + " al " + hasta, referencia(informe), PIE, emisor);
         documento.abrir();
         documento.cabecera("Informe del artista", "Ventas del período",
             desde + " al " + hasta + " · " + informe.periodo().dias()
                 + " días · Cifras en " + moneda);
         documento.metadatos(
-            "Emisor", artista,
+            "Artista", artista(emisor),
             "Filtro", filtro(informe.tipo()),
             "Referencia", referencia(informe),
             "Generado", FormatoPdf.fechaHora(generado(informe.generadoEn())));
@@ -133,6 +133,11 @@ public class InformePdfService {
                 FormatoPdf.numero(item.participacion()) + "%");
         }
         documento.tabla(tabla);
+    }
+
+    private static String artista(EmisorPdf emisor) {
+        return emisor == null || emisor.usuario() == null
+            ? "—" : "@" + emisor.usuario();
     }
 
     private String referencia(InformeVentasDTO informe) {

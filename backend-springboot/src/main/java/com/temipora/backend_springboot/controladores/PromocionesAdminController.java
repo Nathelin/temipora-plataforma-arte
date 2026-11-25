@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.temipora.backend_springboot.modelo.InformeDescuentosDTO;
 import com.temipora.backend_springboot.servicios.InformeDescuentosPdfService;
 import com.temipora.backend_springboot.servicios.PromocionDescuentoService;
+import com.temipora.backend_springboot.servicios.UsuarioService;
 import com.temipora.backend_springboot.servicios.informes.FormatoPdf;
 
 @RestController
@@ -25,12 +27,15 @@ public class PromocionesAdminController {
 
     private final PromocionDescuentoService descuentoService;
     private final InformeDescuentosPdfService pdfService;
+    private final UsuarioService usuarioService;
 
     public PromocionesAdminController(
             PromocionDescuentoService descuentoService,
-            InformeDescuentosPdfService pdfService) {
+            InformeDescuentosPdfService pdfService,
+            UsuarioService usuarioService) {
         this.descuentoService = descuentoService;
         this.pdfService = pdfService;
+        this.usuarioService = usuarioService;
     }
 
     @GetMapping("/descuentos")
@@ -47,6 +52,7 @@ public class PromocionesAdminController {
 
     @GetMapping("/descuentos/pdf")
     public ResponseEntity<byte[]> descuentosPdf(
+            Authentication authentication,
             @RequestParam(required = false) String desde,
             @RequestParam(required = false) String hasta,
             @RequestParam(required = false) String q,
@@ -54,7 +60,8 @@ public class PromocionesAdminController {
         InformeDescuentosDTO informe = descuentoService.generar(
             desde, hasta, q, comisionCero, 0,
             PromocionDescuentoService.FILAS_PDF);
-        byte[] pdf = pdfService.generar(informe);
+        byte[] pdf = pdfService.generar(
+            informe, usuarioService.emisor(authentication.getName()));
 
         ContentDisposition disposition = ContentDisposition.attachment()
             .filename("descuentos-promociones-"

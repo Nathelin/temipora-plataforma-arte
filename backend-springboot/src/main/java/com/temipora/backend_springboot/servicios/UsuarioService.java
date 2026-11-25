@@ -31,6 +31,7 @@ import com.temipora.backend_springboot.repositorios.PaisRepository;
 import com.temipora.backend_springboot.repositorios.RolRepository;
 import com.temipora.backend_springboot.repositorios.SancionCuentaRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
+import com.temipora.backend_springboot.servicios.informes.EmisorPdf;
 
 @Service
 @Validated
@@ -131,6 +132,26 @@ public class UsuarioService {
     public Usuario getByNombreUsuario(String nombreUsuario) {
         return usuarioRepository.findByNombreUsuarioIgnoreCase(nombreUsuario)
                 .orElseThrow(() -> new NoSuchElementException(nombreUsuario));
+    }
+
+    /**
+     * Datos del usuario que solicita un PDF, para dejarlos impresos en el
+     * documento como constancia de quién lo emitió.
+     */
+    public EmisorPdf emisor(String nombreUsuario) {
+        return emisor(getByNombreUsuario(nombreUsuario));
+    }
+
+    public EmisorPdf emisor(Usuario usuario) {
+        if (usuario == null) {
+            return null;
+        }
+        String rol = usuario.getRol() != null
+                && usuario.getRol().getNombre() != null
+            ? usuario.getRol().getNombre().name()
+            : null;
+        return EmisorPdf.de(
+            usuario.getNombreUsuario(), usuario.getNombreDisplay(), rol);
     }
 
     public void actualizarUltimaConexion(String nombreUsuario) {

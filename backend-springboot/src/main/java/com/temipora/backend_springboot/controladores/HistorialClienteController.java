@@ -67,7 +67,8 @@ public class HistorialClienteController {
         HistorialClienteDTO informe = historialService.listar(
             usuario.getIdUsuario(), desde, hasta, tipo, estado, q, 0,
             HistorialClienteService.FILAS_PDF);
-        byte[] pdf = pdfService.generar(informe, nombre(usuario));
+        byte[] pdf = pdfService.generar(
+            informe, usuarioService.emisor(usuario));
 
         ContentDisposition disposition = ContentDisposition.attachment()
             .filename("mi-historial-" + periodoArchivo(informe) + ".pdf",
@@ -84,14 +85,6 @@ public class HistorialClienteController {
 
     private Usuario usuario(Authentication authentication) {
         return usuarioService.getByNombreUsuario(authentication.getName());
-    }
-
-    private static String nombre(Usuario usuario) {
-        if (usuario.getNombreDisplay() != null
-                && !usuario.getNombreDisplay().isBlank()) {
-            return usuario.getNombreDisplay();
-        }
-        return usuario.getNombreUsuario();
     }
 
     private static String periodoArchivo(HistorialClienteDTO informe) {

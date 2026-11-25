@@ -16,6 +16,7 @@ import com.temipora.backend_springboot.modelo.PedidoDTO;
 import com.temipora.backend_springboot.modelo.ProrrogaDTO;
 import com.temipora.backend_springboot.modelo.UsuarioResumenDTO;
 import com.temipora.backend_springboot.servicios.informes.DocumentoPdf;
+import com.temipora.backend_springboot.servicios.informes.EmisorPdf;
 import com.temipora.backend_springboot.servicios.informes.FormatoPdf;
 import com.temipora.backend_springboot.servicios.informes.TablaPdf;
 
@@ -36,11 +37,12 @@ public class ConstanciaService {
             : urlFrontend.replaceAll("/+$", "");
     }
 
-    public byte[] generar(PedidoDTO pedido) {
+    public byte[] generar(PedidoDTO pedido, EmisorPdf emisor) {
         String referencia = "Pedido #" + pedido.getIdPedido();
         String moneda = FormatoPdf.moneda(pedido.getMonedaMostrada());
 
-        DocumentoPdf documento = DocumentoPdf.vertical(TIPO, referencia, PIE);
+        DocumentoPdf documento = DocumentoPdf.vertical(
+            TIPO, referencia, PIE, emisor);
         documento.abrir();
         documento.cabecera("Documento contractual", referencia,
             "Estado del pedido al momento de generarse · Cifras en " + moneda);

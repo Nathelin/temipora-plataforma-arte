@@ -15,6 +15,7 @@ import com.temipora.backend_springboot.modelo.DescuentoPedidoDTO;
 import com.temipora.backend_springboot.modelo.InformeDescuentosDTO;
 import com.temipora.backend_springboot.modelo.OfertasReactivacionResumenDTO;
 import com.temipora.backend_springboot.modelo.ResumenDescuentosDTO;
+import com.temipora.backend_springboot.servicios.informes.EmisorPdf;
 
 class InformeDescuentosPdfServiceTest {
 
@@ -24,7 +25,7 @@ class InformeDescuentosPdfServiceTest {
     @Test
     void generaElInformeConPedidosYOfertas() throws Exception {
         String texto = texto(servicio.generar(
-            informe(pedidos(), resumen(2), ofertas(12))));
+            informe(pedidos(), resumen(2), ofertas(12)), emisor()));
 
         assertThat(texto)
             .contains("Descuentos aplicados en pedidos")
@@ -35,17 +36,22 @@ class InformeDescuentosPdfServiceTest {
             .contains("#101")
             .contains("cliente1")
             .contains("La comisión congelada al emitir el presupuesto fue 0%")
+            .contains("@admin")
             .contains("Total");
     }
 
     @Test
     void informaCuandoNoHayPedidos() throws Exception {
         String texto = texto(servicio.generar(
-            informe(List.of(), resumen(0), ofertas(0))));
+            informe(List.of(), resumen(0), ofertas(0)), emisor()));
 
         assertThat(texto)
             .contains("No hay pedidos con descuento para los filtros elegidos.")
             .contains("No se generaron ofertas de reactivación en el período.");
+    }
+
+    private EmisorPdf emisor() {
+        return EmisorPdf.de("admin", "Ana Admin", "ADMIN");
     }
 
     private InformeDescuentosDTO informe(

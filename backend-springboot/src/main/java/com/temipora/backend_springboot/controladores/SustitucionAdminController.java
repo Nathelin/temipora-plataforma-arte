@@ -9,6 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,6 +28,7 @@ import com.temipora.backend_springboot.servicios.ConfiguracionSustitucionService
 import com.temipora.backend_springboot.servicios.InformeSustitucionesPdfService;
 import com.temipora.backend_springboot.servicios.SustitucionHistorialService;
 import com.temipora.backend_springboot.servicios.SustitucionService;
+import com.temipora.backend_springboot.servicios.UsuarioService;
 import com.temipora.backend_springboot.servicios.informes.FormatoPdf;
 
 import jakarta.validation.Valid;
@@ -41,18 +43,21 @@ public class SustitucionAdminController {
     private final CierreEmailService cierreEmailService;
     private final SustitucionHistorialService historialService;
     private final InformeSustitucionesPdfService pdfService;
+    private final UsuarioService usuarioService;
 
     public SustitucionAdminController(
             ConfiguracionSustitucionService configuracionService,
             SustitucionService sustitucionService,
             CierreEmailService cierreEmailService,
             SustitucionHistorialService historialService,
-            InformeSustitucionesPdfService pdfService) {
+            InformeSustitucionesPdfService pdfService,
+            UsuarioService usuarioService) {
         this.configuracionService = configuracionService;
         this.sustitucionService = sustitucionService;
         this.cierreEmailService = cierreEmailService;
         this.historialService = historialService;
         this.pdfService = pdfService;
+        this.usuarioService = usuarioService;
     }
 
     @GetMapping("/configuracion-sustitucion")
@@ -97,6 +102,7 @@ public class SustitucionAdminController {
 
     @GetMapping("/sustituciones/historial/pdf")
     public ResponseEntity<byte[]> historialPdf(
+            Authentication authentication,
             @RequestParam(required = false) String desde,
             @RequestParam(required = false) String hasta,
             @RequestParam(required = false) String q,
@@ -106,7 +112,8 @@ public class SustitucionAdminController {
         InformeSustitucionesHistorialDTO informe = historialService.generar(
             desde, hasta, q, estado, motivo, disparador, 0,
             SustitucionHistorialService.FILAS_PDF);
-        byte[] pdf = pdfService.generar(informe);
+        byte[] pdf = pdfService.generar(
+            informe, usuarioService.emisor(authentication.getName()));
 
         ContentDisposition disposition = ContentDisposition.attachment()
             .filename("historial-sustituciones-"

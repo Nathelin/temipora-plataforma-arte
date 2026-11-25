@@ -15,6 +15,7 @@ import com.temipora.backend_springboot.modelo.InformeSustitucionesHistorialDTO;
 import com.temipora.backend_springboot.modelo.ResumenSustitucionesHistorialDTO;
 import com.temipora.backend_springboot.modelo.SustitucionConteoDTO;
 import com.temipora.backend_springboot.modelo.SustitucionHistorialDTO;
+import com.temipora.backend_springboot.servicios.informes.EmisorPdf;
 
 class InformeSustitucionesPdfServiceTest {
 
@@ -23,7 +24,8 @@ class InformeSustitucionesPdfServiceTest {
 
     @Test
     void generaElPdfConResumenMotivosYEventos() throws Exception {
-        String texto = texto(servicio.generar(informe(eventos(), resumen(2))));
+        String texto = texto(
+            servicio.generar(informe(eventos(), resumen(2)), emisor()));
 
         assertThat(texto)
             .contains("Historial de eventos")
@@ -36,17 +38,22 @@ class InformeSustitucionesPdfServiceTest {
             .contains("#99")
             .contains("Alternativa:")
             .contains("Ilustración")
+            .contains("@admin")
             .contains("Total");
     }
 
     @Test
     void informaCuandoNoHayEventos() throws Exception {
         String texto = texto(servicio.generar(
-            informe(List.of(), resumen(0))));
+            informe(List.of(), resumen(0)), emisor()));
 
         assertThat(texto)
             .contains("No hay eventos de sustitución en el período.")
             .contains("No hay eventos de sustitución para los filtros elegidos.");
+    }
+
+    private EmisorPdf emisor() {
+        return EmisorPdf.de("admin", "Ana Admin", "ADMIN");
     }
 
     private InformeSustitucionesHistorialDTO informe(

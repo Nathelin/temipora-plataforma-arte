@@ -14,6 +14,7 @@ import com.lowagie.text.pdf.parser.PdfTextExtractor;
 import com.temipora.backend_springboot.modelo.HistorialClienteDTO;
 import com.temipora.backend_springboot.modelo.HistorialItemDTO;
 import com.temipora.backend_springboot.modelo.HistorialResumenDTO;
+import com.temipora.backend_springboot.servicios.informes.EmisorPdf;
 
 class InformeHistorialPdfServiceTest {
 
@@ -22,11 +23,13 @@ class InformeHistorialPdfServiceTest {
 
     @Test
     void generaLaConstanciaConResumenYOperaciones() throws Exception {
-        String texto = texto(servicio.generar(informe(items()), "cliente1"));
+        String texto = texto(
+            servicio.generar(informe(items()), emisor()));
 
         assertThat(texto)
             .contains("Historial de pedidos y compras")
             .contains("cliente1")
+            .contains("@cliente1")
             .contains("HIST-20261101-20261121")
             .contains("Operaciones")
             .contains("Servicio")
@@ -38,10 +41,15 @@ class InformeHistorialPdfServiceTest {
 
     @Test
     void avisaCuandoNoHayOperaciones() throws Exception {
-        String texto = texto(servicio.generar(informe(List.of()), "cliente1"));
+        String texto = texto(
+            servicio.generar(informe(List.of()), emisor()));
 
         assertThat(texto)
             .contains("No hay operaciones para los filtros elegidos.");
+    }
+
+    private EmisorPdf emisor() {
+        return EmisorPdf.de("cliente1", "Cliente Prueba", "CLIENTE");
     }
 
     private HistorialClienteDTO informe(List<HistorialItemDTO> items) {

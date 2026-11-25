@@ -97,12 +97,12 @@ const tarjetas = computed(() => {
       valor: formatearPrecio(r.ticketPromedio, moneda.value),
       detalle: 'Importe pagado por el cliente.',
     },
-    {
+    /*{
       etiqueta: 'Pedidos con comisión 0',
       valor: conComisionCero,
       detalle: `${formatearPrecio(r.descuentoConComisionCero || 0, moneda.value)} de descuento`,
       alerta: conComisionCero > 0,
-    },
+    },*/
   ]
 })
 

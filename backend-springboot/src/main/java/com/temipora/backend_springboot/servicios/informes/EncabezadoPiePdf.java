@@ -27,15 +27,18 @@ final class EncabezadoPiePdf extends PdfPageEventHelper {
     private final String referencia;
     private final String pie;
     private final String detallePie;
+    private final String emisor;
     private PdfTemplate totalPaginas;
     private BaseFont fuente;
 
     EncabezadoPiePdf(
-            String tipo, String referencia, String pie, String detallePie) {
+            String tipo, String referencia, String pie, String detallePie,
+            String emisor) {
         this.tipo = tipo;
         this.referencia = referencia;
         this.pie = pie;
         this.detallePie = detallePie;
+        this.emisor = emisor;
     }
 
     @Override
@@ -81,6 +84,11 @@ final class EncabezadoPiePdf extends PdfPageEventHelper {
             new Phrase(pie, EstiloPdf.PIE), izquierda, abajo + 12, 0);
         ColumnText.showTextAligned(lienzo, Element.ALIGN_LEFT,
             new Phrase(detallePie, EstiloPdf.PIE), izquierda, abajo, 0);
+        if (emisor != null && !emisor.isBlank()) {
+            ColumnText.showTextAligned(lienzo, Element.ALIGN_LEFT,
+                new Phrase("Emitido por " + emisor, EstiloPdf.PIE),
+                izquierda, abajo - 10, 0);
+        }
 
         String etiqueta = "Página " + writer.getPageNumber() + " de";
         float anchoEtiqueta = fuente.getWidthPoint(etiqueta, 7.5f);

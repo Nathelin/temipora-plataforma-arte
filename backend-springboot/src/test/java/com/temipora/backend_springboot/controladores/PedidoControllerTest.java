@@ -82,7 +82,8 @@ class PedidoControllerTest {
 
     @Test
     void constancia_generaElPdfYLoRegistra() {
-        when(constanciaService.generar(any())).thenReturn(new byte[] {1, 2, 3});
+        when(constanciaService.generar(any(), any()))
+            .thenReturn(new byte[] {1, 2, 3});
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getRemoteAddr()).thenReturn("127.0.0.1");
 

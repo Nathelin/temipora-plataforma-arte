@@ -12,6 +12,7 @@ import com.temipora.backend_springboot.modelo.InformeDescuentosDTO;
 import com.temipora.backend_springboot.modelo.OfertasReactivacionResumenDTO;
 import com.temipora.backend_springboot.modelo.ResumenDescuentosDTO;
 import com.temipora.backend_springboot.servicios.informes.DocumentoPdf;
+import com.temipora.backend_springboot.servicios.informes.EmisorPdf;
 import com.temipora.backend_springboot.servicios.informes.FormatoPdf;
 import com.temipora.backend_springboot.servicios.informes.TablaPdf;
 
@@ -23,12 +24,12 @@ public class InformeDescuentosPdfService {
         "Documento interno de administración · generado automáticamente por "
             + "Temipora";
 
-    public byte[] generar(InformeDescuentosDTO informe) {
+    public byte[] generar(InformeDescuentosDTO informe, EmisorPdf emisor) {
         String desde = FormatoPdf.fecha(informe.desde());
         String hasta = FormatoPdf.fecha(informe.hasta());
 
         DocumentoPdf documento = DocumentoPdf.vertical(
-            TIPO, desde + " al " + hasta, referencia(informe), PIE);
+            TIPO, desde + " al " + hasta, referencia(informe), PIE, emisor);
         documento.abrir();
         documento.cabecera("Promociones por inactividad",
             "Descuentos aplicados en pedidos",
@@ -63,13 +64,13 @@ public class InformeDescuentosPdfService {
                 "Descuento financiado", "Cifras en ARS", true),
             new DocumentoPdf.Metrica(
                 FormatoPdf.monto(resumen.ticketPromedio()),
-                "Ticket promedio", null, false),
-            new DocumentoPdf.Metrica(
+                "Ticket promedio", null, false));
+            /*new DocumentoPdf.Metrica(
                 String.valueOf(resumen.pedidosConComisionCero()),
                 "Pedidos con comisión 0",
                 FormatoPdf.monto(resumen.descuentoConComisionCero())
                     + " de descuento",
-                false));
+                false));*/
 
         documento.resumen(
             new String[] { "Volumen con descuento", "Volumen sin descuento",

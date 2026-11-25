@@ -31,6 +31,7 @@ import com.temipora.backend_springboot.modelo.PedidoResumenDTO;
 import com.temipora.backend_springboot.modelo.PublicacionPedidoRequest;
 import com.temipora.backend_springboot.modelo.SolicitudRevisionRequest;
 import com.temipora.backend_springboot.modelo.TipoDescarga;
+import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.servicios.ConstanciaService;
 import com.temipora.backend_springboot.servicios.DescargaService;
 import com.temipora.backend_springboot.servicios.MoraClienteService;
@@ -79,11 +80,14 @@ public class PedidoController {
             @PathVariable Long idPedido,
             Authentication authentication,
             HttpServletRequest request) {
-        Long idUsuario = idAutenticado(authentication);
+        Usuario usuario = usuarioService
+            .getByNombreUsuario(authentication.getName());
+        Long idUsuario = usuario.getIdUsuario();
         boolean esAdmin = esAdmin(authentication);
         PedidoDTO pedido = pedidoService.obtener(
             idPedido, idUsuario, esAdmin);
-        byte[] pdf = constanciaService.generar(pedido);
+        byte[] pdf = constanciaService.generar(
+            pedido, usuarioService.emisor(usuario));
 
         descargaService.registrar(
             idPedido,

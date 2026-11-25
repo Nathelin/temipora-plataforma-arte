@@ -84,7 +84,7 @@ class InformeAdminControllerTest {
         stubUsuarioConRol("admin", ERol.ADMIN);
         when(informeAdminService.generar(any(), any(), any(), any()))
             .thenReturn(informe());
-        when(informeAdminPdfService.generar(any()))
+        when(informeAdminPdfService.generar(any(), any()))
             .thenReturn("%PDF".getBytes());
 
         mockMvc.perform(get("/api/admin/informes/ventas/pdf")

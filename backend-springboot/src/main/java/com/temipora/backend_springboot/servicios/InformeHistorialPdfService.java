@@ -9,6 +9,7 @@ import com.temipora.backend_springboot.modelo.HistorialClienteDTO;
 import com.temipora.backend_springboot.modelo.HistorialItemDTO;
 import com.temipora.backend_springboot.modelo.HistorialResumenDTO;
 import com.temipora.backend_springboot.servicios.informes.DocumentoPdf;
+import com.temipora.backend_springboot.servicios.informes.EmisorPdf;
 import com.temipora.backend_springboot.servicios.informes.FormatoPdf;
 import com.temipora.backend_springboot.servicios.informes.TablaPdf;
 
@@ -20,14 +21,14 @@ public class InformeHistorialPdfService {
         "Documento personal generado automáticamente por Temipora · "
             + "Conservá esta constancia como comprobante de tu actividad";
 
-    public byte[] generar(HistorialClienteDTO informe, String cuenta) {
+    public byte[] generar(HistorialClienteDTO informe, EmisorPdf emisor) {
         DocumentoPdf documento = DocumentoPdf.vertical(
-            TIPO, informe.periodoTexto(), referencia(informe), PIE);
+            TIPO, informe.periodoTexto(), referencia(informe), PIE, emisor);
         documento.abrir();
         documento.cabecera("Tu actividad", "Historial de pedidos y compras",
             informe.periodoTexto() + " · " + informe.filtroTexto());
         documento.metadatos(
-            "Cuenta", cuenta,
+            "Cuenta", emisor == null ? "—" : emisor.nombreVisible(),
             "Período", informe.periodoTexto(),
             "Filtro", informe.filtroTexto(),
             "Moneda", "ARS",
