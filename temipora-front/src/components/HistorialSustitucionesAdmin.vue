@@ -40,7 +40,6 @@ const MOTIVOS = [
   { valor: 'PRESUPUESTO_RETIRADO', texto: 'Presupuesto retirado' },
   { valor: 'PRESUPUESTO_VENCIDO', texto: 'Presupuesto vencido' },
   { valor: 'SERVICIO_DADO_DE_BAJA', texto: 'Servicio dado de baja' },
-  //{ valor: 'PEDIDO_IMPAGO', texto: 'Pedido impago' },
 ]
 
 const DISPARADORES = [
@@ -533,6 +532,14 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
                     </span>
                     <p class="mt-1 max-w-[16rem] text-xs text-cafe/55">
                       {{ evento.resultado }}
+                    </p>
+                    <p v-if="evento.idPedido" class="mt-1 text-xs">
+                      <router-link
+                        :to="{ name: 'admin-pedido-detalle', params: { idPedido: evento.idPedido } }"
+                        class="font-semibold text-coral transition hover:text-rojizo"
+                      >
+                        Pedido #{{ evento.idPedido }}
+                      </router-link>
                     </p>
                   </td>
                 </tr>

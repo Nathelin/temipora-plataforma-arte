@@ -34,7 +34,11 @@ public interface SustitucionRepository extends JpaRepository<Sustitucion, Long> 
             @Param("desde") LocalDateTime desde,
             Pageable pageable);
 
-    long countByEstado(EstadoSustitucion estado);
+    long countByMotivoNot(MotivoSustitucion motivo);
+
+    long countByEstadoAndMotivoNot(
+        EstadoSustitucion estado,
+        MotivoSustitucion motivo);
 
     @Query(value = """
         SELECT s FROM Sustitucion s
@@ -42,10 +46,12 @@ public interface SustitucionRepository extends JpaRepository<Sustitucion, Long> 
         JOIN FETCH s.servicioOrigen so
         JOIN FETCH s.artistaOrigen ao
         LEFT JOIN FETCH s.servicioElegido se
-        LEFT JOIN FETCH s.solicitud
+        LEFT JOIN FETCH s.solicitud sol
+        LEFT JOIN FETCH sol.pedido
         LEFT JOIN FETCH s.pedido
         WHERE s.fechaCreacion >= :desde
           AND s.fechaCreacion < :hasta
+          AND s.motivo <> :motivoExcluido
           AND (:estado IS NULL OR s.estado = :estado)
           AND (:motivo IS NULL OR s.motivo = :motivo)
           AND (:disparador IS NULL OR s.disparador = :disparador)
@@ -67,6 +73,7 @@ public interface SustitucionRepository extends JpaRepository<Sustitucion, Long> 
         LEFT JOIN s.servicioElegido se
         WHERE s.fechaCreacion >= :desde
           AND s.fechaCreacion < :hasta
+          AND s.motivo <> :motivoExcluido
           AND (:estado IS NULL OR s.estado = :estado)
           AND (:motivo IS NULL OR s.motivo = :motivo)
           AND (:disparador IS NULL OR s.disparador = :disparador)
@@ -87,6 +94,7 @@ public interface SustitucionRepository extends JpaRepository<Sustitucion, Long> 
         @Param("motivo") MotivoSustitucion motivo,
         @Param("disparador") DisparadorSustitucion disparador,
         @Param("patron") String patron,
+        @Param("motivoExcluido") MotivoSustitucion motivoExcluido,
         Pageable pageable);
 
     @Query("""
@@ -100,6 +108,7 @@ public interface SustitucionRepository extends JpaRepository<Sustitucion, Long> 
         LEFT JOIN s.servicioElegido se
         WHERE s.fechaCreacion >= :desde
           AND s.fechaCreacion < :hasta
+          AND s.motivo <> :motivoExcluido
           AND (:estado IS NULL OR s.estado = :estado)
           AND (:motivo IS NULL OR s.motivo = :motivo)
           AND (:disparador IS NULL OR s.disparador = :disparador)
@@ -121,7 +130,8 @@ public interface SustitucionRepository extends JpaRepository<Sustitucion, Long> 
         @Param("estado") EstadoSustitucion estado,
         @Param("motivo") MotivoSustitucion motivo,
         @Param("disparador") DisparadorSustitucion disparador,
-        @Param("patron") String patron);
+        @Param("patron") String patron,
+        @Param("motivoExcluido") MotivoSustitucion motivoExcluido);
 
     @Query("""
         SELECT s FROM Sustitucion s
@@ -130,7 +140,8 @@ public interface SustitucionRepository extends JpaRepository<Sustitucion, Long> 
         JOIN FETCH s.artistaOrigen
         LEFT JOIN FETCH s.servicioElegido se
         LEFT JOIN FETCH se.artista
-        LEFT JOIN FETCH s.solicitud
+        LEFT JOIN FETCH s.solicitud sol
+        LEFT JOIN FETCH sol.pedido
         LEFT JOIN FETCH s.pedido
         WHERE s.idSustitucion = :idSustitucion
         """)

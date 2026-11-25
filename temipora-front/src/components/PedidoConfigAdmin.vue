@@ -605,7 +605,7 @@ async function reenviarRecordatorios() {
     <ModalConfirmacion
       :abierto="confirmandoReenvio"
       titulo="Reenviar recordatorios ya enviados"
-      mensaje="Se van a volver a enviar los recordatorios vigentes a los destinatarios reales. Es para pruebas y demos: en producción puede mandar correos duplicados."
+      mensaje="Se van a volver a enviar los recordatorios vigentes a los destinatarios reales. Es para pruebas."
       texto-confirmar="Reenviar"
       :confirmar-habilitado="!reenviando"
       @confirmar="reenviarRecordatorios"

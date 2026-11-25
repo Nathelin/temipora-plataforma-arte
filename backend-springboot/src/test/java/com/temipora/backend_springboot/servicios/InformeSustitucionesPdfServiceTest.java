@@ -33,7 +33,9 @@ class InformeSustitucionesPdfServiceTest {
             .contains("Sin cupos")
             .contains("Eventos")
             .contains("cliente1")
-            .contains("Alternativa: Ilustración")
+            .contains("#99")
+            .contains("Alternativa:")
+            .contains("Ilustración")
             .contains("Total");
     }
 
@@ -111,7 +113,7 @@ class InformeSustitucionesPdfServiceTest {
             9L,
             "Ilustración",
             15L,
-            null,
+            99L,
             resultado);
     }
 

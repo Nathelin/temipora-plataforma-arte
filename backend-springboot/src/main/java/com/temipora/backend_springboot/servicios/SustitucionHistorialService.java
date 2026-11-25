@@ -88,7 +88,8 @@ public class SustitucionHistorialService {
         LocalDateTime fin = hasta.plusDays(1).atStartOfDay();
 
         Page<Sustitucion> page = sustitucionRepository.buscarHistorial(
-            inicio, fin, estado, motivo, disparador, patron, pageable);
+            inicio, fin, estado, motivo, disparador, patron,
+            MotivoSustitucion.PEDIDO_IMPAGO, pageable);
         List<SustitucionHistorialDTO> eventos = page.getContent().stream()
             .map(this::aDto)
             .toList();
@@ -114,6 +115,10 @@ public class SustitucionHistorialService {
             .findByIdConDetalle(idSustitucion)
             .orElseThrow(() -> new NoSuchElementException(
                 "Evento de sustitución no encontrado: " + idSustitucion));
+        if (sustitucion.getMotivo() == MotivoSustitucion.PEDIDO_IMPAGO) {
+            throw new NoSuchElementException(
+                "Evento de sustitución no encontrado: " + idSustitucion);
+        }
         List<SustitucionOpcion> opciones = opcionRepository
             .findHistorialPorSustitucion(idSustitucion);
         return new SustitucionDetalleHistorialDTO(
@@ -129,7 +134,8 @@ public class SustitucionHistorialService {
             DisparadorSustitucion disparador,
             String patron) {
         List<Object[]> filas = sustitucionRepository.agruparHistorial(
-            inicio, fin, estado, motivo, disparador, patron);
+            inicio, fin, estado, motivo, disparador, patron,
+            MotivoSustitucion.PEDIDO_IMPAGO);
 
         Map<EstadoSustitucion, Long> porEstado =
             new EnumMap<>(EstadoSustitucion.class);
@@ -225,9 +231,23 @@ public class SustitucionHistorialService {
             elegido != null ? elegido.getNombre() : null,
             sustitucion.getSolicitud() != null
                 ? sustitucion.getSolicitud().getIdSolicitud() : null,
-            sustitucion.getPedido() != null
-                ? sustitucion.getPedido().getIdPedido() : null,
+            idPedido(sustitucion),
             resultado(sustitucion));
+    }
+
+    /**
+     * El pedido puede colgar del evento (cierres) o de la solicitud con la que
+     * el cliente terminó eligiendo otra artista.
+     */
+    private static Long idPedido(Sustitucion sustitucion) {
+        if (sustitucion.getPedido() != null) {
+            return sustitucion.getPedido().getIdPedido();
+        }
+        if (sustitucion.getSolicitud() != null
+                && sustitucion.getSolicitud().getPedido() != null) {
+            return sustitucion.getSolicitud().getPedido().getIdPedido();
+        }
+        return null;
     }
 
     private SustitucionOpcionHistorialDTO aDtoOpcion(

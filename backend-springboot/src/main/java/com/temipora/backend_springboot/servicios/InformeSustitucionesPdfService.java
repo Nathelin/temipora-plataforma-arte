@@ -114,11 +114,10 @@ public class InformeSustitucionesPdfService {
 
         TablaPdf tabla = new TablaPdf(
             new String[] { "Fecha", "Cliente", "Servicio origen",
-                "Artista origen", "Motivo", "Disparador", "Opc.",
-                "Resultado" },
-            new float[] { 0.8f, 1.0f, 1.45f, 0.95f, 1.0f, 0.95f, 0.45f,
-                1.55f },
-            new boolean[] { false, false, false, false, false, false, true,
+                "Artista origen", "Motivo", "Opc.", "Pedido", "Resultado" },
+            new float[] { 0.85f, 1.0f, 1.35f, 0.9f, 0.95f, 0.4f, 0.55f,
+                2.1f },
+            new boolean[] { false, false, false, false, false, true, true,
                 false });
 
         for (SustitucionHistorialDTO evento : eventos) {
@@ -129,8 +128,8 @@ public class InformeSustitucionesPdfService {
                 recortar(evento.servicioOrigen(), 30),
                 FormatoPdf.texto(evento.artistaOrigen()),
                 FormatoPdf.texto(evento.motivoEtiqueta()),
-                FormatoPdf.texto(evento.disparadorEtiqueta()),
                 String.valueOf(evento.cantidadOpciones()),
+                evento.idPedido() != null ? "#" + evento.idPedido() : "—",
                 recortar(evento.resultado(), 36));
         }
         tabla.total("Total", String.valueOf(eventos.size()), "", "", "", "",

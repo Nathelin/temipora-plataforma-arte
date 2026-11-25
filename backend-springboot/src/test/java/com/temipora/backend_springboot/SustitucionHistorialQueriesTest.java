@@ -12,6 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 
 import com.temipora.backend_springboot.modelo.InformeSustitucionesHistorialDTO;
+import com.temipora.backend_springboot.modelo.MotivoSustitucion;
 import com.temipora.backend_springboot.modelo.Sustitucion;
 import com.temipora.backend_springboot.repositorios.SustitucionRepository;
 import com.temipora.backend_springboot.servicios.SustitucionHistorialService;
@@ -33,12 +34,14 @@ class SustitucionHistorialQueriesTest {
         LocalDateTime fin = hasta.plusDays(1).atStartOfDay();
 
         var pagina = sustitucionRepository.buscarHistorial(
-            inicio, fin, null, null, null, "", PageRequest.of(0, 20));
+            inicio, fin, null, null, null, "",
+            MotivoSustitucion.PEDIDO_IMPAGO, PageRequest.of(0, 20));
 
         assertThat(pagina).isNotNull();
         assertThat(pagina.getContent()).isNotNull();
         assertThat(sustitucionRepository.agruparHistorial(
-            inicio, fin, null, null, null, "")).isNotNull();
+            inicio, fin, null, null, null, "",
+            MotivoSustitucion.PEDIDO_IMPAGO)).isNotNull();
 
         InformeSustitucionesHistorialDTO informe = service.generar(
             desde.toString(), hasta.toString(), null, null, null, null, 0,
