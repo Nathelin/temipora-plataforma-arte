@@ -3,13 +3,16 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { useSesion } from '../composables/useSesion'
+import { useAccesoEnlace } from '../composables/useAccesoEnlace'
 import { usePagoHito } from '../composables/usePagoHito'
 import { formatearPrecio } from '../servicios/moneda'
+import { gruposDeRespuestas } from '../servicios/solicitudes'
 import SubirEntregable from '../components/SubirEntregable.vue'
 import CargandoPagina from '../components/CargandoPagina.vue'
 
 const router = useRouter()
 const { limpiarSesionLocal } = useSesion()
+const { consumirSiCorresponde } = useAccesoEnlace()
 
 const cargando = ref(true)
 const error = ref('')
@@ -57,6 +60,13 @@ function montoDeuda(deuda) {
   )
 }
 
+function dibujosDe(solicitud) {
+  return (solicitud?.items || []).map((item) => ({
+    ...item,
+    grupos: gruposDeRespuestas(item),
+  }))
+}
+
 function salirDeRestriccion() {
   localStorage.setItem('restringido', '0')
   localStorage.setItem('alcance', '')
@@ -93,14 +103,23 @@ async function cargar() {
     deudas.value = []
     const listaRes = await api.get('/pedidos/restringido')
     const resumenes = listaRes.data || []
-    const detalles = await Promise.all(
-      resumenes.map((p) => api.get(`/pedidos/${p.idPedido}`)),
+    const [detalles, solicitudes] = await Promise.all([
+      Promise.all(resumenes.map((p) => api.get(`/pedidos/${p.idPedido}`))),
+      Promise.all(resumenes.map((p) => (p.idSolicitud
+        ? api.get(`/solicitudes-servicio/${p.idSolicitud}`)
+          .then((r) => r.data)
+          .catch(() => null)
+        : Promise.resolve(null)))),
+    ])
+    const solicitudPorPedido = new Map(
+      resumenes.map((p, indice) => [p.idPedido, solicitudes[indice]]),
     )
     items.value = detalles.flatMap((r) => {
       const pedido = r.data
+      const solicitud = solicitudPorPedido.get(pedido.idPedido) || null
       return (pedido.hitos || [])
         .filter((hito) => hito.puedeEntregar)
-        .map((hito) => ({ pedido, hito }))
+        .map((hito) => ({ pedido, hito, solicitud }))
     })
   } catch (e) {
     error.value = e.response?.data?.message
@@ -160,7 +179,11 @@ function cerrarSesion() {
   router.push({ name: 'login' })
 }
 
-onMounted(cargar)
+onMounted(async () => {
+  const acceso = await consumirSiCorresponde()
+  if (acceso.habiaEnlace) return
+  await cargar()
+})
 </script>
 
 <template>
@@ -273,6 +296,82 @@ onMounted(cargar)
                 · entrega prevista {{ item.pedido.fechaEntregaPrevista }}
               </span>
             </p>
+
+            <details
+              v-if="item.solicitud"
+              class="mt-3 rounded-xl border border-rosa/40 bg-rosa/5 px-3 py-2"
+            >
+              <summary class="cursor-pointer text-sm font-semibold text-granate">
+                Qué pidió el cliente
+              </summary>
+              <div class="mt-3 space-y-4">
+                <div
+                  v-for="(dibujo, indiceDibujo) in dibujosDe(item.solicitud)"
+                  :key="dibujo.idItemSolicitud || indiceDibujo"
+                >
+                  <p class="text-xs font-semibold uppercase tracking-wide text-cafe/50">
+                    {{ dibujo.nombre }}
+                  </p>
+                  <div
+                    v-for="grupo in dibujo.grupos"
+                    :key="grupo.clave"
+                    class="mt-2"
+                  >
+                    <p class="text-sm font-semibold text-cafe">
+                      {{ grupo.enunciado }}
+                    </p>
+                    <div
+                      v-if="grupo.codigoTipo === 'SUBIR_IMAGEN'"
+                      class="mt-2 flex flex-wrap gap-2"
+                    >
+                      <a
+                        v-for="(url, indiceUrl) in grupo.valores"
+                        :key="`${url}-${indiceUrl}`"
+                        :href="url"
+                        target="_blank"
+                        rel="noopener"
+                        class="block h-16 w-16 overflow-hidden rounded-lg ring-1 ring-rosa/40"
+                      >
+                        <img
+                          :src="url"
+                          alt="Imagen de referencia del pedido"
+                          class="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      </a>
+                    </div>
+                    <p
+                      v-else-if="grupo.codigoTipo === 'TEXTO'"
+                      class="mt-1 whitespace-pre-line text-sm text-cafe/75"
+                    >
+                      {{ grupo.valores.join('\n') }}
+                    </p>
+                    <div v-else class="mt-1 flex flex-wrap gap-2">
+                      <span
+                        v-for="(valor, indiceValor) in grupo.valores"
+                        :key="`${valor}-${indiceValor}`"
+                        class="rounded-full bg-blanco px-2.5 py-0.5 text-xs text-cafe ring-1 ring-rosa/40"
+                      >
+                        {{ valor }}
+                      </span>
+                    </div>
+                  </div>
+                  <p
+                    v-if="!dibujo.grupos.length"
+                    class="mt-1 text-xs text-cafe/50"
+                  >
+                    Este ítem no tiene respuestas registradas.
+                  </p>
+                </div>
+                <p
+                  v-if="!item.solicitud.items?.length"
+                  class="text-sm text-cafe/60"
+                >
+                  La solicitud no tiene detalle del formulario.
+                </p>
+              </div>
+            </details>
+
             <SubirEntregable
               :id-pedido="item.pedido.idPedido"
               :hito="item.hito"

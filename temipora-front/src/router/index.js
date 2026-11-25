@@ -666,6 +666,8 @@ router.beforeEach(async (to, from) => {
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
   const rol = localStorage.getItem('rol')
+  const tieneEnlace = typeof to.query.acceso === 'string'
+    && to.query.acceso.length > 0
 
   const routeTitle = to.meta.title;
 
@@ -677,7 +679,7 @@ router.beforeEach((to, from, next) => {
     document.title = 'Temipora';
   }
 
-  if (to.matched.some((r) => r.meta.requiresAuth) && !token) {
+  if (to.matched.some((r) => r.meta.requiresAuth) && !token && !tieneEnlace) {
     next({ name: 'login', query: { redirect: to.fullPath } })
     return
   }

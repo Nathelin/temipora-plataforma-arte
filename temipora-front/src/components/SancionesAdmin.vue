@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import api from '../servicios/api'
 import { formatearFechaHora } from '../servicios/fechas'
 import AdminPageHeader from './admin/AdminPageHeader.vue'
+import SancionPruebasAdmin from './SancionPruebasAdmin.vue'
 
 const route = useRoute()
 
@@ -36,9 +37,9 @@ const nombresTipo = {
 }
 
 const nombresAlcance = {
-  ACCESO: 'Acceso completo',
-  VENTAS: 'Ventas',
-  ENTREGAS: 'Solo entregas',
+  ACCESO: 'Cuenta inhabilitada (Nivel 2)',
+  VENTAS: 'Ventas suspendidas',
+  ENTREGAS: 'Solo entregas (Nivel 1)',
   COMPRAS: 'Compras suspendidas',
   PAGOS: 'Solo pagos',
 }
@@ -200,6 +201,8 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
     </AdminPageHeader>
 
     <AdminTabs />
+
+    <SancionPruebasAdmin />
 
     <div class="mb-6 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
       <input

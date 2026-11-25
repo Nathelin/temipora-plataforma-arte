@@ -55,10 +55,10 @@ class SancionIncumplimientoServiceTest {
 
     @Test
     void procesar_curaCuandoNoQuedaNingunPedidoEnMora() {
-        SancionCuenta sancion = sancionVentas(LocalDateTime.now().plusDays(5));
+        SancionCuenta sancion = sancionEntregas(LocalDateTime.now().plusDays(5));
         when(configuracionPedidoService.obtener()).thenReturn(configuracion());
         when(sancionRepository.findPorOrigenYAlcance(
-                OrigenSancion.AUTOMATICA, AlcanceSancion.VENTAS,
+                OrigenSancion.AUTOMATICA, AlcanceSancion.ENTREGAS,
                 EstadoSancion.ACTIVA))
             .thenReturn(List.of(sancion));
         when(pedidoRepository.findEnMoraDeArtista(
@@ -74,11 +74,11 @@ class SancionIncumplimientoServiceTest {
 
     @Test
     void procesar_curaCuandoElHitoYaEstaAprobado() {
-        SancionCuenta sancion = sancionVentas(LocalDateTime.now().plusDays(5));
+        SancionCuenta sancion = sancionEntregas(LocalDateTime.now().plusDays(5));
         Pedido pedido = pedido(LocalDateTime.now().minusDays(20));
         when(configuracionPedidoService.obtener()).thenReturn(configuracion());
         when(sancionRepository.findPorOrigenYAlcance(
-                OrigenSancion.AUTOMATICA, AlcanceSancion.VENTAS,
+                OrigenSancion.AUTOMATICA, AlcanceSancion.ENTREGAS,
                 EstadoSancion.ACTIVA))
             .thenReturn(List.of(sancion));
         when(pedidoRepository.findEnMoraDeArtista(
@@ -94,11 +94,11 @@ class SancionIncumplimientoServiceTest {
 
     @Test
     void procesar_noCuraSiElHitoEstaEntregadoPeroSinAprobar() {
-        SancionCuenta sancion = sancionVentas(LocalDateTime.now().plusDays(5));
+        SancionCuenta sancion = sancionEntregas(LocalDateTime.now().plusDays(5));
         Pedido pedido = pedido(LocalDateTime.now().minusDays(20));
         when(configuracionPedidoService.obtener()).thenReturn(configuracion());
         when(sancionRepository.findPorOrigenYAlcance(
-                OrigenSancion.AUTOMATICA, AlcanceSancion.VENTAS,
+                OrigenSancion.AUTOMATICA, AlcanceSancion.ENTREGAS,
                 EstadoSancion.ACTIVA))
             .thenReturn(List.of(sancion));
         when(pedidoRepository.findEnMoraDeArtista(
@@ -115,11 +115,11 @@ class SancionIncumplimientoServiceTest {
 
     @Test
     void procesar_escalaAlVencerLaSancionSiSigueEnMora() {
-        SancionCuenta sancion = sancionVentas(LocalDateTime.now().minusDays(1));
+        SancionCuenta sancion = sancionEntregas(LocalDateTime.now().minusDays(1));
         Pedido pedido = pedido(LocalDateTime.now().minusDays(20));
         when(configuracionPedidoService.obtener()).thenReturn(configuracion());
         when(sancionRepository.findPorOrigenYAlcance(
-                OrigenSancion.AUTOMATICA, AlcanceSancion.VENTAS,
+                OrigenSancion.AUTOMATICA, AlcanceSancion.ENTREGAS,
                 EstadoSancion.ACTIVA))
             .thenReturn(List.of(sancion));
         when(pedidoRepository.findEnMoraDeArtista(
@@ -153,21 +153,19 @@ class SancionIncumplimientoServiceTest {
     }
 
     @Test
-    void procesar_aplicaNivel1ApenasVenceElPlazo() {
+    void procesar_noAplicaNivel1DentroDeLaGracia() {
         Pedido pedido = pedido(LocalDateTime.now().minusDays(1));
         when(configuracionPedidoService.obtener()).thenReturn(configuracion());
         when(pedidoRepository.findEnMora(EstadoPedido.EN_CURSO))
             .thenReturn(List.of(pedido));
         when(entregaPendienteService.plazoVigente(pedido))
             .thenReturn(LocalDateTime.now().minusDays(1));
-        when(sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
-                eq(7L), eq(EstadoSancion.ACTIVA)))
-            .thenReturn(Optional.empty());
 
         SancionIncumplimientoService.Resumen resumen = service.procesar();
 
-        assertThat(resumen.nivel1Aplicados()).isEqualTo(1);
-        verify(sancionAutomaticaService).aplicarNivel1(pedido, 14);
+        assertThat(resumen.nivel1Aplicados()).isZero();
+        verify(sancionAutomaticaService, never())
+            .aplicarNivel1(any(), anyInt());
     }
 
     @Test
@@ -195,7 +193,7 @@ class SancionIncumplimientoServiceTest {
             .thenReturn(LocalDateTime.now().minusDays(5));
         when(sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
                 eq(7L), eq(EstadoSancion.ACTIVA)))
-            .thenReturn(Optional.of(sancionVentas(
+            .thenReturn(Optional.of(sancionEntregas(
                 LocalDateTime.now().plusDays(3))));
 
         SancionIncumplimientoService.Resumen resumen = service.procesar();
@@ -207,16 +205,16 @@ class SancionIncumplimientoServiceTest {
 
     @Test
     void procesar_cierraLosPedidosAlVencerElPlazoDelNivel2() {
-        SancionCuenta sancion = sancionEntregas(
+        SancionCuenta sancion = sancionAcceso(
             LocalDateTime.now().minusDays(10));
         Pedido pedido = pedido(LocalDateTime.now().minusDays(20));
         when(configuracionPedidoService.obtener()).thenReturn(configuracion());
         when(sancionRepository.findPorOrigenYAlcance(
-                OrigenSancion.AUTOMATICA, AlcanceSancion.VENTAS,
+                OrigenSancion.AUTOMATICA, AlcanceSancion.ENTREGAS,
                 EstadoSancion.ACTIVA))
             .thenReturn(List.of());
         when(sancionRepository.findPorOrigenYAlcance(
-                OrigenSancion.AUTOMATICA, AlcanceSancion.ENTREGAS,
+                OrigenSancion.AUTOMATICA, AlcanceSancion.ACCESO,
                 EstadoSancion.ACTIVA))
             .thenReturn(List.of(sancion));
         when(pedidoRepository.findEnMoraDeArtista(
@@ -235,16 +233,16 @@ class SancionIncumplimientoServiceTest {
 
     @Test
     void procesar_noCierraSiElHitoEstaAprobado() {
-        SancionCuenta sancion = sancionEntregas(
+        SancionCuenta sancion = sancionAcceso(
             LocalDateTime.now().minusDays(10));
         Pedido pedido = pedido(LocalDateTime.now().minusDays(20));
         when(configuracionPedidoService.obtener()).thenReturn(configuracion());
         when(sancionRepository.findPorOrigenYAlcance(
-                OrigenSancion.AUTOMATICA, AlcanceSancion.VENTAS,
+                OrigenSancion.AUTOMATICA, AlcanceSancion.ENTREGAS,
                 EstadoSancion.ACTIVA))
             .thenReturn(List.of());
         when(sancionRepository.findPorOrigenYAlcance(
-                OrigenSancion.AUTOMATICA, AlcanceSancion.ENTREGAS,
+                OrigenSancion.AUTOMATICA, AlcanceSancion.ACCESO,
                 EstadoSancion.ACTIVA))
             .thenReturn(List.of(sancion));
         when(pedidoRepository.findEnMoraDeArtista(
@@ -261,15 +259,15 @@ class SancionIncumplimientoServiceTest {
 
     @Test
     void procesar_noCierraAntesDelPlazoConfigurado() {
-        SancionCuenta sancion = sancionEntregas(
+        SancionCuenta sancion = sancionAcceso(
             LocalDateTime.now().minusDays(2));
         when(configuracionPedidoService.obtener()).thenReturn(configuracion());
         when(sancionRepository.findPorOrigenYAlcance(
-                OrigenSancion.AUTOMATICA, AlcanceSancion.VENTAS,
+                OrigenSancion.AUTOMATICA, AlcanceSancion.ENTREGAS,
                 EstadoSancion.ACTIVA))
             .thenReturn(List.of());
         when(sancionRepository.findPorOrigenYAlcance(
-                OrigenSancion.AUTOMATICA, AlcanceSancion.ENTREGAS,
+                OrigenSancion.AUTOMATICA, AlcanceSancion.ACCESO,
                 EstadoSancion.ACTIVA))
             .thenReturn(List.of(sancion));
 
@@ -288,24 +286,24 @@ class SancionIncumplimientoServiceTest {
         return config;
     }
 
-    private SancionCuenta sancionVentas(LocalDateTime fechaFin) {
+    private SancionCuenta sancionEntregas(LocalDateTime fechaFin) {
         return SancionCuenta.builder()
             .idSancion(9L)
             .usuario(Usuario.builder().idUsuario(7L).build())
             .origen(OrigenSancion.AUTOMATICA)
-            .alcance(AlcanceSancion.VENTAS)
+            .alcance(AlcanceSancion.ENTREGAS)
             .estado(EstadoSancion.ACTIVA)
             .fechaInicio(LocalDateTime.now().minusDays(20))
             .fechaFin(fechaFin)
             .build();
     }
 
-    private SancionCuenta sancionEntregas(LocalDateTime fechaEscalada) {
+    private SancionCuenta sancionAcceso(LocalDateTime fechaEscalada) {
         return SancionCuenta.builder()
             .idSancion(9L)
             .usuario(Usuario.builder().idUsuario(7L).build())
             .origen(OrigenSancion.AUTOMATICA)
-            .alcance(AlcanceSancion.ENTREGAS)
+            .alcance(AlcanceSancion.ACCESO)
             .estado(EstadoSancion.ACTIVA)
             .fechaInicio(LocalDateTime.now().minusDays(30))
             .fechaEscalada(fechaEscalada)

@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
+
 @Service
 public class EmailPlantillaService {
 
@@ -27,12 +29,15 @@ public class EmailPlantillaService {
     private static final String PLANTILLA_RECORDATORIO = "emails/recordatorio";
     private static final String PLANTILLA_BAJA_CONFIRMADA = "emails/baja-confirmada";
     private static final String PLANTILLA_BAJA_INVALIDA = "emails/baja-invalida";
+    private static final String PLANTILLA_SANCION = "emails/sancion";
     private static final String PREHEADER_REACTIVACION =
         "Tenés ofertas con descuento esperándote en Temipora.";
     private static final String PREHEADER_CIERRE =
         "Novedades sobre tus solicitudes y pedidos en Temipora.";
     private static final String PREHEADER_RECORDATORIO =
         "Tenés pagos o entregas pendientes en Temipora.";
+    private static final String PREHEADER_SANCION =
+        "Hay una restricción activa en tu cuenta de Temipora.";
 
     private static final DateTimeFormatter FECHA_CIERRE =
         DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -61,6 +66,15 @@ public class EmailPlantillaService {
             List<String> caracteristicas) {
     }
 
+    public record SancionEmail(
+            AlcanceSancion alcance,
+            Long idPedido,
+            String nombreServicio,
+            String nombreCliente,
+            String motivo,
+            LocalDateTime fechaFin) {
+    }
+
     public record RecordatorioEmail(
             String contexto,
             Long idPedido,
@@ -87,6 +101,9 @@ public class EmailPlantillaService {
 
     @Value("${temipora.mail.base-url:http://localhost:5173}")
     private String frontUrl;
+
+    @Value("${temipora.contacto.email:}")
+    private String contactoEmail;
 
     public EmailPlantillaService(SpringTemplateEngine templateEngine) {
         this.templateEngine = templateEngine;
@@ -160,13 +177,78 @@ public class EmailPlantillaService {
         }
         if (hayEntregas) {
             if (urgente) {
-                return "URGENTE: entregá hoy o se suspenden tus ventas";
+                return "URGENTE: entregá hoy o tu cuenta queda limitada";
             }
             return riesgo
-                ? "Tu cuenta puede suspenderse: entrega pendiente en Temipora"
-                : "Entrega pendiente: evitá que se suspendan tus ventas";
+                ? "Tu cuenta puede quedar limitada: entrega pendiente en Temipora"
+                : "Entrega pendiente: evitá que se limite tu cuenta";
         }
         return "Tenés pendientes en Temipora";
+    }
+
+    public String asuntoSancion(AlcanceSancion alcance) {
+        if (alcance == AlcanceSancion.ENTREGAS) {
+            return "Tu cuenta quedó limitada a entregas en Temipora";
+        }
+        if (alcance == AlcanceSancion.ACCESO) {
+            return "Tu cuenta quedó inhabilitada en Temipora";
+        }
+        if (alcance == AlcanceSancion.VENTAS) {
+            return "Tus ventas quedaron suspendidas en Temipora";
+        }
+        return "Tu cuenta tiene una restricción en Temipora";
+    }
+
+    public String sancion(String nombre, SancionEmail datos) {
+        return sancion(nombre, datos, null);
+    }
+
+    public String sancion(
+            String nombre, SancionEmail datos, String tokenAcceso) {
+        boolean entregas = datos != null
+            && datos.alcance() == AlcanceSancion.ENTREGAS;
+        boolean bloqueo = datos != null
+            && datos.alcance() == AlcanceSancion.ACCESO;
+        Context contexto = contexto();
+        contexto.setVariable("nombre", nombre);
+        contexto.setVariable("preheader", PREHEADER_SANCION);
+        contexto.setVariable("entregas", entregas);
+        contexto.setVariable("etiqueta", entregas
+            ? "CUENTA LIMITADA"
+            : bloqueo ? "CUENTA INHABILITADA" : "VENTAS SUSPENDIDAS");
+        contexto.setVariable("titulo", entregas
+            ? "Tu cuenta quedó limitada a entregas"
+            : bloqueo
+                ? "Tu cuenta quedó inhabilitada"
+                : "Tus ventas quedaron suspendidas");
+        contexto.setVariable("motivo", datos != null ? datos.motivo() : null);
+        contexto.setVariable("idPedido", datos != null ? datos.idPedido() : null);
+        contexto.setVariable("nombreServicio", datos != null
+            ? datos.nombreServicio() : null);
+        contexto.setVariable("nombreCliente", datos != null
+            ? datos.nombreCliente() : null);
+        contexto.setVariable("fechaFin", datos != null
+                && datos.fechaFin() != null
+            ? FECHA_CIERRE.format(datos.fechaFin())
+            : null);
+        contexto.setVariable("consecuencia", entregas
+            ? "Solo podés subir los entregables pendientes, ver tus"
+                + " notificaciones y apelar la sanción. El resto de la plataforma"
+                + " queda bloqueado hasta que el cliente apruebe la entrega o un"
+                + " administrador revise tu caso."
+            : bloqueo
+                ? "No podés iniciar sesión ni usar la plataforma. Para apelar la"
+                    + " sanción, escribí a soporte."
+                : "Podés terminar los pedidos que ya tenés abiertos, pero no vas a"
+                    + " poder recibir encargos nuevos ni publicar productos mientras"
+                    + " dure la suspensión. Si no resolvés la entrega, la cuenta pasa"
+                    + " a estar limitada solo a entregas.");
+        contexto.setVariable("url", urlSancion(datos, tokenAcceso));
+        contexto.setVariable("etiquetaBoton", entregas
+            ? "Subir entrega"
+            : bloqueo ? "Escribir a soporte" : "Ver mis pedidos");
+        contexto.setVariable("contacto", contactoEmail);
+        return templateEngine.process(PLANTILLA_SANCION, contexto);
     }
 
     public String recordatorio(
@@ -247,6 +329,23 @@ public class EmailPlantillaService {
             path = "/panel/pedidos/" + item.idPedido();
         }
         return baseFront() + path + enlaceAcceso(tokenAcceso);
+    }
+
+    private String urlSancion(SancionEmail datos, String tokenAcceso) {
+        if (datos != null && datos.alcance() == AlcanceSancion.ACCESO) {
+            return contactoEmail != null && !contactoEmail.isBlank()
+                ? "mailto:" + contactoEmail
+                : baseFront() + "/contacto";
+        }
+        if (datos != null && datos.alcance() == AlcanceSancion.ENTREGAS) {
+            return baseFront() + "/cuenta/restringida"
+                + enlaceAcceso(tokenAcceso);
+        }
+        if (datos != null && datos.idPedido() != null) {
+            return baseFront() + "/panel/pedidos/" + datos.idPedido()
+                + enlaceAcceso(tokenAcceso);
+        }
+        return baseFront() + "/panel/pedidos" + enlaceAcceso(tokenAcceso);
     }
 
     private boolean hayAlerta(

@@ -19,8 +19,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.modelo.ERol;
 import com.temipora.backend_springboot.modelo.EstadoSancion;
+import com.temipora.backend_springboot.modelo.OrigenSancion;
 import com.temipora.backend_springboot.modelo.Rol;
 import com.temipora.backend_springboot.modelo.SancionCuenta;
 import com.temipora.backend_springboot.modelo.SancionCuentaDTO;
@@ -72,6 +74,48 @@ class SancionServiceTest {
         verify(auditoria).registrar(
             eq(AccionesAdmin.CUENTA_SANCIONAR), eq("SancionCuenta"), eq(10L),
             any(), any(), any(), any());
+    }
+
+    @Test
+    void aplicarSistema_conClaveRevertida_creaUnaSancionNueva() {
+        String clave = "AUTO:ENTREGA:31:NIVEL1";
+        Usuario artista = usuario(880L, "ArtistaMoroso", ERol.ARTISTA);
+        SancionCuenta anterior = SancionCuenta.builder()
+            .idSancion(5L)
+            .usuario(artista)
+            .alcance(AlcanceSancion.ENTREGAS)
+            .origen(OrigenSancion.AUTOMATICA)
+            .estado(EstadoSancion.REVERTIDA)
+            .motivo("anterior")
+            .clave(clave)
+            .fechaInicio(LocalDateTime.now().minusDays(10))
+            .build();
+
+        when(sancionRepository.findByClave(clave))
+            .thenReturn(Optional.of(anterior));
+        when(sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
+                eq(880L), eq(EstadoSancion.ACTIVA)))
+            .thenReturn(Optional.empty());
+        when(usuarioRepository.findByIdUsuario(880L))
+            .thenReturn(Optional.of(artista));
+        when(sancionRepository.save(any(SancionCuenta.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        SancionCuenta nueva = sancionService.aplicarSistema(
+            880L,
+            TipoSancion.SUSPENSION,
+            AlcanceSancion.ENTREGAS,
+            "nuevo incumplimiento",
+            LocalDateTime.now().plusDays(14),
+            clave,
+            null,
+            null,
+            LocalDateTime.now().minusDays(5));
+
+        assertThat(anterior.getClave()).isNull();
+        assertThat(nueva.getEstado()).isEqualTo(EstadoSancion.ACTIVA);
+        assertThat(nueva.getClave()).isEqualTo(clave);
+        assertThat(nueva.getAlcance()).isEqualTo(AlcanceSancion.ENTREGAS);
     }
 
     @Test

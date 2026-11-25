@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import com.temipora.backend_springboot.servicios.MoraService;
 import com.temipora.backend_springboot.servicios.SancionIncumplimientoService;
 
 /**
@@ -19,29 +20,35 @@ public class SancionIncumplimientoJob {
         LoggerFactory.getLogger(SancionIncumplimientoJob.class);
 
     private final SancionIncumplimientoService sancionIncumplimientoService;
+    private final MoraService moraService;
 
     @Value("${temipora.incumplimiento.programado:true}")
     private boolean habilitado;
 
     public SancionIncumplimientoJob(
-            SancionIncumplimientoService sancionIncumplimientoService) {
+            SancionIncumplimientoService sancionIncumplimientoService,
+            MoraService moraService) {
         this.sancionIncumplimientoService = sancionIncumplimientoService;
+        this.moraService = moraService;
     }
 
-    @Scheduled(initialDelayString = "PT5M", fixedDelayString = "PT1H")
+    @Scheduled(initialDelayString = "PT1M", fixedDelayString = "PT10M")
     public void ejecutar() {
         if (!habilitado) {
             return;
         }
         try {
+            // Detecta la mora en la misma corrida para no depender del orden
+            // entre jobs.
+            int moras = moraService.detectar();
             SancionIncumplimientoService.Resumen resumen =
                 sancionIncumplimientoService.procesar();
-            if (resumen.curados() + resumen.escalados()
+            if (moras > 0 || resumen.curados() + resumen.escalados()
                     + resumen.nivel1Aplicados() + resumen.pedidosCerrados() > 0) {
                 log.info(
-                    "Incumplimientos: {} sanciones curadas, {} escaladas, "
-                        + "{} nivel 1 aplicados, {} pedidos cerrados.",
-                    resumen.curados(), resumen.escalados(),
+                    "Incumplimientos: {} moras, {} sanciones curadas, "
+                        + "{} escaladas, {} nivel 1 aplicados, {} pedidos cerrados.",
+                    moras, resumen.curados(), resumen.escalados(),
                     resumen.nivel1Aplicados(), resumen.pedidosCerrados());
             }
         } catch (Exception e) {

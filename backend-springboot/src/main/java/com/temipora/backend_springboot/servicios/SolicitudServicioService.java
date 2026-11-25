@@ -304,8 +304,8 @@ public class SolicitudServicioService {
         if (artista != null && artista.getIdUsuario().equals(idCliente)) {
             throw new IllegalArgumentException("No podés solicitar tu propio servicio.");
         }
-        if (artista != null && sancionService.tieneSancionVigente(
-                artista.getIdUsuario(), AlcanceSancion.VENTAS)) {
+        if (artista != null && sancionService
+                .tieneSancionQueImpideVender(artista.getIdUsuario())) {
             throw new ConflictoException(
                 "El artista no está recibiendo encargos en este momento.");
         }

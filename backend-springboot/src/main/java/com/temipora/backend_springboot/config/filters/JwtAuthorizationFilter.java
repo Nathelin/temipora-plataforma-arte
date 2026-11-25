@@ -38,6 +38,8 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
         Pattern.compile("^/api/pedidos/\\d+$");
     private static final Pattern PEDIDOS_RESTRINGIDOS =
         Pattern.compile("^/api/pedidos/restringido$");
+    private static final Pattern SOLICITUD_DETALLE =
+        Pattern.compile("^/api/solicitudes-servicio/\\d+$");
     private static final Pattern ENTREGA_HITO =
         Pattern.compile("^/api/pedidos/\\d+/hitos/\\d+/entregas$");
     private static final Pattern DEUDAS =
@@ -134,6 +136,7 @@ public class JwtAuthorizationFilter extends OncePerRequestFilter {
         if ("GET".equals(metodo)) {
             return PEDIDO_DETALLE.matcher(uri).matches()
                 || PEDIDOS_RESTRINGIDOS.matcher(uri).matches()
+                || SOLICITUD_DETALLE.matcher(uri).matches()
                 || uri.startsWith("/api/notificaciones")
                 || uri.startsWith("/api/apelaciones")
                 || uri.startsWith("/api/contacto");

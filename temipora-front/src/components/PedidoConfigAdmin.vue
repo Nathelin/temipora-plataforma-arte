@@ -101,7 +101,7 @@ async function guardar() {
     entero(revisionesMaximasPorHito.value, 1, 10, 'El máximo de revisiones'),
     entero(diasReentrega.value, 1, 60, 'El plazo de reentrega'),
     entero(diasGraciaEntrega.value, 1, 30, 'La gracia de entrega'),
-    entero(diasSancionVentas.value, 1, 60, 'La sanción de ventas'),
+    entero(diasSancionVentas.value, 1, 60, 'La duración del Nivel 1'),
     entero(diasReapelacion.value, 1, 90, 'La espera entre apelaciones'),
     entero(diasCierreTrasBloqueo.value, 7, 180, 'El cierre tras el bloqueo'),
     entero(diasGraciaPago.value, 1, 30, 'La gracia de pago'),
@@ -203,7 +203,8 @@ async function reenviarRecordatorios() {
     const res = await api.post('/admin/recordatorios/reenviar')
     const reabiertos = Number(res.data?.reabiertos || 0)
     const enviados = Number(res.data?.enviados || 0)
-    mensajeReenvio.value = `Se reabrieron ${reabiertos} recordatorio(s) y se enviaron ${enviados}.`
+    const avisosSancion = Number(res.data?.avisosSancion || 0)
+    mensajeReenvio.value = `Se reabrieron ${reabiertos} recordatorio(s), se enviaron ${enviados} y se reenviaron ${avisosSancion} aviso(s) de sanción.`
   } catch (e) {
     errorReenvio.value = e.response?.data?.message
       || 'No se pudieron reenviar los recordatorios.'
@@ -384,7 +385,7 @@ async function reenviarRecordatorios() {
           <div class="grid gap-4 sm:grid-cols-2">
             <div>
               <label for="dias-sancion-ventas" class="mb-2 block text-sm text-cafe">
-                Duración de la suspensión de ventas (días) <span class="text-rojizo">*</span>
+                Duración del Nivel 1 antes de inhabilitar (días) <span class="text-rojizo">*</span>
               </label>
               <input
                 id="dias-sancion-ventas"
@@ -396,8 +397,9 @@ async function reenviarRecordatorios() {
                 class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
               />
               <p class="mt-2 text-xs leading-relaxed text-cafe/50">
-                Tiempo que el catálogo queda pausado. Al terminar, si sigue la mora,
-                la cuenta pasa a “solo entregas”.
+                Tiempo que la cuenta queda limitada a entregar y el catálogo
+                pausado. Al terminar, si sigue la mora, la cuenta se inhabilita
+                por completo.
               </p>
             </div>
             <div>
@@ -523,7 +525,9 @@ async function reenviarRecordatorios() {
             La prueba envía dos mails separados a tu correo: uno de pagos y otro
             de entregas. No encola ni modifica pedidos. El reenvío vuelve a mandar
             los recordatorios que ya se enviaron y todavía cumplen las
-            condiciones.
+            condiciones. También reenvía el aviso de sanción a las cuentas
+            restringidas, con un enlace de acceso directo a la pantalla que
+            corresponde.
           </p>
           <p v-if="mensajeMails" class="mt-3 text-sm text-green-700">{{ mensajeMails }}</p>
           <p v-if="errorMails" class="mt-3 text-sm text-rojizo">{{ errorMails }}</p>
@@ -604,8 +608,8 @@ async function reenviarRecordatorios() {
 
     <ModalConfirmacion
       :abierto="confirmandoReenvio"
-      titulo="Reenviar recordatorios ya enviados"
-      mensaje="Se van a volver a enviar los recordatorios vigentes a los destinatarios reales. Es para pruebas."
+      titulo="Reenviar recordatorios y avisos de sanción"
+      mensaje="Se van a volver a enviar los recordatorios vigentes y el aviso de sanción a las cuentas restringidas, con enlaces de acceso nuevos. Es para pruebas."
       texto-confirmar="Reenviar"
       :confirmar-habilitado="!reenviando"
       @confirmar="reenviarRecordatorios"

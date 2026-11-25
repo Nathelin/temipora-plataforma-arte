@@ -261,9 +261,8 @@ public class PedidoService {
                 "El presupuesto no tiene un plan de pagos.");
         }
         if (solicitud.getArtista() != null
-                && sancionService.tieneSancionVigente(
-                    solicitud.getArtista().getIdUsuario(),
-                    AlcanceSancion.VENTAS)) {
+                && sancionService.tieneSancionQueImpideVender(
+                    solicitud.getArtista().getIdUsuario())) {
             throw new ConflictoException(
                 "El artista no está recibiendo encargos en este momento.");
         }
@@ -584,9 +583,8 @@ public class PedidoService {
         if (pedido.getEstado() != EstadoPedido.EN_CURSO) {
             throw new ConflictoException("El pedido no está en curso.");
         }
-        if (!sancionService.tieneSancionVigente(
-                pedido.getArtista().getIdUsuario(),
-                AlcanceSancion.ENTREGAS)) {
+        if (!sancionService.tieneSancionDeEntrega(
+                pedido.getArtista().getIdUsuario())) {
             throw new ConflictoException(
                 "El artista todavía no está bloqueado por incumplimiento.");
         }
@@ -1688,9 +1686,8 @@ public class PedidoService {
                     || pedido.getEstado() == EstadoPedido.EN_CURSO))
             .puedeCerrarPorIncumplimiento(esCliente
                 && pedido.getEstado() == EstadoPedido.EN_CURSO
-                && sancionService.tieneSancionVigente(
-                    pedido.getArtista().getIdUsuario(),
-                    AlcanceSancion.ENTREGAS))
+                && sancionService.tieneSancionDeEntrega(
+                    pedido.getArtista().getIdUsuario()))
             .rolVista(esAdmin
                 ? "ADMIN"
                 : esArtista ? "ARTISTA" : "CLIENTE")

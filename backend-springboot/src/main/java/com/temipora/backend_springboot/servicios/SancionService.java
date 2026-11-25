@@ -128,7 +128,17 @@ public class SancionService {
             LocalDateTime fechaObjetivo) {
         var existente = sancionRepository.findByClave(clave);
         if (existente.isPresent()) {
-            return existente.get();
+            SancionCuenta previa = existente.get();
+            if (previa.getEstado() == EstadoSancion.ACTIVA) {
+                return previa;
+            }
+            // La clave es única. Si el incumplimiento anterior fue revertido,
+            // liberamos la clave para poder registrar uno nuevo sobre el mismo
+            // pedido; de lo contrario el job nunca volvería a sancionar.
+            previa.setClave(null);
+            // Se fuerza el UPDATE antes del INSERT para no chocar con la
+            // restricción única de clave dentro de la misma transacción.
+            sancionRepository.saveAndFlush(previa);
         }
         var activa = sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
             idUsuario, EstadoSancion.ACTIVA);
@@ -181,6 +191,7 @@ public class SancionService {
         }
         sancion.setTipo(TipoSancion.INHABILITACION);
         sancion.setAlcance(alcance);
+        sancion.setMotivo(motivo);
         sancion.setFechaFin(null);
         sancion.setClave(clave);
         sancion.setPedido(pedido);
@@ -201,6 +212,27 @@ public class SancionService {
                 idUsuario, EstadoSancion.ACTIVA, LocalDateTime.now())
             .stream()
             .anyMatch(sancion -> sancion.getAlcance() == alcance);
+    }
+
+    /**
+     * El artista no puede vender ni recibir encargos nuevos: aplica a la
+     * suspensión de ventas, a la restricción a entregas y al bloqueo total.
+     */
+    @Transactional(readOnly = true)
+    public boolean tieneSancionQueImpideVender(Long idUsuario) {
+        return tieneSancionVigente(idUsuario, AlcanceSancion.VENTAS)
+            || tieneSancionVigente(idUsuario, AlcanceSancion.ENTREGAS)
+            || tieneSancionVigente(idUsuario, AlcanceSancion.ACCESO);
+    }
+
+    /**
+     * El artista tiene una restricción de entregas o un bloqueo total: el
+     * cliente puede cerrar el pedido por incumplimiento.
+     */
+    @Transactional(readOnly = true)
+    public boolean tieneSancionDeEntrega(Long idUsuario) {
+        return tieneSancionVigente(idUsuario, AlcanceSancion.ENTREGAS)
+            || tieneSancionVigente(idUsuario, AlcanceSancion.ACCESO);
     }
 
     /**
@@ -235,6 +267,9 @@ public class SancionService {
         }
         Snapshot antes = Snapshot.de(sancion, CAMPOS_REVERSION);
         sancion.setEstado(EstadoSancion.REVERTIDA);
+        // Permite que un nuevo incumplimiento del mismo pedido genere una
+        // sanción nueva en lugar de reutilizar esta fila revertida.
+        sancion.setClave(null);
         sancion.setFechaReversion(LocalDateTime.now());
         sancion.setObservacionReversion(
             observacion != null && !observacion.isBlank()
@@ -269,6 +304,7 @@ public class SancionService {
 
         Snapshot antes = Snapshot.de(sancion, CAMPOS_REVERSION);
         sancion.setEstado(EstadoSancion.REVERTIDA);
+        sancion.setClave(null);
         sancion.setAdminRevertio(admin);
         sancion.setFechaReversion(ahora);
         sancion.setObservacionReversion(

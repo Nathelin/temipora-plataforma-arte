@@ -210,8 +210,8 @@ public class RecordatorioProcesador {
                 + " podés mensajear al artista al que le debés."
             : "Tenés que entregar '" + item.detalle() + "' del pedido #"
                 + item.idPedido() + " antes del " + item.vence()
-                + ". Si no lo hacés, se suspenden tus ventas y la cuenta queda"
-                + " limitada a entregar los pedidos abiertos.";
+                + ". Si no lo hacés, tu cuenta queda limitada a entregar los"
+                + " pedidos abiertos.";
         notificacionService.crearOActualizarParaUsuario(
             fila.getUsuario().getIdUsuario(),
             pago ? NOTIF_PAGO : NOTIF_ENTREGA,
@@ -328,21 +328,21 @@ public class RecordatorioProcesador {
 
     private String consecuenciaEntrega(MotivoRecordatorio motivo) {
         if (motivo == MotivoRecordatorio.ENTREGA_7D) {
-            return "Si no entregás, se suspenden tus ventas y la cuenta queda"
-                + " limitada a entregar los pedidos abiertos: no podés vender,"
-                + " comprar ni usar el resto del sitio hasta que un administrador"
-                + " te reintegre.";
+            return "Si no entregás, tu cuenta queda limitada a entregar los"
+                + " pedidos abiertos: no podés vender, comprar ni usar el resto"
+                + " del sitio hasta que el cliente apruebe la entrega o un"
+                + " administrador revise tu caso.";
         }
         if (motivo == MotivoRecordatorio.ENTREGA_1D) {
-            return "Mañana vence el plazo. Si no entregás, se suspenden tus"
-                + " ventas y la cuenta queda limitada a entregar los pedidos"
-                + " abiertos: no podés vender, comprar ni usar el resto del sitio.";
+            return "Mañana vence el plazo. Si no entregás, tu cuenta queda"
+                + " limitada a entregar los pedidos abiertos: no podés vender,"
+                + " comprar ni usar el resto del sitio.";
         }
         if (motivo == MotivoRecordatorio.ENTREGA_HOY) {
-            return "Vence hoy. Si no entregás, se suspenden tus ventas. Si la"
-                + " demora continúa, tu cuenta queda limitada solo a entregar"
-                + " los pedidos abiertos: no podés usar el resto del sitio hasta"
-                + " que un administrador te reintegre.";
+            return "Vence hoy. Si no entregás, tu cuenta queda limitada a"
+                + " entregar los pedidos abiertos: no podés usar el resto del"
+                + " sitio hasta que el cliente apruebe la entrega o un"
+                + " administrador revise tu caso.";
         }
         return null;
     }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -22,7 +23,9 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.AlcanceSancion;
+import com.temipora.backend_springboot.modelo.EnvioEmail;
 import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
+import com.temipora.backend_springboot.modelo.EstadoEnvioEmail;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.EstadoProducto;
@@ -33,6 +36,7 @@ import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.HitoPresupuesto;
 import com.temipora.backend_springboot.modelo.OrigenSancion;
 import com.temipora.backend_springboot.modelo.Pedido;
+import com.temipora.backend_springboot.modelo.PropositoToken;
 import com.temipora.backend_springboot.modelo.Producto;
 import com.temipora.backend_springboot.modelo.PublicacionReventa;
 import com.temipora.backend_springboot.modelo.SancionCuenta;
@@ -65,6 +69,15 @@ class SancionAutomaticaServiceTest {
     @Mock
     private NotificacionService notificacionService;
 
+    @Mock
+    private EmailPlantillaService emailPlantillaService;
+
+    @Mock
+    private EnvioEmailService envioEmailService;
+
+    @Mock
+    private AccesoEnlaceService accesoEnlaceService;
+
     @Spy
     private EntregaPendienteService entregaPendienteService =
         new EntregaPendienteService();
@@ -75,14 +88,27 @@ class SancionAutomaticaServiceTest {
     @Test
     void aplicarNivel1_pausaElCatalogoYGuardaElAlcanceAfectado() {
         Pedido pedido = pedido();
+        pedido.getArtista().setCorreo("artista@test.com");
+        pedido.getArtista().setNombreUsuario("ArtistaMoroso");
         Servicio servicio = servicio(1L, EstadoServicio.PUBLICADO);
+        servicio.setNombre("Retrato angelical");
+        pedido.setServicio(servicio);
+        pedido.setCliente(Usuario.builder()
+            .idUsuario(8L)
+            .nombreUsuario("Cliente2")
+            .build());
         Producto producto = producto(2L, EstadoProducto.DISPONIBLE);
         PublicacionReventa reventa = reventa(3L, EstadoPublicacionReventa.PUBLICADA);
         SancionCuenta sancion = sancionAutomatica();
+        sancion.setUsuario(pedido.getArtista());
 
         when(sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
                 eq(7L), eq(EstadoSancion.ACTIVA)))
             .thenReturn(Optional.empty());
+        when(emailPlantillaService.asuntoSancion(any()))
+            .thenReturn("Tu cuenta quedó limitada a entregas");
+        when(emailPlantillaService.sancion(any(), any(), any()))
+            .thenReturn("<html>sancion</html>");
         when(servicioRepository.findByArtistaIdUsuarioAndEstado(
                 7L, EstadoServicio.PUBLICADO)).thenReturn(List.of(servicio));
         when(productoRepository.findByArtistaIdUsuarioAndEstadoOrderByTituloAsc(
@@ -105,8 +131,12 @@ class SancionAutomaticaServiceTest {
         assertThat(reventa.getEstado())
             .isEqualTo(EstadoPublicacionReventa.SUSPENDIDA);
         verify(notificacionService).crearParaUsuario(
-            eq(7L), eq("CUENTA_SUSPENDIDA_VENTAS"), any(), any(),
+            eq(7L), eq("CUENTA_RESTRINGIDA_ENTREGAS"), any(), any(),
             eq(10L), eq("PEDIDO"));
+        verify(envioEmailService).enviar(
+            eq(pedido.getArtista()), eq("SANCION"), eq(99L), eq("SANCION"),
+            eq("Tu cuenta quedó limitada a entregas"),
+            eq("<html>sancion</html>"), eq("sancion:99:ENTREGAS"));
     }
 
     @Test
@@ -130,26 +160,96 @@ class SancionAutomaticaServiceTest {
     @Test
     void escalarNivel2_escalaYNotifica() {
         Pedido pedido = pedido();
+        pedido.getArtista().setCorreo("artista@test.com");
+        pedido.setCliente(Usuario.builder()
+            .idUsuario(8L)
+            .nombreUsuario("Cliente2")
+            .build());
         SancionCuenta escalada = sancionAutomatica();
+        escalada.setUsuario(pedido.getArtista());
+        escalada.setAlcance(AlcanceSancion.ACCESO);
 
         when(sancionService.escalarSistema(
                 eq(99L), any(), anyString(), anyString(), any(), any(), any()))
             .thenReturn(escalada);
+        when(emailPlantillaService.asuntoSancion(AlcanceSancion.ACCESO))
+            .thenReturn("Tu cuenta quedó inhabilitada");
+        when(emailPlantillaService.sancion(any(), any(), any()))
+            .thenReturn("<html>sancion</html>");
 
         SancionCuenta resultado = service.escalarNivel2(sancionAutomatica(), pedido);
 
         assertThat(resultado).isSameAs(escalada);
         verify(sancionService).escalarSistema(
             eq(99L),
-            eq(AlcanceSancion.ENTREGAS),
+            eq(AlcanceSancion.ACCESO),
             anyString(),
             eq("AUTO:ENTREGA:10:NIVEL2"),
             eq(pedido),
             any(),
             eq(pedido.getMoraDesde()));
         verify(notificacionService).crearParaUsuario(
-            eq(7L), eq("CUENTA_RESTRINGIDA_ENTREGAS"), any(), any(),
+            eq(7L), eq("CUENTA_INHABILITADA"), any(), any(),
             eq(10L), eq("PEDIDO"));
+        verify(envioEmailService).enviar(
+            eq(pedido.getArtista()), eq("SANCION"), eq(99L), eq("SANCION"),
+            eq("Tu cuenta quedó inhabilitada"),
+            eq("<html>sancion</html>"), eq("sancion:99:ACCESO"));
+    }
+
+    @Test
+    void reenviarAvisosVigentes_mandaAvisoConEnlaceFresco() {
+        Pedido pedido = pedido();
+        pedido.getArtista().setCorreo("artista@test.com");
+        pedido.setCliente(Usuario.builder()
+            .idUsuario(8L)
+            .nombreUsuario("Cliente2")
+            .build());
+        SancionCuenta sancion = sancionAutomatica();
+        sancion.setUsuario(pedido.getArtista());
+        sancion.setPedido(pedido);
+
+        when(sancionRepository.findPorOrigenYAlcance(
+                OrigenSancion.AUTOMATICA, AlcanceSancion.ENTREGAS,
+                EstadoSancion.ACTIVA))
+            .thenReturn(List.of(sancion));
+        when(sancionRepository.findPorOrigenYAlcance(
+                OrigenSancion.AUTOMATICA, AlcanceSancion.ACCESO,
+                EstadoSancion.ACTIVA))
+            .thenReturn(List.of());
+        when(emailPlantillaService.asuntoSancion(AlcanceSancion.ENTREGAS))
+            .thenReturn("Tu cuenta quedó limitada a entregas");
+        when(emailPlantillaService.sancion(any(), any(), any()))
+            .thenReturn("<html>sancion</html>");
+        when(accesoEnlaceService.generar(
+                eq(sancion.getUsuario()),
+                eq(PropositoToken.SANCION),
+                eq(99L),
+                eq(72)))
+            .thenReturn("token-nuevo");
+        EnvioEmail envio = new EnvioEmail();
+        envio.setEstado(EstadoEnvioEmail.ENVIADO);
+        when(envioEmailService.enviar(
+                any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(envio);
+
+        int enviados = service.reenviarAvisosVigentes();
+
+        assertThat(enviados).isEqualTo(1);
+        verify(accesoEnlaceService).generar(
+            eq(sancion.getUsuario()),
+            eq(PropositoToken.SANCION),
+            eq(99L),
+            eq(72));
+        verify(envioEmailService).enviar(
+            eq(sancion.getUsuario()),
+            eq("SANCION"),
+            eq(99L),
+            eq("SANCION"),
+            eq("Tu cuenta quedó limitada a entregas"),
+            eq("<html>sancion</html>"),
+            argThat(clave -> clave.startsWith(
+                "sancion:99:ENTREGAS:reenvio:")));
     }
 
     @Test
@@ -201,7 +301,7 @@ class SancionAutomaticaServiceTest {
             .idSancion(99L)
             .usuario(Usuario.builder().idUsuario(7L).build())
             .origen(OrigenSancion.AUTOMATICA)
-            .alcance(AlcanceSancion.VENTAS)
+            .alcance(AlcanceSancion.ENTREGAS)
             .tipo(com.temipora.backend_springboot.modelo.TipoSancion.SUSPENSION)
             .motivo("motivo")
             .fechaInicio(LocalDateTime.now().minusDays(5))

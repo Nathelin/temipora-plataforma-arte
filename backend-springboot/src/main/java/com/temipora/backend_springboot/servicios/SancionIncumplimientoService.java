@@ -68,9 +68,12 @@ public class SancionIncumplimientoService {
         int diasCierre = config.getDiasCierreTrasBloqueo() != null
             ? config.getDiasCierreTrasBloqueo()
             : ConfiguracionPedido.DIAS_CIERRE_TRAS_BLOQUEO_POR_DEFECTO;
+        int diasGracia = config.getDiasGraciaEntrega() != null
+            ? config.getDiasGraciaEntrega()
+            : ConfiguracionPedido.DIAS_GRACIA_ENTREGA_POR_DEFECTO;
 
         Resumen curacion = curarOEscalar(ahora);
-        int nivel1 = aplicarNivel1(ahora, diasVentas);
+        int nivel1 = aplicarNivel1(ahora, diasVentas, diasGracia);
         int cerrados = cerrarPedidos(ahora, diasCierre);
         return new Resumen(
             curacion.curados(), curacion.escalados(), nivel1, cerrados);
@@ -79,9 +82,11 @@ public class SancionIncumplimientoService {
     private Resumen curarOEscalar(LocalDateTime ahora) {
         int curados = 0;
         int escalados = 0;
-        List<SancionCuenta> ventas = sancionRepository.findPorOrigenYAlcance(
-            OrigenSancion.AUTOMATICA, AlcanceSancion.VENTAS, EstadoSancion.ACTIVA);
-        for (SancionCuenta sancion : ventas) {
+        List<SancionCuenta> restricciones =
+            sancionRepository.findPorOrigenYAlcance(
+                OrigenSancion.AUTOMATICA, AlcanceSancion.ENTREGAS,
+                EstadoSancion.ACTIVA);
+        for (SancionCuenta sancion : restricciones) {
             List<Pedido> enMora = enMoraDeArtista(
                 sancion.getUsuario().getIdUsuario(), ahora);
             if (enMora.isEmpty()) {
@@ -100,7 +105,7 @@ public class SancionIncumplimientoService {
     }
 
     private int aplicarNivel1(
-            LocalDateTime ahora, int diasVentas) {
+            LocalDateTime ahora, int diasVentas, int diasGracia) {
         Map<Long, Pedido> disparadores = new LinkedHashMap<>();
         for (Pedido pedido : pedidoRepository.findEnMora(EstadoPedido.EN_CURSO)) {
             if (pedido.getMoraDesde() == null || !enMora(pedido, ahora)) {
@@ -116,7 +121,14 @@ public class SancionIncumplimientoService {
         for (Map.Entry<Long, Pedido> entrada : disparadores.entrySet()) {
             Pedido pedido = entrada.getValue();
             LocalDateTime plazo = entregaPendienteService.plazoVigente(pedido);
-            if (plazo == null || !ahora.isAfter(plazo)) {
+            if (plazo == null) {
+                continue;
+            }
+            // La gracia configurable corre desde el vencimiento: la mora se
+            // registra al instante, pero la sanción recién se aplica al vencer
+            // la ventana de gracia.
+            LocalDateTime limite = plazo.plusDays(Math.max(0, diasGracia));
+            if (!ahora.isAfter(limite)) {
                 continue;
             }
             if (sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
@@ -132,10 +144,10 @@ public class SancionIncumplimientoService {
 
     private int cerrarPedidos(LocalDateTime ahora, int diasCierre) {
         int cerrados = 0;
-        List<SancionCuenta> entregas = sancionRepository.findPorOrigenYAlcance(
-            OrigenSancion.AUTOMATICA, AlcanceSancion.ENTREGAS,
+        List<SancionCuenta> bloqueos = sancionRepository.findPorOrigenYAlcance(
+            OrigenSancion.AUTOMATICA, AlcanceSancion.ACCESO,
             EstadoSancion.ACTIVA);
-        for (SancionCuenta sancion : entregas) {
+        for (SancionCuenta sancion : bloqueos) {
             if (sancion.getFechaEscalada() == null
                     || ahora.isBefore(sancion.getFechaEscalada()
                         .plusDays(diasCierre))) {

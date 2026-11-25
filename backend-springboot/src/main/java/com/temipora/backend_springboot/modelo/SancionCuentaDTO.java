@@ -25,6 +25,7 @@ public class SancionCuentaDTO {
     private String motivo;
     private LocalDateTime fechaInicio;
     private LocalDateTime fechaFin;
+    private LocalDateTime fechaEscalada;
     private Long idPedido;
     private Long idHitoPedido;
     private LocalDateTime fechaObjetivo;
@@ -48,6 +49,7 @@ public class SancionCuentaDTO {
             .motivo(sancion.getMotivo())
             .fechaInicio(sancion.getFechaInicio())
             .fechaFin(sancion.getFechaFin())
+            .fechaEscalada(sancion.getFechaEscalada())
             .idPedido(sancion.getPedido() != null
                 ? sancion.getPedido().getIdPedido()
                 : null)
