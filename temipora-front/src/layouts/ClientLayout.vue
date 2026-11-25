@@ -17,6 +17,7 @@ const ICONOS = {
 const principal = {
   nombre: 'Resumen',
   to: '/mi-actividad',
+  base: '/mi-actividad',
   icono: ICONOS.resumen,
 }
 

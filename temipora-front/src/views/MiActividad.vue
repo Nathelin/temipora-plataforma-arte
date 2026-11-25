@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import ActividadTabs from '../components/ActividadTabs.vue'
 import PageHeader from '../components/PageHeader.vue'
 import ItemAtencionPanel from '../components/ItemAtencionPanel.vue'
 import FilaPedidoActivo from '../components/FilaPedidoActivo.vue'
@@ -301,6 +302,8 @@ function claseDeuda(deuda) {
         </router-link>
       </template>
     </PageHeader>
+
+    <ActividadTabs class="mt-6" />
 
     <div v-if="cargando" class="mt-8 space-y-6" role="status" aria-live="polite">
       <span class="sr-only">Cargando resumen...</span>

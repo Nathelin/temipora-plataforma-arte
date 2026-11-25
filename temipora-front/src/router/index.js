@@ -88,6 +88,7 @@ const MiReventa = () => import('../views/MiReventa.vue')
 const Carrito = () => import('../views/Carrito.vue')
 const MisCompras = () => import('../views/MisCompras.vue')
 const MiActividad = () => import('../views/MiActividad.vue')
+const MiHistorial = () => import('../views/MiHistorial.vue')
 const CompraDetalle = () => import('../views/CompraDetalle.vue')
 const CertificadoPublico = () => import('../views/CertificadoPublico.vue')
 const TerminosAceptadosPublico = () => import('../views/TerminosAceptadosPublico.vue')
@@ -221,6 +222,12 @@ const routes = [
             name: 'mi-actividad',
             component: MiActividad,
             meta: { title: 'Mi actividad', requiresComprador: true },
+          },
+          {
+            path: 'historial',
+            name: 'mi-historial',
+            component: MiHistorial,
+            meta: { title: 'Mi historial', requiresComprador: true },
           },
           {
             path: '/compras',
