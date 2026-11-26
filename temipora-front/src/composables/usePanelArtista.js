@@ -41,6 +41,7 @@ const solicitudesMensajePendientes = computed(
   () => Number(resumen.value?.solicitudesMensajePendientes || 0),
 )
 const cuentaCobrosConectada = computed(() => resumen.value?.cuentaCobrosConectada !== false)
+const saludCuenta = computed(() => resumen.value?.saludCuenta || null)
 
 function haySesionArtista() {
   return Boolean(localStorage.getItem('token'))
@@ -63,7 +64,9 @@ async function cargar({ silencioso = false } = {}) {
 
   cargaEnCurso = (async () => {
     try {
-      const res = await api.get('/panel-artista/resumen')
+      const res = await api.get('/panel-artista/resumen', {
+        meta: { silenciosa: silencioso },
+      })
       resumen.value = res.data || null
     } catch (e) {
       if (e.response?.status === 401) {
@@ -116,6 +119,7 @@ export function usePanelArtista() {
     mensajesNoLeidos,
     solicitudesMensajePendientes,
     cuentaCobrosConectada,
+    saludCuenta,
     cargando,
     error,
     cargar,

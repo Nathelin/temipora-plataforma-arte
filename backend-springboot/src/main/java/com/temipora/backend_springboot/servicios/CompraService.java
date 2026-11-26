@@ -106,6 +106,7 @@ public class CompraService {
     private final EventoLedgerRepository eventoLedgerRepository;
     private final LedgerService ledgerService;
     private final AnclajeService anclajeService;
+    private final SancionService sancionService;
     private final String proveedorPago;
     private final int reservaMinutos;
 
@@ -125,6 +126,7 @@ public class CompraService {
             EventoLedgerRepository eventoLedgerRepository,
             LedgerService ledgerService,
             AnclajeService anclajeService,
+            SancionService sancionService,
             @Value("${pagos.proveedor:simulado}") String proveedorPago,
             @Value("${compra.reserva-minutos:30}") int reservaMinutos) {
         this.compraRepository = compraRepository;
@@ -142,6 +144,7 @@ public class CompraService {
         this.eventoLedgerRepository = eventoLedgerRepository;
         this.ledgerService = ledgerService;
         this.anclajeService = anclajeService;
+        this.sancionService = sancionService;
         this.proveedorPago = proveedorPago;
         this.reservaMinutos = reservaMinutos;
     }
@@ -167,6 +170,10 @@ public class CompraService {
         Carrito carrito = carritoRepository
             .findByUsuarioIdUsuario(cliente.getIdUsuario())
             .orElseThrow(() -> new ConflictoException("El carrito está vacío."));
+        if (sancionService.tieneSancionDeCompra(cliente.getIdUsuario())) {
+            throw new ConflictoException(
+                MoraClienteService.MENSAJE_COMPRA_BLOQUEADA);
+        }
         if (carrito.getItems().isEmpty()) {
             throw new ConflictoException("El carrito está vacío.");
         }

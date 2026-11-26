@@ -104,6 +104,10 @@ public class ManejoGlobalErrores {
     private String mensajeDeIntegridad(DataIntegrityViolationException e) {
         String detalle = causasDe(e).toLowerCase(Locale.ROOT);
 
+        if (detalle.contains("uk_terminos_plataforma_vigente")) {
+            return "No se pudo publicar la nueva versión de los términos. "
+                + "Volvé a intentarlo.";
+        }
         if (detalle.contains("uk_entregable_variante")) {
             return "No se pudieron guardar los archivos entregables de la variante. "
                 + "Volvé a intentarlo; si el problema sigue, quitá y volvé a marcar "

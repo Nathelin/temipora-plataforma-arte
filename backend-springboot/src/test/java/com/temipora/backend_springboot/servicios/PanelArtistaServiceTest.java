@@ -8,7 +8,9 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -19,6 +21,7 @@ import com.temipora.backend_springboot.modelo.ContadorMensajesDTO;
 import com.temipora.backend_springboot.modelo.CuentaCobroDTO;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.PanelArtistaResumenDTO;
+import com.temipora.backend_springboot.modelo.SaludCuentaDTO;
 import com.temipora.backend_springboot.modelo.SolicitudResumenDTO;
 import com.temipora.backend_springboot.repositorios.CompraGrupoRepository;
 import com.temipora.backend_springboot.repositorios.PagoRepository;
@@ -41,9 +44,23 @@ class PanelArtistaServiceTest {
     private ConversacionService conversacionService;
     @Mock
     private MercadoPagoOAuthService mercadoPagoOAuthService;
+    @Mock
+    private SaludCuentaService saludCuentaService;
 
     @InjectMocks
     private PanelArtistaService panelArtistaService;
+
+    @BeforeEach
+    void setUp() {
+        when(saludCuentaService.salud(ARTISTA)).thenReturn(
+            new SaludCuentaService.Salud(
+                SaludCuentaDTO.builder()
+                    .estado("AL_DIA")
+                    .diasGraciaEntrega(3)
+                    .pausados(List.of())
+                    .build(),
+                Map.of()));
+    }
 
     @Test
     void sinDatosDevuelveTodoEnCero() {
@@ -56,6 +73,7 @@ class PanelArtistaServiceTest {
 
         assertThat(resumen.getMetricas().getSolicitudesPorResponder()).isZero();
         assertThat(resumen.getMetricas().getSolicitudesEnEspera()).isZero();
+        assertThat(resumen.getSaludCuenta().getEstado()).isEqualTo("AL_DIA");
         assertThat(resumen.getPedidosActivos()).isEmpty();
         assertThat(resumen.getHitosAtencion()).isEmpty();
         assertThat(resumen.getSolicitudesRecientes()).isEmpty();

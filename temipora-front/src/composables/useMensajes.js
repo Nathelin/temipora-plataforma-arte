@@ -34,7 +34,9 @@ async function cargarContador({ silencioso = false } = {}) {
 
   cargaEnCurso = (async () => {
     try {
-      const res = await cargarContadorMensajes()
+      const res = await cargarContadorMensajes({
+        meta: { silenciosa: silencioso },
+      })
       noLeidos.value = Number(res.data?.noLeidos || 0)
       solicitudesPendientes.value = Number(res.data?.solicitudesPendientes || 0)
     } catch (e) {

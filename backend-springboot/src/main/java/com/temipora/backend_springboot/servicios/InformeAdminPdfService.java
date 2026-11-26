@@ -13,6 +13,7 @@ import com.temipora.backend_springboot.modelo.InformeAdminTipoDTO;
 import com.temipora.backend_springboot.modelo.InformeAdminTotalesDTO;
 import com.temipora.backend_springboot.modelo.InformeAdminVendedorDTO;
 import com.temipora.backend_springboot.servicios.informes.DocumentoPdf;
+import com.temipora.backend_springboot.servicios.informes.EmisorPdf;
 import com.temipora.backend_springboot.servicios.informes.FormatoPdf;
 import com.temipora.backend_springboot.servicios.informes.TablaPdf;
 
@@ -24,13 +25,13 @@ public class InformeAdminPdfService {
         "Documento interno de administración · generado automáticamente por "
             + "Temipora";
 
-    public byte[] generar(InformeAdminDTO informe) {
+    public byte[] generar(InformeAdminDTO informe, EmisorPdf emisor) {
         String desde = FormatoPdf.fecha(informe.periodo().desde());
         String hasta = FormatoPdf.fecha(informe.periodo().hasta());
         String moneda = FormatoPdf.moneda(informe.moneda());
 
         DocumentoPdf documento = DocumentoPdf.vertical(
-            TIPO, desde + " al " + hasta, referencia(informe), PIE);
+            TIPO, desde + " al " + hasta, referencia(informe), PIE, emisor);
         documento.abrir();
         documento.cabecera("Informe de administración",
             "Ventas y comisiones",

@@ -1,4 +1,7 @@
 import axios from 'axios'
+import { useCargaGlobal } from '../composables/useCargaGlobal'
+
+const { iniciarCarga, finalizarCarga } = useCargaGlobal()
 
 const api = axios.create({
   baseURL: '/api',
@@ -11,9 +14,15 @@ function limpiarSesion() {
   localStorage.removeItem('idUsuario')
   localStorage.removeItem('urlFotoPerfil')
   localStorage.removeItem('monedaPreferida')
+  localStorage.removeItem('restringido')
+  localStorage.removeItem('alcance')
 }
 
 api.interceptors.request.use((config) => {
+  if (!config.meta?.silenciosa) {
+    config.meta = { ...(config.meta || {}), _cargaGlobal: true }
+    iniciarCarga()
+  }
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -22,8 +31,12 @@ api.interceptors.request.use((config) => {
 })
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.config?.meta?._cargaGlobal) finalizarCarga()
+    return response
+  },
   (error) => {
+    if (error.config?.meta?._cargaGlobal) finalizarCarga()
     const status = error.response?.status
     const data = error.response?.data
 
@@ -32,6 +45,13 @@ api.interceptors.response.use(
     }
     if (status === 403 && data?.codigo === 'TOS_NO_ACEPTADOS') {
       window.dispatchEvent(new CustomEvent('tos-no-aceptados'))
+    }
+    if (status === 403 && data?.codigo === 'CUENTA_RESTRINGIDA') {
+      localStorage.setItem('restringido', '1')
+      if (data?.alcance) {
+        localStorage.setItem('alcance', data.alcance)
+      }
+      window.dispatchEvent(new CustomEvent('cuenta-restringida'))
     }
     if (status === 403
         && (data?.codigo === 'CUENTA_SANCIONADA'

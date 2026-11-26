@@ -18,6 +18,7 @@ import com.temipora.backend_springboot.modelo.InformePeriodoDTO;
 import com.temipora.backend_springboot.modelo.InformeSerieDTO;
 import com.temipora.backend_springboot.modelo.InformeTotalesDTO;
 import com.temipora.backend_springboot.modelo.InformeVentasDTO;
+import com.temipora.backend_springboot.servicios.informes.EmisorPdf;
 
 class InformePdfServiceTest {
 
@@ -25,7 +26,7 @@ class InformePdfServiceTest {
 
     @Test
     void generaUnPdfConEncabezadoPieYSecciones() throws Exception {
-        byte[] pdf = servicio.generar(informeConItems(), "artista");
+        byte[] pdf = servicio.generar(informeConItems(), emisor());
         int paginas = paginas(pdf);
 
         assertThat(texto(pdf))
@@ -48,13 +49,15 @@ class InformePdfServiceTest {
             .contains("Se te pagó")
             .doesNotContain("Costo de cobro")
             .contains("01/11/2026")
+            .contains("@artista")
+            .contains("Artista")
             .doesNotContain("Notas")
             .containsPattern("Página\\s+1\\s+de\\s*" + paginas);
     }
 
     @Test
     void guardaElTituloEnLosMetadatosDelPdf() throws Exception {
-        byte[] pdf = servicio.generar(informeConItems(), "artista");
+        byte[] pdf = servicio.generar(informeConItems(), emisor());
         PdfReader lector = new PdfReader(pdf);
 
         try {
@@ -69,7 +72,7 @@ class InformePdfServiceTest {
     @Test
     void repiteElEncabezadoDeLaTablaYNumeraTodasLasPaginas()
             throws Exception {
-        byte[] pdf = servicio.generar(informeConMuchosItems(), "artista");
+        byte[] pdf = servicio.generar(informeConMuchosItems(), emisor());
         PdfReader lector = new PdfReader(pdf);
         int paginas = lector.getNumberOfPages();
         lector.close();
@@ -92,7 +95,7 @@ class InformePdfServiceTest {
             base.totales(), base.comparacion(),
             base.operacionesSinNetoReal(), base.serie(), base.items());
 
-        assertThat(texto(servicio.generar(soloServicios, "artista")))
+        assertThat(texto(servicio.generar(soloServicios, emisor())))
             .contains("Solo servicios");
     }
 
@@ -114,9 +117,13 @@ class InformePdfServiceTest {
             List.of(),
             List.of());
 
-        assertThat(texto(servicio.generar(informe, "artista")))
+        assertThat(texto(servicio.generar(informe, emisor())))
             .contains("No hay ventas registradas en el período.")
             .contains("sin ventas en el período anterior");
+    }
+
+    private EmisorPdf emisor() {
+        return EmisorPdf.de("artista", "Artista Prueba", "ARTISTA");
     }
 
     private InformeVentasDTO informeConItems() {

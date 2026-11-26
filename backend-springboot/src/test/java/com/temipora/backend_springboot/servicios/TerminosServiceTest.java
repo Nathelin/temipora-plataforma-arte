@@ -30,6 +30,7 @@ import com.temipora.backend_springboot.modelo.TerminosRequest;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.repositorios.DerechoTerminoRepository;
 import com.temipora.backend_springboot.repositorios.ServicioRepository;
+import com.temipora.backend_springboot.repositorios.TerminosPlataformaRepository;
 import com.temipora.backend_springboot.repositorios.TerminosRepository;
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
@@ -47,6 +48,9 @@ class TerminosServiceTest {
 
     @Mock
     private ServicioRepository servicioRepository;
+
+    @Mock
+    private TerminosPlataformaRepository terminosPlataformaRepository;
 
     @InjectMocks
     private TerminosService terminosService;

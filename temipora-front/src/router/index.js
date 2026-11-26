@@ -6,6 +6,7 @@ import MainLayout from '../layouts/MainLayout.vue'
 const Login = () => import('../components/Login.vue')
 const Usuarios = () => import('../components/Usuarios.vue')
 const SancionesAdmin = () => import('../components/SancionesAdmin.vue')
+const AdminSancionesPruebas = () => import('../views/AdminSancionesPruebas.vue')
 const AnclajeAdmin = () => import('../components/AnclajeAdmin.vue')
 const TiposAdmin = () => import('../components/TiposAdmin.vue')
 const EtiquetasAdmin = () => import('../components/EtiquetasAdmin.vue')
@@ -19,7 +20,9 @@ const MonedasAdmin = () => import('../components/MonedasAdmin.vue')
 const PresupuestoAdmin = () => import('../components/PresupuestoAdmin.vue')
 const ComisionAdmin = () => import('../components/ComisionAdmin.vue')
 const PromocionesAdmin = () => import('../components/PromocionesAdmin.vue')
+const DescuentosPromocionesAdmin = () => import('../components/DescuentosPromocionesAdmin.vue')
 const SustitucionesAdmin = () => import('../components/SustitucionesAdmin.vue')
+const HistorialSustitucionesAdmin = () => import('../components/HistorialSustitucionesAdmin.vue')
 const PedidoConfigAdmin = () => import('../components/PedidoConfigAdmin.vue')
 const ConfiguracionBajaCuentaAdmin = () => import('../components/ConfiguracionBajaCuentaAdmin.vue')
 const ConfiguracionMensajeriaAdmin = () => import('../components/ConfiguracionMensajeriaAdmin.vue')
@@ -69,6 +72,8 @@ const ConfiguracionFormularioPedidos = () => import('../views/ConfiguracionFormu
 const ConfiguracionTerminosArtista = () => import('../views/ConfiguracionTerminosArtista.vue')
 const ConfiguracionCuenta = () => import('../views/ConfiguracionCuenta.vue')
 const ConfiguracionCobros = () => import('../views/ConfiguracionCobros.vue')
+const CuentaRestringida = () => import('../views/CuentaRestringida.vue')
+const ApelacionesAdmin = () => import('../components/ApelacionesAdmin.vue')
 const PortfolioSubir = () => import('../views/PortfolioSubir.vue')
 const MisServicios = () => import('../views/MisServicios.vue')
 const ServicioForm = () => import('../views/ServicioForm.vue')
@@ -83,6 +88,8 @@ const ReventaPublica = () => import('../views/ReventaPublica.vue')
 const MiReventa = () => import('../views/MiReventa.vue')
 const Carrito = () => import('../views/Carrito.vue')
 const MisCompras = () => import('../views/MisCompras.vue')
+const MiActividad = () => import('../views/MiActividad.vue')
+const MiHistorial = () => import('../views/MiHistorial.vue')
 const CompraDetalle = () => import('../views/CompraDetalle.vue')
 const CertificadoPublico = () => import('../views/CertificadoPublico.vue')
 const TerminosAceptadosPublico = () => import('../views/TerminosAceptadosPublico.vue')
@@ -211,7 +218,18 @@ const routes = [
         component: ClientLayout,
         meta: { requiresAuth: true },
         children: [
-          { path: '', redirect: { name: 'compras' } },
+          {
+            path: '',
+            name: 'mi-actividad',
+            component: MiActividad,
+            meta: { title: 'Mi actividad', requiresComprador: true },
+          },
+          {
+            path: 'historial',
+            name: 'mi-historial',
+            component: MiHistorial,
+            meta: { title: 'Mi historial', requiresComprador: true },
+          },
           {
             path: '/compras',
             name: 'compras',
@@ -360,6 +378,12 @@ const routes = [
     ],
   },
   {
+    path: '/cuenta/restringida',
+    name: 'cuenta-restringida',
+    component: CuentaRestringida,
+    meta: { title: 'Cuenta restringida', requiresAuth: true },
+  },
+  {
     path: '/admin',
     component: AdminLayout,
     meta: { requiresAdmin: true },
@@ -391,6 +415,18 @@ const routes = [
         name: 'admin-sanciones',
         component: SancionesAdmin,
         meta: { title: 'Sanciones de cuentas' },
+      },
+      {
+        path: 'sanciones/pruebas',
+        name: 'admin-sanciones-pruebas',
+        component: AdminSancionesPruebas,
+        meta: { title: 'Pruebas de sanciones' },
+      },
+      {
+        path: 'apelaciones',
+        name: 'admin-apelaciones',
+        component: ApelacionesAdmin,
+        meta: { title: 'Apelaciones de sanciones' },
       },
       {
         path: 'anclaje',
@@ -509,10 +545,22 @@ const routes = [
         meta: { title: 'Promociones' },
       },
       {
+        path: 'campanas/promociones/descuentos',
+        name: 'admin-promociones-descuentos',
+        component: DescuentosPromocionesAdmin,
+        meta: { title: 'Promociones - Descuentos aplicados' },
+      },
+      {
         path: 'campanas/sustituciones',
         name: 'admin-sustituciones',
         component: SustitucionesAdmin,
         meta: { title: 'Sustituciones de artistas' },
+      },
+      {
+        path: 'campanas/sustituciones/historial',
+        name: 'admin-sustituciones-historial',
+        component: HistorialSustitucionesAdmin,
+        meta: { title: 'Sustituciones - Historial' },
       },
       {
         path: 'ajustes/pedidos',
@@ -625,6 +673,8 @@ router.beforeEach(async (to, from) => {
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
   const rol = localStorage.getItem('rol')
+  const tieneEnlace = typeof to.query.acceso === 'string'
+    && to.query.acceso.length > 0
 
   const routeTitle = to.meta.title;
 
@@ -636,8 +686,14 @@ router.beforeEach((to, from, next) => {
     document.title = 'Temipora';
   }
 
-  if (to.matched.some((r) => r.meta.requiresAuth) && !token) {
+  if (to.matched.some((r) => r.meta.requiresAuth) && !token && !tieneEnlace) {
     next({ name: 'login', query: { redirect: to.fullPath } })
+    return
+  }
+
+  if (localStorage.getItem('restringido') === '1'
+      && to.name !== 'cuenta-restringida') {
+    next({ name: 'cuenta-restringida' })
     return
   }
 
@@ -668,6 +724,44 @@ router.beforeEach((to, from, next) => {
   }
 
   next()
+})
+
+const CLAVE_RECARGA_CHUNK = 'temipora-recarga-por-chunk'
+
+router.onError((error, to) => {
+  const mensaje = String(error?.message || '')
+  if (!/dynamically imported module|Importing a module script failed|Failed to fetch/i.test(mensaje)) {
+    return
+  }
+  let yaRecargo = false
+  try {
+    yaRecargo = sessionStorage.getItem(CLAVE_RECARGA_CHUNK) === '1'
+  } catch {
+    // sessionStorage no disponible: no intentamos recargar para evitar bucles.
+    return
+  }
+  if (yaRecargo) {
+    try {
+      sessionStorage.removeItem(CLAVE_RECARGA_CHUNK)
+    } catch {
+      // sin almacenamiento, nada que limpiar.
+    }
+    return
+  }
+  try {
+    sessionStorage.setItem(CLAVE_RECARGA_CHUNK, '1')
+  } catch {
+    return
+  }
+  window.location.assign(to?.fullPath || window.location.href)
+})
+
+router.afterEach(() => {
+  try {
+    sessionStorage.removeItem(CLAVE_RECARGA_CHUNK)
+  } catch {
+    // sin almacenamiento, nada que limpiar.
+  }
 })
 
 const rutasPrecargadas = new Set()

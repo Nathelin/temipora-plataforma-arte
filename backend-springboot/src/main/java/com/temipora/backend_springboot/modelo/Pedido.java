@@ -23,6 +23,7 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 
 @Entity
 @Table(name = "pedido")
@@ -71,6 +72,28 @@ public class Pedido {
     @Column(name = "finalizado_en")
     private LocalDateTime finalizadoEn;
 
+    /**
+     * Instante del plazo de entrega que el artista incumplió. Se guarda una vez
+     * y no se recalcula: {@code entregaPrevista} se corre hacia adelante si el
+     * cliente paga tarde.
+     */
+    @Column(name = "mora_desde")
+    private LocalDateTime moraDesde;
+
+    /**
+     * Instante del plazo de pago de la entrega final que el cliente incumplió.
+     * Se guarda una vez y no se recalcula: el plazo se corre si el cliente pide
+     * una revisión o si el artista reentrega.
+     */
+    @Column(name = "impago_desde")
+    private LocalDateTime impagoDesde;
+
+    @Column(name = "incumplimiento_en")
+    private LocalDateTime incumplimientoEn;
+
+    @Column(name = "cierre_por_incumplimiento", nullable = false)
+    private boolean cierrePorIncumplimiento = false;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "id_aceptacion_terminos_plataforma", nullable = false)
     private AceptacionTerminosPlataforma aceptacionTerminosPlataforma;
@@ -91,8 +114,22 @@ public class Pedido {
     @OrderBy("orden ASC")
     private List<HitoPedido> hitos = new ArrayList<>();
 
+    /**
+     * Propuestas de prórroga del plazo. Se cargan en lote para que proyectar
+     * las fechas de una lista de pedidos no dispare una consulta por fila.
+     */
+    @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("fechaSolicitud DESC")
+    @BatchSize(size = 50)
+    private List<ProrrogaPedido> prorrogas = new ArrayList<>();
+
     public void agregarHito(HitoPedido hito) {
         hito.setPedido(this);
         this.hitos.add(hito);
+    }
+
+    public void agregarProrroga(ProrrogaPedido prorroga) {
+        prorroga.setPedido(this);
+        this.prorrogas.add(prorroga);
     }
 }

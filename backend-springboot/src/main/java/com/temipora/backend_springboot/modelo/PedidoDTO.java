@@ -33,8 +33,17 @@ public class PedidoDTO {
     private LocalDate limiteEntrega;
     private LocalDate fechaEntregaPrevista;
     private int diasDemoraCliente;
+    private int diasProrroga;
     private boolean entregaAtrasada;
+    private List<ProrrogaDTO> prorrogas;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private ProrrogaDTO prorrogaPendiente;
+    private boolean puedeSolicitarProrroga;
+    private boolean puedeResponderProrroga;
     private LocalDateTime finalizadoEn;
+    private LocalDateTime impagoDesde;
+    private boolean pagoVencido;
+    private Integer diasGraciaPagoRestantes;
     private BigDecimal precioFinal;
     private BigDecimal precioFinalCobro;
     private BigDecimal precioFinalMostrado;
@@ -100,6 +109,7 @@ public class PedidoDTO {
     private List<HitoPedidoDTO> hitos;
     private List<DibujoResumenDTO> dibujos;
     private boolean puedeCancelar;
+    private boolean puedeCerrarPorIncumplimiento;
     private String rolVista;
     private Long idConversacion;
     private String estadoConversacion;

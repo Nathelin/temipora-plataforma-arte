@@ -23,6 +23,14 @@ public class PedidoConfigDTO {
     private Integer maxHitos;
     private BigDecimal porcentajeMaxPrimerHito;
     private BigDecimal montoMinimoCuota;
+    private Integer diasGraciaEntrega;
+    private Integer diasSancionVentas;
+    private Integer diasReapelacion;
+    private Integer diasCierreTrasBloqueo;
+    private Integer diasGraciaPago;
+    private Integer diasSancionCompras;
+    private Integer horasRespuestaProrroga;
+    private LocalDateTime sancionesAutomaticasDesde;
     private LocalDateTime fechaActualizacion;
 
     public static PedidoConfigDTO desdeConfiguracion(ConfiguracionPedido config) {
@@ -34,6 +42,14 @@ public class PedidoConfigDTO {
             .maxHitos(config.getMaxHitos())
             .porcentajeMaxPrimerHito(config.getPorcentajeMaxPrimerHito())
             .montoMinimoCuota(config.getMontoMinimoCuota())
+            .diasGraciaEntrega(config.getDiasGraciaEntrega())
+            .diasSancionVentas(config.getDiasSancionVentas())
+            .diasReapelacion(config.getDiasReapelacion())
+            .diasCierreTrasBloqueo(config.getDiasCierreTrasBloqueo())
+            .diasGraciaPago(config.getDiasGraciaPago())
+            .diasSancionCompras(config.getDiasSancionCompras())
+            .horasRespuestaProrroga(config.getHorasRespuestaProrroga())
+            .sancionesAutomaticasDesde(config.getSancionesAutomaticasDesde())
             .fechaActualizacion(config.getFechaActualizacion())
             .build();
     }

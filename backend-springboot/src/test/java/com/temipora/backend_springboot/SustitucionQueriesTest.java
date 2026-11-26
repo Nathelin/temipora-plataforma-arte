@@ -31,8 +31,9 @@ class SustitucionQueriesTest {
     }
 
     @Test
-    void contarPorEstado_esValido() {
-        assertThat(sustitucionRepository.countByEstado(EstadoSustitucion.ABIERTA))
+    void contarPorEstadoSinImpago_esValido() {
+        assertThat(sustitucionRepository.countByEstadoAndMotivoNot(
+                EstadoSustitucion.ABIERTA, MotivoSustitucion.PEDIDO_IMPAGO))
             .isGreaterThanOrEqualTo(0L);
     }
 }

@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.temipora.backend_springboot.modelo.ContadoresPedidosDTO;
+import com.temipora.backend_springboot.modelo.DeudaClienteDTO;
 import com.temipora.backend_springboot.modelo.EntregaHitoMultipartRequest;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
@@ -30,8 +31,10 @@ import com.temipora.backend_springboot.modelo.PedidoResumenDTO;
 import com.temipora.backend_springboot.modelo.PublicacionPedidoRequest;
 import com.temipora.backend_springboot.modelo.SolicitudRevisionRequest;
 import com.temipora.backend_springboot.modelo.TipoDescarga;
+import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.servicios.ConstanciaService;
 import com.temipora.backend_springboot.servicios.DescargaService;
+import com.temipora.backend_springboot.servicios.MoraClienteService;
 import com.temipora.backend_springboot.servicios.PedidoService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -46,16 +49,19 @@ public class PedidoController {
     private final UsuarioService usuarioService;
     private final ConstanciaService constanciaService;
     private final DescargaService descargaService;
+    private final MoraClienteService moraClienteService;
 
     public PedidoController(
             PedidoService pedidoService,
             UsuarioService usuarioService,
             ConstanciaService constanciaService,
-            DescargaService descargaService) {
+            DescargaService descargaService,
+            MoraClienteService moraClienteService) {
         this.pedidoService = pedidoService;
         this.usuarioService = usuarioService;
         this.constanciaService = constanciaService;
         this.descargaService = descargaService;
+        this.moraClienteService = moraClienteService;
     }
 
     @GetMapping("/{idPedido}")
@@ -74,11 +80,14 @@ public class PedidoController {
             @PathVariable Long idPedido,
             Authentication authentication,
             HttpServletRequest request) {
-        Long idUsuario = idAutenticado(authentication);
+        Usuario usuario = usuarioService
+            .getByNombreUsuario(authentication.getName());
+        Long idUsuario = usuario.getIdUsuario();
         boolean esAdmin = esAdmin(authentication);
         PedidoDTO pedido = pedidoService.obtener(
             idPedido, idUsuario, esAdmin);
-        byte[] pdf = constanciaService.generar(pedido);
+        byte[] pdf = constanciaService.generar(
+            pedido, usuarioService.emisor(usuario));
 
         descargaService.registrar(
             idPedido,
@@ -99,6 +108,19 @@ public class PedidoController {
             .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
             .header("X-Content-Type-Options", "nosniff")
             .body(pdf);
+    }
+
+    @GetMapping("/restringido")
+    @PreAuthorize("hasAnyRole('ARTISTA', 'CLIENTE')")
+    public List<PedidoResumenDTO> restringidos(Authentication authentication) {
+        return pedidoService.pedidosRestringidos(
+            idAutenticado(authentication));
+    }
+
+    @GetMapping("/deudas")
+    @PreAuthorize("hasAnyRole('ARTISTA', 'CLIENTE')")
+    public List<DeudaClienteDTO> deudas(Authentication authentication) {
+        return moraClienteService.deudas(idAutenticado(authentication));
     }
 
     @GetMapping("/recibidos")
@@ -199,6 +221,15 @@ public class PedidoController {
             @PathVariable Long idPedido,
             Authentication authentication) {
         return pedidoService.cancelar(
+            idPedido, idAutenticado(authentication));
+    }
+
+    @PostMapping("/{idPedido}/cerrar-incumplimiento")
+    @PreAuthorize("hasAnyRole('CLIENTE', 'ARTISTA')")
+    public PedidoDTO cerrarPorIncumplimiento(
+            @PathVariable Long idPedido,
+            Authentication authentication) {
+        return pedidoService.cerrarPorIncumplimiento(
             idPedido, idAutenticado(authentication));
     }
 

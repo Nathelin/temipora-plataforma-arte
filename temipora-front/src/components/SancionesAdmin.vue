@@ -35,6 +35,19 @@ const nombresTipo = {
   INHABILITACION: 'Inhabilitación permanente',
 }
 
+const nombresAlcance = {
+  ACCESO: 'Cuenta inhabilitada (Nivel 2)',
+  VENTAS: 'Ventas suspendidas',
+  ENTREGAS: 'Solo entregas (Nivel 1)',
+  COMPRAS: 'Compras suspendidas',
+  PAGOS: 'Solo pagos',
+}
+
+const nombresOrigen = {
+  MANUAL: 'Manual',
+  AUTOMATICA: 'Automática',
+}
+
 const nombresEstado = {
   ACTIVA: 'Activa',
   VENCIDA: 'Vencida',
@@ -48,6 +61,14 @@ function formatearFecha(valor) {
 
 function nombreTipo(valor) {
   return nombresTipo[valor] || valor || '—'
+}
+
+function nombreAlcance(valor) {
+  return nombresAlcance[valor] || valor || '—'
+}
+
+function nombreOrigen(valor) {
+  return nombresOrigen[valor] || valor || '—'
 }
 
 function nombreEstado(valor) {
@@ -166,53 +187,53 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
 
 <template>
   <main class="mx-auto w-full px-4 py-8 sm:px-8">
-    <div class="mb-6 flex flex-col gap-4">
-      <AdminPageHeader
-        eyebrow="Comunidad"
-        titulo="Sanciones de cuentas"
-        descripcion="Inhabilitá cuentas y revisá el historial. La persona mencionada es desconectada y no puede volver a iniciar sesión hasta que se revierta."
-      >
-        <template #acciones>
-          <span class="text-sm tabular-nums text-cafe/60">
-            {{ totalElementos }} sanción(es)
-          </span>
-        </template>
-      </AdminPageHeader>
+    <AdminPageHeader
+      eyebrow="Comunidad"
+      titulo="Sanciones de cuentas"
+      descripcion="Inhabilitá cuentas y revisá el historial. La persona mencionada es desconectada y no puede volver a iniciar sesión hasta que se revierta."
+    >
+      <template #acciones>
+        <span class="text-sm tabular-nums text-cafe/60">
+          {{ totalElementos }} sanción(es)
+        </span>
+      </template>
+    </AdminPageHeader>
 
-      <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
-        <input
-          v-model="texto"
-          type="search"
-          placeholder="Buscar por usuario o correo…"
-          class="min-w-0 rounded-lg border-0 px-4 py-2.5 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
-        />
-        <select
-          v-model="estado"
-          aria-label="Filtrar por estado"
-          class="rounded-lg border-0 px-3 py-2.5 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
-        >
-          <option value="">Todos los estados</option>
-          <option value="ACTIVA">Activas</option>
-          <option value="VENCIDA">Vencidas</option>
-          <option value="REVERTIDA">Revertidas</option>
-        </select>
-        <select
-          v-model="tipo"
-          aria-label="Filtrar por tipo"
-          class="rounded-lg border-0 px-3 py-2.5 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
-        >
-          <option value="">Todos los tipos</option>
-          <option value="SUSPENSION">Suspensión temporal</option>
-          <option value="INHABILITACION">Inhabilitación permanente</option>
-        </select>
-        <button
-          type="button"
-          class="inline-flex min-h-10 items-center justify-center rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition hover:bg-rosa/20"
-          @click="limpiarFiltros"
-        >
-          Limpiar
-        </button>
-      </div>
+    <AdminTabs />
+
+    <div class="mb-6 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+      <input
+        v-model="texto"
+        type="search"
+        placeholder="Buscar por usuario o correo…"
+        class="min-w-0 rounded-lg border-0 px-4 py-2.5 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+      />
+      <select
+        v-model="estado"
+        aria-label="Filtrar por estado"
+        class="rounded-lg border-0 px-3 py-2.5 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+      >
+        <option value="">Todos los estados</option>
+        <option value="ACTIVA">Activas</option>
+        <option value="VENCIDA">Vencidas</option>
+        <option value="REVERTIDA">Revertidas</option>
+      </select>
+      <select
+        v-model="tipo"
+        aria-label="Filtrar por tipo"
+        class="rounded-lg border-0 px-3 py-2.5 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:ring-2 focus:ring-inset focus:ring-coral focus:outline-none"
+      >
+        <option value="">Todos los tipos</option>
+        <option value="SUSPENSION">Suspensión temporal</option>
+        <option value="INHABILITACION">Inhabilitación permanente</option>
+      </select>
+      <button
+        type="button"
+        class="inline-flex min-h-10 items-center justify-center rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+        @click="limpiarFiltros"
+      >
+        Limpiar
+      </button>
     </div>
 
     <p v-if="cargando" class="py-10 text-center text-cafe/60">Cargando sanciones…</p>
@@ -245,7 +266,12 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
                   <p class="font-semibold text-granate">@{{ fila.nombreUsuario }}</p>
                   <p class="text-xs text-cafe/55">{{ fila.correo }}</p>
                 </td>
-                <td class="px-5 py-3 text-cafe">{{ nombreTipo(fila.tipo) }}</td>
+                <td class="px-5 py-3">
+                  <p class="text-cafe">{{ nombreTipo(fila.tipo) }}</p>
+                  <p class="text-xs text-cafe/50">
+                    {{ nombreAlcance(fila.alcance) }} · {{ nombreOrigen(fila.origen) }}
+                  </p>
+                </td>
                 <td class="max-w-[14rem] px-5 py-3">
                   <p class="line-clamp-2 whitespace-normal break-words text-cafe/80">
                     {{ fila.motivo }}
@@ -324,6 +350,14 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
                 <dd class="text-right font-medium text-cafe">{{ nombreTipo(seleccionada.tipo) }}</dd>
               </div>
               <div class="flex justify-between gap-3">
+                <dt class="text-cafe/55">Alcance</dt>
+                <dd class="text-right text-cafe">{{ nombreAlcance(seleccionada.alcance) }}</dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-cafe/55">Origen</dt>
+                <dd class="text-right text-cafe">{{ nombreOrigen(seleccionada.origen) }}</dd>
+              </div>
+              <div class="flex justify-between gap-3">
                 <dt class="text-cafe/55">Estado</dt>
                 <dd class="text-right">
                   <span
@@ -347,6 +381,21 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
               <div class="flex justify-between gap-3">
                 <dt class="text-cafe/55">Aplicó</dt>
                 <dd class="text-right text-cafe">{{ seleccionada.adminAplico || '—' }}</dd>
+              </div>
+              <div v-if="seleccionada.idPedido" class="flex justify-between gap-3">
+                <dt class="text-cafe/55">Pedido</dt>
+                <dd class="text-right">
+                  <router-link
+                    :to="`/admin/pedidos/${seleccionada.idPedido}`"
+                    class="font-semibold text-coral hover:underline"
+                  >
+                    #{{ seleccionada.idPedido }}
+                  </router-link>
+                </dd>
+              </div>
+              <div v-if="seleccionada.fechaObjetivo" class="flex justify-between gap-3">
+                <dt class="text-cafe/55">Plazo incumplido</dt>
+                <dd class="text-right text-cafe">{{ formatearFecha(seleccionada.fechaObjetivo) }}</dd>
               </div>
               <div v-if="seleccionada.adminRevertio" class="flex justify-between gap-3">
                 <dt class="text-cafe/55">Revirtió</dt>
@@ -381,6 +430,7 @@ onBeforeUnmount(() => clearTimeout(debounceTimer))
                 >
                   <p class="font-semibold text-cafe">{{ nombreTipo(item.tipo) }}</p>
                   <p>{{ formatearFecha(item.fechaInicio) }} · {{ nombreEstado(item.estadoEfectivo) }}</p>
+                  <p>{{ nombreAlcance(item.alcance) }}</p>
                 </li>
               </ul>
               <p v-else class="mt-2 text-sm text-cafe/55">Sin otras sanciones.</p>

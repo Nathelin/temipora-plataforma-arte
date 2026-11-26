@@ -27,6 +27,7 @@ import com.temipora.backend_springboot.modelo.ConversacionDTO;
 import com.temipora.backend_springboot.modelo.ConversacionParticipante;
 import com.temipora.backend_springboot.modelo.ConversacionResumenDTO;
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.modelo.EscribiendoDTO;
 import com.temipora.backend_springboot.modelo.EstadoConversacion;
 import com.temipora.backend_springboot.modelo.EstadoMensaje;
@@ -70,6 +71,8 @@ public class ConversacionService {
     private final NotificacionService notificacionService;
     private final IndicadorEscritura indicadorEscritura;
     private final ApplicationEventPublisher eventoPublisher;
+    private final MoraClienteService moraClienteService;
+    private final SancionService sancionService;
 
     public ConversacionService(
             ConversacionRepository conversacionRepository,
@@ -80,7 +83,9 @@ public class ConversacionService {
             ConfiguracionMensajeriaService configuracionService,
             NotificacionService notificacionService,
             IndicadorEscritura indicadorEscritura,
-            ApplicationEventPublisher eventoPublisher) {
+            ApplicationEventPublisher eventoPublisher,
+            MoraClienteService moraClienteService,
+            SancionService sancionService) {
         this.conversacionRepository = conversacionRepository;
         this.participanteRepository = participanteRepository;
         this.accionRepository = accionRepository;
@@ -90,6 +95,8 @@ public class ConversacionService {
         this.notificacionService = notificacionService;
         this.indicadorEscritura = indicadorEscritura;
         this.eventoPublisher = eventoPublisher;
+        this.moraClienteService = moraClienteService;
+        this.sancionService = sancionService;
     }
 
     @Transactional
@@ -109,6 +116,21 @@ public class ConversacionService {
             .orElseThrow(() -> new NoSuchElementException(
                 "No existe el usuario @" + nombreDestinatario + "."));
         validarDestinatario(remitente, destinatario);
+        boolean destinatarioLimitado = sancionService.tieneSancionVigente(
+                destinatario.getIdUsuario(), AlcanceSancion.ENTREGAS)
+            || sancionService.tieneSancionVigente(
+                destinatario.getIdUsuario(), AlcanceSancion.ACCESO);
+        if (destinatarioLimitado) {
+            throw new ConflictoException(
+                "La cuenta de @" + destinatario.getNombreUsuario()
+                    + " está limitada por un incumplimiento y no puede recibir"
+                    + " mensajes nuevos.");
+        }
+        if (!moraClienteService.chatPermitido(
+                remitente.getIdUsuario(), destinatario.getIdUsuario())) {
+            throw new ConflictoException(
+                MoraClienteService.MENSAJE_CHAT_BLOQUEADO);
+        }
 
         String motivo = TextoMensajeria.obligatorio(
             request.getMotivoContacto(), config.getLongitudMaximaMotivo(),
@@ -182,7 +204,9 @@ public class ConversacionService {
             Usuario artista,
             Long idSolicitud,
             String nombreServicio) {
-        if (!participantesValidos(cliente, artista)) {
+        if (!participantesValidos(cliente, artista)
+                || !moraClienteService.chatPermitido(
+                    cliente.getIdUsuario(), artista.getIdUsuario())) {
             return;
         }
 
@@ -489,6 +513,27 @@ public class ConversacionService {
                 || !otro.isEstadoCuenta()) {
             return relacion(EstadoRelacionMensaje.NINGUNA, null, false,
                 "El usuario no está disponible para recibir mensajes.", null);
+        }
+
+        boolean otroLimitado = sancionService.tieneSancionVigente(
+                otro.getIdUsuario(), AlcanceSancion.ENTREGAS)
+            || sancionService.tieneSancionVigente(
+                otro.getIdUsuario(), AlcanceSancion.ACCESO);
+        if (otroLimitado) {
+            return conContraparte(
+                relacion(EstadoRelacionMensaje.NINGUNA, null, false,
+                    "La cuenta de este usuario está limitada por un"
+                        + " incumplimiento y no puede recibir mensajes nuevos.",
+                    null),
+                otro);
+        }
+
+        if (!moraClienteService.chatPermitido(
+                idUsuario, otro.getIdUsuario())) {
+            return conContraparte(
+                relacion(EstadoRelacionMensaje.NINGUNA, null, false,
+                    MoraClienteService.MENSAJE_CHAT_BLOQUEADO, null),
+                otro);
         }
 
         Optional<Conversacion> existente = conversacionRepository

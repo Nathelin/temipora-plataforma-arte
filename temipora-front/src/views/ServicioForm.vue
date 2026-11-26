@@ -8,6 +8,7 @@ import { esImagenVerificada } from '../servicios/imagenes'
 import { hayContenidoTerminos } from '../servicios/terminos'
 import { useMonedas } from '../composables/useMonedas'
 import { useCambiosSinGuardar } from '../composables/useCambiosSinGuardar'
+import { useNotificaciones } from '../composables/useNotificaciones'
 import SelectorPortfolio from '../components/SelectorPortfolio.vue'
 import SelectorEtiquetas from '../components/SelectorEtiquetas.vue'
 import EditorFormularioPedidos from '../components/EditorFormularioPedidos.vue'
@@ -20,6 +21,7 @@ import BurbujaInfo from '../components/BurbujaInfo.vue'
 
 const route = useRoute()
 const router = useRouter()
+const { exito, error: notificarError } = useNotificaciones()
 const nombreUsuario = localStorage.getItem('nombreUsuario') || ''
 
 const idServicio = computed(() => (route.params.id ? Number(route.params.id) : null))
@@ -202,6 +204,7 @@ function crearTerminosVacios() {
       pagoExtra: '',
       queDibuja: '',
       queNoDibuja: '',
+      aceptaPreeminencia: false,
     },
     estadoDerechos: {},
   }
@@ -237,6 +240,7 @@ function construirTerminos(data) {
     pagoExtra: data.pagoExtra || '',
     queDibuja: data.queDibuja || '',
     queNoDibuja: data.queNoDibuja || '',
+    aceptaPreeminencia: !!data.aceptaPreeminencia,
   }
 
   const derechosGuardados = data.derechos || []
@@ -573,12 +577,18 @@ function validarFormulario() {
 }
 
 function validarTerminos() {
-  if (hayContenidoTerminos(terminosVisible.value)) return []
-  return [
-    personalizarTerminos.value
-      ? 'Completá al menos una sección de los términos personalizados.'
-      : 'Tus términos globales están vacíos. Completalos antes de publicar el servicio.',
-  ]
+  const errs = []
+  if (!hayContenidoTerminos(terminosVisible.value)) {
+    errs.push(
+      personalizarTerminos.value
+        ? 'Completá al menos una sección de los términos personalizados.'
+        : 'Tus términos globales están vacíos. Completalos antes de publicar el servicio.',
+    )
+  }
+  if (personalizarTerminos.value && !configTerminos.value.form.aceptaPreeminencia) {
+    errs.push('Aceptá que los Términos de la Plataforma prevalecen sobre los tuyos.')
+  }
+  return errs
 }
 
 function validarPasoActual() {
@@ -646,6 +656,7 @@ function payloadTerminosDe(t) {
     pagoExtra: t.form.pagoExtra || null,
     queDibuja: t.form.queDibuja || null,
     queNoDibuja: t.form.queNoDibuja || null,
+    aceptaPreeminencia: !!t.form.aceptaPreeminencia,
     derechos: derechosCatalogo.value.map((derecho) => {
       const estado = t.estadoDerechos[derecho.idDerechoTermino]
       return {
@@ -678,6 +689,11 @@ function solicitarGuardarTerminosGlobal() {
     errorTerminosGlobal.value = 'Completá al menos una sección de tus términos.'
     return
   }
+  if (!configTerminosGlobalEdicion.value.form.aceptaPreeminencia) {
+    errorTerminosGlobal.value =
+      'Aceptá que los Términos de la Plataforma prevalecen sobre los tuyos.'
+    return
+  }
   if (!hayCambiosTerminosGlobal.value) return
   confirmandoTerminosGlobal.value = true
 }
@@ -701,6 +717,7 @@ async function guardarTerminosGlobal() {
       estadoGuardado.value = instantanea()
     }
     modalTerminosGlobal.value = false
+    exito('Términos globales guardados correctamente.')
   } catch (e) {
     errorTerminosGlobal.value = e.response?.data?.message || 'No se pudieron guardar los términos globales.'
   } finally {
@@ -778,16 +795,25 @@ async function guardar() {
 
     estadoGuardado.value = instantanea()
     limpiarCambios()
-    irAlListado()
+    exito(
+      esEdicion.value
+        ? 'Servicio actualizado correctamente.'
+        : `Publicaste “${form.value.nombre}”. Ya podés verlo en tus servicios.`,
+    )
+    irAlListado({ creado: !esEdicion.value })
   } catch (e) {
-    errorGuardado.value = e.response?.data?.message || 'No se pudo guardar el servicio.'
+    const mensaje = e.response?.data?.message || 'No se pudo guardar el servicio.'
+    errorGuardado.value = mensaje
+    notificarError(mensaje)
   } finally {
     guardando.value = false
   }
 }
 
-function irAlListado() {
-  router.push('/panel/servicios')
+function irAlListado({ creado = false } = {}) {
+  router.push(creado
+    ? { path: '/panel/servicios', query: { creado: '1' } }
+    : '/panel/servicios')
 }
 
 // ---------------------------------------------------------------

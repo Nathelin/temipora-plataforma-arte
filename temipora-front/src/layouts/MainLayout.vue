@@ -6,6 +6,7 @@ import ImagenOptimizada from '../components/ImagenOptimizada.vue'
 import ThemeToggle from '../components/ThemeToggle.vue'
 import MenuTemaMovil from '../components/MenuTemaMovil.vue'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
+import SpinnerCarga from '../components/SpinnerCarga.vue'
 import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
 import { useMensajes } from '../composables/useMensajes'
 import { useMensajeriaSocket } from '../composables/useMensajeriaSocket'
@@ -13,6 +14,7 @@ import { useNotificacionesSistema } from '../composables/useNotificacionesSistem
 import { useCarrito } from '../composables/useCarrito'
 import { cuandoEsteLibre } from '../composables/useTareasDiferidas'
 import { obtenerContacto } from '../servicios/contacto'
+import { obtenerMiEstadoCuenta } from '../servicios/miEstadoCuenta'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,18 +25,44 @@ const nombreUsuario = ref(localStorage.getItem('nombreUsuario') || '')
 const urlFotoPerfil = ref(localStorage.getItem('urlFotoPerfil') || '')
 
 const contactoEmail = ref('temiporasupport@gmail.com')
+const estadoCuenta = ref(null)
 
 let cancelarTareasIniciales = null
+
+async function cargarEstadoCuenta() {
+  if (!token.value || rol.value === 'ADMIN') {
+    estadoCuenta.value = null
+    return
+  }
+  try {
+    const res = await obtenerMiEstadoCuenta()
+    estadoCuenta.value = res.data
+  } catch {
+    estadoCuenta.value = null
+  }
+}
+
+const avisoPagoPendiente = computed(() => Boolean(
+  (estadoCuenta.value?.deudas?.length || 0) > 0
+  && estadoCuenta.value?.alcance !== 'PAGOS',
+))
+const cuentaSuspendida = computed(() => Boolean(
+  estadoCuenta.value?.sancionado
+  && estadoCuenta.value?.alcance === 'COMPRAS',
+))
+const primeraDeuda = computed(() => estadoCuenta.value?.deudas?.[0] || null)
 
 onMounted(() => {
   cuandoEsteLibre(async () => {
     contactoEmail.value = await obtenerContacto()
+    await cargarEstadoCuenta()
   })
 })
 
 const menuAbierto = ref(false)
 const menuMovilAbierto = ref(false)
 const temaMovilAbierto = ref(false)
+const saliendo = ref(false)
 const contenedorMenu = ref(null)
 const contenedorNav = ref(null)
 
@@ -42,7 +70,9 @@ const estaLogueado = computed(() => !!token.value)
 const esAdmin = computed(() => rol.value === 'ADMIN')
 const esArtista = computed(() => rol.value === 'ARTISTA')
 const puedeVerActividad = computed(() => estaLogueado.value && !esAdmin.value)
-const enActividad = computed(() => route.path.startsWith('/compras')
+const enActividad = computed(() => route.path.startsWith('/mi-actividad')
+  || route.path.startsWith('/compras')
+  || route.path.startsWith('/reventa')
   || route.path.startsWith('/pedidos')
   || route.path.startsWith('/solicitudes'))
 const enCarrito = computed(() => route.path.startsWith('/carrito'))
@@ -169,7 +199,9 @@ onBeforeUnmount(() => {
   desconectarSocket()
 })
 
-function cerrarSesion() {
+async function cerrarSesion() {
+  if (saliendo.value) return
+  saliendo.value = true
   localStorage.removeItem('token')
   localStorage.removeItem('rol')
   localStorage.removeItem('nombreUsuario')
@@ -181,7 +213,11 @@ function cerrarSesion() {
   limpiarMensajes()
   limpiarCarrito()
   desconectarSocket()
-  router.push({ name: 'login' })
+  try {
+    await router.push({ name: 'login' })
+  } finally {
+    saliendo.value = false
+  }
 }
 
 function irAPerfil() {
@@ -192,6 +228,17 @@ function irAPerfil() {
 
 <template>
   <div class="min-h-screen w-full flex flex-col bg-crema text-cafe">
+    <div
+      v-if="saliendo"
+      class="fixed inset-0 z-[130] flex items-center justify-center bg-granate/30 px-4 backdrop-blur-sm"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="flex items-center gap-3 rounded-2xl bg-blanco px-5 py-4 shadow-xl">
+        <SpinnerCarga tamano="md" etiqueta="Cerrando sesión" />
+        <span class="text-sm text-cafe">Cerrando sesión…</span>
+      </div>
+    </div>
     <header class="sticky top-0 z-30 border-b border-rosa/40 bg-crema/85 backdrop-blur-md">
       <div class="mx-auto flex h-14 max-w-screen-2xl items-center justify-between gap-4 px-4 sm:h-16 sm:px-8">
         <!-- Marca y navegación -->
@@ -232,7 +279,7 @@ function irAPerfil() {
             </router-link>
             <router-link
               v-if="puedeVerActividad"
-              to="/compras"
+              to="/mi-actividad"
               class="relative inline-flex items-center gap-2 rounded-full border border-coral/25 bg-coral/10 px-3 py-1.5 text-sm font-semibold text-coral transition hover:bg-coral/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/60"
               :class="enActividad ? 'ring-2 ring-coral/40' : ''"
               :aria-current="enActividad ? 'page' : undefined"
@@ -403,11 +450,14 @@ function irAPerfil() {
                   Apariencia
                 </button>
                 <button
-                  class="mt-1 w-full rounded-xl border-t border-rosa/30 px-3.5 py-2.5 text-left text-sm text-rojizo transition hover:bg-rosa/20"
+                  class="mt-1 flex w-full items-center gap-2 rounded-xl border-t border-rosa/30 px-3.5 py-2.5 text-left text-sm text-rojizo transition hover:bg-rosa/20 disabled:cursor-wait disabled:opacity-60"
                   role="menuitem"
+                  :disabled="saliendo"
+                  :aria-busy="saliendo"
                   @click="menuAbierto = false; cerrarSesion()"
                 >
-                  Cerrar sesión
+                  <SpinnerCarga v-if="saliendo" etiqueta="Cerrando sesión" />
+                  {{ saliendo ? 'Cerrando sesión…' : 'Cerrar sesión' }}
                 </button>
               </div>
             </div>
@@ -494,7 +544,7 @@ function irAPerfil() {
 
               <div v-if="puedeVerActividad" class="mt-1 border-t border-rosa/40 pt-2">
                 <router-link
-                  to="/compras"
+                  to="/mi-actividad"
                   class="flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/25 bg-coral/10 px-4 py-3 text-sm font-semibold text-coral transition hover:bg-coral/15"
                   :class="enActividad ? 'ring-2 ring-coral/40' : ''"
                   :aria-current="enActividad ? 'page' : undefined"
@@ -575,10 +625,13 @@ function irAPerfil() {
                 />
                 <button
                   type="button"
-                  class="flex w-full items-center rounded-2xl px-4 py-3 text-left text-sm font-semibold text-rojizo transition hover:bg-rosa/20"
+                  class="flex w-full items-center gap-2 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-rojizo transition hover:bg-rosa/20 disabled:cursor-wait disabled:opacity-60"
+                  :disabled="saliendo"
+                  :aria-busy="saliendo"
                   @click="menuMovilAbierto = false; cerrarSesion()"
                 >
-                  Cerrar sesión
+                  <SpinnerCarga v-if="saliendo" etiqueta="Cerrando sesión" />
+                  {{ saliendo ? 'Cerrando sesión…' : 'Cerrar sesión' }}
                 </button>
               </div>
             </div>
@@ -586,6 +639,33 @@ function irAPerfil() {
         </div>
       </div>
     </header>
+
+    <div
+      v-if="avisoPagoPendiente"
+      class="border-b border-durazno/60 bg-durazno/30"
+    >
+      <div class="mx-auto flex max-w-screen-2xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-8">
+        <p class="text-sm leading-relaxed text-cafe">
+          <template v-if="cuentaSuspendida">
+            Tenés un pago pendiente de una entrega final. Tus compras están
+            suspendidas y solo podés mensajear al artista al que le debés.
+            Regularizá el pago para recuperar el resto de la plataforma.
+          </template>
+          <template v-else>
+            Tenés un pago vencido de una entrega final. Regularizalo para no
+            perder la posibilidad de comprar, contratar y mensajear con otros
+            usuarios.
+          </template>
+        </p>
+        <router-link
+          v-if="primeraDeuda"
+          :to="{ name: 'pedido-detalle', params: { idPedido: primeraDeuda.idPedido } }"
+          class="inline-flex min-h-9 items-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+        >
+          Regularizar pago
+        </router-link>
+      </div>
+    </div>
 
     <main class="flex-1 w-full">
       <!-- La key cubre cualquier parámetro (servicio, perfil, pedido, token):

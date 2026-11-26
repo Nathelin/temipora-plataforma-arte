@@ -42,6 +42,9 @@ const perfil = ref({
   biografia: '',
   urlFotoPerfil: '',
   urlBanner: '',
+  sancionado: false,
+  sancionTipo: '',
+  sancionAlcance: '',
   // placeholders hasta que existan sus endpoints
   portfolio: [],
   servicios: [],
@@ -833,9 +836,28 @@ const configMensajeria = ref({
 const puedeEnviarMensaje = computed(() =>
   haySesion.value
   && !esDuenio.value
+  && !perfil.value.sancionado
   && (perfil.value.rol === 'ARTISTA' || perfil.value.rol === 'CLIENTE'))
 
+const textoRestriccion = computed(() => {
+  switch (perfil.value.sancionAlcance) {
+    case 'ENTREGAS':
+      return 'Esta cuenta está limitada a entregar sus pedidos abiertos por un incumplimiento.'
+    case 'ACCESO':
+      return 'Esta cuenta está inhabilitada por un incumplimiento.'
+    case 'VENTAS':
+      return 'Esta cuenta tiene las ventas suspendidas por un incumplimiento.'
+    case 'COMPRAS':
+      return 'Esta cuenta no puede contratar ni comprar por un incumplimiento.'
+    case 'PAGOS':
+      return 'Esta cuenta está limitada a regularizar pagos pendientes.'
+    default:
+      return 'Esta cuenta tiene una restricción vigente por un incumplimiento.'
+  }
+})
+
 const textoBotonMensaje = computed(() => {
+  if (perfil.value.sancionado) return 'Mensajes no disponibles'
   if (cargandoEstadoMensaje.value) return 'Cargando...'
   const estado = estadoMensaje.value
   if (!estado || estado.estadoRelacion === 'NINGUNA') {
@@ -1191,13 +1213,15 @@ function irASubirImagen(imagen = null) {
             <span>{{ actualizandoFavorito ? 'Guardando...' : esFavorito ? 'En favoritos' : 'Favorito' }}</span>
           </button>
           <button
-            v-if="puedeEnviarMensaje"
+            v-if="puedeEnviarMensaje || (perfil.sancionado && !esDuenio)"
             type="button"
             class="inline-flex min-h-10 items-center gap-2 rounded-full border px-5 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60"
-            :class="mensajeDestacado
-              ? 'border-coral bg-coral text-white shadow-sm hover:bg-rojizo'
-              : 'border-coral/50 bg-superficie text-granate hover:bg-rosa/25'"
-            :disabled="cargandoEstadoMensaje"
+            :class="perfil.sancionado
+              ? 'cursor-not-allowed border-borde/60 bg-superficie text-cafe/40'
+              : mensajeDestacado
+                ? 'border-coral bg-coral text-white shadow-sm hover:bg-rojizo'
+                : 'border-coral/50 bg-superficie text-granate hover:bg-rosa/25'"
+            :disabled="cargandoEstadoMensaje || perfil.sancionado"
             @click="accionMensaje"
           >
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -1218,6 +1242,29 @@ function irASubirImagen(imagen = null) {
           >
             Editar perfil
           </button>
+        </div>
+      </div>
+
+      <div
+        v-if="perfil.sancionado"
+        class="mt-4 flex items-start gap-3 rounded-2xl border border-rojizo/30 bg-rojizo/5 px-4 py-3 text-sm text-rojizo"
+        role="status"
+      >
+        <svg
+          class="mt-0.5 h-5 w-5 shrink-0"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          aria-hidden="true"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+        </svg>
+        <div>
+          <p class="font-semibold">Cuenta limitada por incumplimiento</p>
+          <p class="mt-0.5 leading-relaxed text-cafe/75">
+            {{ textoRestriccion }} No puede recibir mensajes nuevos mientras dure la restricción.
+          </p>
         </div>
       </div>
 

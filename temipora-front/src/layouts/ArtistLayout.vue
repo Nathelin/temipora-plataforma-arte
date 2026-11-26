@@ -60,7 +60,7 @@ const secciones = [
 
 const inferior = computed(() => {
   const items = [
-    { nombre: 'Mi actividad', to: '/compras', icono: ICONOS.compras },
+    { nombre: 'Mi actividad', to: '/mi-actividad', icono: ICONOS.compras },
     { nombre: 'Configuración de cuenta', to: '/configuracion/perfil', icono: ICONOS.cuenta },
   ]
   if (nombreUsuario) {
@@ -75,8 +75,7 @@ const inferior = computed(() => {
 
 const badges = computed(() => ({
   '/panel/solicitudes': metricas.value.solicitudesPorResponder || 0,
-  '/panel/pedidos':
-    (metricas.value.entregasPendientes || 0) + (metricas.value.pedidosImpagos || 0),
+  '/panel/pedidos': metricas.value.entregasPendientes || 0,
   '/panel/mensajes': (noLeidos.value || 0) + (solicitudesPendientes.value || 0),
 }))
 

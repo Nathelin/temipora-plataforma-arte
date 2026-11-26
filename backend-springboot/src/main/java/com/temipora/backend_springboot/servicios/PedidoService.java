@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -33,6 +34,7 @@ import com.temipora.backend_springboot.modelo.EstadoMensaje;
 import com.temipora.backend_springboot.modelo.EstadoPago;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
+import com.temipora.backend_springboot.modelo.EstadoProrroga;
 import com.temipora.backend_springboot.modelo.EstadoSolicitud;
 import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.HitoPedidoDTO;
@@ -47,9 +49,12 @@ import com.temipora.backend_springboot.modelo.PedidoDTO;
 import com.temipora.backend_springboot.modelo.PedidoResumenDTO;
 import com.temipora.backend_springboot.modelo.Presupuesto;
 import com.temipora.backend_springboot.modelo.PresupuestoDTO;
+import com.temipora.backend_springboot.modelo.ProrrogaDTO;
+import com.temipora.backend_springboot.modelo.ProrrogaPedido;
 import com.temipora.backend_springboot.modelo.Solicitud;
 import com.temipora.backend_springboot.modelo.SolicitudRevisionRequest;
 import com.temipora.backend_springboot.modelo.AceptacionTerminosPlataforma;
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.modelo.TipoHito;
 import com.temipora.backend_springboot.modelo.UsuarioResumenDTO;
 import com.temipora.backend_springboot.repositorios.ConversacionRepository;
@@ -72,6 +77,7 @@ public class PedidoService {
     private static final String NOTIF_HITO_CON_REVISION = "HITO_CON_REVISION";
     private static final String NOTIF_PEDIDO_CANCELADO = "PEDIDO_CANCELADO";
     private static final String NOTIF_PEDIDO_IMPAGO = "PEDIDO_IMPAGO";
+    private static final String NOTIF_PEDIDO_INCUMPLIDO = "PEDIDO_INCUMPLIDO";
     private static final String NOTIF_PUBLICACION_AUTORIZADA =
         "PEDIDO_PUBLICACION_AUTORIZADA";
     private static final String NOTIF_PUBLICACION_RETIRADA =
@@ -104,8 +110,7 @@ public class PedidoService {
 
     private static final List<EstadoPedido> ESTADOS_PANEL_ACTIVOS = List.of(
         EstadoPedido.PENDIENTE_PAGO,
-        EstadoPedido.EN_CURSO,
-        EstadoPedido.IMPAGO);
+        EstadoPedido.EN_CURSO);
     private static final int MAX_HITOS_PANEL = 10;
     private static final int DIAS_HITO_POR_VENCER = 3;
 
@@ -122,9 +127,12 @@ public class PedidoService {
     private static final List<EstadoPedido> ESTADOS_ARCHIVO = List.of(
         EstadoPedido.FINALIZADO,
         EstadoPedido.CANCELADO,
-        EstadoPedido.IMPAGO);
+        EstadoPedido.IMPAGO,
+        EstadoPedido.INCUMPLIMIENTO);
     private static final List<EstadoPedido> ESTADOS_CERRADOS = List.of(
-        EstadoPedido.CANCELADO, EstadoPedido.IMPAGO);
+        EstadoPedido.CANCELADO,
+        EstadoPedido.IMPAGO,
+        EstadoPedido.INCUMPLIMIENTO);
     private static final List<EstadoEntregaHito> ESTADOS_ENTREGA_ABIERTA =
         List.of(
             EstadoEntregaHito.NO_INICIADO,
@@ -148,6 +156,8 @@ public class PedidoService {
     private final ArancelEstimadoService arancelEstimadoService;
     private final CuposEventPublisher cuposEventPublisher;
     private final CierreEmailService cierreEmailService;
+    private final SancionService sancionService;
+    private final EntregaPendienteService entregaPendienteService;
 
     public PedidoService(
             PedidoRepository pedidoRepository,
@@ -166,7 +176,9 @@ public class PedidoService {
             AuditoriaService auditoria,
             ArancelEstimadoService arancelEstimadoService,
             CuposEventPublisher cuposEventPublisher,
-            CierreEmailService cierreEmailService) {
+            CierreEmailService cierreEmailService,
+            SancionService sancionService,
+            EntregaPendienteService entregaPendienteService) {
         this.pedidoRepository = pedidoRepository;
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.pagoRepository = pagoRepository;
@@ -184,6 +196,8 @@ public class PedidoService {
         this.arancelEstimadoService = arancelEstimadoService;
         this.cuposEventPublisher = cuposEventPublisher;
         this.cierreEmailService = cierreEmailService;
+        this.sancionService = sancionService;
+        this.entregaPendienteService = entregaPendienteService;
     }
 
     @Transactional
@@ -195,6 +209,10 @@ public class PedidoService {
         if (solicitud.getCliente() == null
                 || !solicitud.getCliente().getIdUsuario().equals(idCliente)) {
             throw new AccesoDenegadoException("No podés pagar esta solicitud.");
+        }
+        if (sancionService.tieneSancionDeCompra(idCliente)) {
+            throw new ConflictoException(
+                MoraClienteService.MENSAJE_COMPRA_BLOQUEADA);
         }
 
         Optional<Pedido> existente = pedidoRepository
@@ -241,6 +259,12 @@ public class PedidoService {
         if (presupuesto.getHitos() == null || presupuesto.getHitos().isEmpty()) {
             throw new ConflictoException(
                 "El presupuesto no tiene un plan de pagos.");
+        }
+        if (solicitud.getArtista() != null
+                && sancionService.tieneSancionQueImpideVender(
+                    solicitud.getArtista().getIdUsuario())) {
+            throw new ConflictoException(
+                "El artista no está recibiendo encargos en este momento.");
         }
 
         AceptacionTerminosPlataforma aceptacionTerminos =
@@ -362,9 +386,14 @@ public class PedidoService {
             throw new ConflictoException("La cuota todavía no está paga.");
         }
 
+        LocalDateTime ahora = LocalDateTime.now();
+        LocalDateTime plazoEntrega =
+            entregaPendienteService.plazoVigente(pedido, hito);
+        boolean entregaTardia = plazoEntrega != null
+            && ahora.isAfter(plazoEntrega);
+
         EntregaHito entrega = entregaService.crear(pedido, hito, request, archivos);
 
-        LocalDateTime ahora = LocalDateTime.now();
         hito.setEstadoEntrega(EstadoEntregaHito.ENTREGADO);
         hito.setFechaEntrega(ahora);
         hito.setFechaLimiteAprobacion(null);
@@ -377,6 +406,16 @@ public class PedidoService {
                 ahora.plusDays(hitoFlujoService.diasAprobacion()));
         }
         hitoPedidoRepository.save(hito);
+        if (entregaTardia && pedido.getMoraDesde() == null) {
+            // La entrega llegó tarde: la mora nace acá, sin esperar al job.
+            pedido.setMoraDesde(plazoEntrega);
+            pedidoRepository.save(pedido);
+            auditoria.registrarSistema(
+                AccionesAdmin.PEDIDO_MORA_DETECTAR, ENTIDAD_PEDIDO,
+                pedido.getIdPedido(),
+                "Registró la mora de entrega al subir el entregable fuera de plazo"
+                    + " (vencido el " + plazoEntrega.toLocalDate() + ")");
+        }
         auditoria.registrar(
             AccionesAdmin.ENTREGA_CREAR, ENTIDAD_ENTREGA, entrega.getIdEntrega(),
             "Entregó el hito '" + hito.getHitoPresupuesto().getNombre() + "' del pedido #"
@@ -424,6 +463,7 @@ public class PedidoService {
             antesHito, hito, CAMPOS_HITO);
         HitoPedido siguiente = hitoFlujoService.habilitarSiguiente(
             pedido, hito, ahora);
+        limpiarMoraSiCorresponde(pedido, ahora);
         notificarAprobado(pedido, hito, false);
         if (siguiente == null) {
             pedidoCierreService.finalizar(pedido, ahora);
@@ -525,6 +565,79 @@ public class PedidoService {
             AccionesAdmin.PEDIDO_CANCELAR, ENTIDAD_PEDIDO, pedido.getIdPedido(),
             "Canceló el pedido", antesPedido, pedido, CAMPOS_PEDIDO);
         return construirDTO(pedido, idCliente);
+    }
+
+    /**
+     * El cliente cierra el pedido cuando el artista ya está en Nivel 2. Conserva
+     * los archivos de las etapas entregadas; no hay reembolso.
+     */
+    @Transactional
+    public PedidoDTO cerrarPorIncumplimiento(Long idPedido, Long idCliente) {
+        Pedido pedido = pedidoRepository.findByIdPedidoForUpdate(idPedido)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Pedido no encontrado: " + idPedido));
+        if (!pedido.getCliente().getIdUsuario().equals(idCliente)) {
+            throw new AccesoDenegadoException(
+                "No podés cerrar este pedido.");
+        }
+        if (pedido.getEstado() != EstadoPedido.EN_CURSO) {
+            throw new ConflictoException("El pedido no está en curso.");
+        }
+        if (!sancionService.tieneSancionDeEntrega(
+                pedido.getArtista().getIdUsuario())) {
+            throw new ConflictoException(
+                "El artista todavía no está bloqueado por incumplimiento.");
+        }
+        cerrarPorIncumplimiento(pedido);
+        return construirDTO(pedido, idCliente);
+    }
+
+    @Transactional
+    public boolean cerrarPorIncumplimientoSistema(Long idPedido) {
+        Pedido pedido = pedidoRepository.findByIdPedidoForUpdate(idPedido)
+            .orElse(null);
+        if (pedido == null || pedido.getEstado() != EstadoPedido.EN_CURSO) {
+            return false;
+        }
+        cerrarPorIncumplimiento(pedido);
+        return true;
+    }
+
+    private void cerrarPorIncumplimiento(Pedido pedido) {
+        LocalDateTime ahora = LocalDateTime.now();
+        for (HitoPedido hito : pedido.getHitos()) {
+            if (hito.getEstadoPago() == EstadoPagoHito.PENDIENTE) {
+                hito.setEstadoPago(EstadoPagoHito.CANCELADO);
+                pagoService.cancelarPendientes(hito);
+            }
+        }
+        pedido.setEstado(EstadoPedido.INCUMPLIMIENTO);
+        pedido.setIncumplimientoEn(ahora);
+        pedido.setCierrePorIncumplimiento(true);
+        pedido.setFinalizadoEn(ahora);
+        pedidoRepository.save(pedido);
+        notificarIncumplimiento(pedido);
+        if (pedido.getServicio() != null) {
+            cuposEventPublisher.publicar(pedido.getServicio().getIdServicio());
+        }
+        auditoria.registrarSistema(
+            AccionesAdmin.PEDIDO_CERRAR_INCUMPLIMIENTO, ENTIDAD_PEDIDO,
+            pedido.getIdPedido(),
+            "Cerró el pedido por incumplimiento del artista");
+    }
+
+    private void notificarIncumplimiento(Pedido pedido) {
+        String descripcion = "El pedido de '" + nombreServicio(pedido)
+            + "' se cerró por incumplimiento del artista. Conservás los "
+            + "archivos de las etapas entregadas.";
+        notificacionService.crearParaUsuario(
+            pedido.getCliente().getIdUsuario(),
+            NOTIF_PEDIDO_INCUMPLIDO, "Pedido incumplido", descripcion,
+            pedido.getIdPedido(), TIPO_REFERENCIA);
+        notificacionService.crearParaUsuario(
+            pedido.getArtista().getIdUsuario(),
+            NOTIF_PEDIDO_INCUMPLIDO, "Pedido cerrado por incumplimiento",
+            descripcion, pedido.getIdPedido(), TIPO_REFERENCIA);
     }
 
     @Transactional
@@ -661,6 +774,14 @@ public class PedidoService {
             Long idServicio,
             String busqueda,
             String orden) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<PedidoResumenDTO> pedidosRestringidos(Long idArtista) {
+        return pedidoRepository.findEnMoraDeArtista(
+                idArtista, EstadoPedido.EN_CURSO).stream()
+            .map(pedido -> construirResumen(pedido, idArtista))
+            .toList();
     }
 
     @Transactional(readOnly = true)
@@ -848,6 +969,18 @@ public class PedidoService {
             String monedaMostrada) {
     }
 
+    public record ActividadComprador(
+            List<PedidoResumenDTO> pedidosActivos,
+            List<HitoPedidoDTO> hitosAtencion,
+            long pedidosEnCurso,
+            long pedidosPendientesPago,
+            long entregasPorAprobar,
+            long pagosPendientes,
+            long pagosVencidos,
+            BigDecimal porPagar,
+            String monedaPorPagar) {
+    }
+
     private record HitoAtencion(
             int prioridad, LocalDateTime fecha, HitoPedidoDTO dto) {
     }
@@ -864,7 +997,6 @@ public class PedidoService {
         List<HitoAtencion> atenciones = new ArrayList<>();
         long enCurso = 0;
         long pendientePago = 0;
-        long impagos = 0;
         long entregasPendientes = 0;
         long conRevision = 0;
         long porVencer = 0;
@@ -875,8 +1007,6 @@ public class PedidoService {
                 enCurso++;
             } else if (pedido.getEstado() == EstadoPedido.PENDIENTE_PAGO) {
                 pendientePago++;
-            } else if (pedido.getEstado() == EstadoPedido.IMPAGO) {
-                impagos++;
             }
 
             boolean muestraOrigen = PresupuestoDTO.mismaMoneda(
@@ -973,7 +1103,7 @@ public class PedidoService {
                 .toList(),
             enCurso,
             pendientePago,
-            impagos,
+            0,
             entregasPendientes,
             conRevision,
             porVencer,
@@ -986,6 +1116,142 @@ public class PedidoService {
             return 0;
         }
         if (resumen.isPuedeEntregar()) {
+            return 1;
+        }
+        if (EstadoPedido.PENDIENTE_PAGO.name().equals(resumen.getEstado())) {
+            return 2;
+        }
+        return 3;
+    }
+
+    @Transactional(readOnly = true)
+    public ActividadComprador actividadComprador(Long idCliente) {
+        LocalDateTime ahora = LocalDateTime.now();
+        Moneda mostrada = monedaVistaService.preferidaDe(idCliente);
+        List<Pedido> pedidos = pedidoRepository
+            .findByClienteIdUsuarioAndEstadoInOrderByFechaCreacionDesc(
+                idCliente, ESTADOS_PANEL_ACTIVOS, PageRequest.of(0, 20));
+
+        List<PedidoResumenDTO> resumenes = new ArrayList<>();
+        List<HitoAtencion> atenciones = new ArrayList<>();
+        long enCurso = 0;
+        long pendientePago = 0;
+        long porAprobar = 0;
+        long pagosPendientes = 0;
+        long pagosVencidos = 0;
+        BigDecimal porPagar = BigDecimal.ZERO;
+
+        for (Pedido pedido : pedidos) {
+            if (pedido.getEstado() == EstadoPedido.EN_CURSO) {
+                enCurso++;
+            } else if (pedido.getEstado() == EstadoPedido.PENDIENTE_PAGO) {
+                pendientePago++;
+            }
+
+            boolean muestraOrigen = PresupuestoDTO.mismaMoneda(
+                mostrada, pedido.getPresupuesto().getMoneda());
+            boolean muestraCobro = !muestraOrigen
+                && PresupuestoDTO.mismaMoneda(
+                    mostrada, pedido.getPresupuesto().getMonedaCobro());
+            BigDecimal factorCobro = mostrada != null
+                ? monedaVistaService.factorCobroAMostrada(mostrada, ahora)
+                : null;
+            BigDecimal factorOrigen = mostrada != null
+                ? monedaVistaService.factorOrigenAMostrada(
+                    pedido.getPresupuesto().getMoneda(), mostrada, ahora)
+                : null;
+
+            for (HitoPedido hito : pedido.getHitos()) {
+                boolean aprobable = puedeAprobar(hito);
+                boolean pagable = puedePagar(pedido, hito, List.of());
+                boolean vencido = hito.getEstadoPago()
+                    == EstadoPagoHito.VENCIDO;
+                boolean pendiente = hito.getEstadoPago()
+                    == EstadoPagoHito.PENDIENTE;
+
+                if (aprobable) {
+                    porAprobar++;
+                }
+                if (pendiente || vencido) {
+                    pagosPendientes++;
+                    BigDecimal monto =
+                        hito.getHitoPresupuesto().getMontoCobro();
+                    if (monto != null) {
+                        porPagar = porPagar.add(monto);
+                    }
+                }
+                if (vencido) {
+                    pagosVencidos++;
+                }
+
+                int prioridad = aprobable ? 0
+                    : vencido ? 1
+                    : pagable ? 2
+                    : -1;
+                if (prioridad < 0) {
+                    continue;
+                }
+                LocalDateTime fecha = aprobable
+                    ? (hito.getFechaLimiteAprobacion() != null
+                        ? hito.getFechaLimiteAprobacion()
+                        : hito.getFechaEntrega())
+                    : hito.getFechaLimitePago();
+                atenciones.add(new HitoAtencion(
+                    prioridad,
+                    fecha,
+                    HitoPedidoDTO.desdeHito(
+                        hito,
+                        List.of(),
+                        false,
+                        true,
+                        List.of(),
+                        pagable,
+                        false,
+                        aprobable,
+                        false,
+                        0,
+                        muestraOrigen,
+                        muestraCobro,
+                        factorCobro,
+                        factorOrigen)));
+            }
+
+            resumenes.add(construirResumen(pedido, idCliente));
+        }
+
+        resumenes.sort(Comparator
+            .comparingInt(this::urgenciaPedidoComprador)
+            .thenComparing(
+                PedidoResumenDTO::getFechaCreacion,
+                Comparator.nullsLast(
+                    Comparator.<LocalDateTime>reverseOrder())));
+        atenciones.sort(Comparator
+            .comparingInt(HitoAtencion::prioridad)
+            .thenComparing(
+                HitoAtencion::fecha,
+                Comparator.nullsLast(
+                    Comparator.<LocalDateTime>naturalOrder())));
+
+        return new ActividadComprador(
+            resumenes,
+            atenciones.stream()
+                .limit(MAX_HITOS_PANEL)
+                .map(HitoAtencion::dto)
+                .toList(),
+            enCurso,
+            pendientePago,
+            porAprobar,
+            pagosPendientes,
+            pagosVencidos,
+            porPagar,
+            MonedaVistaService.CODIGO_COBRO);
+    }
+
+    private int urgenciaPedidoComprador(PedidoResumenDTO resumen) {
+        if (resumen.isPuedeAprobar()) {
+            return 0;
+        }
+        if (resumen.isPuedePagar()) {
             return 1;
         }
         if (EstadoPedido.PENDIENTE_PAGO.name().equals(resumen.getEstado())) {
@@ -1014,7 +1280,8 @@ public class PedidoService {
             Pedido pedido = pedidoRepository.findByIdPedidoForUpdate(
                     hito.getPedido().getIdPedido())
                 .orElse(null);
-            if (pedido == null || pedido.getEstado() != EstadoPedido.EN_CURSO) {
+            if (pedido == null || pedido.getEstado() != EstadoPedido.EN_CURSO
+                    || pedido.getMoraDesde() != null) {
                 continue;
             }
             hito.setEstadoEntrega(
@@ -1058,6 +1325,15 @@ public class PedidoService {
                     || !hito.getFechaLimitePago().isBefore(ahora)) {
                 continue;
             }
+            // La entrega final impaga no cierra el pedido: la gestiona
+            // MoraClienteService para conservar la deuda y poder cobrarla.
+            if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
+                continue;
+            }
+            if (ahora.isBefore(hito.getFechaLimitePago()
+                    .plusDays(hitoFlujoService.diasGraciaPago()))) {
+                continue;
+            }
             Pedido pedido = pedidoRepository.findByIdPedidoForUpdate(
                     hito.getPedido().getIdPedido())
                 .orElse(null);
@@ -1095,6 +1371,38 @@ public class PedidoService {
             expirados++;
         }
         return expirados;
+    }
+
+    /**
+     * Días que le quedan al cliente antes de que se le suspendan las compras.
+     * Se cuenta hasta el fin de la gracia y nunca es negativo.
+     */
+    private Integer diasGraciaPagoRestantes(Pedido pedido) {
+        if (pedido.getImpagoDesde() == null) {
+            return null;
+        }
+        LocalDateTime finGracia = pedido.getImpagoDesde()
+            .plusDays(hitoFlujoService.diasGraciaPago());
+        long dias = ChronoUnit.DAYS.between(
+            LocalDateTime.now().toLocalDate(), finGracia.toLocalDate());
+        return (int) Math.max(0, dias);
+    }
+
+    /**
+     * Limpia la mora cuando el cliente aprobó todo lo pendiente. Sin esto el
+     * pedido queda marcado como en mora para siempre y se congelan la escalera
+     * de pagos y la aprobación automática.
+     */
+    private void limpiarMoraSiCorresponde(Pedido pedido, LocalDateTime ahora) {
+        if (pedido.getMoraDesde() == null
+                || entregaPendienteService.estaEnMora(pedido, ahora)) {
+            return;
+        }
+        pedido.setMoraDesde(null);
+        pedidoRepository.save(pedido);
+        auditoria.registrarSistema(
+            AccionesAdmin.PEDIDO_MORA_CURAR, ENTIDAD_PEDIDO, pedido.getIdPedido(),
+            "Limpió la mora: el cliente aprobó los entregables pendientes");
     }
 
     private PedidoDTO construirDTO(Pedido pedido, Long idVista) {
@@ -1155,6 +1463,19 @@ public class PedidoService {
         boolean puedeOcultarPublicacion = esCliente
             && pedido.getEstado() == EstadoPedido.FINALIZADO
             && pedido.isPublicacionAutorizada();
+        List<ProrrogaPedido> prorrogas = pedido.getProrrogas() != null
+            ? pedido.getProrrogas()
+            : List.of();
+        ProrrogaPedido pendiente = prorrogaPendiente(prorrogas);
+        boolean prorrogaVigente = pendiente != null
+            && pendiente.getFechaLimiteRespuesta() != null
+            && pendiente.getFechaLimiteRespuesta().isAfter(ahora);
+        boolean puedeSolicitarProrroga = esArtista
+            && pedido.getEstado() == EstadoPedido.EN_CURSO
+            && pedido.getLimiteEntrega() != null
+            && pedido.getMoraDesde() == null
+            && prorrogas.isEmpty();
+        boolean puedeResponderProrroga = esCliente && prorrogaVigente;
 
         int revisionesMaximas = hitoFlujoService.revisionesMaximasPorHito();
         for (HitoPedido hito : pedido.getHitos()) {
@@ -1248,9 +1569,13 @@ public class PedidoService {
             .limiteEntrega(pedido.getLimiteEntrega())
             .fechaEntregaPrevista(PedidoFechas.entregaPrevista(pedido))
             .diasDemoraCliente(PedidoFechas.diasDemoraCliente(pedido))
+            .diasProrroga(PedidoFechas.diasProrroga(pedido))
             .entregaAtrasada(PedidoFechas.entregaAtrasada(
                 pedido, LocalDate.now()))
             .finalizadoEn(pedido.getFinalizadoEn())
+            .impagoDesde(pedido.getImpagoDesde())
+            .pagoVencido(pedido.getImpagoDesde() != null)
+            .diasGraciaPagoRestantes(diasGraciaPagoRestantes(pedido))
             .precioFinal(pedido.getPresupuesto().getPrecioFinal())
             .precioFinalCobro(pedido.getPresupuesto().getPrecioFinalCobro())
             .precioFinalMostrado(PresupuestoDTO.totalMostrado(
@@ -1359,6 +1684,10 @@ public class PedidoService {
             .puedeCancelar(esCliente
                 && (pedido.getEstado() == EstadoPedido.PENDIENTE_PAGO
                     || pedido.getEstado() == EstadoPedido.EN_CURSO))
+            .puedeCerrarPorIncumplimiento(esCliente
+                && pedido.getEstado() == EstadoPedido.EN_CURSO
+                && sancionService.tieneSancionDeEntrega(
+                    pedido.getArtista().getIdUsuario()))
             .rolVista(esAdmin
                 ? "ADMIN"
                 : esArtista ? "ARTISTA" : "CLIENTE")
@@ -1378,6 +1707,14 @@ public class PedidoService {
             .publicacionVisible(publicacionVisible)
             .puedeAutorizarPublicacion(puedeAutorizarPublicacion)
             .puedeOcultarPublicacion(puedeOcultarPublicacion)
+            .prorrogas(prorrogas.stream()
+                .map(ProrrogaDTO::desde)
+                .toList())
+            .prorrogaPendiente(pendiente != null
+                ? ProrrogaDTO.desde(pendiente)
+                : null)
+            .puedeSolicitarProrroga(puedeSolicitarProrroga)
+            .puedeResponderProrroga(puedeResponderProrroga)
             .build();
 
         if (incluirComision) {
@@ -1404,6 +1741,13 @@ public class PedidoService {
         BigDecimal factorCobro = mostrada != null
             ? monedaVistaService.factorCobroAMostrada(mostrada, ahora)
             : null;
+        List<ProrrogaPedido> prorrogas = pedido.getProrrogas() != null
+            ? pedido.getProrrogas()
+            : List.of();
+        ProrrogaPedido pendiente = prorrogaPendiente(prorrogas);
+        boolean prorrogaVigente = pendiente != null
+            && pendiente.getFechaLimiteRespuesta() != null
+            && pendiente.getFechaLimiteRespuesta().isAfter(ahora);
         HitoPedido proximo = proximoHito(pedido);
         BigDecimal montoMostrado = proximo != null
             ? PresupuestoDTO.totalMostrado(
@@ -1428,8 +1772,14 @@ public class PedidoService {
             .limiteEntrega(pedido.getLimiteEntrega())
             .fechaEntregaPrevista(PedidoFechas.entregaPrevista(pedido))
             .diasDemoraCliente(PedidoFechas.diasDemoraCliente(pedido))
+            .diasProrroga(PedidoFechas.diasProrroga(pedido))
             .entregaAtrasada(PedidoFechas.entregaAtrasada(
                 pedido, LocalDate.now()))
+            .prorrogaPendiente(pendiente != null)
+            .puedeResponderProrroga(esCliente && prorrogaVigente)
+            .impagoDesde(pedido.getImpagoDesde())
+            .pagoVencido(pedido.getImpagoDesde() != null)
+            .diasGraciaPagoRestantes(diasGraciaPagoRestantes(pedido))
             .precioFinalCobro(pedido.getPresupuesto().getPrecioFinalCobro())
             .monedaCobro(pedido.getPresupuesto().getMonedaCobro() != null
                 ? pedido.getPresupuesto().getMonedaCobro().getCodigo()
@@ -1470,6 +1820,17 @@ public class PedidoService {
             .puedeAprobar(esCliente && pedido.getHitos().stream()
                 .anyMatch(this::puedeAprobar))
             .build();
+    }
+
+    private ProrrogaPedido prorrogaPendiente(
+            List<ProrrogaPedido> prorrogas) {
+        for (ProrrogaPedido prorroga : prorrogas) {
+            if (prorroga != null
+                    && prorroga.getEstado() == EstadoProrroga.PENDIENTE) {
+                return prorroga;
+            }
+        }
+        return null;
     }
 
     private int hitosPagadosDe(Pedido pedido) {
@@ -1550,6 +1911,9 @@ public class PedidoService {
         if (hito.getOrden() == null || hito.getOrden() == 0) {
             return true;
         }
+        if (hito.getFechaLimitePago() == null) {
+            return false;
+        }
         HitoPedido anterior = hitoAnterior(pedido, hito);
         return anterior != null && esAprobado(anterior);
     }
@@ -1565,6 +1929,10 @@ public class PedidoService {
         }
         if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA) {
             return "La entrega final todavía no está disponible para pagar.";
+        }
+        if (hito.getOrden() != null && hito.getOrden() > 0
+                && hito.getFechaLimitePago() == null) {
+            return "La cuota todavía no está habilitada para pagar.";
         }
         if (hito.getOrden() != null && hito.getOrden() > 0) {
             HitoPedido anterior = hitoAnterior(pedido, hito);

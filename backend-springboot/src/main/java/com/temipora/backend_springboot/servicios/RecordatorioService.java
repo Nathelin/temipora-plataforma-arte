@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.EmailRecordatorioPendiente;
 import com.temipora.backend_springboot.modelo.EstadoEmailRecordatorio;
-import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.HitoPedido;
@@ -23,7 +22,7 @@ import com.temipora.backend_springboot.repositorios.PedidoRepository;
 
 /**
  * Encola los recordatorios de pago (clientes) y de entrega (artistas) y
- * dispara el envío agrupado por usuario.
+ * dispara el envío de cada recordatorio pendiente en su propio correo.
  */
 @Service
 public class RecordatorioService {
@@ -38,18 +37,21 @@ public class RecordatorioService {
     private final EmailRecordatorioPendienteRepository recordatorioRepository;
     private final SancionService sancionService;
     private final RecordatorioProcesador procesador;
+    private final EntregaPendienteService entregaPendienteService;
 
     public RecordatorioService(
             HitoPedidoRepository hitoPedidoRepository,
             PedidoRepository pedidoRepository,
             EmailRecordatorioPendienteRepository recordatorioRepository,
             SancionService sancionService,
-            RecordatorioProcesador procesador) {
+            RecordatorioProcesador procesador,
+            EntregaPendienteService entregaPendienteService) {
         this.hitoPedidoRepository = hitoPedidoRepository;
         this.pedidoRepository = pedidoRepository;
         this.recordatorioRepository = recordatorioRepository;
         this.sancionService = sancionService;
         this.procesador = procesador;
+        this.entregaPendienteService = entregaPendienteService;
     }
 
     @Transactional
@@ -63,11 +65,30 @@ public class RecordatorioService {
             EstadoEmailRecordatorio.PENDIENTE);
         int enviados = 0;
         for (Long idUsuario : usuarios) {
-            if (procesador.procesar(idUsuario)) {
-                enviados++;
-            }
+            enviados += procesador.procesar(idUsuario);
         }
         return enviados;
+    }
+
+    /**
+     * Reabre los recordatorios ya enviados (o fallidos) para poder reenviarlos.
+     * Pensado para pruebas y demos: el envío normal es idempotente y no repite
+     * un recordatorio ya enviado. El procesador vuelve a validar las
+     * condiciones y omite los que ya no corresponden.
+     */
+    @Transactional
+    public int reabrirEnviados() {
+        List<EmailRecordatorioPendiente> filas = recordatorioRepository.findByEstadoIn(
+            List.of(EstadoEmailRecordatorio.ENVIADO,
+                EstadoEmailRecordatorio.FALLIDO));
+        for (EmailRecordatorioPendiente fila : filas) {
+            fila.setEstado(EstadoEmailRecordatorio.PENDIENTE);
+            fila.setIntentos(0);
+            fila.setEnviadoEn(null);
+            fila.setIdLote(null);
+        }
+        recordatorioRepository.saveAll(filas);
+        return filas.size();
     }
 
     private int encolarPagos(LocalDateTime ahora) {
@@ -80,6 +101,24 @@ public class RecordatorioService {
             ahora.minusHours(HORAS_ESPERA_SENA));
         for (HitoPedido hito : senas) {
             total += encolarPago(hito, MotivoRecordatorio.PAGO_SENA);
+        }
+
+        // Aviso semanal solo para la entrega final, que se paga después de la
+        // entrega y tiene una ventana más larga.
+        List<HitoPedido> entregasPorVencer =
+            hitoPedidoRepository.findPagosPorVencer(
+                EstadoPagoHito.PENDIENTE,
+                List.of(TipoHito.ENTREGA),
+                List.of(EstadoPedido.EN_CURSO),
+                ahora,
+                ahora.plusDays(DIAS_AVISO_SEMANAL));
+        for (HitoPedido hito : entregasPorVencer) {
+            LocalDateTime limite = hito.getFechaLimitePago();
+            if (limite == null
+                    || !limite.isAfter(ahora.plusHours(HORAS_AVISO_72))) {
+                continue;
+            }
+            total += encolarPago(hito, MotivoRecordatorio.PAGO_7D);
         }
 
         List<HitoPedido> porVencer = hitoPedidoRepository.findPagosPorVencer(
@@ -117,9 +156,8 @@ public class RecordatorioService {
         if (pedido == null || pedido.getCliente() == null) {
             return 0;
         }
-        if (estaSancionado(pedido.getCliente().getIdUsuario())) {
-            return 0;
-        }
+        // Los recordatorios de pago no se suprimen por una sanción: son el
+        // aviso que le permite al cliente desbloquear la cuenta.
         String clave = clave(motivo, pedido, hito, hito.getFechaLimitePago());
         if (recordatorioRepository.existsByClave(clave)) {
             return 0;
@@ -148,7 +186,7 @@ public class RecordatorioService {
             if (dias < 0 || dias > DIAS_AVISO_SEMANAL) {
                 continue;
             }
-            if (!artistaDebeEntregar(pedido)) {
+            if (!entregaPendienteService.artistaDebeEntregar(pedido)) {
                 continue;
             }
             long duracion = pedido.getFechaInicio() != null
@@ -185,26 +223,6 @@ public class RecordatorioService {
             total++;
         }
         return total;
-    }
-
-    private boolean artistaDebeEntregar(Pedido pedido) {
-        for (HitoPedido hito : pedido.getHitos()) {
-            if (hito.getHitoPresupuesto() == null
-                    || !hito.getHitoPresupuesto().isRequiereEntrega()) {
-                continue;
-            }
-            EstadoEntregaHito estado = hito.getEstadoEntrega();
-            if (estado == EstadoEntregaHito.ENTREGADO
-                    || estado == EstadoEntregaHito.APROBADO
-                    || estado == EstadoEntregaHito.APROBADO_AUTOMATICAMENTE) {
-                continue;
-            }
-            if (hito.getHitoPresupuesto().getTipo() == TipoHito.ENTREGA
-                    || hito.getEstadoPago() == EstadoPagoHito.PAGADO) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private boolean estaSancionado(Long idUsuario) {

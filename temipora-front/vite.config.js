@@ -64,6 +64,38 @@ function cacheInmutableAssets() {
   }
 }
 
+// El HTML de la SPA no lleva hash y es el que referencia los chunks con su
+// hash. Si el navegador o un CDN lo cachea, tras un nuevo build el HTML viejo
+// pide chunks que ya no existen (404). Por eso el HTML siempre se revalida.
+function cacheHtmlFresco() {
+  return {
+    name: 'temipora-cache-html-fresco',
+    configurePreviewServer(servidor) {
+      servidor.middlewares.use((req, res, next) => {
+        const ruta = (req.url || '').split('?')[0]
+        const aceptaHtml = String(req.headers.accept || '').includes('text/html')
+        if (ruta.startsWith('/assets/')
+            || (!aceptaHtml && ruta !== '/' && !ruta.endsWith('.html'))) {
+          next()
+          return
+        }
+
+        const escribirCabecera = res.setHeader.bind(res)
+        res.setHeader = (nombre, valor) => {
+          if (String(nombre).toLowerCase() === 'cache-control') {
+            return escribirCabecera(
+              'Cache-Control',
+              'no-cache, no-store, must-revalidate',
+            )
+          }
+          return escribirCabecera(nombre, valor)
+        }
+        next()
+      })
+    },
+  }
+}
+
 // El HTML se sirve igual para cualquier ruta de la SPA, así que no puede saber
 // qué vista se va a abrir. El chunk de Explorar y las fuentes latinas se
 // precargan desde el <head> para que empiecen a bajar junto con el entry, en
@@ -123,6 +155,7 @@ export default defineConfig({
     vue(),
     tailwindcss(),
     cacheInmutableAssets(),
+    cacheHtmlFresco(),
     precargarVistaYFuentes(),
   ],
   resolve: {

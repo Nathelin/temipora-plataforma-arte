@@ -49,6 +49,11 @@ public class HitoFlujoService {
             return null;
         }
         if (siguiente.getHitoPresupuesto().getTipo() != TipoHito.ENTREGA) {
+            // Un pedido en mora congela su escalera de pagos: el hito siguiente
+            // existe, pero sin plazo de pago no se puede abonar.
+            if (pedido.getMoraDesde() != null) {
+                return siguiente;
+            }
             siguiente.setFechaLimitePago(
                 PedidoFechas.ventanaPago(pedido, ahora, diasPagoCuota()));
             hitoPedidoRepository.save(siguiente);
@@ -91,6 +96,13 @@ public class HitoFlujoService {
         return config.getDiasReentrega() != null
             ? config.getDiasReentrega()
             : ConfiguracionPedido.DIAS_REENTREGA_POR_DEFECTO;
+    }
+
+    public int diasGraciaPago() {
+        ConfiguracionPedido config = configuracionPedidoService.obtener();
+        return config.getDiasGraciaPago() != null
+            ? config.getDiasGraciaPago()
+            : ConfiguracionPedido.DIAS_GRACIA_PAGO_POR_DEFECTO;
     }
 
     private String nombreServicio(Pedido pedido) {

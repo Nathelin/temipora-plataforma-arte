@@ -3,7 +3,6 @@ package com.temipora.backend_springboot.servicios;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -14,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
+import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.EmailRecordatorioPendiente;
 import com.temipora.backend_springboot.modelo.EnvioEmail;
 import com.temipora.backend_springboot.modelo.EstadoEmailRecordatorio;
@@ -22,6 +23,7 @@ import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
 import com.temipora.backend_springboot.modelo.HitoPedido;
+import com.temipora.backend_springboot.modelo.MotivoRecordatorio;
 import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.PropositoToken;
 import com.temipora.backend_springboot.modelo.TipoHito;
@@ -30,8 +32,9 @@ import com.temipora.backend_springboot.repositorios.EmailRecordatorioPendienteRe
 import com.temipora.backend_springboot.repositorios.UsuarioRepository;
 
 /**
- * Procesa los recordatorios pendientes de un usuario. Pagos y entregas se
- * mandan en correos separados: un usuario puede recibir dos mails distintos.
+ * Procesa los recordatorios pendientes de un usuario. Cada recordatorio se
+ * manda en su propio correo: no se agrupan etapas distintas del mismo pedido,
+ * así el aviso previo y el del mismo día llegan como mails separados.
  */
 @Service
 public class RecordatorioProcesador {
@@ -41,106 +44,117 @@ public class RecordatorioProcesador {
     private static final int MAX_INTENTOS = 3;
     private static final int MAX_LOTE = 50;
     private static final int VIGENCIA_ENLACE_HORAS = 72;
+    private static final String NOTIF_PAGO = "PAGO_POR_VENCER";
+    private static final String NOTIF_ENTREGA = "ENTREGA_POR_VENCER";
+    private static final String TIPO_REFERENCIA = "PEDIDO";
     private static final DateTimeFormatter FECHA =
         DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final EmailRecordatorioPendienteRepository repository;
     private final UsuarioRepository usuarioRepository;
     private final SancionService sancionService;
+    private final ConfiguracionPedidoService configuracionPedidoService;
     private final EmailPlantillaService emailPlantillaService;
     private final EnvioEmailService envioEmailService;
     private final AccesoEnlaceService accesoEnlaceService;
+    private final NotificacionService notificacionService;
 
     public RecordatorioProcesador(
             EmailRecordatorioPendienteRepository repository,
             UsuarioRepository usuarioRepository,
             SancionService sancionService,
+            ConfiguracionPedidoService configuracionPedidoService,
             EmailPlantillaService emailPlantillaService,
             EnvioEmailService envioEmailService,
-            AccesoEnlaceService accesoEnlaceService) {
+            AccesoEnlaceService accesoEnlaceService,
+            NotificacionService notificacionService) {
         this.repository = repository;
         this.usuarioRepository = usuarioRepository;
         this.sancionService = sancionService;
+        this.configuracionPedidoService = configuracionPedidoService;
         this.emailPlantillaService = emailPlantillaService;
         this.envioEmailService = envioEmailService;
         this.accesoEnlaceService = accesoEnlaceService;
+        this.notificacionService = notificacionService;
     }
 
+    /**
+     * @return cantidad de correos enviados, uno por cada recordatorio pendiente.
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean procesar(Long idUsuario) {
+    public int procesar(Long idUsuario) {
         Usuario usuario = usuarioRepository.findByIdUsuario(idUsuario)
             .orElse(null);
         if (usuario == null || !usuario.isEstadoCuenta()
                 || usuario.getCorreo() == null
                 || usuario.getCorreo().isBlank()) {
             omitirPendientes(idUsuario);
-            return false;
+            return 0;
         }
-        if (sancionService.obtenerVigente(idUsuario).isPresent()) {
-            return false;
+        var sancionVigente = sancionService.obtenerVigente(idUsuario);
+        if (sancionVigente.isPresent()
+                && sancionVigente.get().getAlcance() == AlcanceSancion.ACCESO) {
+            return 0;
         }
+        boolean sancionado = sancionVigente.isPresent();
 
         List<EmailRecordatorioPendiente> pendientes = repository
             .findByUsuarioIdUsuarioAndEstadoOrderByCreadoEnAsc(
                 idUsuario, EstadoEmailRecordatorio.PENDIENTE,
                 PageRequest.of(0, MAX_LOTE));
         if (pendientes.isEmpty()) {
-            return false;
+            return 0;
         }
 
-        List<EmailPlantillaService.RecordatorioEmail> pagos = new ArrayList<>();
-        List<EmailPlantillaService.RecordatorioEmail> entregas =
-            new ArrayList<>();
-        List<EmailRecordatorioPendiente> filasPago = new ArrayList<>();
-        List<EmailRecordatorioPendiente> filasEntrega = new ArrayList<>();
+        ConfiguracionPedido config = configuracionPedidoService.obtener();
+        int graciaPago = config.getDiasGraciaPago() != null
+            ? config.getDiasGraciaPago()
+            : ConfiguracionPedido.DIAS_GRACIA_PAGO_POR_DEFECTO;
+        int diasCompras = config.getDiasSancionCompras() != null
+            ? config.getDiasSancionCompras()
+            : ConfiguracionPedido.DIAS_SANCION_COMPRAS_POR_DEFECTO;
 
+        int enviados = 0;
         for (EmailRecordatorioPendiente fila : pendientes) {
-            EmailPlantillaService.RecordatorioEmail item = item(fila);
+            EmailPlantillaService.RecordatorioEmail item =
+                item(fila, graciaPago, diasCompras, sancionado);
             if (item == null) {
                 fila.setEstado(EstadoEmailRecordatorio.OMITIDO);
                 continue;
             }
-            if (item.esPago()) {
-                pagos.add(item);
-                filasPago.add(fila);
-            } else {
-                entregas.add(item);
-                filasEntrega.add(fila);
+            notificarRecordatorio(fila, item);
+            if (enviarRecordatorio(usuario, fila, item)) {
+                enviados++;
             }
         }
         repository.saveAll(pendientes);
-
-        boolean enviado = false;
-        if (!pagos.isEmpty()) {
-            enviado |= enviarGrupo(
-                usuario, pagos, filasPago, true, false);
-        }
-        if (!entregas.isEmpty()) {
-            enviado |= enviarGrupo(
-                usuario, entregas, filasEntrega, false, true);
-        }
-        return enviado;
+        return enviados;
     }
 
-    private boolean enviarGrupo(
+    /**
+     * Envía un correo por cada recordatorio pendiente. No se agrupan etapas
+     * distintas del mismo pedido: cada fila conserva su asunto y su lote.
+     */
+    private boolean enviarRecordatorio(
             Usuario usuario,
-            List<EmailPlantillaService.RecordatorioEmail> items,
-            List<EmailRecordatorioPendiente> filas,
-            boolean hayPagos,
-            boolean hayEntregas) {
+            EmailRecordatorioPendiente fila,
+            EmailPlantillaService.RecordatorioEmail item) {
         String lote = UUID.randomUUID().toString();
-        for (EmailRecordatorioPendiente fila : filas) {
-            fila.setIdLote(lote);
-        }
-        repository.saveAll(filas);
+        fila.setIdLote(lote);
+        repository.save(fila);
 
+        boolean pago = item.esPago();
+        boolean pagoCuentaEnRiesgo = pago && esEntregaFinal(fila);
         String asunto = emailPlantillaService.asuntoRecordatorio(
-            hayPagos, hayEntregas, hayUrgente(items));
+            pago, !pago, pagoCuentaEnRiesgo,
+            item.alerta(), item.urgente());
         try {
             String token = accesoEnlaceService.generar(
                 usuario, PropositoToken.RECORDATORIO, null,
                 VIGENCIA_ENLACE_HORAS);
-            String html = hayPagos
+            List<EmailPlantillaService.RecordatorioEmail> items =
+                List.of(item);
+            String html = pago
                 ? emailPlantillaService.recordatorio(
                     nombre(usuario), items, List.of(), token)
                 : emailPlantillaService.recordatorio(
@@ -155,42 +169,70 @@ public class RecordatorioProcesador {
                 "recordatorio:" + lote);
             if (envio != null
                     && envio.getEstado() == EstadoEnvioEmail.ENVIADO) {
-                LocalDateTime ahora = LocalDateTime.now();
-                for (EmailRecordatorioPendiente fila : filas) {
-                    fila.setEstado(EstadoEmailRecordatorio.ENVIADO);
-                    fila.setEnviadoEn(ahora);
-                }
-                repository.saveAll(filas);
+                fila.setEstado(EstadoEmailRecordatorio.ENVIADO);
+                fila.setEnviadoEn(LocalDateTime.now());
+                repository.save(fila);
                 return true;
             }
             if (envio != null
                     && envio.getEstado() == EstadoEnvioEmail.PENDIENTE) {
                 return false;
             }
-            incrementarIntentos(filas);
+            incrementarIntentos(List.of(fila));
             return false;
         } catch (RuntimeException e) {
             log.warn("No se pudo enviar el recordatorio del usuario {}: {}",
                 usuario.getIdUsuario(), e.getMessage());
-            incrementarIntentos(filas);
+            incrementarIntentos(List.of(fila));
             return false;
         }
     }
 
-    private boolean hayUrgente(
-            List<EmailPlantillaService.RecordatorioEmail> items) {
-        for (EmailPlantillaService.RecordatorioEmail item : items) {
-            if (item.urgente()) {
-                return true;
-            }
+    /**
+     * Refleja el recordatorio en la campana. La campana mantiene una sola
+     * entrada por pedido y tipo mientras siga sin leer: los pasos de la
+     * escalera actualizan esa entrada en lugar de acumular duplicados.
+     */
+    private void notificarRecordatorio(
+            EmailRecordatorioPendiente fila,
+            EmailPlantillaService.RecordatorioEmail item) {
+        if (fila.getUsuario() == null) {
+            return;
         }
-        return false;
+        boolean pago = item.esPago();
+        String nombre = pago
+            ? "Pago pendiente: tu cuenta en riesgo"
+            : "Entrega pendiente: tu cuenta en riesgo";
+        String descripcion = pago
+            ? "El pago de '" + item.detalle() + "' del pedido #"
+                + item.idPedido() + " vence el " + item.vence()
+                + ". Si no lo regularizás, se suspenden tus compras y solo"
+                + " podés mensajear al artista al que le debés."
+            : "Tenés que entregar '" + item.detalle() + "' del pedido #"
+                + item.idPedido() + " antes del " + item.vence()
+                + ". Si no lo hacés, tu cuenta queda limitada a entregar los"
+                + " pedidos abiertos.";
+        notificacionService.crearOActualizarParaUsuario(
+            fila.getUsuario().getIdUsuario(),
+            pago ? NOTIF_PAGO : NOTIF_ENTREGA,
+            nombre,
+            descripcion,
+            item.idPedido(),
+            TIPO_REFERENCIA);
     }
 
     private EmailPlantillaService.RecordatorioEmail item(
-            EmailRecordatorioPendiente fila) {
+            EmailRecordatorioPendiente fila,
+            int graciaPago,
+            int diasCompras,
+            boolean sancionado) {
         Pedido pedido = fila.getPedido();
         if (pedido == null || fila.getMotivo() == null) {
+            return null;
+        }
+        // Una sanción no impide el recordatorio de pago (es la salida), pero sí
+        // omite los de entrega mientras la cuenta esté restringida.
+        if (sancionado && !fila.getMotivo().esPago()) {
             return null;
         }
         String servicio = nombreServicio(pedido);
@@ -224,7 +266,9 @@ public class RecordatorioProcesador {
                 hito.getHitoPresupuesto().getMonto(),
                 moneda,
                 fila.getMotivo().esUrgente(),
-                fila.getMotivo().esAlerta());
+                fila.getMotivo().esAlerta(),
+                consecuenciaPago(fila.getMotivo(), graciaPago, diasCompras,
+                    esEntregaFinal(fila)));
         }
 
         String cliente = pedido.getCliente() != null
@@ -252,7 +296,59 @@ public class RecordatorioProcesador {
             null,
             moneda,
             fila.getMotivo().esUrgente(),
-            fila.getMotivo().esAlerta());
+            fila.getMotivo().esAlerta(),
+            consecuenciaEntrega(fila.getMotivo()));
+    }
+
+    private String consecuenciaPago(
+            MotivoRecordatorio motivo, int graciaPago, int diasCompras,
+            boolean entregaFinal) {
+        if (motivo != MotivoRecordatorio.PAGO_7D
+                && motivo != MotivoRecordatorio.PAGO_72H
+                && motivo != MotivoRecordatorio.PAGO_24H) {
+            return null;
+        }
+        if (!entregaFinal) {
+            return "Si no pagás antes de la fecha, el pedido se cierra y el"
+                + " artista conserva lo cobrado.";
+        }
+        int total = graciaPago + diasCompras;
+        return "Si no pagás, en " + dias(graciaPago)
+            + " se suspenden tus compras y solo podés mensajear al artista al que"
+            + " le debés. Si el impago sigue, a los " + dias(total)
+            + " del vencimiento la cuenta queda limitada a pagos.";
+    }
+
+    private boolean esEntregaFinal(EmailRecordatorioPendiente fila) {
+        return fila.getHitoPedido() != null
+            && fila.getHitoPedido().getHitoPresupuesto() != null
+            && fila.getHitoPedido().getHitoPresupuesto().getTipo()
+                == TipoHito.ENTREGA;
+    }
+
+    private String consecuenciaEntrega(MotivoRecordatorio motivo) {
+        if (motivo == MotivoRecordatorio.ENTREGA_7D) {
+            return "Si no entregás, tu cuenta queda limitada a entregar los"
+                + " pedidos abiertos: no podés vender, comprar ni usar el resto"
+                + " del sitio hasta que el cliente apruebe la entrega o un"
+                + " administrador revise tu caso.";
+        }
+        if (motivo == MotivoRecordatorio.ENTREGA_1D) {
+            return "Mañana vence el plazo. Si no entregás, tu cuenta queda"
+                + " limitada a entregar los pedidos abiertos: no podés vender,"
+                + " comprar ni usar el resto del sitio.";
+        }
+        if (motivo == MotivoRecordatorio.ENTREGA_HOY) {
+            return "Vence hoy. Si no entregás, tu cuenta queda limitada a"
+                + " entregar los pedidos abiertos: no podés usar el resto del"
+                + " sitio hasta que el cliente apruebe la entrega o un"
+                + " administrador revise tu caso.";
+        }
+        return null;
+    }
+
+    private String dias(int cantidad) {
+        return cantidad == 1 ? "1 día" : cantidad + " días";
     }
 
     private HitoPedido proximoEntregable(Pedido pedido) {

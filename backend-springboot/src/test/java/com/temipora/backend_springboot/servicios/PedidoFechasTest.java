@@ -9,9 +9,11 @@ import org.junit.jupiter.api.Test;
 
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
+import com.temipora.backend_springboot.modelo.EstadoProrroga;
 import com.temipora.backend_springboot.modelo.HitoPedido;
 import com.temipora.backend_springboot.modelo.HitoPresupuesto;
 import com.temipora.backend_springboot.modelo.Pedido;
+import com.temipora.backend_springboot.modelo.ProrrogaPedido;
 import com.temipora.backend_springboot.modelo.TipoHito;
 
 class PedidoFechasTest {
@@ -160,6 +162,52 @@ class PedidoFechasTest {
     }
 
     @Test
+    void prorrogaAceptada_correLaEntregaPrevista() {
+        Pedido pedido = pedido(PROMETIDA, EstadoPedido.EN_CURSO);
+        prorroga(pedido, EstadoProrroga.ACEPTADA, 7);
+
+        assertThat(PedidoFechas.diasProrroga(pedido)).isEqualTo(7);
+        assertThat(PedidoFechas.entregaPrevista(pedido))
+            .isEqualTo(PROMETIDA.plusDays(7));
+    }
+
+    @Test
+    void prorrogaPendienteRechazadaOVencida_noMueveLaFecha() {
+        Pedido pedido = pedido(PROMETIDA, EstadoPedido.EN_CURSO);
+        prorroga(pedido, EstadoProrroga.PENDIENTE, 10);
+        prorroga(pedido, EstadoProrroga.RECHAZADA, 10);
+        prorroga(pedido, EstadoProrroga.VENCIDA, 10);
+
+        assertThat(PedidoFechas.diasProrroga(pedido)).isZero();
+        assertThat(PedidoFechas.entregaPrevista(pedido)).isEqualTo(PROMETIDA);
+    }
+
+    @Test
+    void prorrogasAceptadas_seAcumulanConLaDemoraDelCliente() {
+        Pedido pedido = pedido(PROMETIDA, EstadoPedido.EN_CURSO);
+        hito(pedido, TipoHito.CUOTA,
+            LocalDateTime.of(2026, 11, 20, 10, 0),
+            LocalDateTime.of(2026, 11, 22, 18, 0));
+        prorroga(pedido, EstadoProrroga.ACEPTADA, 5);
+        prorroga(pedido, EstadoProrroga.ACEPTADA, 3);
+
+        assertThat(PedidoFechas.diasDemoraCliente(pedido)).isEqualTo(2);
+        assertThat(PedidoFechas.diasProrroga(pedido)).isEqualTo(8);
+        assertThat(PedidoFechas.entregaPrevista(pedido))
+            .isEqualTo(PROMETIDA.plusDays(10));
+    }
+
+    @Test
+    void ventanaPago_usaLaEntregaCorridaPorLaProrroga() {
+        Pedido pedido = pedido(PROMETIDA, EstadoPedido.EN_CURSO);
+        prorroga(pedido, EstadoProrroga.ACEPTADA, 10);
+        LocalDateTime ahora = LocalDateTime.of(2026, 12, 20, 10, 0);
+
+        assertThat(PedidoFechas.ventanaPago(pedido, ahora, 7))
+            .isEqualTo(PROMETIDA.plusDays(10).atTime(23, 59, 59));
+    }
+
+    @Test
     void escenarioSimulado_senaImpagaNoExtiendeNiDejaSinPlazo() {
         Pedido pedido = pedido(null, EstadoPedido.PENDIENTE_PAGO);
         hito(pedido, TipoHito.SENA,
@@ -178,6 +226,17 @@ class PedidoFechasTest {
         pedido.setEstado(estado);
         pedido.setLimiteEntrega(limiteEntrega);
         return pedido;
+    }
+
+    private ProrrogaPedido prorroga(
+            Pedido pedido, EstadoProrroga estado, int dias) {
+        ProrrogaPedido prorroga = new ProrrogaPedido();
+        prorroga.setEstado(estado);
+        prorroga.setDiasSolicitados(dias);
+        prorroga.setMotivo("Motivo de prueba");
+        prorroga.setFechaLimiteRespuesta(LocalDateTime.now().plusHours(24));
+        pedido.agregarProrroga(prorroga);
+        return prorroga;
     }
 
     private HitoPedido hito(

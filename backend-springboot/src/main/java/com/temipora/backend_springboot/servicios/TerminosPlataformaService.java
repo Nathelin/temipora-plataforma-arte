@@ -167,6 +167,10 @@ public class TerminosPlataformaService {
             anterior.setVigente(false);
             terminosRepository.save(anterior);
         }
+        // Hibernate ordena los INSERT antes que los UPDATE. Sin este flush, la
+        // versión nueva se insertaría con vigente=true mientras la anterior
+        // todavía lo está, violando uk_terminos_plataforma_vigente.
+        terminosRepository.flush();
 
         TerminosPlataforma terminos = new TerminosPlataforma();
         terminos.setVersion(version);

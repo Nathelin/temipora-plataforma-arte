@@ -21,6 +21,7 @@ public class ReseniaDTO {
 
     private Long idResenia;
     private Long idPedido;
+    private boolean pedidoIncumplido;
     private String nombreServicio;
     private Long idProducto;
     private String nombreProducto;
@@ -54,6 +55,8 @@ public class ReseniaDTO {
         ReseniaDTOBuilder builder = ReseniaDTO.builder()
             .idResenia(resenia.getIdResenia())
             .idPedido(pedido != null ? pedido.getIdPedido() : null)
+            .pedidoIncumplido(pedido != null
+                && pedido.getEstado() == EstadoPedido.INCUMPLIMIENTO)
             .nombreServicio(pedido != null && pedido.getServicio() != null
                 ? pedido.getServicio().getNombre()
                 : null)

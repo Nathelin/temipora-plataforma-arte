@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
+import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.EnvioEmail;
 import com.temipora.backend_springboot.modelo.EstadoEnvioEmail;
 import com.temipora.backend_springboot.modelo.PropositoToken;
@@ -27,14 +28,17 @@ public class RecordatorioPruebaService {
     private final EmailPlantillaService emailPlantillaService;
     private final EnvioEmailService envioEmailService;
     private final AccesoEnlaceService accesoEnlaceService;
+    private final ConfiguracionPedidoService configuracionPedidoService;
 
     public RecordatorioPruebaService(
             EmailPlantillaService emailPlantillaService,
             EnvioEmailService envioEmailService,
-            AccesoEnlaceService accesoEnlaceService) {
+            AccesoEnlaceService accesoEnlaceService,
+            ConfiguracionPedidoService configuracionPedidoService) {
         this.emailPlantillaService = emailPlantillaService;
         this.envioEmailService = envioEmailService;
         this.accesoEnlaceService = accesoEnlaceService;
+        this.configuracionPedidoService = configuracionPedidoService;
     }
 
     public int enviar(Usuario usuario) {
@@ -43,10 +47,19 @@ public class RecordatorioPruebaService {
             return 0;
         }
         int enviados = 0;
-        if (enviarGrupo(usuario, pagosDeMuestra(), true, false, "pago")) {
+        ConfiguracionPedido config = configuracionPedidoService.obtener();
+        int graciaPago = config.getDiasGraciaPago() != null
+            ? config.getDiasGraciaPago()
+            : ConfiguracionPedido.DIAS_GRACIA_PAGO_POR_DEFECTO;
+        int diasCompras = config.getDiasSancionCompras() != null
+            ? config.getDiasSancionCompras()
+            : ConfiguracionPedido.DIAS_SANCION_COMPRAS_POR_DEFECTO;
+        if (enviarGrupo(usuario, pagosDeMuestra(graciaPago, diasCompras), true, false,
+                "pago")) {
             enviados++;
         }
-        if (enviarGrupo(usuario, entregasDeMuestra(), false, true, "entrega")) {
+        if (enviarGrupo(usuario, entregasDeMuestra(), false, true,
+                "entrega")) {
             enviados++;
         }
         return enviados;
@@ -62,7 +75,7 @@ public class RecordatorioPruebaService {
             usuario, PropositoToken.RECORDATORIO, null,
             VIGENCIA_ENLACE_HORAS);
         String asunto = "[Prueba] " + emailPlantillaService.asuntoRecordatorio(
-            hayPagos, hayEntregas, hayUrgente(items));
+            hayPagos, hayEntregas, false, hayAlerta(items), hayUrgente(items));
         String html = hayPagos
             ? emailPlantillaService.recordatorio(
                 nombre(usuario), items, List.of(), token)
@@ -81,7 +94,8 @@ public class RecordatorioPruebaService {
             && envio.getEstado() == EstadoEnvioEmail.ENVIADO;
     }
 
-    private List<EmailPlantillaService.RecordatorioEmail> pagosDeMuestra() {
+    private List<EmailPlantillaService.RecordatorioEmail> pagosDeMuestra(
+            int gracia, int diasCompras) {
         return List.of(new EmailPlantillaService.RecordatorioEmail(
             "PAGO",
             null,
@@ -93,7 +107,8 @@ public class RecordatorioPruebaService {
             new BigDecimal("1200"),
             "ARS",
             true,
-            false));
+            false,
+            consecuenciaPago(gracia, diasCompras)));
     }
 
     private List<EmailPlantillaService.RecordatorioEmail> entregasDeMuestra() {
@@ -108,7 +123,37 @@ public class RecordatorioPruebaService {
             null,
             "ARS",
             true,
-            false));
+            false,
+            consecuenciaEntrega()));
+    }
+
+    private String consecuenciaPago(int gracia, int diasCompras) {
+        int total = gracia + diasCompras;
+        return "Si no pagás, en " + dias(gracia)
+            + " se suspenden tus compras y solo podés mensajear al artista al que"
+            + " le debés. Si el impago sigue, a los " + dias(total)
+            + " del vencimiento la cuenta queda limitada a pagos.";
+    }
+
+    private String consecuenciaEntrega() {
+        return "Vence hoy. Si no entregás, se suspenden tus ventas. Si la"
+            + " demora continúa, tu cuenta queda limitada solo a entregar los"
+            + " pedidos abiertos: no podés usar el resto del sitio hasta que un"
+            + " administrador te reintegre.";
+    }
+
+    private String dias(int cantidad) {
+        return cantidad == 1 ? "1 día" : cantidad + " días";
+    }
+
+    private boolean hayAlerta(
+            List<EmailPlantillaService.RecordatorioEmail> items) {
+        for (EmailPlantillaService.RecordatorioEmail item : items) {
+            if (item.alerta()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean hayUrgente(

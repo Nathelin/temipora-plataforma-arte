@@ -3,6 +3,7 @@ import { ref } from 'vue'
 
 defineProps({
   derechosCatalogo: { type: Array, default: () => [] },
+  mostrarPreeminencia: { type: Boolean, default: true },
 })
 
 const datos = defineModel({ type: Object, required: true })
@@ -32,6 +33,40 @@ function abrirDescripcion(titulo, descripcion) {
 
 <template>
   <div class="space-y-8">
+    <div v-if="mostrarPreeminencia" class="rounded-xl border border-rosa/60 bg-rosa/10 p-4">
+      <h3 class="text-sm font-semibold text-granate">
+        Preeminencia de los Términos de la Plataforma
+      </h3>
+      <p class="mt-2 text-sm leading-relaxed text-cafe/75">
+        Podés ofrecer al cliente condiciones más favorables que las de la
+        Plataforma, pero nunca menos. Si tus términos contradicen una cláusula
+        de los Términos de la Plataforma, prevalece la más favorable al cliente.
+        En particular, ante un incumplimiento de entrega, los derechos de
+        explotación incluidos en lo que el cliente pagó se entienden otorgados
+        sobre los entregables producidos.
+      </p>
+      <a
+        href="/terminos"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="mt-2 inline-block text-xs font-semibold text-coral hover:underline"
+      >
+        Leer los Términos de la Plataforma
+      </a>
+      <label class="mt-3 flex items-start gap-2 text-sm text-cafe">
+        <input
+          v-model="datos.form.aceptaPreeminencia"
+          type="checkbox"
+          class="mt-0.5 accent-coral"
+        />
+        <span>
+          Entiendo y acepto que, si mis términos contradicen los Términos de la
+          Plataforma, prevalecen los de la Plataforma en lo que sea más
+          favorable al cliente.
+        </span>
+      </label>
+    </div>
+
     <div class="space-y-6">
       <div v-for="s in secciones" :key="s.key">
         <label class="block text-sm text-cafe mb-2">{{ s.label }}</label>

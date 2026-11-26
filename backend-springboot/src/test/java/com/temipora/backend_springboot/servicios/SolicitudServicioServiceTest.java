@@ -138,6 +138,9 @@ class SolicitudServicioServiceTest {
     @Mock
     private CierreEmailService cierreEmailService;
 
+    @Mock
+    private SancionService sancionService;
+
     @InjectMocks
     private SolicitudServicioService solicitudServicioService;
 

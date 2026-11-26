@@ -9,6 +9,8 @@ export function useSesion() {
     )
     localStorage.setItem('idUsuario', datos.idUsuario ?? '')
     localStorage.setItem('urlFotoPerfil', datos.urlFotoPerfil ?? '')
+    localStorage.setItem('restringido', datos.restringido ? '1' : '0')
+    localStorage.setItem('alcance', datos.alcance ?? '')
     if (datos.monedaPreferida) {
       localStorage.setItem('monedaPreferida', datos.monedaPreferida)
     }
@@ -22,6 +24,14 @@ export function useSesion() {
     return Boolean(localStorage.getItem('token'))
   }
 
+  function estaRestringido() {
+    return localStorage.getItem('restringido') === '1'
+  }
+
+  function marcarRestringido(valor) {
+    localStorage.setItem('restringido', valor ? '1' : '0')
+  }
+
   function limpiarSesionLocal() {
     localStorage.removeItem('token')
     localStorage.removeItem('rol')
@@ -29,7 +39,16 @@ export function useSesion() {
     localStorage.removeItem('idUsuario')
     localStorage.removeItem('urlFotoPerfil')
     localStorage.removeItem('monedaPreferida')
+    localStorage.removeItem('restringido')
+    localStorage.removeItem('alcance')
   }
 
-  return { guardarSesion, usuarioActual, estaAutenticado, limpiarSesionLocal }
+  return {
+    guardarSesion,
+    usuarioActual,
+    estaAutenticado,
+    estaRestringido,
+    marcarRestringido,
+    limpiarSesionLocal,
+  }
 }

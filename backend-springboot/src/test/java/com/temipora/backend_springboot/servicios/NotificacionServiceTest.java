@@ -299,6 +299,28 @@ class NotificacionServiceTest {
         return new PageImpl<>(List.of(filas), PageRequest.of(0, 20), filas.length);
     }
 
+    @Test
+    void crearOActualizarParaUsuario_actualizaLaNoLeidaExistente() {
+        Notificacion notificacion = notificacion(5L, "PEDIDO", 10L);
+        notificacion.setTipoNotificacion(tipo("PAGO_POR_VENCER"));
+        NotificacionUsuario destinatario = destinatario(notificacion, 9L);
+        when(notificacionUsuarioRepository.findNoLeidasPorTipoYReferencia(
+                eq(1L), eq("PAGO_POR_VENCER"), eq(10L), any(Pageable.class)))
+            .thenReturn(List.of(destinatario));
+        when(notificacionRepository.save(any(Notificacion.class)))
+            .thenAnswer(inv -> inv.getArgument(0));
+
+        NotificacionDTO dto = service.crearOActualizarParaUsuario(
+            1L, "PAGO_POR_VENCER", "Nuevo nombre", "Nueva descripción",
+            10L, "PEDIDO");
+
+        assertThat(dto.getIdNotificacionUsuario()).isEqualTo(9L);
+        assertThat(notificacion.getNombre()).isEqualTo("Nuevo nombre");
+        assertThat(notificacion.getDescripcion()).isEqualTo("Nueva descripción");
+        assertThat(notificacion.getFechaActualizacion()).isNotNull();
+        verify(tipoNotificacionRepository, never()).findByCodigo(any());
+    }
+
     private Usuario usuario(Long id) {
         return Usuario.builder().idUsuario(id).nombreUsuario("u" + id).build();
     }

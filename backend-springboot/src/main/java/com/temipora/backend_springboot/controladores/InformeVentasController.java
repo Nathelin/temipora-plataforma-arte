@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.temipora.backend_springboot.modelo.InformeVentasDTO;
+import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.servicios.InformePdfService;
 import com.temipora.backend_springboot.servicios.InformeVentasService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
@@ -57,10 +58,12 @@ public class InformeVentasController {
             @RequestParam(required = false) String hasta,
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) String agrupacion) {
+        Usuario usuario = usuarioService
+            .getByNombreUsuario(authentication.getName());
         InformeVentasDTO informe = informeVentasService.generar(
-            idArtista(authentication), desde, hasta, tipo, agrupacion);
+            usuario.getIdUsuario(), desde, hasta, tipo, agrupacion);
         byte[] pdf = informePdfService.generar(
-            informe, authentication.getName());
+            informe, usuarioService.emisor(usuario));
 
         ContentDisposition disposition = ContentDisposition.attachment()
             .filename("informe-ventas-"

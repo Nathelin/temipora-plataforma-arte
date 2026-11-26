@@ -110,6 +110,12 @@ class PedidoServiceTest {
     @Mock
     private CierreEmailService cierreEmailService;
 
+    @Mock
+    private SancionService sancionService;
+
+    @Mock
+    private EntregaPendienteService entregaPendienteService;
+
     @InjectMocks
     private PedidoService pedidoService;
 
@@ -337,6 +343,25 @@ class PedidoServiceTest {
         assertThat(hito.getFechaEntrega()).isNotNull();
         assertThat(hito.getFechaLimiteAprobacion()).isNotNull();
         verify(entregaService).crear(eq(pedido), eq(hito), any(), any());
+    }
+
+    @Test
+    void entregar_fueraDePlazo_registraLaMora() {
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        hito.setEstadoPago(EstadoPagoHito.PAGADO);
+        bloquearPedidoYHito();
+        LocalDateTime plazo = LocalDateTime.now().minusDays(2);
+        when(entregaPendienteService.plazoVigente(pedido, hito))
+            .thenReturn(plazo);
+
+        pedidoService.entregar(
+            PEDIDO, HITO, ARTISTA,
+            new EntregaHitoMultipartRequest(), List.<MultipartFile>of());
+
+        assertThat(pedido.getMoraDesde()).isEqualTo(plazo);
+        verify(auditoria).registrarSistema(
+            eq(AccionesAdmin.PEDIDO_MORA_DETECTAR), eq("Pedido"),
+            eq(PEDIDO), any());
     }
 
     @Test
@@ -575,6 +600,46 @@ class PedidoServiceTest {
     }
 
     @Test
+    void expirarHitos_entregaFinalImpaga_noMarcaImpago() {
+        hito.getHitoPresupuesto().setTipo(TipoHito.ENTREGA);
+        hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
+        hito.setFechaLimitePago(LocalDateTime.now().minusDays(5));
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        when(hitoPedidoRepository
+            .findByEstadoPagoAndFechaLimitePagoBefore(
+                eq(EstadoPagoHito.PENDIENTE), any()))
+            .thenReturn(List.of(hito));
+        when(hitoPedidoRepository.findByIdHitoPedidoForUpdate(HITO))
+            .thenReturn(Optional.of(hito));
+
+        int expirados = pedidoService.expirarHitos();
+
+        assertThat(expirados).isZero();
+        assertThat(hito.getEstadoPago()).isEqualTo(EstadoPagoHito.PENDIENTE);
+        assertThat(pedido.getEstado()).isEqualTo(EstadoPedido.EN_CURSO);
+        verify(pagoService, never()).cancelarPendientes(any());
+    }
+
+    @Test
+    void expirarHitos_dentroDeLaGracia_noMarcaImpago() {
+        hito.setEstadoPago(EstadoPagoHito.PENDIENTE);
+        hito.setFechaLimitePago(LocalDateTime.now().minusDays(1));
+        pedido.setEstado(EstadoPedido.EN_CURSO);
+        when(hitoPedidoRepository
+            .findByEstadoPagoAndFechaLimitePagoBefore(
+                eq(EstadoPagoHito.PENDIENTE), any()))
+            .thenReturn(List.of(hito));
+        when(hitoPedidoRepository.findByIdHitoPedidoForUpdate(HITO))
+            .thenReturn(Optional.of(hito));
+        when(hitoFlujoService.diasGraciaPago()).thenReturn(3);
+
+        int expirados = pedidoService.expirarHitos();
+
+        assertThat(expirados).isZero();
+        assertThat(pedido.getEstado()).isEqualTo(EstadoPedido.EN_CURSO);
+    }
+
+    @Test
     void listarRecibidos_conGrupoArchivo_consultaFinalizadosCanceladosEImpagos() {
         when(pedidoRepository.buscarRecibidos(
             eq(ARTISTA), any(), any(), any(), any(Pageable.class)))
@@ -591,7 +656,8 @@ class PedidoServiceTest {
         assertThat(estados.getValue()).containsExactlyInAnyOrder(
             EstadoPedido.FINALIZADO,
             EstadoPedido.CANCELADO,
-            EstadoPedido.IMPAGO);
+            EstadoPedido.IMPAGO,
+            EstadoPedido.INCUMPLIMIENTO);
     }
 
     @Test
@@ -675,7 +741,8 @@ class PedidoServiceTest {
             eq(ARTISTA), estados.capture(), any(), any(),
             any(Pageable.class));
         assertThat(estados.getValue()).containsExactlyInAnyOrder(
-            EstadoPedido.CANCELADO, EstadoPedido.IMPAGO);
+            EstadoPedido.CANCELADO, EstadoPedido.IMPAGO,
+            EstadoPedido.INCUMPLIMIENTO);
     }
 
     @Test

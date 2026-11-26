@@ -344,14 +344,19 @@ class SustitucionServiceTest {
 
     @Test
     void resumen_calculaLaTasa() {
-        when(sustitucionRepository.count()).thenReturn(10L);
-        when(sustitucionRepository.countByEstado(EstadoSustitucion.RESUELTA_ALTERNATIVA))
+        MotivoSustitucion excluido = MotivoSustitucion.PEDIDO_IMPAGO;
+        when(sustitucionRepository.countByMotivoNot(excluido)).thenReturn(10L);
+        when(sustitucionRepository.countByEstadoAndMotivoNot(
+                EstadoSustitucion.RESUELTA_ALTERNATIVA, excluido))
             .thenReturn(4L);
-        when(sustitucionRepository.countByEstado(EstadoSustitucion.RESUELTA_COLA))
+        when(sustitucionRepository.countByEstadoAndMotivoNot(
+                EstadoSustitucion.RESUELTA_COLA, excluido))
             .thenReturn(2L);
-        when(sustitucionRepository.countByEstado(EstadoSustitucion.DESCARTADA))
+        when(sustitucionRepository.countByEstadoAndMotivoNot(
+                EstadoSustitucion.DESCARTADA, excluido))
             .thenReturn(1L);
-        when(sustitucionRepository.countByEstado(EstadoSustitucion.ABIERTA))
+        when(sustitucionRepository.countByEstadoAndMotivoNot(
+                EstadoSustitucion.ABIERTA, excluido))
             .thenReturn(3L);
 
         SustitucionResumenDTO resumen = service.resumen();

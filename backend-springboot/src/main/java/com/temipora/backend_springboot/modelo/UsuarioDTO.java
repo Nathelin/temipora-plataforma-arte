@@ -41,6 +41,8 @@ public class UsuarioDTO {
     private Boolean sancionado;
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private String sancionTipo;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String sancionAlcance;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaUltimaConexion;
     private String urlFotoPerfil;

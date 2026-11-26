@@ -2,7 +2,6 @@ package com.temipora.backend_springboot.controladores;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -89,7 +88,7 @@ class InformeVentasControllerTest {
         when(usuarioService.getByNombreUsuario("artista")).thenReturn(usuario(2L));
         when(informeVentasService.generar(
             eq(2L), any(), any(), any(), any())).thenReturn(informe());
-        when(informePdfService.generar(any(), anyString()))
+        when(informePdfService.generar(any(), any()))
             .thenReturn("%PDF".getBytes());
 
         mockMvc.perform(get("/api/panel-artista/informes/ventas/pdf")

@@ -89,7 +89,9 @@ async function reactivarCuenta() {
     avisoBaja.value = null
 
     const rol = res.data.rol
-    if (rol === 'ADMIN') {
+    if (res.data.restringido) {
+      router.push({ name: 'cuenta-restringida' })
+    } else if (rol === 'ADMIN') {
       router.push({ name: 'admin-resumen' })
     } else {
       router.push({ name: 'explorar' })
@@ -132,6 +134,11 @@ async function iniciarSesion() {
     baja.value = null
     avisoBaja.value = null
     errorBaja.value = ''
+
+    if (res.data.restringido) {
+      router.push({ name: 'cuenta-restringida' })
+      return
+    }
 
     const redirect = route.query.redirect
     if (redirect) {

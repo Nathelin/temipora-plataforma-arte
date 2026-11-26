@@ -1,5 +1,13 @@
 export const SECCIONES_CON_TABS = [
   {
+    id: 'comunidad',
+    tabs: [
+      { etiqueta: 'Sanciones', to: '/admin/sanciones' },
+      { etiqueta: 'Apelaciones', to: '/admin/apelaciones' },
+      { etiqueta: 'Pruebas', to: '/admin/sanciones/pruebas' },
+    ],
+  },
+  {
     id: 'informes',
     tabs: [
       { etiqueta: 'Ventas', to: '/admin/informes/ventas' },
@@ -46,6 +54,20 @@ export const SECCIONES_CON_TABS = [
     tabs: [
       { etiqueta: 'Vigencia', to: '/admin/ajustes/presupuestos' },
       { etiqueta: 'Reglas de pedidos', to: '/admin/ajustes/pedidos' },
+    ],
+  },
+  {
+    id: 'promociones',
+    tabs: [
+      { etiqueta: 'Configuración', to: '/admin/campanas/promociones' },
+      { etiqueta: 'Descuentos aplicados', to: '/admin/campanas/promociones/descuentos' },
+    ],
+  },
+  {
+    id: 'sustituciones',
+    tabs: [
+      { etiqueta: 'Configuración', to: '/admin/campanas/sustituciones' },
+      { etiqueta: 'Historial', to: '/admin/campanas/sustituciones/historial' },
     ],
   },
 ]

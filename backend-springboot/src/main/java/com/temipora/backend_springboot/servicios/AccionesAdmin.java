@@ -89,6 +89,15 @@ public final class AccionesAdmin {
     public static final String TERMINOS_ACEPTAR = "TERMINOS_ACEPTAR";
     public static final String CUENTA_SANCIONAR = "CUENTA_SANCIONAR";
     public static final String CUENTA_REVERTIR_SANCION = "CUENTA_REVERTIR_SANCION";
+    public static final String CUENTA_SANCIONAR_SISTEMA = "CUENTA_SANCIONAR_SISTEMA";
+    public static final String CUENTA_ESCALAR_SANCION = "CUENTA_ESCALAR_SANCION";
+    public static final String APELACION_CREAR = "APELACION_CREAR";
+    public static final String APELACION_RESOLVER = "APELACION_RESOLVER";
+    public static final String PEDIDO_CERRAR_INCUMPLIMIENTO = "PEDIDO_CERRAR_INCUMPLIMIENTO";
+    public static final String PEDIDO_MORA_DETECTAR = "PEDIDO_MORA_DETECTAR";
+    public static final String PEDIDO_MORA_CURAR = "PEDIDO_MORA_CURAR";
+    public static final String PEDIDO_IMPAGO_DETECTAR = "PEDIDO_IMPAGO_DETECTAR";
+    public static final String PEDIDO_IMPAGO_CURAR = "PEDIDO_IMPAGO_CURAR";
     public static final String USUARIO_CAMBIAR_CORREO = "USUARIO_CAMBIAR_CORREO";
     public static final String USUARIO_CAMBIAR_CONTRASENIA = "USUARIO_CAMBIAR_CONTRASENIA";
     public static final String USUARIO_CAMBIAR_TELEFONO = "USUARIO_CAMBIAR_TELEFONO";
@@ -116,6 +125,10 @@ public final class AccionesAdmin {
     public static final String PEDIDO_GALERIA_OCULTAR = "PEDIDO_GALERIA_OCULTAR";
     public static final String PEDIDO_GALERIA_MOSTRAR = "PEDIDO_GALERIA_MOSTRAR";
     public static final String PEDIDO_PROCESAR = "PEDIDO_PROCESAR";
+    public static final String PRORROGA_SOLICITAR = "PRORROGA_SOLICITAR";
+    public static final String PRORROGA_ACEPTAR = "PRORROGA_ACEPTAR";
+    public static final String PRORROGA_RECHAZAR = "PRORROGA_RECHAZAR";
+    public static final String PRORROGA_VENCER = "PRORROGA_VENCER";
     public static final String HITO_APROBAR = "HITO_APROBAR";
     public static final String HITO_REVISION = "HITO_REVISION";
     public static final String HITO_APROBAR_AUTOMATICO = "HITO_APROBAR_AUTOMATICO";

@@ -42,8 +42,8 @@ export function listarConversaciones(params) {
   return api.get('/conversaciones', { params })
 }
 
-export function obtenerConversacion(idConversacion) {
-  return api.get(`/conversaciones/${idConversacion}`)
+export function obtenerConversacion(idConversacion, opciones = {}) {
+  return api.get(`/conversaciones/${idConversacion}`, opciones)
 }
 
 export function aceptarConversacion(idConversacion) {
@@ -66,8 +66,11 @@ export function archivarConversacion(idConversacion, archivada) {
   )
 }
 
-export function cargarMensajes(idConversacion, params = {}) {
-  return api.get(`/conversaciones/${idConversacion}/mensajes`, { params })
+export function cargarMensajes(idConversacion, params = {}, opciones = {}) {
+  return api.get(`/conversaciones/${idConversacion}/mensajes`, {
+    ...opciones,
+    params,
+  })
 }
 
 export function enviarMensaje(idConversacion, contenido) {
@@ -86,8 +89,8 @@ export function consultarEscribiendo(idConversacion) {
   return api.get(`/conversaciones/${idConversacion}/escribiendo`)
 }
 
-export function cargarContadorMensajes() {
-  return api.get('/conversaciones/contador')
+export function cargarContadorMensajes(opciones = {}) {
+  return api.get('/conversaciones/contador', opciones)
 }
 
 export function cargarConfiguracionMensajeria() {

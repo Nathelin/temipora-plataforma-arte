@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.temipora.backend_springboot.modelo.AccionSolicitud;
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.modelo.Conversacion;
 import com.temipora.backend_springboot.modelo.DerechoTermino;
 import com.temipora.backend_springboot.modelo.DisponibilidadServicioDTO;
@@ -129,6 +130,7 @@ public class SolicitudServicioService {
     private final SustitucionService sustitucionService;
     private final CuposEventPublisher cuposEventPublisher;
     private final CierreEmailService cierreEmailService;
+    private final SancionService sancionService;
 
     public SolicitudServicioService(
             ServicioRepository servicioRepository,
@@ -152,7 +154,8 @@ public class SolicitudServicioService {
             ArancelEstimadoService arancelEstimadoService,
             SustitucionService sustitucionService,
             CuposEventPublisher cuposEventPublisher,
-            CierreEmailService cierreEmailService) {
+            CierreEmailService cierreEmailService,
+            SancionService sancionService) {
         this.servicioRepository = servicioRepository;
         this.usuarioRepository = usuarioRepository;
         this.formularioRepository = formularioRepository;
@@ -175,6 +178,7 @@ public class SolicitudServicioService {
         this.sustitucionService = sustitucionService;
         this.cuposEventPublisher = cuposEventPublisher;
         this.cierreEmailService = cierreEmailService;
+        this.sancionService = sancionService;
     }
 
     @Transactional(readOnly = true)
@@ -281,6 +285,10 @@ public class SolicitudServicioService {
 
         Usuario cliente = usuarioRepository.findByIdUsuario(idCliente)
             .orElseThrow(() -> new NoSuchElementException("Usuario no encontrado: " + idCliente));
+        if (sancionService.tieneSancionDeCompra(idCliente)) {
+            throw new ConflictoException(
+                MoraClienteService.MENSAJE_COMPRA_BLOQUEADA);
+        }
         Servicio servicio = servicioRepository.findByIdServicioForUpdate(request.getIdServicio())
             .orElseThrow(() -> new NoSuchElementException(
                 "Servicio no encontrado: " + request.getIdServicio()));
@@ -295,6 +303,11 @@ public class SolicitudServicioService {
         Usuario artista = servicio.getArtista();
         if (artista != null && artista.getIdUsuario().equals(idCliente)) {
             throw new IllegalArgumentException("No podés solicitar tu propio servicio.");
+        }
+        if (artista != null && sancionService
+                .tieneSancionQueImpideVender(artista.getIdUsuario())) {
+            throw new ConflictoException(
+                "El artista no está recibiendo encargos en este momento.");
         }
 
         TerminosDTO terminos = terminosService.obtenerServicio(

@@ -113,7 +113,9 @@ export function useHiloConversacion(idConversacion, { activo } = {}) {
 
   async function cargarDetalle({ silencioso = false } = {}) {
     try {
-      const res = await obtenerConversacion(id.value)
+      const res = await obtenerConversacion(id.value, {
+        meta: { silenciosa: silencioso },
+      })
       conversacion.value = res.data
     } catch (e) {
       if (e.response?.status === 401) {
@@ -163,7 +165,7 @@ export function useHiloConversacion(idConversacion, { activo } = {}) {
     try {
       const res = await cargarMensajes(id.value, {
         tamanio: TAMANIO_HISTORIAL,
-      })
+      }, { meta: { silenciosa: true } })
       const nuevos = res.data?.mensajes || []
       if (!nuevos.length) return
 

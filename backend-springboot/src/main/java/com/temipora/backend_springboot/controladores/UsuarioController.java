@@ -79,7 +79,16 @@ public class UsuarioController {
 				&& usuario.getRol().getNombre() == ERol.ARTISTA) {
 			visitaService.registrarArtista(viewerId, usuario.getIdUsuario());
 		}
-		return UsuarioDTO.desdeUsuario(usuario);
+		UsuarioDTO dto = UsuarioDTO.desdeUsuario(usuario);
+		usuarioService.sancionVigente(usuario.getIdUsuario())
+			.ifPresent(sancion -> {
+				dto.setSancionado(true);
+				dto.setSancionTipo(sancion.getTipo() != null
+					? sancion.getTipo().name() : null);
+				dto.setSancionAlcance(sancion.getAlcance() != null
+					? sancion.getAlcance().name() : null);
+			});
+		return dto;
 	}
 
 	private Long idAutenticado(Authentication authentication) {

@@ -13,8 +13,10 @@ import com.temipora.backend_springboot.modelo.EntregaHitoDTO;
 import com.temipora.backend_springboot.modelo.HitoPedidoDTO;
 import com.temipora.backend_springboot.modelo.PagoDTO;
 import com.temipora.backend_springboot.modelo.PedidoDTO;
+import com.temipora.backend_springboot.modelo.ProrrogaDTO;
 import com.temipora.backend_springboot.modelo.UsuarioResumenDTO;
 import com.temipora.backend_springboot.servicios.informes.DocumentoPdf;
+import com.temipora.backend_springboot.servicios.informes.EmisorPdf;
 import com.temipora.backend_springboot.servicios.informes.FormatoPdf;
 import com.temipora.backend_springboot.servicios.informes.TablaPdf;
 
@@ -35,11 +37,12 @@ public class ConstanciaService {
             : urlFrontend.replaceAll("/+$", "");
     }
 
-    public byte[] generar(PedidoDTO pedido) {
+    public byte[] generar(PedidoDTO pedido, EmisorPdf emisor) {
         String referencia = "Pedido #" + pedido.getIdPedido();
         String moneda = FormatoPdf.moneda(pedido.getMonedaMostrada());
 
-        DocumentoPdf documento = DocumentoPdf.vertical(TIPO, referencia, PIE);
+        DocumentoPdf documento = DocumentoPdf.vertical(
+            TIPO, referencia, PIE, emisor);
         documento.abrir();
         documento.cabecera("Documento contractual", referencia,
             "Estado del pedido al momento de generarse · Cifras en " + moneda);
@@ -49,13 +52,16 @@ public class ConstanciaService {
             "Servicio", FormatoPdf.texto(pedido.getNombreServicio()),
             "Estado", estadoPedido(pedido.getEstado()),
             "Inicio", FormatoPdf.fecha(pedido.getFechaInicio()),
-            "Límite de entrega", FormatoPdf.fecha(pedido.getLimiteEntrega()),
+            "Entrega prometida", FormatoPdf.fecha(pedido.getLimiteEntrega()),
+            "Entrega vigente",
+            FormatoPdf.fecha(pedido.getFechaEntregaPrevista()),
             "Finalizado", FormatoPdf.fechaHora(pedido.getFinalizadoEn()),
             "Moneda", moneda,
             "Generado", FormatoPdf.fechaHora(LocalDateTime.now()));
 
         importes(documento, pedido);
         planDePagos(documento, pedido);
+        prorrogas(documento, pedido);
         entregas(documento, pedido);
         pagos(documento, pedido);
         terminos(documento, pedido);
@@ -146,8 +152,53 @@ public class ConstanciaService {
         documento.tabla(tabla);
     }
 
+    private void prorrogas(DocumentoPdf documento, PedidoDTO pedido) {
+        documento.seccion("3", "Prórrogas del plazo");
+
+        List<ProrrogaDTO> prorrogas = pedido.getProrrogas() != null
+            ? pedido.getProrrogas() : List.of();
+        if (prorrogas.isEmpty()) {
+            documento.parrafo(
+                "El pedido no tiene prórrogas del plazo registradas.");
+            return;
+        }
+
+        TablaPdf tabla = new TablaPdf(
+            new String[] { "Solicitada", "Días", "Estado", "Entrega antes",
+                "Entrega después", "Motivo" },
+            new float[] { 1.15f, 0.5f, 1.2f, 1.15f, 1.2f, 2.0f },
+            new boolean[] { false, true, false, true, true, false });
+        for (ProrrogaDTO prorroga : prorrogas) {
+            tabla.fila(
+                FormatoPdf.fechaHora(prorroga.getFechaSolicitud()),
+                String.valueOf(prorroga.getDiasSolicitados()),
+                estadoProrroga(prorroga.getEstado()),
+                FormatoPdf.fecha(prorroga.getEntregaPrevistaAntes()),
+                FormatoPdf.fecha(prorroga.getEntregaPrevistaDespues()),
+                FormatoPdf.texto(prorroga.getMotivo()));
+        }
+        documento.tabla(tabla);
+
+        for (ProrrogaDTO prorroga : prorrogas) {
+            if (prorroga.getFechaRespuesta() == null
+                    && prorroga.getMotivoRespuesta() == null) {
+                continue;
+            }
+            String respuesta = "Respuesta ("
+                + estadoProrroga(prorroga.getEstado()) + ")";
+            if (prorroga.getFechaRespuesta() != null) {
+                respuesta += " — "
+                    + FormatoPdf.fechaHora(prorroga.getFechaRespuesta());
+            }
+            if (prorroga.getMotivoRespuesta() != null) {
+                respuesta += ": " + prorroga.getMotivoRespuesta();
+            }
+            documento.parrafoChico(respuesta);
+        }
+    }
+
     private void entregas(DocumentoPdf documento, PedidoDTO pedido) {
-        documento.seccion("3", "Entregas");
+        documento.seccion("4", "Entregas");
 
         List<HitoPedidoDTO> hitos = pedido.getHitos() != null
             ? pedido.getHitos() : List.of();
@@ -200,7 +251,7 @@ public class ConstanciaService {
     }
 
     private void pagos(DocumentoPdf documento, PedidoDTO pedido) {
-        documento.seccion("4", "Pagos");
+        documento.seccion("5", "Pagos");
 
         List<HitoPedidoDTO> hitos = pedido.getHitos() != null
             ? pedido.getHitos() : List.of();
@@ -285,7 +336,7 @@ public class ConstanciaService {
     }
 
     private void terminos(DocumentoPdf documento, PedidoDTO pedido) {
-        documento.seccion("5", "Términos aceptados");
+        documento.seccion("6", "Términos aceptados");
 
         TablaPdf tabla = new TablaPdf(
             new String[] { "Documento", "Versión", "Alcance", "Aceptado",
@@ -345,6 +396,19 @@ public class ConstanciaService {
             return "—";
         }
         return huella.length() <= 16 ? huella : huella.substring(0, 16) + "…";
+    }
+
+    private static String estadoProrroga(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return "—";
+        }
+        return switch (valor) {
+            case "PENDIENTE" -> "Pendiente de respuesta";
+            case "ACEPTADA" -> "Aceptada";
+            case "RECHAZADA" -> "Rechazada";
+            case "VENCIDA" -> "Vencida sin respuesta";
+            default -> valor;
+        };
     }
 
     private static String estadoPago(String valor) {

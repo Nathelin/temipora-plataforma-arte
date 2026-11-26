@@ -197,6 +197,10 @@ class ConfiguracionPedidoServiceTest {
         request.setMaxHitos(4);
         request.setPorcentajeMaxPrimerHito(new BigDecimal("50.00"));
         request.setMontoMinimoCuota(new BigDecimal("10.00"));
+        request.setDiasGraciaEntrega(3);
+        request.setDiasSancionVentas(14);
+        request.setDiasReapelacion(7);
+        request.setDiasCierreTrasBloqueo(30);
         return request;
     }
 }

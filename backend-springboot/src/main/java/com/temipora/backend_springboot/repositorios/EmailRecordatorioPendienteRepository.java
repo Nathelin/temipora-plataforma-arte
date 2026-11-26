@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.repositorios;
 
+import java.util.Collection;
 import java.util.List;
 
 import org.springframework.data.domain.Pageable;
@@ -14,6 +15,9 @@ public interface EmailRecordatorioPendienteRepository
         extends JpaRepository<EmailRecordatorioPendiente, Long> {
 
     boolean existsByClave(String clave);
+
+    List<EmailRecordatorioPendiente> findByEstadoIn(
+        Collection<EstadoEmailRecordatorio> estados);
 
     List<EmailRecordatorioPendiente>
         findByUsuarioIdUsuarioAndEstadoOrderByCreadoEnAsc(

@@ -26,6 +26,7 @@ const {
   mensajesNoLeidos,
   solicitudesMensajePendientes,
   cuentaCobrosConectada,
+  saludCuenta,
   cargando: cargandoPanel,
   error: errorPanel,
   cargar: cargarPanel,
@@ -57,6 +58,74 @@ const perfilPublico = computed(() =>
     ? { name: 'perfil', params: { nombreUsuario } }
     : { name: 'inicio' },
 )
+
+const SALUD_ESTADOS = {
+  VENTAS_SUSPENDIDAS: {
+    etiqueta: 'Ventas suspendidas',
+    descripcion: 'Tu catálogo está pausado. Podés seguir entregando los pedidos abiertos.',
+    clase: 'border-rojizo/30 bg-rojizo/10 text-rojizo',
+  },
+  LIMITADA_ENTREGAS: {
+    etiqueta: 'Cuenta limitada a entregas',
+    descripcion: 'Solo podés entregar los pedidos abiertos y apelar.',
+    clase: 'border-rojizo/30 bg-rojizo/10 text-rojizo',
+  },
+  LIMITADA_ACCESO: {
+    etiqueta: 'Cuenta suspendida',
+    descripcion: 'Tu cuenta está suspendida. Podés apelar para que un administrador la revise.',
+    clase: 'border-rojizo/30 bg-rojizo/10 text-rojizo',
+  },
+}
+
+const TIPOS_PAUSADOS = {
+  SERVICIO: 'Servicio',
+  PRODUCTO: 'Producto',
+  REVENTA: 'Reventa',
+}
+
+const saludEstado = computed(() => (
+  saludCuenta.value ? SALUD_ESTADOS[saludCuenta.value.estado] : null
+))
+
+const puedeApelar = computed(() => (
+  Boolean(saludCuenta.value?.idSancion)
+  && !saludCuenta.value?.apelacionPendiente
+))
+
+const mostrarApelacion = ref(false)
+const mensajeApelacion = ref('')
+const enviandoApelacion = ref(false)
+const errorApelacion = ref('')
+const avisoApelacion = ref('')
+
+function fechaHora(valor) {
+  if (!valor) return ''
+  return new Date(valor).toLocaleString('es-AR')
+}
+
+async function apelar() {
+  if (!saludCuenta.value?.idSancion || !mensajeApelacion.value.trim()) {
+    errorApelacion.value = 'Contá brevemente por qué pedís la revisión.'
+    return
+  }
+  enviandoApelacion.value = true
+  errorApelacion.value = ''
+  avisoApelacion.value = ''
+  try {
+    await api.post(`/apelaciones/sancion/${saludCuenta.value.idSancion}`, {
+      mensaje: mensajeApelacion.value.trim(),
+    })
+    mensajeApelacion.value = ''
+    mostrarApelacion.value = false
+    avisoApelacion.value = 'Apelación enviada. Un administrador la va a revisar.'
+    await cargarPanel()
+  } catch (e) {
+    errorApelacion.value = e.response?.data?.message
+      || 'No se pudo enviar la apelación.'
+  } finally {
+    enviandoApelacion.value = false
+  }
+}
 
 const cargando = computed(() => cargandoServicios.value || cargandoPanel.value)
 const error = computed(() => errorServicios.value || errorPanel.value)
@@ -144,7 +213,17 @@ const tarjetas = computed(() => {
 
 function diasHasta(valor) {
   if (!valor) return Number.POSITIVE_INFINITY
-  const fecha = new Date(valor)
+  const texto = String(valor)
+  // Las fechas sin hora (YYYY-MM-DD) se comparan por día: parsearlas con
+  // `new Date` las toma como UTC y el resultado cambia según la zona horaria.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) {
+    const [anio, mes, dia] = texto.split('-').map(Number)
+    const objetivo = new Date(anio, mes - 1, dia)
+    const hoy = new Date()
+    hoy.setHours(0, 0, 0, 0)
+    return Math.round((objetivo - hoy) / 86400000)
+  }
+  const fecha = new Date(texto)
   if (Number.isNaN(fecha.getTime())) return Number.POSITIVE_INFINITY
   return Math.ceil((fecha.getTime() - Date.now()) / 86400000)
 }
@@ -182,7 +261,7 @@ const pedidosPorId = computed(() => {
 
 const atenciones = computed(() => {
   const items = []
-  const prioridad = { revision: 0, vencido: 1, entrega: 2 }
+  const prioridad = { revision: 0, vencido: 1, entrega: 2, pago: 3 }
   const grupos = new Map()
 
   for (const hito of hitosAtencion.value) {
@@ -192,7 +271,9 @@ const atenciones = computed(() => {
         ? 'vencido'
         : hito.puedeEntregar
           ? 'entrega'
-          : null
+          : hito.estadoPago === 'PENDIENTE'
+            ? 'pago'
+            : null
     if (!motivo) continue
     const clave = `${motivo}:${hito.idPedido}`
     if (!grupos.has(clave)) {
@@ -220,7 +301,9 @@ const atenciones = computed(() => {
         to,
         icono: ICONOS.alerta,
         tono: 'alerta',
-        meta: 'Espera tu nueva versión',
+        meta: primero.fechaLimiteReentrega
+          ? textoVencimiento(primero.fechaLimiteReentrega)
+          : 'Espera tu nueva versión',
       })
       continue
     }
@@ -232,13 +315,33 @@ const atenciones = computed(() => {
         detalle: `${servicio} · el pedido puede quedar sin efecto.`,
         to,
         icono: ICONOS.alerta,
-        tono: 'alerta',
+        tono: 'info',
         meta: 'Plazo vencido',
+        turno: 'cliente',
       })
       continue
     }
 
-    const limite = primero.fechaLimitePago || pedido?.fechaEntregaPrevista || pedido?.limiteEntrega
+    if (grupo.motivo === 'pago') {
+      items.push({
+        clave: `pago-${grupo.idPedido}`,
+        titulo: `Esperando el pago de «${primero.nombre}»${extra}`,
+        detalle: `${servicio} · el cliente todavía no pagó.`,
+        to,
+        icono: ICONOS.presupuesto,
+        tono: 'info',
+        meta: textoVencimiento(primero.fechaLimitePago),
+        turno: 'cliente',
+      })
+      continue
+    }
+
+    // Para una entrega manda la fecha de entrega prevista del pedido. El
+    // `fechaLimitePago` del hito es el plazo del cliente (por ejemplo, el de la
+    // seña) y no tiene relación con cuándo debe entregar el artista.
+    const limite = pedido?.fechaEntregaPrevista
+      || pedido?.limiteEntrega
+      || primero.fechaLimitePago
     items.push({
       clave: `entrega-${grupo.idPedido}`,
       titulo: `Falta subir tu entrega${extra}`,
@@ -325,8 +428,20 @@ const atenciones = computed(() => {
   return items
 })
 
-const atencionesVisibles = computed(() => atenciones.value.slice(0, 5))
-const atencionesRestantes = computed(() => Math.max(0, atenciones.value.length - 5))
+const atencionesArtista = computed(() => (
+  atenciones.value.filter((item) => item.turno !== 'cliente')
+))
+const atencionesCliente = computed(() => (
+  atenciones.value.filter((item) => item.turno === 'cliente')
+))
+const atencionesVisibles = computed(() => atencionesArtista.value.slice(0, 4))
+const atencionesRestantes = computed(() => (
+  Math.max(0, atencionesArtista.value.length - 4)
+))
+const clientesVisibles = computed(() => atencionesCliente.value.slice(0, 4))
+const clientesRestantes = computed(() => (
+  Math.max(0, atencionesCliente.value.length - 4)
+))
 
 const configuracion = computed(() => {
   const items = []
@@ -385,7 +500,33 @@ const configuracion = computed(() => {
   return items
 })
 
-const pedidosVisibles = computed(() => pedidosActivos.value.slice(0, 5))
+const pedidosVisibles = computed(() => pedidosActivos.value.slice(0, 4))
+
+const DIAS_AVISO_ENTREGA = 7
+
+function diasHastaEntrega(fecha) {
+  if (!fecha) return null
+  const [anio, mes, dia] = String(fecha).split('-').map(Number)
+  if (!anio || !mes || !dia) return null
+  const objetivo = new Date(anio, mes - 1, dia)
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  return Math.round((objetivo - hoy) / 86400000)
+}
+
+const entregasEnRiesgo = computed(() => pedidosActivos.value
+  .filter((pedido) => pedido.puedeEntregar)
+  .map((pedido) => ({
+    ...pedido,
+    dias: diasHastaEntrega(pedido.fechaEntregaPrevista),
+  }))
+  .filter((pedido) => pedido.dias != null
+    && pedido.dias <= DIAS_AVISO_ENTREGA)
+  .sort((a, b) => a.dias - b.dias))
+
+const entregasAtrasadas = computed(
+  () => entregasEnRiesgo.value.filter((pedido) => pedido.dias < 0).length,
+)
 
 const serviciosDestacados = computed(() =>
   [...servicios.value]
@@ -516,15 +657,166 @@ onMounted(() => {
         </router-link>
       </div>
 
+      <section
+        v-if="saludCuenta?.estado === 'AL_DIA' && entregasEnRiesgo.length"
+        class="mt-6 rounded-2xl border-2 p-5 sm:p-6"
+        :class="entregasAtrasadas > 0
+          ? 'border-rojizo/60 bg-rojizo/10'
+          : 'border-coral/60 bg-coral/10'"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-rojizo">
+              Riesgo de sanción
+            </p>
+            <h2 class="mt-1 font-display text-xl font-bold text-granate">
+              {{ entregasAtrasadas > 0
+                ? 'Tenés entregas atrasadas: tu cuenta puede suspenderse'
+                : 'Tenés entregas por vencer: evitá que se suspendan tus ventas' }}
+            </h2>
+          </div>
+          <router-link
+            :to="{ name: 'panel-pedidos' }"
+            class="inline-flex min-h-9 items-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+          >
+            Ver pedidos →
+          </router-link>
+        </div>
+        <p class="mt-2 text-sm leading-relaxed text-cafe/80">
+          Si no subís estos entregables, se suspenden tus ventas y la cuenta
+          queda limitada a entregar los pedidos abiertos: no podés vender,
+          comprar ni usar el resto del sitio hasta que un administrador te
+          reintegre.
+        </p>
+        <ul class="mt-3 space-y-2">
+          <li
+            v-for="pedido in entregasEnRiesgo.slice(0, 3)"
+            :key="pedido.idPedido"
+            class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-blanco/80 px-3 py-2"
+          >
+            <span class="text-sm text-cafe">
+              #{{ pedido.idPedido }} · {{ pedido.nombreServicio }}
+            </span>
+            <span
+              class="text-xs font-semibold"
+              :class="pedido.dias < 0 ? 'text-rojizo' : 'text-coral'"
+            >
+              {{ pedido.dias < 0
+                ? `Atrasada hace ${-pedido.dias} día(s)`
+                : pedido.dias === 0
+                  ? 'Vence hoy'
+                  : `Vence en ${pedido.dias} día(s)` }}
+            </span>
+            <router-link
+              :to="{ name: 'panel-pedido-detalle', params: { idPedido: pedido.idPedido } }"
+              class="text-xs font-semibold text-coral underline decoration-coral/40 underline-offset-2 hover:text-rojizo"
+            >
+              Entregar →
+            </router-link>
+          </li>
+        </ul>
+        <p v-if="entregasEnRiesgo.length > 3" class="mt-2 text-xs text-cafe/60">
+          y {{ entregasEnRiesgo.length - 3 }} entrega(s) más.
+        </p>
+      </section>
+
+      <section
+        v-if="saludCuenta && saludCuenta.estado !== 'AL_DIA' && saludEstado"
+        class="mt-6 rounded-2xl border p-5 sm:p-6"
+        :class="saludEstado?.clase"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.14em]">Salud de la cuenta</p>
+            <h2 class="mt-1 font-display text-xl font-bold">{{ saludEstado?.etiqueta }}</h2>
+          </div>
+        </div>
+
+        <p class="mt-2 text-sm leading-relaxed">{{ saludEstado?.descripcion }}</p>
+        <p
+          v-if="saludCuenta.estado === 'VENTAS_SUSPENDIDAS' && saludCuenta.fechaFin"
+          class="mt-2 text-sm"
+        >
+          La suspensión de ventas termina el {{ fechaHora(saludCuenta.fechaFin) }}.
+        </p>
+        <p v-if="saludCuenta.motivo" class="mt-2 text-sm">{{ saludCuenta.motivo }}</p>
+
+        <div v-if="saludCuenta.pausados?.length" class="mt-3">
+          <p class="text-xs font-semibold uppercase tracking-wide">Catálogo pausado</p>
+          <ul class="mt-1 space-y-1 text-sm">
+            <li v-for="item in saludCuenta.pausados" :key="`${item.tipo}-${item.id}`">
+              {{ TIPOS_PAUSADOS[item.tipo] || item.tipo }}: {{ item.nombre }}
+            </li>
+          </ul>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <router-link
+            :to="{ name: 'panel-pedidos' }"
+            class="inline-flex min-h-9 items-center rounded-full bg-coral px-4 text-sm font-semibold text-white transition hover:bg-rojizo"
+          >
+            Ver pedidos
+          </router-link>
+          <button
+            v-if="puedeApelar"
+            type="button"
+            class="inline-flex min-h-9 items-center rounded-full border border-rosa bg-blanco px-4 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+            @click="mostrarApelacion = !mostrarApelacion"
+          >
+            Apelar la sanción
+          </button>
+          <span v-if="saludCuenta.apelacionPendiente" class="text-xs font-semibold">
+            Apelación enviada; esperando revisión.
+          </span>
+        </div>
+
+        <div v-if="mostrarApelacion" class="mt-3 rounded-xl bg-blanco/70 p-3">
+          <textarea
+            v-model="mensajeApelacion"
+            rows="3"
+            maxlength="2000"
+            placeholder="Contá brevemente por qué pedís la revisión."
+            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+          ></textarea>
+          <p v-if="errorApelacion" class="mt-2 text-sm text-rojizo">{{ errorApelacion }}</p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              :disabled="enviandoApelacion"
+              class="rounded-full bg-coral px-4 py-2 text-sm font-semibold text-white transition hover:bg-rojizo disabled:cursor-not-allowed disabled:bg-coral/40"
+              @click="apelar"
+            >
+              {{ enviandoApelacion ? 'Enviando...' : 'Enviar apelación' }}
+            </button>
+            <button
+              type="button"
+              class="rounded-full border border-rosa bg-blanco px-4 py-2 text-sm font-semibold text-granate transition hover:bg-rosa/20"
+              @click="mostrarApelacion = false"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+        <p v-if="avisoApelacion" class="mt-2 text-sm font-semibold">{{ avisoApelacion }}</p>
+      </section>
+
       <section class="mt-8 rounded-2xl border border-rosa/60 bg-blanco p-5 sm:p-6">
         <div class="flex items-center justify-between gap-3">
           <h2 class="font-display text-xl font-bold text-granate">Requiere tu atención</h2>
-          <span
-            v-if="atenciones.length"
-            class="rounded-full bg-coral/10 px-3 py-1 text-xs font-semibold text-coral"
-          >
-            {{ atenciones.length }}
-          </span>
+          <div class="flex items-center gap-3">
+            <span
+              v-if="atencionesArtista.length"
+              class="rounded-full bg-coral/10 px-3 py-1 text-xs font-semibold text-coral"
+            >
+              {{ atencionesArtista.length }}
+            </span>
+            <router-link
+              :to="{ name: 'panel-pedidos' }"
+              class="text-sm font-semibold text-coral transition hover:text-rojizo"
+            >
+              Ver todos
+            </router-link>
+          </div>
         </div>
 
         <ul v-if="atencionesVisibles.length" class="mt-4 space-y-2">
@@ -546,6 +838,48 @@ onMounted(() => {
 
         <p v-if="atencionesRestantes" class="mt-3 text-xs text-cafe/55">
           y {{ atencionesRestantes }} más para revisar en tus solicitudes y pedidos.
+        </p>
+      </section>
+
+      <section
+        v-if="atencionesCliente.length"
+        class="mt-6 rounded-2xl border border-rosa/60 bg-blanco p-5 sm:p-6"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h2 class="font-display text-xl font-bold text-granate">Esperando al cliente</h2>
+            <p class="mt-1 text-sm text-cafe/60">
+              No necesitás hacer nada por ahora; te avisamos si responde o si vence el plazo.
+            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="rounded-full bg-rosa/30 px-3 py-1 text-xs font-semibold text-granate">
+              {{ atencionesCliente.length }}
+            </span>
+            <router-link
+              :to="{ name: 'panel-pedidos' }"
+              class="text-sm font-semibold text-coral transition hover:text-rojizo"
+            >
+              Ver todos
+            </router-link>
+          </div>
+        </div>
+
+        <ul class="mt-4 space-y-2">
+          <li v-for="atencion in clientesVisibles" :key="atencion.clave">
+            <ItemAtencionPanel
+              :titulo="atencion.titulo"
+              :detalle="atencion.detalle"
+              :to="atencion.to"
+              :icono="atencion.icono"
+              :tono="atencion.tono"
+              :meta="atencion.meta"
+            />
+          </li>
+        </ul>
+
+        <p v-if="clientesRestantes" class="mt-3 text-xs text-cafe/55">
+          y {{ clientesRestantes }} más esperando al cliente.
         </p>
       </section>
 

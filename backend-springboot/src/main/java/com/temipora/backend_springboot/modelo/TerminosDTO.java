@@ -1,5 +1,6 @@
 package com.temipora.backend_springboot.modelo;
 
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
@@ -16,6 +17,10 @@ import lombok.Setter;
 @Builder
 public class TerminosDTO {
 
+    public static final String ACLARACION_CANCELACIONES =
+        "Esta política rige entre artista y cliente en lo que no contradiga los "
+            + "Términos de la Plataforma, que no procesa reembolsos.";
+
     private Long idTerminos;
     private Long idServicio;
     private boolean propio;
@@ -28,6 +33,9 @@ public class TerminosDTO {
     private String pagoExtra;
     private String queDibuja;
     private String queNoDibuja;
+    private boolean aceptaPreeminencia;
+    private LocalDateTime preeminenciaAceptadaEn;
+    private String aclaracionPoliticaCancelaciones;
     private List<TerminoDerechoDTO> derechos;
 
     public static TerminosDTO desdeTerminos(Terminos terminos) {
@@ -55,6 +63,9 @@ public class TerminosDTO {
             .pagoExtra(terminos.getPagoExtra())
             .queDibuja(terminos.getQueDibuja())
             .queNoDibuja(terminos.getQueNoDibuja())
+            .aceptaPreeminencia(terminos.isAceptaPreeminencia())
+            .preeminenciaAceptadaEn(terminos.getPreeminenciaAceptadaEn())
+            .aclaracionPoliticaCancelaciones(ACLARACION_CANCELACIONES)
             .derechos(derechos)
             .build();
     }

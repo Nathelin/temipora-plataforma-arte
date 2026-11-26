@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
+import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.EnvioEmail;
 import com.temipora.backend_springboot.modelo.EstadoEnvioEmail;
 import com.temipora.backend_springboot.modelo.Usuario;
@@ -32,6 +33,8 @@ class RecordatorioPruebaServiceTest {
     private EnvioEmailService envioEmailService;
     @Mock
     private AccesoEnlaceService accesoEnlaceService;
+    @Mock
+    private ConfiguracionPedidoService configuracionPedidoService;
 
     private RecordatorioPruebaService service;
     private Usuario admin;
@@ -41,7 +44,8 @@ class RecordatorioPruebaServiceTest {
         service = new RecordatorioPruebaService(
             new EmailPlantillaService(engine()),
             envioEmailService,
-            accesoEnlaceService);
+            accesoEnlaceService,
+            configuracionPedidoService);
         admin = Usuario.builder()
             .idUsuario(1L)
             .nombreUsuario("admin")
@@ -53,6 +57,9 @@ class RecordatorioPruebaServiceTest {
 
     @Test
     void enviar_mandaUnMailDePagosYOtraDeEntregas() {
+        ConfiguracionPedido config = new ConfiguracionPedido();
+        config.setDiasGraciaEntrega(3);
+        when(configuracionPedidoService.obtener()).thenReturn(config);
         when(accesoEnlaceService.generar(any(), any(), any(), anyInt()))
             .thenReturn("tok");
         EnvioEmail envio = new EnvioEmail();
@@ -72,15 +79,16 @@ class RecordatorioPruebaServiceTest {
 
         List<String> asunto = asuntos.getAllValues();
         List<String> html = htmls.getAllValues();
-        assertThat(asunto.get(0)).contains("pagos pendientes");
+        assertThat(asunto.get(0)).contains("pagá hoy");
         assertThat(html.get(0)).contains("Pago pendiente");
         assertThat(html.get(0)).contains("Cuota 2");
         assertThat(html.get(0)).doesNotContain("Entrega pendiente");
 
-        assertThat(asunto.get(1)).contains("entrega");
+        assertThat(asunto.get(1)).contains("entregá hoy");
         assertThat(html.get(1)).contains("Entrega pendiente");
         assertThat(html.get(1)).contains("Boceto");
-        assertThat(html.get(1)).contains("damos de baja tu cuenta");
+        assertThat(html.get(1)).contains("se suspenden tus ventas");
+        assertThat(html.get(1)).contains("cuenta queda limitada");
         assertThat(html.get(1)).doesNotContain("Pago pendiente");
     }
 

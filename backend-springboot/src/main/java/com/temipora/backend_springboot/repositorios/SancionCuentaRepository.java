@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.temipora.backend_springboot.modelo.EstadoSancion;
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
+import com.temipora.backend_springboot.modelo.OrigenSancion;
 import com.temipora.backend_springboot.modelo.SancionCuenta;
 
 public interface SancionCuentaRepository
@@ -52,4 +54,23 @@ public interface SancionCuentaRepository
             @Param("ahora") LocalDateTime ahora);
 
     List<SancionCuenta> findByUsuarioIdUsuarioOrderByFechaInicioDesc(Long idUsuario);
+
+    java.util.Optional<SancionCuenta> findByClave(String clave);
+
+    java.util.Optional<SancionCuenta> findFirstByUsuarioIdUsuarioAndEstado(
+            Long idUsuario, EstadoSancion estado);
+
+    @Query("""
+        SELECT s FROM SancionCuenta s
+        JOIN FETCH s.usuario
+        LEFT JOIN FETCH s.pedido
+        LEFT JOIN FETCH s.hitoPedido
+        WHERE s.origen = :origen
+          AND s.alcance = :alcance
+          AND s.estado = :estado
+        """)
+    List<SancionCuenta> findPorOrigenYAlcance(
+            @Param("origen") OrigenSancion origen,
+            @Param("alcance") AlcanceSancion alcance,
+            @Param("estado") EstadoSancion estado);
 }

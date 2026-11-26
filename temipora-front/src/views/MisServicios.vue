@@ -1,12 +1,13 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '../servicios/api'
 import { formatearPrecio } from '../servicios/moneda'
 import { estadoServicioDe } from '../servicios/servicios'
 import ModalConfirmacion from '../components/ModalConfirmacion.vue'
 import PageHeader from '../components/PageHeader.vue'
 
+const route = useRoute()
 const router = useRouter()
 
 const servicios = ref([])
@@ -343,7 +344,13 @@ async function confirmarDialogo() {
   }
 }
 
-onMounted(cargar)
+onMounted(async () => {
+  await cargar()
+  if (route.query.creado === '1') {
+    mostrarAviso('exito', '¡Servicio publicado con éxito!')
+    router.replace({ path: '/panel/servicios' })
+  }
+})
 onBeforeUnmount(() => clearTimeout(temporizadorAviso))
 </script>
 

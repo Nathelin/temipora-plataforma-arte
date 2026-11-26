@@ -46,6 +46,7 @@ public class BajaCuentaService {
     private final AuditoriaService auditoria;
     private final JwtUtils jwtUtils;
     private final ContactoPlataforma contacto;
+    private final SancionService sancionService;
 
     public BajaCuentaService(
             UsuarioRepository usuarioRepository,
@@ -55,7 +56,8 @@ public class BajaCuentaService {
             ConfiguracionBajaCuentaService configuracionBajaCuentaService,
             AuditoriaService auditoria,
             JwtUtils jwtUtils,
-            ContactoPlataforma contacto) {
+            ContactoPlataforma contacto,
+            SancionService sancionService) {
         this.usuarioRepository = usuarioRepository;
         this.pedidoRepository = pedidoRepository;
         this.solicitudRepository = solicitudRepository;
@@ -64,6 +66,7 @@ public class BajaCuentaService {
         this.auditoria = auditoria;
         this.jwtUtils = jwtUtils;
         this.contacto = contacto;
+        this.sancionService = sancionService;
     }
 
     public LocalDateTime reactivarHasta(Usuario usuario) {
@@ -96,6 +99,10 @@ public class BajaCuentaService {
         }
         if (!usuario.isEstadoCuenta()) {
             throw new ConflictoException("Tu cuenta ya está inactiva.");
+        }
+        if (sancionService.tieneAlgunaSancionVigente(idUsuario)) {
+            throw new ConflictoException(
+                "No podés darte de baja mientras tengas una sanción vigente.");
         }
 
         long pedidos = pedidoRepository.countByClienteIdUsuarioAndEstadoIn(

@@ -16,10 +16,14 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.temipora.backend_springboot.modelo.AlcanceSancion;
 import com.temipora.backend_springboot.modelo.EstadoSancion;
 import com.temipora.backend_springboot.modelo.EstadoSancionDTO;
 import com.temipora.backend_springboot.modelo.ERol;
+import com.temipora.backend_springboot.modelo.HitoPedido;
+import com.temipora.backend_springboot.modelo.OrigenSancion;
 import com.temipora.backend_springboot.modelo.PaginaDTO;
+import com.temipora.backend_springboot.modelo.Pedido;
 import com.temipora.backend_springboot.modelo.SancionCuenta;
 import com.temipora.backend_springboot.modelo.SancionCuentaDTO;
 import com.temipora.backend_springboot.modelo.SancionRequest;
@@ -86,7 +90,10 @@ public class SancionService {
         SancionCuenta sancion = SancionCuenta.builder()
             .usuario(usuario)
             .tipo(request.getTipo())
-            .alcance(com.temipora.backend_springboot.modelo.AlcanceSancion.ACCESO)
+            .alcance(request.getAlcance() != null
+                ? request.getAlcance()
+                : AlcanceSancion.ACCESO)
+            .origen(OrigenSancion.MANUAL)
             .motivo(motivo)
             .fechaInicio(ahora)
             .fechaFin(request.getFechaFin())
@@ -102,6 +109,182 @@ public class SancionService {
             null, guardada, CAMPOS_APLICAR);
 
         return SancionCuentaDTO.desde(guardada, ahora);
+    }
+
+    /**
+     * Aplica una sanción automática. No exige administrador: queda registrada
+     * con origen AUTOMATICA y el pedido/hito que la dispararon.
+     */
+    @Transactional
+    public SancionCuenta aplicarSistema(
+            Long idUsuario,
+            TipoSancion tipo,
+            AlcanceSancion alcance,
+            String motivo,
+            LocalDateTime fechaFin,
+            String clave,
+            Pedido pedido,
+            HitoPedido hitoPedido,
+            LocalDateTime fechaObjetivo) {
+        var existente = sancionRepository.findByClave(clave);
+        if (existente.isPresent()) {
+            SancionCuenta previa = existente.get();
+            if (previa.getEstado() == EstadoSancion.ACTIVA) {
+                return previa;
+            }
+            // La clave es única. Si el incumplimiento anterior fue revertido,
+            // liberamos la clave para poder registrar uno nuevo sobre el mismo
+            // pedido; de lo contrario el job nunca volvería a sancionar.
+            previa.setClave(null);
+            // Se fuerza el UPDATE antes del INSERT para no chocar con la
+            // restricción única de clave dentro de la misma transacción.
+            sancionRepository.saveAndFlush(previa);
+        }
+        var activa = sancionRepository.findFirstByUsuarioIdUsuarioAndEstado(
+            idUsuario, EstadoSancion.ACTIVA);
+        if (activa.isPresent()) {
+            return activa.get();
+        }
+        Usuario usuario = usuarioRepository.findByIdUsuario(idUsuario)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Usuario no encontrado: " + idUsuario));
+
+        SancionCuenta sancion = SancionCuenta.builder()
+            .usuario(usuario)
+            .tipo(tipo)
+            .alcance(alcance)
+            .origen(OrigenSancion.AUTOMATICA)
+            .motivo(motivo)
+            .fechaInicio(LocalDateTime.now())
+            .fechaFin(fechaFin)
+            .estado(EstadoSancion.ACTIVA)
+            .clave(clave)
+            .pedido(pedido)
+            .hitoPedido(hitoPedido)
+            .fechaObjetivo(fechaObjetivo)
+            .build();
+        SancionCuenta guardada = sancionRepository.save(sancion);
+        auditoria.registrarSistema(
+            AccionesAdmin.CUENTA_SANCIONAR_SISTEMA, ENTIDAD,
+            guardada.getIdSancion(), motivo);
+        return guardada;
+    }
+
+    /**
+     * Escala una sanción automática en su lugar. Se hace sobre la misma fila
+     * porque {@code uq_sancion_cuenta_activa} permite una sola sanción activa.
+     */
+    @Transactional
+    public SancionCuenta escalarSistema(
+            Long idSancion,
+            AlcanceSancion alcance,
+            String motivo,
+            String clave,
+            Pedido pedido,
+            HitoPedido hitoPedido,
+            LocalDateTime fechaObjetivo) {
+        SancionCuenta sancion = sancionRepository.findById(idSancion)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Sanción no encontrada: " + idSancion));
+        if (sancion.getEstado() != EstadoSancion.ACTIVA) {
+            return sancion;
+        }
+        sancion.setTipo(TipoSancion.INHABILITACION);
+        sancion.setAlcance(alcance);
+        sancion.setMotivo(motivo);
+        sancion.setFechaFin(null);
+        sancion.setClave(clave);
+        sancion.setPedido(pedido);
+        sancion.setHitoPedido(hitoPedido);
+        sancion.setFechaObjetivo(fechaObjetivo);
+        sancion.setFechaEscalada(LocalDateTime.now());
+        SancionCuenta guardada = sancionRepository.save(sancion);
+        auditoria.registrarSistema(
+            AccionesAdmin.CUENTA_ESCALAR_SANCION, ENTIDAD,
+            guardada.getIdSancion(), motivo);
+        return guardada;
+    }
+
+    /** Vigencia por alcance, para bloquear ventas o entregas. */
+    @Transactional(readOnly = true)
+    public boolean tieneSancionVigente(Long idUsuario, AlcanceSancion alcance) {
+        return sancionRepository.findVigentesByUsuarioId(
+                idUsuario, EstadoSancion.ACTIVA, LocalDateTime.now())
+            .stream()
+            .anyMatch(sancion -> sancion.getAlcance() == alcance);
+    }
+
+    /**
+     * El artista no puede vender ni recibir encargos nuevos: aplica a la
+     * suspensión de ventas, a la restricción a entregas y al bloqueo total.
+     */
+    @Transactional(readOnly = true)
+    public boolean tieneSancionQueImpideVender(Long idUsuario) {
+        return tieneSancionVigente(idUsuario, AlcanceSancion.VENTAS)
+            || tieneSancionVigente(idUsuario, AlcanceSancion.ENTREGAS)
+            || tieneSancionVigente(idUsuario, AlcanceSancion.ACCESO);
+    }
+
+    /**
+     * El artista tiene una restricción de entregas o un bloqueo total: el
+     * cliente puede cerrar el pedido por incumplimiento.
+     */
+    @Transactional(readOnly = true)
+    public boolean tieneSancionDeEntrega(Long idUsuario) {
+        return tieneSancionVigente(idUsuario, AlcanceSancion.ENTREGAS)
+            || tieneSancionVigente(idUsuario, AlcanceSancion.ACCESO);
+    }
+
+    /**
+     * Sanción vigente de compras o solo-pagos: el cliente no puede contratar,
+     * comprar productos ni mensajear fuera del artista deudor.
+     */
+    @Transactional(readOnly = true)
+    public boolean tieneSancionDeCompra(Long idUsuario) {
+        return tieneSancionVigente(idUsuario, AlcanceSancion.COMPRAS)
+            || tieneSancionVigente(idUsuario, AlcanceSancion.PAGOS);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean tieneAlgunaSancionVigente(Long idUsuario) {
+        return !sancionRepository.findVigentesByUsuarioId(
+                idUsuario, EstadoSancion.ACTIVA, LocalDateTime.now())
+            .isEmpty();
+    }
+
+    /**
+     * Revierte una sanción automática sin administrador. A diferencia de
+     * {@link #revertir}, no exige que la sanción siga vigente: el job puede
+     * curarla justo después de que venció.
+     */
+    @Transactional
+    public SancionCuenta revertirSistema(Long idSancion, String observacion) {
+        SancionCuenta sancion = sancionRepository.findById(idSancion)
+            .orElseThrow(() -> new NoSuchElementException(
+                "Sanción no encontrada: " + idSancion));
+        if (sancion.getEstado() != EstadoSancion.ACTIVA) {
+            return sancion;
+        }
+        Snapshot antes = Snapshot.de(sancion, CAMPOS_REVERSION);
+        sancion.setEstado(EstadoSancion.REVERTIDA);
+        // Permite que un nuevo incumplimiento del mismo pedido genere una
+        // sanción nueva en lugar de reutilizar esta fila revertida.
+        sancion.setClave(null);
+        sancion.setFechaReversion(LocalDateTime.now());
+        sancion.setObservacionReversion(
+            observacion != null && !observacion.isBlank()
+                ? observacion.trim()
+                : null);
+        SancionCuenta guardada = sancionRepository.save(sancion);
+        auditoria.registrar(
+            AccionesAdmin.CUENTA_REVERTIR_SANCION, ENTIDAD,
+            guardada.getIdSancion(),
+            "Revirtió automáticamente la sanción de @"
+                + (guardada.getUsuario() != null
+                    ? guardada.getUsuario().getNombreUsuario()
+                    : "usuario"),
+            antes, guardada, CAMPOS_REVERSION);
+        return guardada;
     }
 
     @Transactional
@@ -121,6 +304,7 @@ public class SancionService {
 
         Snapshot antes = Snapshot.de(sancion, CAMPOS_REVERSION);
         sancion.setEstado(EstadoSancion.REVERTIDA);
+        sancion.setClave(null);
         sancion.setAdminRevertio(admin);
         sancion.setFechaReversion(ahora);
         sancion.setObservacionReversion(

@@ -18,8 +18,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Recordatorio pendiente de enviar por mail. Se agrupa por usuario para
- * mandar un solo correo con todos sus pagos y entregas pendientes.
+ * Recordatorio pendiente de enviar por mail. Cada fila se envía en su propio
+ * correo: no se agrupan etapas distintas del mismo pedido.
  */
 @Entity
 @Table(name = "email_recordatorio_pendiente")

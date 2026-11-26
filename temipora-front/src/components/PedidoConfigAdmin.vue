@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import api from '../servicios/api'
 import { formatearMonto } from '../servicios/moneda'
+import ModalConfirmacion from './ModalConfirmacion.vue'
 
 const cargando = ref(true)
 const guardando = ref(false)
@@ -13,10 +14,21 @@ const diasAprobacionAutomatica = ref('7')
 const diasPagoCuota = ref('7')
 const revisionesMaximasPorHito = ref('2')
 const diasReentrega = ref('7')
+const diasGraciaEntrega = ref('3')
+const diasSancionVentas = ref('14')
+const diasReapelacion = ref('7')
+const diasCierreTrasBloqueo = ref('30')
+const diasGraciaPago = ref('3')
+const diasSancionCompras = ref('27')
+const horasRespuestaProrroga = ref('24')
 const procesandoMails = ref(false)
 const enviandoPrueba = ref(false)
 const mensajeMails = ref('')
 const errorMails = ref('')
+const reenviando = ref(false)
+const confirmandoReenvio = ref(false)
+const mensajeReenvio = ref('')
+const errorReenvio = ref('')
 const maxHitos = ref('4')
 const porcentajeMaxPrimerHito = ref('50')
 const montoMinimoCuota = ref('1')
@@ -31,6 +43,13 @@ async function cargar() {
     diasPagoCuota.value = res.data?.diasPagoCuota ?? 7
     revisionesMaximasPorHito.value = res.data?.revisionesMaximasPorHito ?? 2
     diasReentrega.value = res.data?.diasReentrega ?? 7
+    diasGraciaEntrega.value = res.data?.diasGraciaEntrega ?? 3
+    diasSancionVentas.value = res.data?.diasSancionVentas ?? 14
+    diasReapelacion.value = res.data?.diasReapelacion ?? 7
+    diasCierreTrasBloqueo.value = res.data?.diasCierreTrasBloqueo ?? 30
+    diasGraciaPago.value = res.data?.diasGraciaPago ?? 3
+    diasSancionCompras.value = res.data?.diasSancionCompras ?? 27
+    horasRespuestaProrroga.value = res.data?.horasRespuestaProrroga ?? 24
     maxHitos.value = res.data?.maxHitos ?? 4
     porcentajeMaxPrimerHito.value = res.data?.porcentajeMaxPrimerHito ?? 50
     montoMinimoCuota.value = res.data?.montoMinimoCuota ?? 1
@@ -81,7 +100,19 @@ async function guardar() {
     entero(diasPagoCuota.value, 1, 14, 'El plazo de pago'),
     entero(revisionesMaximasPorHito.value, 1, 10, 'El máximo de revisiones'),
     entero(diasReentrega.value, 1, 60, 'El plazo de reentrega'),
+    entero(diasGraciaEntrega.value, 1, 30, 'La gracia de entrega'),
+    entero(diasSancionVentas.value, 1, 60, 'La duración del Nivel 1'),
+    entero(diasReapelacion.value, 1, 90, 'La espera entre apelaciones'),
+    entero(diasCierreTrasBloqueo.value, 7, 180, 'El cierre tras el bloqueo'),
+    entero(diasGraciaPago.value, 1, 30, 'La gracia de pago'),
+    entero(diasSancionCompras.value, 1, 90, 'La sanción de compras'),
     entero(maxHitos.value, 1, 6, 'El máximo de hitos'),
+    entero(
+      horasRespuestaProrroga.value,
+      1,
+      168,
+      'La respuesta a una prórroga',
+    ),
     decimal(porcentajeMaxPrimerHito.value, 1, 100, 'El porcentaje máximo del primer hito'),
     decimal(montoMinimoCuota.value, 0, 10000000, 'El monto mínimo por cuota'),
   ].filter(Boolean)
@@ -98,7 +129,14 @@ async function guardar() {
       diasPagoCuota: Number(diasPagoCuota.value),
       revisionesMaximasPorHito: Number(revisionesMaximasPorHito.value),
       diasReentrega: Number(diasReentrega.value),
+      diasGraciaEntrega: Number(diasGraciaEntrega.value),
+      diasSancionVentas: Number(diasSancionVentas.value),
+      diasReapelacion: Number(diasReapelacion.value),
+      diasCierreTrasBloqueo: Number(diasCierreTrasBloqueo.value),
+      diasGraciaPago: Number(diasGraciaPago.value),
+      diasSancionCompras: Number(diasSancionCompras.value),
       maxHitos: Number(maxHitos.value),
+      horasRespuestaProrroga: Number(horasRespuestaProrroga.value),
       porcentajeMaxPrimerHito: Number(String(porcentajeMaxPrimerHito.value).replace(',', '.')),
       montoMinimoCuota: Number(String(montoMinimoCuota.value).replace(',', '.')),
     })
@@ -152,6 +190,26 @@ async function enviarRecordatoriosDePrueba() {
       || 'No se pudieron enviar los recordatorios de prueba.'
   } finally {
     enviandoPrueba.value = false
+  }
+}
+
+async function reenviarRecordatorios() {
+  confirmandoReenvio.value = false
+  if (reenviando.value) return
+  reenviando.value = true
+  mensajeReenvio.value = ''
+  errorReenvio.value = ''
+  try {
+    const res = await api.post('/admin/recordatorios/reenviar')
+    const reabiertos = Number(res.data?.reabiertos || 0)
+    const enviados = Number(res.data?.enviados || 0)
+    const avisosSancion = Number(res.data?.avisosSancion || 0)
+    mensajeReenvio.value = `Se reabrieron ${reabiertos} recordatorio(s), se enviaron ${enviados} y se reenviaron ${avisosSancion} aviso(s) de sanción.`
+  } catch (e) {
+    errorReenvio.value = e.response?.data?.message
+      || 'No se pudieron reenviar los recordatorios.'
+  } finally {
+    reenviando.value = false
   }
 }
 </script>
@@ -300,6 +358,124 @@ async function enviarRecordatoriosDePrueba() {
                 Si no reentrega, el pedido queda marcado como atrasado.
               </p>
             </div>
+            <div>
+              <label for="horas-prorroga" class="mb-2 block text-sm text-cafe">
+                Respuesta a una prórroga (horas) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="horas-prorroga"
+                v-model="horasRespuestaProrroga"
+                type="number"
+                min="1"
+                max="168"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Tiempo del cliente para aceptar una prórroga del plazo. Si no responde,
+                se mantienen los plazos originales.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="border-t border-rosa/40 pt-6">
+          <h2 class="mb-4 text-base text-granate">Sanciones por incumplimiento</h2>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label for="dias-sancion-ventas" class="mb-2 block text-sm text-cafe">
+                Duración del Nivel 1 antes de inhabilitar (días) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="dias-sancion-ventas"
+                v-model="diasSancionVentas"
+                type="number"
+                min="1"
+                max="60"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Tiempo que la cuenta queda limitada a entregar y el catálogo
+                pausado. Al terminar, si sigue la mora, la cuenta se inhabilita
+                por completo.
+              </p>
+            </div>
+            <div>
+              <label for="dias-reapelacion" class="mb-2 block text-sm text-cafe">
+                Espera entre apelaciones (días) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="dias-reapelacion"
+                v-model="diasReapelacion"
+                type="number"
+                min="1"
+                max="90"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Días que debe esperar el artista para volver a apelar.
+              </p>
+            </div>
+            <div>
+              <label for="dias-cierre-tras-bloqueo" class="mb-2 block text-sm text-cafe">
+                Cierre tras el bloqueo (días) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="dias-cierre-tras-bloqueo"
+                v-model="diasCierreTrasBloqueo"
+                type="number"
+                min="7"
+                max="180"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Días desde el Nivel 2 antes de cerrar los pedidos pendientes por
+                incumplimiento.
+              </p>
+            </div>
+
+            <h3 class="text-sm font-semibold text-granate sm:col-span-2">
+              Cliente moroso
+            </h3>
+            <div>
+              <label for="dias-gracia-pago" class="mb-2 block text-sm text-cafe">
+                Gracia antes de suspender compras (días) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="dias-gracia-pago"
+                v-model="diasGraciaPago"
+                type="number"
+                min="1"
+                max="30"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Días extra después del pago vencido de la entrega final antes de
+                suspender las compras y el chat con terceros.
+              </p>
+            </div>
+            <div>
+              <label for="dias-sancion-compras" class="mb-2 block text-sm text-cafe">
+                Duración de la suspensión de compras (días) <span class="text-rojizo">*</span>
+              </label>
+              <input
+                id="dias-sancion-compras"
+                v-model="diasSancionCompras"
+                type="number"
+                min="1"
+                max="90"
+                step="1"
+                class="block w-full rounded-lg border-0 px-4 py-2.5 text-base text-cafe shadow-sm ring-1 ring-inset ring-rosa focus:outline-none focus:ring-2 focus:ring-inset focus:ring-coral"
+              />
+              <p class="mt-2 text-xs leading-relaxed text-cafe/50">
+                Al terminar, si sigue el impago, la cuenta pasa a “solo pagos”.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -337,13 +513,26 @@ async function enviarRecordatoriosDePrueba() {
             >
               {{ enviandoPrueba ? 'Enviando...' : 'Enviar recordatorios de prueba' }}
             </button>
+            <button
+              :disabled="reenviando"
+              class="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rosa bg-blanco px-5 text-sm font-semibold text-granate transition hover:bg-rosa/20 disabled:opacity-50"
+              @click="confirmandoReenvio = true"
+            >
+              {{ reenviando ? 'Reenviando...' : 'Reenviar recordatorios vigentes' }}
+            </button>
           </div>
           <p class="mt-3 text-xs leading-relaxed text-cafe/50">
             La prueba envía dos mails separados a tu correo: uno de pagos y otro
-            de entregas. No encola ni modifica pedidos.
+            de entregas. No encola ni modifica pedidos. El reenvío vuelve a mandar
+            los recordatorios que ya se enviaron y todavía cumplen las
+            condiciones. También reenvía el aviso de sanción a las cuentas
+            restringidas, con un enlace de acceso directo a la pantalla que
+            corresponde.
           </p>
           <p v-if="mensajeMails" class="mt-3 text-sm text-green-700">{{ mensajeMails }}</p>
           <p v-if="errorMails" class="mt-3 text-sm text-rojizo">{{ errorMails }}</p>
+          <p v-if="mensajeReenvio" class="mt-3 text-sm text-green-700">{{ mensajeReenvio }}</p>
+          <p v-if="errorReenvio" class="mt-3 text-sm text-rojizo">{{ errorReenvio }}</p>
         </div>
       </div>
 
@@ -379,6 +568,32 @@ async function enviarRecordatoriosDePrueba() {
             <dd class="text-cafe">{{ config.diasReentrega }} días</dd>
           </div>
           <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Suspensión de ventas</dt>
+            <dd class="text-cafe">{{ config.diasSancionVentas }} días</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Espera entre apelaciones</dt>
+            <dd class="text-cafe">{{ config.diasReapelacion }} días</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Cierre tras el bloqueo</dt>
+            <dd class="text-cafe">{{ config.diasCierreTrasBloqueo }} días</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Gracia de pago del cliente</dt>
+            <dd class="text-cafe">{{ config.diasGraciaPago }} días</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Suspensión de compras</dt>
+            <dd class="text-cafe">{{ config.diasSancionCompras }} días</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-xs text-cafe/50">Sanciones automáticas desde</dt>
+            <dd class="text-right text-cafe">
+              {{ formatearFecha(config.sancionesAutomaticasDesde) }}
+            </dd>
+          </div>
+          <div class="flex justify-between gap-3">
             <dt class="text-xs text-cafe/50">Última modificación</dt>
             <dd class="text-right text-cafe">
               {{ formatearFecha(config.fechaActualizacion) }}
@@ -390,5 +605,15 @@ async function enviarRecordatoriosDePrueba() {
         </p>
       </aside>
     </div>
+
+    <ModalConfirmacion
+      :abierto="confirmandoReenvio"
+      titulo="Reenviar recordatorios y avisos de sanción"
+      mensaje="Se van a volver a enviar los recordatorios vigentes y el aviso de sanción a las cuentas restringidas, con enlaces de acceso nuevos. Es para pruebas."
+      texto-confirmar="Reenviar"
+      :confirmar-habilitado="!reenviando"
+      @confirmar="reenviarRecordatorios"
+      @cerrar="confirmandoReenvio = false"
+    />
   </div>
 </template>

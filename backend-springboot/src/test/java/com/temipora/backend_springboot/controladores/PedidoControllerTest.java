@@ -29,6 +29,7 @@ import com.temipora.backend_springboot.modelo.PublicacionPedidoRequest;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.servicios.ConstanciaService;
 import com.temipora.backend_springboot.servicios.DescargaService;
+import com.temipora.backend_springboot.servicios.MoraClienteService;
 import com.temipora.backend_springboot.servicios.PedidoService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
@@ -50,12 +51,19 @@ class PedidoControllerTest {
     @Mock
     private DescargaService descargaService;
 
+    @Mock
+    private MoraClienteService moraClienteService;
+
     private PedidoController controller;
 
     @BeforeEach
     void setUp() {
         controller = new PedidoController(
-            pedidoService, usuarioService, constanciaService, descargaService);
+            pedidoService,
+            usuarioService,
+            constanciaService,
+            descargaService,
+            moraClienteService);
     }
 
     @Test
@@ -74,7 +82,8 @@ class PedidoControllerTest {
 
     @Test
     void constancia_generaElPdfYLoRegistra() {
-        when(constanciaService.generar(any())).thenReturn(new byte[] {1, 2, 3});
+        when(constanciaService.generar(any(), any()))
+            .thenReturn(new byte[] {1, 2, 3});
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getRemoteAddr()).thenReturn("127.0.0.1");
 

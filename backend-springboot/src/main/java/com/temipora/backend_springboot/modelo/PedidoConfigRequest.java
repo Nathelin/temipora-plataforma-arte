@@ -54,4 +54,35 @@ public class PedidoConfigRequest {
     @Digits(integer = 10, fraction = 2,
         message = "El monto mínimo admite hasta 2 decimales.")
     private BigDecimal montoMinimoCuota;
+
+    @Min(value = 1, message = "La gracia de entrega debe ser al menos 1 día.")
+    @Max(value = 30, message = "La gracia de entrega no puede superar los 30 días.")
+    private Integer diasGraciaEntrega;
+
+    @NotNull(message = "La duración de la sanción de ventas es obligatoria.")
+    @Min(value = 1, message = "La sanción de ventas debe durar al menos 1 día.")
+    @Max(value = 60, message = "La sanción de ventas no puede superar los 60 días.")
+    private Integer diasSancionVentas;
+
+    @NotNull(message = "Los días para reintentar una apelación son obligatorios.")
+    @Min(value = 1, message = "La espera entre apelaciones debe ser al menos 1 día.")
+    @Max(value = 90, message = "La espera entre apelaciones no puede superar los 90 días.")
+    private Integer diasReapelacion;
+
+    @NotNull(message = "Los días para cerrar tras el bloqueo son obligatorios.")
+    @Min(value = 7, message = "El cierre tras el bloqueo debe ser al menos 7 días.")
+    @Max(value = 180, message = "El cierre tras el bloqueo no puede superar los 180 días.")
+    private Integer diasCierreTrasBloqueo;
+
+    @Min(value = 1, message = "La gracia de pago debe ser al menos 1 día.")
+    @Max(value = 30, message = "La gracia de pago no puede superar los 30 días.")
+    private Integer diasGraciaPago;
+
+    @Min(value = 1, message = "La sanción de compras debe durar al menos 1 día.")
+    @Max(value = 90, message = "La sanción de compras no puede superar los 90 días.")
+    private Integer diasSancionCompras;
+
+    @Min(value = 1, message = "La respuesta a una prórroga debe tener al menos 1 hora.")
+    @Max(value = 168, message = "La respuesta a una prórroga no puede superar las 168 horas.")
+    private Integer horasRespuestaProrroga;
 }

@@ -24,6 +24,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.temipora.backend_springboot.modelo.ConfiguracionPedido;
 import com.temipora.backend_springboot.modelo.EmailRecordatorioPendiente;
 import com.temipora.backend_springboot.modelo.EnvioEmail;
 import com.temipora.backend_springboot.modelo.EstadoEmailRecordatorio;
@@ -53,11 +54,15 @@ class RecordatorioProcesadorTest {
     @Mock
     private SancionService sancionService;
     @Mock
+    private ConfiguracionPedidoService configuracionPedidoService;
+    @Mock
     private EmailPlantillaService emailPlantillaService;
     @Mock
     private EnvioEmailService envioEmailService;
     @Mock
     private AccesoEnlaceService accesoEnlaceService;
+    @Mock
+    private NotificacionService notificacionService;
 
     @InjectMocks
     private RecordatorioProcesador procesador;
@@ -74,15 +79,18 @@ class RecordatorioProcesadorTest {
             eq(1L), eq(EstadoEmailRecordatorio.PENDIENTE), any()))
             .thenReturn(new ArrayList<>(List.of(fila)));
 
-        boolean enviado = procesador.procesar(1L);
+        int enviados = procesador.procesar(1L);
 
-        assertThat(enviado).isTrue();
+        assertThat(enviados).isEqualTo(1);
         assertThat(fila.getEstado()).isEqualTo(EstadoEmailRecordatorio.ENVIADO);
         assertThat(fila.getEnviadoEn()).isNotNull();
         assertThat(fila.getIdLote()).isNotNull();
         verify(envioEmailService).enviar(
             eq(usuario), eq("RECORDATORIO"), any(), any(),
             anyString(), eq("<html>ok</html>"), anyString());
+        verify(notificacionService).crearOActualizarParaUsuario(
+            eq(1L), eq("PAGO_POR_VENCER"), any(), any(),
+            eq(10L), eq("PEDIDO"));
     }
 
     @Test
@@ -99,9 +107,11 @@ class RecordatorioProcesadorTest {
             eq(1L), eq(EstadoEmailRecordatorio.PENDIENTE), any()))
             .thenReturn(new ArrayList<>(List.of(filaPago, filaEntrega)));
         when(emailPlantillaService.asuntoRecordatorio(
-            eq(true), eq(false), anyBoolean())).thenReturn("Pagos");
+            eq(true), eq(false), anyBoolean(), anyBoolean(), anyBoolean()))
+            .thenReturn("Pagos");
         when(emailPlantillaService.asuntoRecordatorio(
-            eq(false), eq(true), anyBoolean())).thenReturn("Entregas");
+            eq(false), eq(true), anyBoolean(), anyBoolean(), anyBoolean()))
+            .thenReturn("Entregas");
         when(emailPlantillaService.recordatorio(any(), any(), any(), any()))
             .thenReturn("<html>ok</html>");
         EnvioEmail envio = new EnvioEmail();
@@ -110,9 +120,9 @@ class RecordatorioProcesadorTest {
             any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(envio);
 
-        boolean enviado = procesador.procesar(1L);
+        int enviados = procesador.procesar(1L);
 
-        assertThat(enviado).isTrue();
+        assertThat(enviados).isEqualTo(2);
         ArgumentCaptor<String> asuntos = ArgumentCaptor.forClass(String.class);
         verify(envioEmailService, times(2)).enviar(
             eq(usuario), eq("RECORDATORIO"), any(), any(),
@@ -122,19 +132,60 @@ class RecordatorioProcesadorTest {
             .isEqualTo(EstadoEmailRecordatorio.ENVIADO);
         assertThat(filaEntrega.getEstado())
             .isEqualTo(EstadoEmailRecordatorio.ENVIADO);
+        verify(notificacionService).crearOActualizarParaUsuario(
+            eq(1L), eq("PAGO_POR_VENCER"), any(), any(),
+            eq(10L), eq("PEDIDO"));
+        verify(notificacionService).crearOActualizarParaUsuario(
+            eq(1L), eq("ENTREGA_POR_VENCER"), any(), any(),
+            eq(11L), eq("PEDIDO"));
+    }
+
+    @Test
+    void procesar_dosRecordatoriosDeEntrega_mandaDosCorreosSeparados() {
+        Usuario usuario = usuario(1L);
+        Pedido pedido = pedidoEntrega(usuario, 12L);
+        EmailRecordatorioPendiente ayer = fila(
+            pedido, MotivoRecordatorio.ENTREGA_1D);
+        EmailRecordatorioPendiente hoy = fila(
+            pedido, MotivoRecordatorio.ENTREGA_HOY);
+        prepararUsuario(usuario);
+        prepararEnvio("<html>ok</html>");
+        when(repository.findByUsuarioIdUsuarioAndEstadoOrderByCreadoEnAsc(
+            eq(1L), eq(EstadoEmailRecordatorio.PENDIENTE), any()))
+            .thenReturn(new ArrayList<>(List.of(ayer, hoy)));
+
+        int enviados = procesador.procesar(1L);
+
+        assertThat(enviados).isEqualTo(2);
+        verify(envioEmailService, times(2)).enviar(
+            eq(usuario), eq("RECORDATORIO"), any(), any(),
+            anyString(), eq("<html>ok</html>"), anyString());
+        assertThat(ayer.getIdLote()).isNotNull();
+        assertThat(hoy.getIdLote()).isNotNull();
+        assertThat(ayer.getIdLote()).isNotEqualTo(hoy.getIdLote());
+        assertThat(ayer.getEstado()).isEqualTo(EstadoEmailRecordatorio.ENVIADO);
+        assertThat(hoy.getEstado()).isEqualTo(EstadoEmailRecordatorio.ENVIADO);
     }
 
     private void prepararUsuario(Usuario usuario) {
         when(usuarioRepository.findByIdUsuario(1L))
             .thenReturn(Optional.of(usuario));
         when(sancionService.obtenerVigente(1L)).thenReturn(Optional.empty());
+        when(configuracionPedidoService.obtener()).thenReturn(configuracion());
         when(accesoEnlaceService.generar(any(), any(), any(), anyInt()))
             .thenReturn("tok");
     }
 
+    private ConfiguracionPedido configuracion() {
+        ConfiguracionPedido config = new ConfiguracionPedido();
+        config.setDiasGraciaEntrega(3);
+        return config;
+    }
+
     private void prepararEnvio(String html) {
         when(emailPlantillaService.asuntoRecordatorio(
-            anyBoolean(), anyBoolean(), anyBoolean())).thenReturn("Asunto");
+            anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(),
+            anyBoolean())).thenReturn("Asunto");
         when(emailPlantillaService.recordatorio(any(), any(), any(), any()))
             .thenReturn(html);
         EnvioEmail envio = new EnvioEmail();

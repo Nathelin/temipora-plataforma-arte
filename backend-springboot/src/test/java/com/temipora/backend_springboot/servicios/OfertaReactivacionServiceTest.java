@@ -38,6 +38,41 @@ class OfertaReactivacionServiceTest {
     private OfertaReactivacionService service;
 
     @Test
+    void marcarUtilizada_registraElMomentoDeUso() {
+        OfertaReactivacion oferta = new OfertaReactivacion();
+
+        service.marcarUtilizada(oferta);
+
+        assertThat(oferta.getEstado())
+            .isEqualTo(EstadoOfertaReactivacion.UTILIZADA);
+        assertThat(oferta.getFechaUtilizada()).isNotNull();
+    }
+
+    @Test
+    void cerrarCampanasVencidas_distingueUsadasDeVencidas() {
+        CampanaReactivacion usada = new CampanaReactivacion();
+        usada.setIdCampana(1L);
+        CampanaReactivacion sinUsar = new CampanaReactivacion();
+        sinUsar.setIdCampana(2L);
+
+        when(campanaRepository.findByEstadoAndFechaVencimientoBefore(
+                eq(EstadoCampanaReactivacion.ACTIVA), any()))
+            .thenReturn(List.of(usada, sinUsar));
+        when(ofertaRepository.existsByCampanaIdCampanaAndEstado(
+                1L, EstadoOfertaReactivacion.UTILIZADA))
+            .thenReturn(true);
+        when(ofertaRepository.existsByCampanaIdCampanaAndEstado(
+                2L, EstadoOfertaReactivacion.UTILIZADA))
+            .thenReturn(false);
+
+        assertThat(service.cerrarCampanasVencidas()).isEqualTo(2);
+        assertThat(usada.getEstado())
+            .isEqualTo(EstadoCampanaReactivacion.UTILIZADA);
+        assertThat(sinUsar.getEstado())
+            .isEqualTo(EstadoCampanaReactivacion.VENCIDA);
+    }
+
+    @Test
     void activasDeUsuario_muestraUnaSolaOfertaPorServicio() {
         CampanaReactivacion campana = new CampanaReactivacion();
         campana.setEstado(EstadoCampanaReactivacion.ACTIVA);

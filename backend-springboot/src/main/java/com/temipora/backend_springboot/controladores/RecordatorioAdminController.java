@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.temipora.backend_springboot.modelo.Usuario;
 import com.temipora.backend_springboot.servicios.RecordatorioPruebaService;
 import com.temipora.backend_springboot.servicios.RecordatorioService;
+import com.temipora.backend_springboot.servicios.SancionAutomaticaService;
 import com.temipora.backend_springboot.servicios.UsuarioService;
 
 @RestController
@@ -21,14 +22,17 @@ public class RecordatorioAdminController {
 
     private final RecordatorioService recordatorioService;
     private final RecordatorioPruebaService pruebaService;
+    private final SancionAutomaticaService sancionAutomaticaService;
     private final UsuarioService usuarioService;
 
     public RecordatorioAdminController(
             RecordatorioService recordatorioService,
             RecordatorioPruebaService pruebaService,
+            SancionAutomaticaService sancionAutomaticaService,
             UsuarioService usuarioService) {
         this.recordatorioService = recordatorioService;
         this.pruebaService = pruebaService;
+        this.sancionAutomaticaService = sancionAutomaticaService;
         this.usuarioService = usuarioService;
     }
 
@@ -42,6 +46,26 @@ public class RecordatorioAdminController {
         Map<String, Object> respuesta = new LinkedHashMap<>();
         respuesta.put("encolados", encolados);
         respuesta.put("enviados", enviados);
+        return respuesta;
+    }
+
+    /**
+     * Reabre los recordatorios ya enviados y los vuelve a mandar si todavía
+     * cumplen las condiciones. También reenvía el aviso de sanción a las
+     * cuentas con una restricción automática vigente, con un enlace de acceso
+     * fresco a la pantalla correspondiente.
+     */
+    @PostMapping("/reenviar")
+    public Map<String, Object> reenviar() {
+        int reabiertos = recordatorioService.reabrirEnviados();
+        int encolados = recordatorioService.encolar();
+        int enviados = recordatorioService.procesarPendientes();
+        int avisosSancion = sancionAutomaticaService.reenviarAvisosVigentes();
+        Map<String, Object> respuesta = new LinkedHashMap<>();
+        respuesta.put("reabiertos", reabiertos);
+        respuesta.put("encolados", encolados);
+        respuesta.put("enviados", enviados);
+        respuesta.put("avisosSancion", avisosSancion);
         return respuesta;
     }
 

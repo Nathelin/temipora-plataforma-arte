@@ -13,7 +13,9 @@ import com.lowagie.text.pdf.parser.PdfTextExtractor;
 import com.temipora.backend_springboot.modelo.HitoPedidoDTO;
 import com.temipora.backend_springboot.modelo.PagoDTO;
 import com.temipora.backend_springboot.modelo.PedidoDTO;
+import com.temipora.backend_springboot.modelo.ProrrogaDTO;
 import com.temipora.backend_springboot.modelo.UsuarioResumenDTO;
+import com.temipora.backend_springboot.servicios.informes.EmisorPdf;
 
 class ConstanciaServiceTest {
 
@@ -22,27 +24,68 @@ class ConstanciaServiceTest {
 
     @Test
     void generaUnaConstanciaConEncabezadoSeccionesYNotas() throws Exception {
-        byte[] pdf = constanciaService.generar(pedidoConHitosYPagos());
+        byte[] pdf = constanciaService.generar(
+            pedidoConHitosYPagos(), emisor());
 
         assertThat(texto(pdf))
             .contains("Temipora")
+            .contains("@emisor")
+            .contains("Emisor Prueba")
             .contains("Constancia del pedido")
             .contains("Pedido #12")
             .contains("Documento contractual del pedido")
             .contains("Importes")
             .contains("Plan de pagos")
+            .contains("Prórrogas del plazo")
             .contains("Entregas")
             .contains("Pagos")
             .contains("Cifras en ARS")
             .contains("Seña")
+            .contains("El pedido no tiene prórrogas del plazo registradas.")
             .doesNotContain("Notas")
-            .containsPattern("Página\\s+1\\s+de\\s*1");
+            .containsPattern("Página\\s+1\\s+de\\s*\\d+");
+    }
+
+    @Test
+    void muestraLasProrrogasDelPlazoAceptadas() throws Exception {
+        PedidoDTO pedido = PedidoDTO.builder()
+            .idPedido(15L)
+            .cliente(usuario(1L, "cliente"))
+            .artista(usuario(2L, "artista"))
+            .nombreServicio("Ilustración")
+            .estado("EN_CURSO")
+            .limiteEntrega(java.time.LocalDate.of(2026, 12, 12))
+            .fechaEntregaPrevista(java.time.LocalDate.of(2026, 12, 19))
+            .precioFinalMostrado(new BigDecimal("100.00"))
+            .monedaMostrada("ARS")
+            .hitos(List.of())
+            .prorrogas(List.of(ProrrogaDTO.builder()
+                .idProrroga(9L)
+                .diasSolicitados(7)
+                .motivo("Se retrasó la impresión de la pieza")
+                .estado("ACEPTADA")
+                .fechaSolicitud(LocalDateTime.of(2026, 12, 5, 9, 30))
+                .fechaRespuesta(LocalDateTime.of(2026, 12, 5, 14, 0))
+                .entregaPrevistaAntes(java.time.LocalDate.of(2026, 12, 12))
+                .entregaPrevistaDespues(java.time.LocalDate.of(2026, 12, 19))
+                .build()))
+            .build();
+
+        String texto = texto(constanciaService.generar(pedido, emisor()));
+
+        assertThat(texto)
+            .contains("ENTREGA PROMETIDA")
+            .contains("ENTREGA VIGENTE")
+            .contains("Prórrogas del plazo")
+            .contains("impresión")
+            .contains("Aceptada")
+            .contains("Respuesta");
     }
 
     @Test
     void guardaElTituloEnLosMetadatosDelPdf() throws Exception {
         PdfReader lector = new PdfReader(
-            constanciaService.generar(pedidoConHitosYPagos()));
+            constanciaService.generar(pedidoConHitosYPagos(), emisor()));
 
         try {
             assertThat(lector.getInfo().get("Title"))
@@ -57,7 +100,7 @@ class ConstanciaServiceTest {
     @Test
     void muestraElNetoDelArtistaCuandoLaCopiaIncluyeComision()
             throws Exception {
-        String texto = texto(constanciaService.generar(pedidoConHitosYPagos()));
+        String texto = texto(constanciaService.generar(pedidoConHitosYPagos(), emisor()));
         String neto = new java.text.DecimalFormat("#,##0.00")
             .format(new BigDecimal("95.00"));
 
@@ -82,7 +125,7 @@ class ConstanciaServiceTest {
             .hitos(List.of())
             .build();
 
-        String texto = texto(constanciaService.generar(pedido));
+        String texto = texto(constanciaService.generar(pedido, emisor()));
 
         assertThat(texto)
             .contains("Total a pagar")
@@ -127,7 +170,7 @@ class ConstanciaServiceTest {
                     .build()))
             .build();
 
-        String texto = texto(constanciaService.generar(pedido));
+        String texto = texto(constanciaService.generar(pedido, emisor()));
 
         assertThat(texto)
             .contains("No iniciado")
@@ -140,7 +183,7 @@ class ConstanciaServiceTest {
 
     @Test
     void muestraLosTerminosAceptadosConVersionYHuella() throws Exception {
-        String texto = texto(constanciaService.generar(pedidoConHitosYPagos()));
+        String texto = texto(constanciaService.generar(pedidoConHitosYPagos(), emisor()));
 
         assertThat(texto)
             .contains("Términos aceptados")
@@ -154,6 +197,10 @@ class ConstanciaServiceTest {
             .contains(
                 "https://temipora.test/terminos-aceptados/"
                     + "TA-Y-b00994ee58432ff1");
+    }
+
+    private EmisorPdf emisor() {
+        return EmisorPdf.de("emisor", "Emisor Prueba", "ADMIN");
     }
 
     private PedidoDTO pedidoConHitosYPagos() {

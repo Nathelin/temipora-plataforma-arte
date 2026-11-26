@@ -24,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.temipora.backend_springboot.modelo.EmailRecordatorioPendiente;
+import com.temipora.backend_springboot.modelo.EstadoEmailRecordatorio;
 import com.temipora.backend_springboot.modelo.EstadoEntregaHito;
 import com.temipora.backend_springboot.modelo.EstadoPagoHito;
 import com.temipora.backend_springboot.modelo.EstadoPedido;
@@ -54,6 +55,10 @@ class RecordatorioServiceTest {
     @Mock
     private RecordatorioProcesador procesador;
 
+    @org.mockito.Spy
+    private EntregaPendienteService entregaPendienteService =
+        new EntregaPendienteService();
+
     @InjectMocks
     private RecordatorioService service;
 
@@ -65,6 +70,28 @@ class RecordatorioServiceTest {
             .thenReturn(false);
         lenient().when(recordatorioRepository.save(any()))
             .thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    @Test
+    void reabrirEnviados_vuelveALaColaYReseteaElEnvio() {
+        EmailRecordatorioPendiente fila = new EmailRecordatorioPendiente();
+        fila.setEstado(EstadoEmailRecordatorio.ENVIADO);
+        fila.setIntentos(2);
+        fila.setEnviadoEn(LocalDateTime.now());
+        fila.setIdLote("lote");
+        when(recordatorioRepository.findByEstadoIn(List.of(
+                EstadoEmailRecordatorio.ENVIADO,
+                EstadoEmailRecordatorio.FALLIDO)))
+            .thenReturn(List.of(fila));
+
+        int reabiertos = service.reabrirEnviados();
+
+        assertThat(reabiertos).isEqualTo(1);
+        assertThat(fila.getEstado()).isEqualTo(EstadoEmailRecordatorio.PENDIENTE);
+        assertThat(fila.getIntentos()).isZero();
+        assertThat(fila.getEnviadoEn()).isNull();
+        assertThat(fila.getIdLote()).isNull();
+        verify(recordatorioRepository).saveAll(List.of(fila));
     }
 
     @Test
@@ -134,7 +161,7 @@ class RecordatorioServiceTest {
     }
 
     @Test
-    void encolar_usuarioSancionado_noEncola() {
+    void encolar_pagoSeEncolaSiempre() {
         Pedido pedido = pedido(EstadoPedido.PENDIENTE_PAGO, null, null);
         pedido.setFechaCreacion(LocalDateTime.now().minusHours(25));
         HitoPedido hito = hito(pedido, TipoHito.SENA,
@@ -142,6 +169,21 @@ class RecordatorioServiceTest {
         hito.setFechaLimitePago(LocalDateTime.now().plusDays(5));
         when(hitoPedidoRepository.findSenasPendientes(
             any(), any(), any(), any())).thenReturn(List.of(hito));
+
+        assertThat(service.encolar()).isEqualTo(1);
+        assertThat(capturarFila().getMotivo())
+            .isEqualTo(MotivoRecordatorio.PAGO_SENA);
+    }
+
+    @Test
+    void encolar_artistaSancionado_noEncolaLaEntrega() {
+        LocalDate hoy = LocalDate.now();
+        Pedido pedido = pedido(EstadoPedido.EN_CURSO,
+            hoy.minusDays(10), hoy.plusDays(7));
+        hito(pedido, TipoHito.ENTREGA,
+            EstadoPagoHito.PENDIENTE, EstadoEntregaHito.NO_INICIADO);
+        when(pedidoRepository.findConHitosByEstado(EstadoPedido.EN_CURSO))
+            .thenReturn(List.of(pedido));
         when(sancionService.obtenerVigente(anyLong()))
             .thenReturn(Optional.of(new SancionCuenta()));
 
@@ -214,10 +256,10 @@ class RecordatorioServiceTest {
     void procesarPendientes_delegaEnElProcesador() {
         when(recordatorioRepository.findUsuariosConPendientes(any()))
             .thenReturn(List.of(1L, 2L));
-        when(procesador.procesar(1L)).thenReturn(true);
-        when(procesador.procesar(2L)).thenReturn(false);
+        when(procesador.procesar(1L)).thenReturn(2);
+        when(procesador.procesar(2L)).thenReturn(0);
 
-        assertThat(service.procesarPendientes()).isEqualTo(1);
+        assertThat(service.procesarPendientes()).isEqualTo(2);
         verify(procesador).procesar(1L);
         verify(procesador).procesar(2L);
     }

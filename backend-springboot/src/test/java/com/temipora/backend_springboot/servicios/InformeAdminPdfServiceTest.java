@@ -20,6 +20,7 @@ import com.temipora.backend_springboot.modelo.InformeAdminTipoDTO;
 import com.temipora.backend_springboot.modelo.InformeAdminTotalesDTO;
 import com.temipora.backend_springboot.modelo.InformeAdminVendedorDTO;
 import com.temipora.backend_springboot.modelo.InformePeriodoDTO;
+import com.temipora.backend_springboot.servicios.informes.EmisorPdf;
 
 class InformeAdminPdfServiceTest {
 
@@ -27,7 +28,7 @@ class InformeAdminPdfServiceTest {
 
     @Test
     void generaUnPdfVerticalConEncabezadoYSecciones() throws Exception {
-        byte[] pdf = servicio.generar(informe());
+        byte[] pdf = servicio.generar(informe(), emisor());
         PdfReader lector = new PdfReader(pdf);
         int paginas = lector.getNumberOfPages();
         Rectangle pagina = lector.getPageSizeWithRotation(1);
@@ -49,6 +50,8 @@ class InformeAdminPdfServiceTest {
             .contains("Ventas por ítem del catálogo")
             .contains("Cifras en ARS")
             .contains("Total")
+            .contains("@admin")
+            .contains("Administración")
             .doesNotContain("Notas")
             .containsPattern("Página\\s+1\\s+de\\s*" + paginas);
 
@@ -58,7 +61,7 @@ class InformeAdminPdfServiceTest {
 
     @Test
     void guardaElTituloEnLosMetadatosDelPdf() throws Exception {
-        PdfReader lector = new PdfReader(servicio.generar(informe()));
+        PdfReader lector = new PdfReader(servicio.generar(informe(), emisor()));
 
         try {
             assertThat(lector.getInfo().get("Title"))
@@ -77,7 +80,7 @@ class InformeAdminPdfServiceTest {
             base.operacionesSinNetoReal(), base.serie(), base.tipos(),
             base.vendedores(), base.items());
 
-        assertThat(texto(servicio.generar(soloProductos)))
+        assertThat(texto(servicio.generar(soloProductos, emisor())))
             .contains("Solo productos");
     }
 
@@ -99,10 +102,14 @@ class InformeAdminPdfServiceTest {
             List.of(),
             List.of());
 
-        assertThat(texto(servicio.generar(informe)))
+        assertThat(texto(servicio.generar(informe, emisor())))
             .contains("No hay ventas registradas en el período.")
             .contains("No hay ítems vendidos en el período.")
             .contains("No hay un período anterior registrado para comparar.");
+    }
+
+    private EmisorPdf emisor() {
+        return EmisorPdf.de("admin", "Ana Admin", "ADMIN");
     }
 
     private InformeAdminDTO informe() {

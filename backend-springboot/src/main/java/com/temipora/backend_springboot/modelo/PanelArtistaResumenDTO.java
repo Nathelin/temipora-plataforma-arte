@@ -20,6 +20,7 @@ public class PanelArtistaResumenDTO {
     private long mensajesNoLeidos;
     private long solicitudesMensajePendientes;
     private boolean cuentaCobrosConectada;
+    private SaludCuentaDTO saludCuenta;
 
     private List<PedidoResumenDTO> pedidosActivos;
     private List<HitoPedidoDTO> hitosAtencion;

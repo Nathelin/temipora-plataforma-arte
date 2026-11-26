@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import BrandLogo from '../components/BrandLogo.vue'
 import { useAdminMenu } from '../composables/useAdminMenu'
 import PanelNotificaciones from '../components/PanelNotificaciones.vue'
+import SpinnerCarga from '../components/SpinnerCarga.vue'
 import AceptacionTerminosModal from '../components/AceptacionTerminosModal.vue'
 import { useNotificacionesSistema } from '../composables/useNotificacionesSistema'
 import api from '../servicios/api'
@@ -35,6 +36,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const saliendo = ref(false)
 
 const {
   limpiar: limpiarNotificaciones,
@@ -66,7 +68,12 @@ const grupos = [
         icono: ShieldAlert,
         badge: 'reportes',
       },
-      { nombre: 'Sanciones', to: '/admin/sanciones', icono: Ban },
+      {
+        nombre: 'Sanciones',
+        to: '/admin/sanciones',
+        rutas: ['/admin/sanciones', '/admin/apelaciones', '/admin/sanciones/pruebas'],
+        icono: Ban,
+      },
       { nombre: 'Bajas de cuenta', to: '/admin/ajustes/bajas-cuenta', icono: UserX },
     ],
   },
@@ -102,8 +109,18 @@ const grupos = [
         rutas: ['/admin/ajustes/presupuestos', '/admin/ajustes/pedidos'],
         icono: Receipt,
       },
-      { nombre: 'Ofertas por inactividad', to: '/admin/campanas/promociones', icono: Megaphone },
-      { nombre: 'Sustituciones de artistas', to: '/admin/campanas/sustituciones', icono: Users },
+      {
+        nombre: 'Ofertas por inactividad',
+        to: '/admin/campanas/promociones',
+        rutas: ['/admin/campanas/promociones', '/admin/campanas/promociones/descuentos'],
+        icono: Megaphone,
+      },
+      {
+        nombre: 'Sustituciones de artistas',
+        to: '/admin/campanas/sustituciones',
+        rutas: ['/admin/campanas/sustituciones', '/admin/campanas/sustituciones/historial'],
+        icono: Users,
+      },
       { nombre: 'Comisiones', to: '/admin/ajustes/comisiones', icono: Percent },
       {
         nombre: 'Monedas y cotización',
@@ -241,7 +258,9 @@ function irAPerfil() {
   router.push({ name: 'perfil', params: { nombreUsuario: nombreUsuario.value } })
 }
 
-function cerrarSesion() {
+async function cerrarSesion() {
+  if (saliendo.value) return
+  saliendo.value = true
   localStorage.removeItem('token')
   localStorage.removeItem('rol')
   localStorage.removeItem('nombreUsuario')
@@ -249,12 +268,27 @@ function cerrarSesion() {
   localStorage.removeItem('urlFotoPerfil')
   limpiarNotificaciones()
   detenerPollingNotificaciones()
-  router.push({ name: 'login' })
+  try {
+    await router.push({ name: 'login' })
+  } finally {
+    saliendo.value = false
+  }
 }
 </script>
 
 <template>
   <div class="flex min-h-screen w-full flex-col bg-blanco text-cafe">
+    <div
+      v-if="saliendo"
+      class="fixed inset-0 z-[130] flex items-center justify-center bg-granate/30 px-4 backdrop-blur-sm"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="flex items-center gap-3 rounded-2xl bg-blanco px-5 py-4 shadow-xl">
+        <SpinnerCarga tamano="md" etiqueta="Cerrando sesión" />
+        <span class="text-sm text-cafe">Cerrando sesión…</span>
+      </div>
+    </div>
     <header class="sticky top-0 z-50 border-b border-rosa/40 bg-blanco/95 backdrop-blur-md">
       <div class="flex h-14 w-full items-center justify-between px-4 sm:h-16 sm:px-8">
         <div class="flex items-center gap-3 sm:gap-4">
@@ -343,11 +377,14 @@ function cerrarSesion() {
               Apariencia
             </button>
             <button
-              class="mt-1 w-full rounded-xl border-t border-rosa/30 px-3.5 py-2.5 text-left text-sm text-rojizo transition hover:bg-rosa/20"
+              class="mt-1 flex w-full items-center gap-2 rounded-xl border-t border-rosa/30 px-3.5 py-2.5 text-left text-sm text-rojizo transition hover:bg-rosa/20 disabled:cursor-wait disabled:opacity-60"
               role="menuitem"
+              :disabled="saliendo"
+              :aria-busy="saliendo"
               @click="menuAbierto = false; cerrarSesion()"
             >
-              Cerrar sesión
+              <SpinnerCarga v-if="saliendo" etiqueta="Cerrando sesión" />
+              {{ saliendo ? 'Cerrando sesión…' : 'Cerrar sesión' }}
             </button>
           </div>
           </div>

@@ -295,15 +295,16 @@ public class SustitucionService {
 
     @Transactional(readOnly = true)
     public SustitucionResumenDTO resumen() {
-        long total = sustitucionRepository.count();
-        long alternativa = sustitucionRepository.countByEstado(
-            EstadoSustitucion.RESUELTA_ALTERNATIVA);
-        long cola = sustitucionRepository.countByEstado(
-            EstadoSustitucion.RESUELTA_COLA);
-        long descartadas = sustitucionRepository.countByEstado(
-            EstadoSustitucion.DESCARTADA);
-        long abiertas = sustitucionRepository.countByEstado(
-            EstadoSustitucion.ABIERTA);
+        MotivoSustitucion excluido = MotivoSustitucion.PEDIDO_IMPAGO;
+        long total = sustitucionRepository.countByMotivoNot(excluido);
+        long alternativa = sustitucionRepository.countByEstadoAndMotivoNot(
+            EstadoSustitucion.RESUELTA_ALTERNATIVA, excluido);
+        long cola = sustitucionRepository.countByEstadoAndMotivoNot(
+            EstadoSustitucion.RESUELTA_COLA, excluido);
+        long descartadas = sustitucionRepository.countByEstadoAndMotivoNot(
+            EstadoSustitucion.DESCARTADA, excluido);
+        long abiertas = sustitucionRepository.countByEstadoAndMotivoNot(
+            EstadoSustitucion.ABIERTA, excluido);
 
         long resueltas = alternativa + cola;
         double tasa = resueltas > 0
